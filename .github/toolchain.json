@@ -1,0 +1,59 @@
+{
+  "$schema": "https://aegis.dev/schema/toolchain.json",
+  "project_name": "aegis-engine",
+  "engine": "web",
+  "language": "typescript",
+  "runtime": "node-24",
+  "test": {
+    "unit": "node:test",
+    "e2e": "playwright"
+  },
+  "linters": [
+    "eslint",
+    "knip"
+  ],
+  "strict_typing": true,
+  "git_provider": "github",
+  "ide": "antigravity",
+  "agents": {
+    "count": 2,
+    "names": [
+      "alice",
+      "bob"
+    ],
+    "worktree_prefix": "experimental/",
+    "isolated_environments": {
+      "alice": {
+        "port_range": [3000, 3099],
+        "test_db": "aegis_test_alice",
+        "env_overrides": {
+          "PORT": "3000",
+          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_alice"
+        }
+      },
+      "bob": {
+        "port_range": [3100, 3199],
+        "test_db": "aegis_test_bob",
+        "env_overrides": {
+          "PORT": "3100",
+          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_bob"
+        }
+      }
+    }
+  },
+  "watchdog": {
+    "adaptive_timeout": true,
+    "base_timeout_seconds": 30,
+    "max_ceiling_seconds": 600,
+    "stagnation_threshold_seconds": 60,
+    "max_retries": 3,
+    "issue_token_cap": 50000
+  },
+  "iron_cage": {
+    "max_function_lines": 40,
+    "max_file_lines": 300,
+    "max_cyclomatic_complexity": 10,
+    "forbid_full_file_rewrites": true,
+    "require_tdd": true
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@aegis/shared",
+  "version": "0.1.0",
+  "description": "Common types, interfaces, and utilities for Aegis Engine",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --version"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

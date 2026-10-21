@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.turbo/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Aegis Agent Worktrees (Isolated directories)
+experimental/
+experimental/*
+
+# Coverage & Testing
+coverage/
+.nyc_output/
+stryker.log
+
+# Temporary execution artifacts
+scratch/
+tmp/
+*.tmp

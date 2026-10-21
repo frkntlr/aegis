@@ -1,0 +1,19 @@
+{
+  "name": "@aegis/orchestrator",
+  "version": "0.1.0",
+  "description": "Aegis Git Worktree and Agent Lifecycle Orchestrator",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "@aegis/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "aegis-cli",
+  "version": "0.1.0",
+  "description": "Aegis Core CLI - The Autonomous Vibe Coding Harness",
+  "bin": {
+    "aegis": "./dist/bin/aegis.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "@aegis/shared": "*",
+    "@aegis/watchdog": "*",
+    "@aegis/orchestrator": "*",
+    "@aegis/iron-cage": "*",
+    "@aegis/ast-skeleton": "*",
+    "@aegis/compound-checker": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}

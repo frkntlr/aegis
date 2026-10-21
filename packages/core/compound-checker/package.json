@@ -1,0 +1,19 @@
+{
+  "name": "@aegis/compound-checker",
+  "version": "0.1.0",
+  "description": "Aegis Compounding Error & Runaway Regression Detector",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "@aegis/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@aegis/ast-skeleton",
+  "version": "0.1.0",
+  "description": "Aegis Surgical Context & AST Skeleton Generator for Token Economy",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "@aegis/shared": "*",
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1"
+  }
+}
