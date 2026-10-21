@@ -1,17 +1,57 @@
 import type { GitHubIssue } from './types.js';
+import { GitHubLiveAdapter } from './live-adapter.js';
+import { GitHubTokenResolver } from './token-resolver.js';
 
 export interface GitHubClientOptions {
   repo?: string;
   maxSelfSpawnedIssues?: number;
+  liveAdapter?: GitHubLiveAdapter;
+  autoConnectLive?: boolean;
 }
 
 export class GitHubClient {
   private issues: Map<number, GitHubIssue> = new Map();
   private selfSpawnCounter: Map<number, number> = new Map(); // parentIssueId -> count
   private readonly maxSelfSpawned: number;
+  private liveAdapter?: GitHubLiveAdapter;
 
   constructor(options: GitHubClientOptions = {}) {
     this.maxSelfSpawned = options.maxSelfSpawnedIssues ?? 3;
+    if (options.liveAdapter) {
+      this.liveAdapter = options.liveAdapter;
+    } else if (options.autoConnectLive) {
+      const auth = GitHubTokenResolver.resolve();
+      if (auth.hasCredentials && auth.token) {
+        this.liveAdapter = new GitHubLiveAdapter({
+          token: auth.token,
+          owner: auth.owner,
+          repo: auth.repo
+        });
+      }
+    }
+  }
+
+  public isLive(): boolean {
+    return !!this.liveAdapter;
+  }
+
+  public setLiveAdapter(adapter: GitHubLiveAdapter): void {
+    this.liveAdapter = adapter;
+  }
+
+  public getLiveAdapter(): GitHubLiveAdapter | undefined {
+    return this.liveAdapter;
+  }
+
+  public async syncFromLive(): Promise<number> {
+    if (!this.liveAdapter) return 0;
+    const { issues } = await this.liveAdapter.listIssues();
+    let count = 0;
+    for (const issue of issues) {
+      this.registerIssue(issue);
+      count++;
+    }
+    return count;
   }
 
   public registerIssue(issue: GitHubIssue): void {
@@ -38,6 +78,28 @@ export class GitHubClient {
     issue.status = 'in_progress';
     issue.assignee = agentName;
     return { success: true, issue };
+  }
+
+  public async claimLiveIssue(issueNumber: number, agentName: string): Promise<{ success: boolean; issue?: GitHubIssue; error?: string }> {
+    const claimRes = this.claimIssue(issueNumber, agentName);
+    if (!claimRes.success || !claimRes.issue || !this.liveAdapter) {
+      return claimRes;
+    }
+
+    try {
+      const remainingLabels = claimRes.issue.labels.filter(l => !l.startsWith('status:'));
+      await this.liveAdapter.updateIssue(issueNumber, {
+        labels: [...remainingLabels, 'status:in_progress']
+      });
+      const lockNotice = claimRes.issue.targetFiles.map(f => `\`${f}\``).join(', ');
+      await this.liveAdapter.addComment(
+        issueNumber,
+        `🤖 **Aegis Fleet**: Agent \`@${agentName}\` claimed this task in \`experimental/${agentName}\`.\nLocks acquired: ${lockNotice}`
+      );
+    } catch {
+      // Soft-fail: retain local claim even if network request fails
+    }
+    return claimRes;
   }
 
   public updateIssueStatus(issueNumber: number, status: GitHubIssue['status']): boolean {

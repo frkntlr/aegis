@@ -1,6 +1,7 @@
 {
   "name": "aegis-cli",
   "version": "0.1.0",
+  "type": "module",
   "description": "Aegis Core CLI - The Autonomous Vibe Coding Harness",
   "bin": {
     "aegis": "./dist/bin/aegis.js"
