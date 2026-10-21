@@ -22,7 +22,8 @@
     "@aegis/github-live": "*",
     "@aegis/trust-verifier": "*",
     "@aegis/mcp-security": "*",
-    "@aegis/web-dashboard": "*"
+    "@aegis/web-dashboard": "*",
+    "@aegis/telemetry-tester": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

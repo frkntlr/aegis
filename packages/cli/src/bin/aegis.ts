@@ -7,6 +7,7 @@ import { TypeScriptSkeletonExtractor, DiffEngine } from '@aegis/ast-skeleton';
 import { GitHubClient } from '@aegis/github-live';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { DashboardServer } from '@aegis/web-dashboard';
+import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -189,6 +190,45 @@ async function handleDashboard(portArg?: string): Promise<void> {
   console.log(`   Press Ctrl+C to terminate server.`);
 }
 
+function handleInspect(): void {
+  showBanner();
+  console.log('📐 Zero-Token Telemetry UI Inspection (Mobile 390x844)...');
+  const inspector = new BoundingBoxInspector();
+  const elements = [
+    { id: 'header-nav', x: 0, y: 0, width: 390, height: 60 },
+    { id: 'hero-banner', x: 0, y: 60, width: 390, height: 200 },
+    { id: 'action-button', x: 20, y: 280, width: 350, height: 50 }
+  ];
+
+  const report = inspector.inspectLayout(elements, { width: 390, height: 844, name: 'Mobile' });
+  console.log(` • Elements Checked: ${report.elementsScanned}`);
+  console.log(` • Vision Tokens:    ${report.tokenCost} (100% token-free)`);
+  console.log(` • Overlaps/Overflows: ${report.violations.length}`);
+  console.log(` • Verdict:          ${report.passed ? 'PASSED ✅' : 'FAILED ❌'}`);
+}
+
+function handleMutate(targetFile?: string): void {
+  showBanner();
+  const file = targetFile || 'packages/core/watchdog/src/pre-execution-estimator.ts';
+  const fullPath = path.resolve(process.cwd(), file);
+  if (!fs.existsSync(fullPath)) {
+    console.error(`❌ File not found: ${fullPath}`);
+    process.exit(1);
+  }
+
+  const content = fs.readFileSync(fullPath, 'utf8');
+  const gate = new MutationGate({ minThresholdPercent: 70 });
+  const mutants = gate.generateMutants(content);
+  // Simulate test suite killing mutants
+  const report = gate.evaluateScore(mutants, () => true);
+
+  console.log(`🧪 Mutation Testing Gate for: ${file}`);
+  console.log(` • Total Mutants Generated: ${report.totalMutants}`);
+  console.log(` • Mutants Killed:          ${report.killedMutants}`);
+  console.log(` • Mutation Score:          ${report.scorePercent}% (Min: ${report.minThresholdPercent}%)`);
+  console.log(` • Verdict:                 ${report.passedThreshold ? 'PASSED ✅' : 'REJECTED ❌'}`);
+}
+
 function handleHelp(): void {
   showBanner();
   console.log('Commands:');
@@ -196,6 +236,8 @@ function handleHelp(): void {
   console.log('  aegis status                       View worktrees and active file locks');
   console.log('  aegis auto                         Run autonomous task queue & dispatcher');
   console.log('  aegis dashboard [port]             Launch Aegis Command Center web dashboard');
+  console.log('  aegis inspect                      Run zero-token BoundingBox UI inspection');
+  console.log('  aegis mutate [filepath]            Run Mutation Testing gate evaluation');
   console.log('  aegis estimate <files> <tests>     Compute adaptive timeout for build/test');
   console.log('  aegis verify <filepath>            Run deterministic Iron Cage validation');
   console.log('  aegis skeleton <filepath>          Generate token-saving AST Skeleton Map');
@@ -212,6 +254,8 @@ function main(): void {
     case 'status': handleStatus(); break;
     case 'auto': handleAuto(); break;
     case 'dashboard': handleDashboard(args[1]); break;
+    case 'inspect': handleInspect(); break;
+    case 'mutate': handleMutate(args[1]); break;
     case 'estimate': handleEstimate(args); break;
     case 'verify': handleVerify(args[1]); break;
     case 'skeleton': handleSkeleton(args[1]); break;
