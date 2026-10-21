@@ -18,7 +18,9 @@
     "@aegis/orchestrator": "*",
     "@aegis/iron-cage": "*",
     "@aegis/ast-skeleton": "*",
-    "@aegis/compound-checker": "*"
+    "@aegis/compound-checker": "*",
+    "@aegis/github-live": "*",
+    "@aegis/trust-verifier": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

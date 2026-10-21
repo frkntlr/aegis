@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
-import { WorktreeManager } from '@aegis/orchestrator';
+import { WorktreeManager, TaskDispatcher } from '@aegis/orchestrator';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { TypeScriptSkeletonExtractor, DiffEngine } from '@aegis/ast-skeleton';
+import { GitHubClient, WikiMemoryManager } from '@aegis/github-live';
+import { ImmutableOracle } from '@aegis/trust-verifier';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -127,15 +129,72 @@ function handleDiff(diffText?: string): void {
   }
 }
 
+function handleAuto(): void {
+  showBanner();
+  console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
+  const ghClient = new GitHubClient();
+  const wtManager = new WorktreeManager();
+  const dispatcher = new TaskDispatcher(wtManager);
+
+  // Register demo queue if empty
+  ghClient.registerIssue({
+    id: 101,
+    number: 101,
+    title: 'Implement User Avatar Component',
+    body: 'Create avatar with fallback initials',
+    labels: ['status:ready', 'lock:src/Avatar.tsx', 'wiki:ui-components'],
+    status: 'ready',
+    targetFiles: ['src/Avatar.tsx'],
+    acceptanceCriteria: ['Pass unit tests', 'No spagetti code']
+  });
+
+  const ready = ghClient.listReadyIssues();
+  const result = dispatcher.dispatchNextTask(['alice', 'bob'], ready);
+
+  if (result.dispatched && result.agentName && result.issue) {
+    ghClient.claimIssue(result.issue.number, result.agentName);
+    console.log(`🎯 Task Claimed!`);
+    console.log(` • Agent:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
+    console.log(` • Issue:  #${result.issue.number} - "${result.issue.title}"`);
+    console.log(` • Target: ${result.issue.targetFiles.join(', ')} (Locked)`);
+
+    const wiki = new WikiMemoryManager();
+    const mem = wiki.getContextForLabels(result.issue.labels);
+    if (mem) console.log(` • Memory: ${mem.split('\n')[0]}`);
+  } else {
+    console.log(`⏸️  No dispatchable tasks: ${result.reason}`);
+  }
+}
+
+function handleAudit(modifiedFilesStr?: string): void {
+  showBanner();
+  const oracle = new ImmutableOracle();
+  const files = (modifiedFilesStr || '').split(',').map(f => f.trim()).filter(Boolean);
+  const report = oracle.audit({
+    modifiedFiles: files.length > 0 ? files : ['src/clean.ts'],
+    reportedPassedCount: 1,
+    reportedFailedCount: 0
+  });
+
+  console.log(`🔍 Trust Verification Audit:`);
+  console.log(` • Verdict:    ${report.verdict}`);
+  console.log(` • Suspicious: ${report.suspicious ? 'YES ⚠️' : 'NO ✅'}`);
+  for (const d of report.details) {
+    console.log(`   - ${d}`);
+  }
+}
+
 function handleHelp(): void {
   showBanner();
   console.log('Commands:');
   console.log('  aegis init                         Initialize worktrees and environment');
   console.log('  aegis status                       View worktrees and active file locks');
+  console.log('  aegis auto                         Run autonomous task queue & dispatcher');
   console.log('  aegis estimate <files> <tests>     Compute adaptive timeout for build/test');
   console.log('  aegis verify <filepath>            Run deterministic Iron Cage validation');
   console.log('  aegis skeleton <filepath>          Generate token-saving AST Skeleton Map');
   console.log('  aegis diff <diff>                  Validate surgical unified diff compliance');
+  console.log('  aegis audit <files>                Run Immutable Oracle trust verification');
 }
 
 function main(): void {
@@ -145,10 +204,12 @@ function main(): void {
   switch (command) {
     case 'init': handleInit(); break;
     case 'status': handleStatus(); break;
+    case 'auto': handleAuto(); break;
     case 'estimate': handleEstimate(args); break;
     case 'verify': handleVerify(args[1]); break;
     case 'skeleton': handleSkeleton(args[1]); break;
     case 'diff': handleDiff(args[1]); break;
+    case 'audit': handleAudit(args[1]); break;
     case 'help':
     default: handleHelp(); break;
   }

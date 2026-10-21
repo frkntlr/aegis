@@ -10,7 +10,8 @@
     "test": "node --test dist/**/*.test.js"
   },
   "dependencies": {
-    "@aegis/shared": "*"
+    "@aegis/shared": "*",
+    "@aegis/github-live": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
