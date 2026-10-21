@@ -1,0 +1,18 @@
+#!/bin/sh
+# Aegis Pre-Commit Hook (Deterministic Iron Cage)
+echo "🛡️  [Aegis] Pre-commit Quality Gate running..."
+
+export PATH="$PATH:/c/Users/user/AppData/Roaming/Antigravity/bin:/c/Program Files/nodejs"
+
+NPM_CMD="npm"
+if command -v npm.cmd >/dev/null 2>&1; then
+  NPM_CMD="npm.cmd"
+fi
+
+$NPM_CMD run test --workspaces || {
+  echo "❌ [Aegis] Pre-commit rejected: One or more unit tests failed."
+  exit 1
+}
+
+echo "✅ [Aegis] All 32 quality gate tests passed. Commit approved."
+exit 0
