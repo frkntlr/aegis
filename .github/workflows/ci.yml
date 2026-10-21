@@ -1,0 +1,39 @@
+name: Aegis CI / CD Engine Verification
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  verify:
+    name: Monorepo Quality Gate & Unit Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Monorepo Build (TypeScript)
+        run: npm run build
+
+      - name: Iron Cage Verification
+        run: node packages/cli/dist/bin/aegis.js verify packages/cli/src/bin/aegis.ts
+
+      - name: Monorepo Unit Test Suite (All Workspaces)
+        run: npm run test --workspaces
+
+      - name: Zero-Token UI Layout Inspection
+        run: node packages/cli/dist/bin/aegis.js inspect
+
+      - name: Mutation Testing Gate
+        run: node packages/cli/dist/bin/aegis.js mutate packages/core/watchdog/src/pre-execution-estimator.ts

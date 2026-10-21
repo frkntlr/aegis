@@ -1,0 +1,32 @@
+name: Aegis Release & Package Distribution
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build & Package Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Monorepo
+        run: npm run build
+
+      - name: Run Test Verification
+        run: npm run test --workspaces
+
+      - name: Publish Aegis CLI (Dry Run)
+        run: npm publish --workspace=aegis-cli --dry-run
