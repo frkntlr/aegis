@@ -20,7 +20,9 @@
     "@aegis/ast-skeleton": "*",
     "@aegis/compound-checker": "*",
     "@aegis/github-live": "*",
-    "@aegis/trust-verifier": "*"
+    "@aegis/trust-verifier": "*",
+    "@aegis/mcp-security": "*",
+    "@aegis/web-dashboard": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

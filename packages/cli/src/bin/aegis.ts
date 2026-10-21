@@ -4,8 +4,9 @@ import { WorktreeManager, TaskDispatcher } from '@aegis/orchestrator';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { TypeScriptSkeletonExtractor, DiffEngine } from '@aegis/ast-skeleton';
-import { GitHubClient, WikiMemoryManager } from '@aegis/github-live';
+import { GitHubClient } from '@aegis/github-live';
 import { ImmutableOracle } from '@aegis/trust-verifier';
+import { DashboardServer } from '@aegis/web-dashboard';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -136,7 +137,6 @@ function handleAuto(): void {
   const wtManager = new WorktreeManager();
   const dispatcher = new TaskDispatcher(wtManager);
 
-  // Register demo queue if empty
   ghClient.registerIssue({
     id: 101,
     number: 101,
@@ -157,10 +157,6 @@ function handleAuto(): void {
     console.log(` • Agent:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
     console.log(` • Issue:  #${result.issue.number} - "${result.issue.title}"`);
     console.log(` • Target: ${result.issue.targetFiles.join(', ')} (Locked)`);
-
-    const wiki = new WikiMemoryManager();
-    const mem = wiki.getContextForLabels(result.issue.labels);
-    if (mem) console.log(` • Memory: ${mem.split('\n')[0]}`);
   } else {
     console.log(`⏸️  No dispatchable tasks: ${result.reason}`);
   }
@@ -184,12 +180,22 @@ function handleAudit(modifiedFilesStr?: string): void {
   }
 }
 
+async function handleDashboard(portArg?: string): Promise<void> {
+  showBanner();
+  const port = parseInt(portArg || '3000', 10);
+  const server = new DashboardServer({ port });
+  await server.start();
+  console.log(`🌐 Aegis Web Command Center running at: http://localhost:${port}`);
+  console.log(`   Press Ctrl+C to terminate server.`);
+}
+
 function handleHelp(): void {
   showBanner();
   console.log('Commands:');
   console.log('  aegis init                         Initialize worktrees and environment');
   console.log('  aegis status                       View worktrees and active file locks');
   console.log('  aegis auto                         Run autonomous task queue & dispatcher');
+  console.log('  aegis dashboard [port]             Launch Aegis Command Center web dashboard');
   console.log('  aegis estimate <files> <tests>     Compute adaptive timeout for build/test');
   console.log('  aegis verify <filepath>            Run deterministic Iron Cage validation');
   console.log('  aegis skeleton <filepath>          Generate token-saving AST Skeleton Map');
@@ -205,6 +211,7 @@ function main(): void {
     case 'init': handleInit(); break;
     case 'status': handleStatus(); break;
     case 'auto': handleAuto(); break;
+    case 'dashboard': handleDashboard(args[1]); break;
     case 'estimate': handleEstimate(args); break;
     case 'verify': handleVerify(args[1]); break;
     case 'skeleton': handleSkeleton(args[1]); break;
