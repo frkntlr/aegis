@@ -47,7 +47,7 @@ function handleHelp(): void {
   console.log('  aegis init                             Initialize worktrees and environment');
   console.log('  aegis status                           View worktrees and active file locks');
   console.log('  aegis auto                             Run autonomous task queue & dispatcher');
-  console.log('  aegis prompt <alice|bob> <id>          Compile surgical AST prompt caching context');
+  console.log('  aegis prompt [role|id] [id]         Compile surgical AST prompt caching context');
   console.log('  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution');
   console.log('  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria');
   console.log('  aegis nlm:sync                         Export and synchronize architecture with NotebookLM');
@@ -61,7 +61,7 @@ function handleHelp(): void {
   console.log('  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache');
   console.log('  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo');
   console.log('  aegis wiki:status                      Inspect GitHub Wiki remote git availability');
-  console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
+  console.log('  aegis merge <solver|qa|docs> [branch]  4-step atomic merge & sibling synchronization');
   console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
   console.log('  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix');
   console.log('  aegis ide:sync                         Synchronize MCP servers & Skills across all IDEs');

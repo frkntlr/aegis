@@ -27,12 +27,12 @@ test('SessionDetector accurately detects worktree sessions and registers heartbe
   const sessions = detector.detectSessions();
   assert.ok(Array.isArray(sessions));
   assert.ok(sessions.length >= 2);
-  assert.ok(sessions.some(s => s.agentName === 'alice'));
+  assert.ok(sessions.some(s => s.agentName === 'solver'));
 
-  detector.registerHeartbeat('alice', 'Google Antigravity');
+  detector.registerHeartbeat('solver', 'Google Antigravity');
   const updated = detector.detectSessions();
-  const alice = updated.find(s => s.agentName === 'alice');
-  assert.strictEqual(alice?.ideType, 'Google Antigravity');
+  const solver = updated.find(s => s.agentName === 'solver');
+  assert.strictEqual(solver?.ideType, 'Google Antigravity');
 });
 
 test('RealtimeMetricsService manages dynamic issues and calculates real AST metrics', async () => {
@@ -44,9 +44,9 @@ test('RealtimeMetricsService manages dynamic issues and calculates real AST metr
   assert.strictEqual(created.title, 'Test Dynamic Task');
   assert.strictEqual(created.status, 'ready');
 
-  const assigned = metrics.moveTask(created.number, 'in_progress', 'alice', 'Google Antigravity');
+  const assigned = metrics.moveTask(created.number, 'in_progress', 'solver', 'Google Antigravity');
   assert.strictEqual(assigned?.status, 'in_progress');
-  assert.strictEqual(assigned?.assignedAgent, 'alice');
+  assert.strictEqual(assigned?.assignedAgent, 'solver');
 
   const completed = metrics.moveTask(created.number, 'done');
   assert.strictEqual(completed?.status, 'done');
@@ -73,7 +73,7 @@ test('AegisEngineService executes all underlying Aegis core tools successfully',
   assert.strictEqual(est.tool, 'adaptive_timeout');
   assert.ok(est.timeoutSeconds > 0);
 
-  const mcp = engine.runMcpSecurity('alice', 'ast_skeleton');
+  const mcp = engine.runMcpSecurity('solver', 'ast_skeleton');
   assert.strictEqual(mcp.allowed, true);
 
   const diff = engine.runDiffValidator();
@@ -97,7 +97,7 @@ test('DashboardServer handles move_task and status via API', async () => {
     const moveRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'move_task', issueNumber: testNum, targetStatus: 'in_progress', agentName: 'alice' })
+      body: JSON.stringify({ action: 'move_task', issueNumber: testNum, targetStatus: 'in_progress', agentName: 'solver' })
     });
     assert.strictEqual(moveRes.status, 200);
     const moveData = await moveRes.json() as any;
@@ -147,9 +147,9 @@ test('GitHubKanbanService manages issues and sync_github responds via API', asyn
   assert.strictEqual(created.title, 'Test Offline Issue');
   assert.strictEqual(created.status, 'ready');
 
-  const moved = kanban.updateIssueStatus(created.number, 'in_progress', 'alice');
+  const moved = kanban.updateIssueStatus(created.number, 'in_progress', 'solver');
   assert.strictEqual(moved?.status, 'in_progress');
-  assert.strictEqual(moved?.assignedAgent, 'alice');
+  assert.strictEqual(moved?.assignedAgent, 'solver');
 
   const server = new DashboardServer({ port: 0 });
   const port = await server.start();

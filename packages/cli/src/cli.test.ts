@@ -25,14 +25,22 @@ test('Aegis CLI displays help menu with all core and live commands', () => {
 });
 
 test('Aegis CLI compiles surgical prompt context for agents', () => {
-  const output = execSync(`node "${cliPath}" prompt alice 101 --json`, { encoding: 'utf8' });
+  const output = execSync(`node "${cliPath}" prompt solver 101 --json`, { encoding: 'utf8' });
   const parsed = JSON.parse(output);
 
-  assert.strictEqual(parsed.agentName, 'alice');
+  assert.strictEqual(parsed.agentName, 'solver');
   assert.strictEqual(parsed.issue.number, 101);
   assert.ok(parsed.context.cacheRatioPercent > 0);
   assert.ok(parsed.promptMarkdown.includes('Demir Kafes Constitution'));
   assert.ok(parsed.promptMarkdown.includes('SURGICAL CONTEXT (AST SKELETON MAP)'));
+});
+
+test('Aegis CLI auto-classifies agent role when role parameter is omitted', () => {
+  const output = execSync(`node "${cliPath}" prompt 101 --json`, { encoding: 'utf8' });
+  const parsed = JSON.parse(output);
+
+  assert.ok(['solver', 'qa', 'docs'].includes(parsed.agentName));
+  assert.strictEqual(parsed.issue.number, 101);
 });
 
 test('Aegis CLI executes rfc:triage command and formats issue preview', () => {

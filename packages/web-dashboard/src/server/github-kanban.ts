@@ -46,7 +46,7 @@ export class GitHubKanbanService {
         status: 'in_progress',
         targetFiles: ['packages/web-dashboard/src/server/github-kanban.ts'],
         labels: ['status:in_progress', 'aegis:task'],
-        assignedAgent: 'alice',
+        assignedAgent: 'solver',
         assignedIde: 'Google Antigravity'
       },
       {
@@ -111,7 +111,7 @@ export class GitHubKanbanService {
           status: iss.status,
           targetFiles: iss.targetFiles,
           labels: iss.labels,
-          assignedAgent: existing?.assignedAgent ?? (iss.status === 'in_progress' ? 'alice' : undefined),
+          assignedAgent: existing?.assignedAgent ?? (iss.status === 'in_progress' ? 'solver' : undefined),
           assignedIde: existing?.assignedIde ?? (iss.status === 'in_progress' ? 'Google Antigravity' : undefined),
           body: iss.body,
           acceptanceCriteria: iss.acceptanceCriteria,
@@ -187,7 +187,7 @@ export class GitHubKanbanService {
     issue.status = targetStatus;
     issue.labels = [...issue.labels.filter(l => !l.startsWith('status:')), `status:${targetStatus}`];
     if (targetStatus === 'in_progress') {
-      issue.assignedAgent = agent || 'alice';
+      issue.assignedAgent = agent || 'solver';
       issue.assignedIde = ide || 'Google Antigravity';
     } else if (targetStatus === 'ready' || targetStatus === 'done') {
       issue.assignedAgent = undefined;
@@ -205,7 +205,7 @@ export class GitHubKanbanService {
 
     this.adapter.updateIssue(num, { state, labels: newLabels }).then(() => {
       if (targetStatus === 'in_progress') {
-        const ag = agent || 'alice';
+        const ag = agent || 'solver';
         const tool = ide || 'Google Antigravity';
         this.adapter?.addComment(num, `🤖 **Aegis Fleet**: Agent \`@${ag}\` (${tool}) claimed this task.\nLocks: ${issue.targetFiles.map(f => `\`${f}\``).join(', ')}`);
       } else if (targetStatus === 'done') {

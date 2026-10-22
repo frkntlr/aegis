@@ -56,7 +56,7 @@ export class SessionDetector {
   }
 
   private getBaselineWorktrees(): AgentWorktree[] {
-    const defaultAgents = ['alice', 'bob'];
+    const defaultAgents = ['solver', 'qa', 'docs'];
     return defaultAgents.map(name => ({
       agentName: name,
       branch: `aegis/${name}`,
@@ -84,7 +84,7 @@ export class SessionDetector {
 
       const defaultIde = this.detectIdeType(wt.path);
       const meta = this.readSessionFile(wt.agentName, defaultIde);
-      const status: AgentSession['status'] = lockedFiles.length > 0 ? 'locked' : (wt.agentName === 'alice' ? 'active' : 'idle');
+      const status: AgentSession['status'] = lockedFiles.length > 0 ? 'locked' : (wt.agentName === 'solver' ? 'active' : 'idle');
 
       sessions.push({
         agentName: wt.agentName,

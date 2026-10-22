@@ -83,6 +83,29 @@ export class WorktreeManager {
     };
   }
 
+  public removeWorktree(agentName: string): boolean {
+    const targetDir = this.getWorktreePath(agentName);
+    try {
+      execSync(`git worktree remove "${targetDir}" --force`, { cwd: this.repoRoot, stdio: 'pipe' });
+      return true;
+    } catch {
+      if (fs.existsSync(targetDir)) {
+        try {
+          fs.rmSync(targetDir, { recursive: true, force: true });
+        } catch {
+          // ignore lock on windows
+        }
+        try {
+          execSync('git worktree prune', { cwd: this.repoRoot, stdio: 'pipe' });
+        } catch {
+          // ignore prune failure
+        }
+        return true;
+      }
+      return false;
+    }
+  }
+
   private parseWorktreeBlock(block: string): AgentWorktree | null {
     if (!block.trim()) return null;
     const lines = block.split('\n');

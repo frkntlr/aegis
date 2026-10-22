@@ -26,7 +26,7 @@ export const TOOLCHAIN_PAGE: WikiSuitePage = {
     '---',
     '',
     '### 2. Otomatik Ayar ve Dizin İzolasyonu',
-    'Birden fazla ajan paralel worktree\'lerde (`experimental/alice`, `experimental/bob`) çalışırken, modern IDE\'lerin (özellikle VS Code ve Cursor) dosya izleyicileri ve dil sunucuları (LSP) tüm worktree\'leri taramaya çalışarak işlemciyi kilitleyebilir.',
+    'Birden fazla ajan paralel worktree\'lerde (`experimental/solver`, `experimental/qa`, `experimental/docs`) çalışırken, modern IDE\'lerin (özellikle VS Code ve Cursor) dosya izleyicileri ve dil sunucuları (LSP) tüm worktree\'leri taramaya çalışarak işlemciyi kilitleyebilir.',
     '',
     'Aegis `IdeAdapter` katmanı, her editör yapılandırmasına otomatik olarak şu izolasyon kurallarını enjekte eder:',
     '```json',

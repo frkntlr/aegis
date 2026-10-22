@@ -1,6 +1,6 @@
 import * as http from 'node:http';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
-import { WorktreeManager, IdeLauncher, UniversalToolchainSync } from '@aegis/orchestrator';
+import { WorktreeManager, IdeLauncher, UniversalToolchainSync, RoleClassifier } from '@aegis/orchestrator';
 import { SessionDetector } from './session-detector.js';
 import { RealtimeMetricsService } from './realtime-metrics.js';
 import { AegisEngineService } from './engine-service.js';
@@ -79,7 +79,11 @@ export class DashboardServer {
     if (!issue) return { success: false, message: `Görev #${num} bulunamadı.` };
 
     if (targetStatus === 'in_progress') {
-      const agent = payload.agentName || 'alice';
+      let agent = payload.agentName;
+      if (!agent || agent === 'auto' || agent === 'alice') {
+        const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
+        agent = inf.role;
+      }
       const ide = payload.ideType || 'Google Antigravity';
       const lockRes = this.wtManager.acquireFileLocks(agent, issue.targetFiles);
       if (!lockRes.success) {
@@ -103,8 +107,11 @@ export class DashboardServer {
     const ready = this.metrics.getIssues().filter(i => i.status === 'ready');
     if (ready.length === 0) return { success: true, message: 'Ready sütununda bekleyen görev yok.' };
     const sessions = this.detector.detectSessions();
-    const idle = sessions.find(s => s.status === 'idle') || sessions[0];
     const target = ready[0];
+    const inf = new RoleClassifier().classify({ title: target.title, targetFiles: target.targetFiles });
+    const idle = sessions.find(s => s.agentName === inf.role && s.status === 'idle')
+      || sessions.find(s => s.status === 'idle')
+      || sessions[0];
     const lockRes = this.wtManager.acquireFileLocks(idle.agentName, target.targetFiles);
     if (!lockRes.success) {
       return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
@@ -117,7 +124,7 @@ export class DashboardServer {
     if (action === 'launch_ide') {
       return this.launcher.launchIde({
         ideType: payload.ideType || 'Google Antigravity',
-        worktreePath: payload.worktreePath || 'experimental/alice',
+        worktreePath: payload.worktreePath || 'experimental/solver',
         focusFile: payload.focusFile
       });
     }
@@ -156,10 +163,15 @@ export class DashboardServer {
     }
     if (action === 'create_task') {
       const issue = await this.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
-      if (payload.launchIde && payload.ideType) {
-        this.launcher.launchIde({ ideType: payload.ideType, worktreePath: `experimental/${payload.agentName || 'alice'}` });
+      let targetAgent = payload.agentName;
+      if (!targetAgent || targetAgent === 'auto') {
+        const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
+        targetAgent = inf.role;
       }
-      return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu.`, issue };
+      if (payload.launchIde && payload.ideType) {
+        this.launcher.launchIde({ ideType: payload.ideType, worktreePath: `experimental/${targetAgent}` });
+      }
+      return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu (@${targetAgent}).`, issue };
     }
     if (action === 'complete_task') return this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' });
     if (action === 'scan_ast') {

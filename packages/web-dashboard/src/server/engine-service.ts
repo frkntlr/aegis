@@ -66,7 +66,7 @@ export class AegisEngineService {
     };
   }
 
-  public runMcpSecurity(agent = 'alice', tool = 'ast_skeleton'): Record<string, any> {
+  public runMcpSecurity(agent = 'solver', tool = 'ast_skeleton'): Record<string, any> {
     const auth = this.mcpManager.authorizeToolCall(agent, tool);
     return {
       tool: 'mcp_security',

@@ -5,3 +5,4 @@ export * from './ide-adapter.js';
 export * from './ide-launcher.js';
 export * from './toolchain-sync.js';
 export * from './mcp-skills-sync.js';
+export * from './role-classifier.js';

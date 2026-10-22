@@ -51,7 +51,7 @@ export class NotebookLmBridge {
       '',
       '## 1. Temel Prensipler',
       '- **Mulgravity & Paralel Editörler:** Google Antigravity, Cursor AI, VS Code eşzamanlı çalışır.',
-      '- **İzole Worktree Yapısı:** Her ajan (`alice`, `bob`, `contributor`) fiziksel izole `experimental/<agent>` worktree alanında geliştirme yapar.',
+      '- **İzole Worktree Yapısı:** Her ajan (`solver`, `qa`, `docs`) fiziksel izole `experimental/<role>` worktree alanında geliştirme yapar.',
       '- **Cerrahi AST İskeletleme:** Fonksiyon gövdeleri çıkartılarak ~%82 token tasarrufu sağlanır.',
       '- **Deterministik Demir Kafes:** Maks. 40 satır/fonksiyon, maks. 300 satır/dosya statik sınırları.',
       '- **Sıfır-Token UI Testi:** BoundingBox geometrik çakışma tespiti ile LLM vision token maliyeti sıfıra indirilir.'

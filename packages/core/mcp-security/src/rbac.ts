@@ -13,6 +13,9 @@ export class MCPSecurityManager {
 
   constructor(options: { maxCallsPerMinute?: number } = {}) {
     this.maxCallsPerMinute = options.maxCallsPerMinute ?? 30;
+    this.registerAgent('solver', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton']);
+    this.registerAgent('qa', ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton']);
+    this.registerAgent('docs', ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton']);
     this.registerAgent('alice', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton']);
     this.registerAgent('bob', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton']);
     this.registerAgent('human', ['*']);

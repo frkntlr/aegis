@@ -51,7 +51,7 @@ export async function handleGhSync(tokenArg?: string): Promise<void> {
   const ready = client.listReadyIssues();
   console.log(`📋 Found ${ready.length} ready issue(s) with acceptance criteria.`);
 
-  const dispatchResult = dispatcher.dispatchNextTask(['alice', 'bob'], ready);
+  const dispatchResult = dispatcher.dispatchNextTask(['solver', 'qa', 'docs'], ready);
   if (dispatchResult.dispatched && dispatchResult.agentName && dispatchResult.issue) {
     await client.claimLiveIssue(dispatchResult.issue.number, dispatchResult.agentName);
     console.log(`🎯 Live Issue #${dispatchResult.issue.number} Claimed!`);

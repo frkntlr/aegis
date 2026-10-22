@@ -24,12 +24,16 @@ function setupIdeExclusions(repoRoot: string): void {
 
 export function handleInit(): void {
   showBanner();
-  console.log('🚀 Initializing Aegis environment...');
+  console.log('🚀 Initializing Aegis role-based environment...');
   const wtManager = new WorktreeManager({ persistLocks: true });
-  const alice = wtManager.ensureWorktree('alice');
-  const bob = wtManager.ensureWorktree('bob');
-  console.log(`✅ Worktree ready: ${alice.agentName} -> ${alice.path}`);
-  console.log(`✅ Worktree ready: ${bob.agentName} -> ${bob.path}`);
+  wtManager.removeWorktree('alice');
+  wtManager.removeWorktree('bob');
+  const solver = wtManager.ensureWorktree('solver');
+  const qa = wtManager.ensureWorktree('qa');
+  const docs = wtManager.ensureWorktree('docs');
+  console.log(`✅ Worktree ready: ${solver.agentName} -> ${solver.path}`);
+  console.log(`✅ Worktree ready: ${qa.agentName} -> ${qa.path}`);
+  console.log(`✅ Worktree ready: ${docs.agentName} -> ${docs.path}`);
 
   setupIdeExclusions(process.cwd());
   console.log('✅ Constitution & Toolchain loaded.');
@@ -75,7 +79,7 @@ export async function handleAuto(): Promise<void> {
   }
 
   const ready = ghClient.listReadyIssues();
-  const result = dispatcher.dispatchNextTask(['alice', 'bob'], ready);
+  const result = dispatcher.dispatchNextTask(['solver', 'qa', 'docs'], ready);
 
   if (result.dispatched && result.agentName && result.issue) {
     if (ghClient.isLive()) {
@@ -84,9 +88,9 @@ export async function handleAuto(): Promise<void> {
       ghClient.claimIssue(result.issue.number, result.agentName);
     }
     console.log(`🎯 Task Claimed!`);
-    console.log(` • Agent:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
-    console.log(` • Issue:  #${result.issue.number} - "${result.issue.title}"`);
-    console.log(` • Target: ${result.issue.targetFiles.join(', ') || 'General repository'} (Locked)`);
+    console.log(` • Agent Role:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
+    console.log(` • Issue:       #${result.issue.number} - "${result.issue.title}"`);
+    console.log(` • Target:      ${result.issue.targetFiles.join(', ') || 'General repository'} (Locked)`);
   } else {
     console.log(`⏸️  No dispatchable tasks: ${result.reason}`);
   }
@@ -95,14 +99,15 @@ export async function handleAuto(): Promise<void> {
 export async function handleMerge(agentName?: string, baseBranch = 'master'): Promise<void> {
   showBanner();
   if (!agentName || agentName === '--help' || agentName === '-h') {
-    console.error('❌ Usage: aegis merge <alice|bob> [baseBranch]');
+    console.error('❌ Usage: aegis merge <solver|qa|docs> [baseBranch]');
     process.exit(1);
   }
 
   const pipeline = new MergePipeline({ baseBranch });
   const wtManager = new WorktreeManager({ persistLocks: true });
   console.log(`🔀 Running 4-Step Atomic Merge Pipeline for Agent [${agentName}] into [${baseBranch}]...`);
-  const res = await pipeline.executePipeline(agentName, ['alice', 'bob'], true);
+  const siblings = ['solver', 'qa', 'docs'].filter(a => a !== agentName);
+  const res = await pipeline.executePipeline(agentName, siblings, true);
 
   for (const s of res.steps) {
     const icon = s.passed ? '✅' : '❌';

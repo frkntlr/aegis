@@ -1,4 +1,5 @@
 import { WorktreeManager } from './worktree-manager.js';
+import { RoleClassifier } from './role-classifier.js';
 import type { GitHubIssue, GitHubClient } from '@aegis/github-live';
 
 export interface ILoopBreaker {
@@ -21,14 +22,16 @@ export interface DispatchResult {
 export class TaskDispatcher {
   private worktreeManager: WorktreeManager;
   private loopBreaker?: ILoopBreaker;
+  private roleClassifier: RoleClassifier;
 
-  constructor(worktreeManager?: WorktreeManager, loopBreaker?: ILoopBreaker) {
+  constructor(worktreeManager?: WorktreeManager, loopBreaker?: ILoopBreaker, roleClassifier?: RoleClassifier) {
     this.worktreeManager = worktreeManager ?? new WorktreeManager();
     this.loopBreaker = loopBreaker;
+    this.roleClassifier = roleClassifier ?? new RoleClassifier();
   }
 
   public dispatchNextTask(
-    availableAgents: string[],
+    availableAgents: string[] = ['solver', 'qa', 'docs'],
     readyIssues: GitHubIssue[]
   ): DispatchResult {
     if (availableAgents.length === 0) {
@@ -39,6 +42,17 @@ export class TaskDispatcher {
     );
     if (filteredIssues.length === 0) {
       return { dispatched: false, reason: 'No ready issues found in GitHub queue.' };
+    }
+
+    for (const issue of filteredIssues) {
+      const inference = this.roleClassifier.classify(issue);
+      const optimalAgent = availableAgents.find(a => a === inference.role);
+      if (optimalAgent) {
+        const lockAttempt = this.worktreeManager.acquireFileLocks(optimalAgent, issue.targetFiles);
+        if (lockAttempt.success) {
+          return { dispatched: true, agentName: optimalAgent, issue };
+        }
+      }
     }
 
     for (const agent of availableAgents) {

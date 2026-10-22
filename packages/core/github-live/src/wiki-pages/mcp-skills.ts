@@ -34,10 +34,9 @@ export const MCP_SKILLS_PAGE: WikiSuitePage = {
     '',
     '| Ajan Rolü | Birincil Beceriler | Görev Tanımı | Çalışma Alanı |',
     '|---|---|---|---|',
-    '| **`alice` (Issue Solver)** | `solver`, `godot-runtime`, `ast-skeleton` | Hata çözümü, TDD testleri, Demir Kafes uyumu | `experimental/alice` |',
-    '| **`bob` (QA Hunter)** | `qa`, `telemetry-tester`, `godot-runtime` | Görsel UI denetimi, BoundingBox çakışma tespiti, girdi simülasyonu | `experimental/bob` |',
-    '| **`contributor` (Doc Architect)** | `docs`, `github-live`, `notebooklm` | Yaşayan Wiki bakımı, topluluk RFC değerlendirmesi, karar kayıtları | `experimental/contributor` |',
-    '| **`ui-specialist`** | `ui`, `godot-runtime` | Container/Anchor standartları, tema (*.tres) ve CSS düzenlemeleri | İzole UI Worktree |',
+    '| **`solver` (Issue Solver)** | `solver`, `godot-runtime`, `ast-skeleton` | Hata çözümü, TDD testleri, Demir Kafes uyumu | `experimental/solver` |',
+    '| **`qa` (QA Hunter)** | `qa`, `telemetry-tester`, `godot-runtime` | Görsel UI denetimi, BoundingBox çakışma tespiti, girdi simülasyonu | `experimental/qa` |',
+    '| **`docs` (Doc Architect)** | `docs`, `github-live`, `notebooklm` | Yaşayan Wiki bakımı, topluluk RFC değerlendirmesi, karar kayıtları | `experimental/docs` |',
     '',
     'Bu rol matrisi sayesinde bir hata çözülürken QA Hunter oyunu veya arayüzü denetler, Doc Architect ise yapılan değişiklikleri yaşayan GitHub Wiki belleğine kaydeder.'
   ].join('\n')

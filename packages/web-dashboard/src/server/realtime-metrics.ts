@@ -147,7 +147,7 @@ export class RealtimeMetricsService {
   public moveTask(num: number, targetStatus: SystemIssue['status'], agent?: string, ide?: string): SystemIssue | null {
     const issue = this.githubService.updateIssueStatus(num, targetStatus, agent, ide);
     if (issue && targetStatus === 'in_progress') {
-      this.compilePromptFile(issue, agent || 'alice');
+      this.compilePromptFile(issue, agent || 'solver');
     }
     return issue;
   }

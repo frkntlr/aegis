@@ -4,7 +4,7 @@ export const HOME_PAGE: WikiSuitePage = {
   slug: 'Home',
   title: 'Aegis Otonom Vibe Coding Motoru Ana Dizini',
   threeBullets: [
-    'Alice, Bob ve Açık Kaynak Geliştiricileri İçin Çoklu-Çalışma Alanı (Multi-Worktree) Otonom Yürütme Koşumu.',
+    'Solver, QA Hunter ve Doc Architect İçin Çoklu-Çalışma Alanı (Multi-Worktree) Otonom Yürütme Koşumu.',
     'Evrensel Çoklu-IDE ve Oyun Motoru Uyumluluğu (MultiGravity, Cursor, Windsurf, Zed, VS Code, Godot 4.x).',
     'Deterministik Demir Kafes Kalite Kapıları, Sıfır-Token UI Telemetrisi ve NotebookLM Zemin Doğrulaması.'
   ],
@@ -21,7 +21,7 @@ export const HOME_PAGE: WikiSuitePage = {
     '',
     'Aegis mimarisinin tüm bileşenleri doğrudan GitHub Wiki üzerinde yaşayan bellek (living memory) olarak korunmaktadır:',
     '',
-    '- **[[Architecture]]:** Çekirdek sistem mimarisi, fiziksel Git worktree izolasyonu (`experimental/alice`, `experimental/bob`), AST iskelet prompt önbelleklemesi (~%82 tasarruf) ve 4 adımlı atomik birleştirme boru hattı.',
+    '- **[[Architecture]]:** Çekirdek sistem mimarisi, fiziksel Git worktree izolasyonu (`experimental/solver`, `experimental/qa`, `experimental/docs`), AST iskelet prompt önbelleklemesi (~%82 tasarruf) ve 4 adımlı atomik birleştirme boru hattı.',
     '- **[[Toolchain-and-IDEs]]:** Antigravity (MultiGravity), Cursor, Windsurf, Zed, VS Code ve **Godot 4.x Oyun Motoru** için tam çalışma zamanı ve ayar izolasyonu uyumluluk matrisi.',
     '- **[[MCP-and-Skills-Ecosystem]]:** `aegis ide:sync` ile evrensel MCP ve Skill dağıtımı, MCP Güvenlik İzin Listesi, yıkıcı çağrıların engellenmesi ve uzman ajan rolleri (QA Hunter, Issue Solver, UI Specialist, Doc Architect).',
     '- **[[Plugin-and-Extensibility]]:** `LanguageExtractor` ve `IdeAdapter` eklenti arayüzleri, topluluk katkıları ve sıfır-token RFC değerlendirme boru hattı (`aegis rfc:triage`).',
@@ -45,12 +45,12 @@ export const HOME_PAGE: WikiSuitePage = {
     '',
     '---',
     '',
-    '### 🤖 Çoklu-Ajan Çalışma Modeli (Alice & Bob)',
+    '### 🤖 Çoklu-Ajan Çalışma Modeli (Solver, QA & Docs)',
     '',
-    'Aegis ekosisteminde her ajan izole bir rol üstlenir:',
-    '1. **Alice (Issue Solver):** `experimental/alice` worktree\'sinde çalışır. TDD yaklaşımıyla test yazar, kodu onarır ve Demir Kafes sınırlarına sadık kalır.',
-    '2. **Bob (QA Hunter / Telemetri):** `experimental/bob` worktree\'sinde çalışır. Sıfır-token BoundingBox UI denetimi yapar, görsel regresyonları ve oyun motoru girdi simülasyonlarını test eder.',
-    '3. **Doc Architect (Wiki & RFC):** Yaşayan GitHub Wiki sayfalarını ve mimari araştırma kararlarını güncel tutar.',
+    'Aegis ekosisteminde her ajan alanına göre uzmanlaşmış bir rol üstlenir:',
+    '1. **Solver (Issue Solver):** `experimental/solver` worktree\'sinde çalışır. TDD yaklaşımıyla test yazar, kodu onarır ve Demir Kafes sınırlarına sadık kalır.',
+    '2. **QA Hunter (Test & Telemetri):** `experimental/qa` worktree\'sinde çalışır. Sıfır-token BoundingBox UI denetimi yapar, görsel regresyonları ve oyun motoru girdi simülasyonlarını test eder.',
+    '3. **Doc Architect (Wiki & RFC):** `experimental/docs` worktree\'sinde çalışır. Yaşayan GitHub Wiki sayfalarını, karar kayıtlarını ve mimari dokümantasyonu yönetir.',
     '',
     '_Aegis Yaşayan Bellek Sistemi Tarafından Doğrudan GitHub Wiki Üzerinde Yönetilmektedir._'
   ].join('\n')

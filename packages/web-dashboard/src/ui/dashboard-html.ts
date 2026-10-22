@@ -87,7 +87,7 @@ export function getDashboardHtml(): string {
       <h3 style="margin-bottom: 1rem;">➕ Yeni Görev Oluştur & IDE'ye Aktar</h3>
       <label>Görev Başlığı:</label><input id="task-title" class="form-control" placeholder="Örn: Implement Rust Token Optimizer" />
       <label>Hedef Dosyalar (Virgülle ayırın):</label><input id="task-files" class="form-control" placeholder="packages/core/ast-skeleton/src/rust-extractor.ts" />
-      <label>Hedef Ajan:</label><select id="task-agent" class="form-control"><option value="alice">Alice (worktrees/alice)</option><option value="bob">Bob (worktrees/bob)</option><option value="contributor">Contributor</option></select>
+      <label>Hedef Ajan / Rol:</label><select id="task-agent" class="form-control"><option value="auto">🎯 Otomatik Belirle (Auto-Detect)</option><option value="solver">Solver (experimental/solver)</option><option value="qa">QA Hunter (experimental/qa)</option><option value="docs">Doc Architect (experimental/docs)</option></select>
       <label>Hedef IDE:</label><select id="task-ide" class="form-control"><option value="Google Antigravity">Google Antigravity</option><option value="Cursor AI">Cursor AI</option><option value="VS Code">VS Code</option></select>
       <label><input type="checkbox" id="task-launch" checked /> Görevi oluştururken IDE'yi otomatik başlat/aç</label>
       <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">

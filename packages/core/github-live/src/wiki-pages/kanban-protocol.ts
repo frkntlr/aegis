@@ -25,7 +25,7 @@ export const KANBAN_PROTOCOL_PAGE: WikiSuitePage = {
     '| Durum | GitHub Kolonu | Anlamı ve İşleyişi |',
     '|---|---|---|',
     '| **`ready`** | **Todo** | Kabul kriterleri tanımlanmış, boşta duran ve herhangi bir ajan tarafından üstlenilmeye hazır görev. |',
-    '| **`in_progress`** | **In Progress** | Bir ajan (Alice/Bob) tarafından üstlenilmiş; ilgili kaynak dosyalar `lock:<dosya-yolu>` ile kilitlenmiş görev. |',
+    '| **`in_progress`** | **In Progress** | Bir ajan (Solver/QA/Docs) tarafından üstlenilmiş; ilgili kaynak dosyalar `lock:<dosya-yolu>` ile kilitlenmiş görev. |',
     '| **`review`** | **In Progress** | TDD testleri ve Demir Kafes denetimi yerel worktree\'de geçmiş; 4 adımlı atomik merge bekleyen görev. |',
     '| **`done`** | **Done** | Ana dala birleştirilmiş, test edilmiş, Issue\'su kapatılmış ve panoda Done kolonuna taşınmış görev. |',
     '| **`blocked`** | **Blocked / Todo** | Ardışık 3 kez hata vererek Loop Breaker tetiklemiş; kilitleri açılmış ve hata telemetrisi Issue\'ya yazılmış görev. |',

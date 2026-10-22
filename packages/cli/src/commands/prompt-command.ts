@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SkeletonGenerator, PromptCacheManager, type LayeredPromptContext } from '@aegis/ast-skeleton';
 import { GitHubClient, type GitHubIssue } from '@aegis/github-live';
-import { WorktreeManager } from '@aegis/orchestrator';
+import { WorktreeManager, RoleClassifier } from '@aegis/orchestrator';
 import { showBanner } from './banner.js';
 
 export interface PromptResult {
@@ -78,19 +78,59 @@ export async function compilePrompt(
   return { agentName, issue, worktreePath, context, promptMarkdown };
 }
 
-export async function handlePrompt(agentArg?: string, issueArg?: string, flag?: string): Promise<void> {
-  if (flag !== '--json') {
-    showBanner();
+function parsePromptArgs(agentArg?: string, issueArg?: string, flag?: string) {
+  if (agentArg && !isNaN(parseInt(agentArg, 10))) {
+    return {
+      role: 'auto',
+      issueNumber: parseInt(agentArg, 10),
+      flag: issueArg?.startsWith('--') ? issueArg : flag
+    };
   }
-  if (!agentArg || !issueArg || agentArg === '--help' || agentArg === '-h') {
-    console.error('❌ Usage: aegis prompt <alice|bob> <issueId> [--save|--json]');
+  return {
+    role: agentArg || 'solver',
+    issueNumber: parseInt(issueArg || '1', 10),
+    flag
+  };
+}
+
+async function resolveRoleAndIssue(
+  rawRole: string,
+  issueNumber: number,
+  isJson: boolean,
+  client = new GitHubClient({ autoConnectLive: true })
+): Promise<{ role: string; issueNumber: number; issue: GitHubIssue }> {
+  const issue = await resolveIssue(issueNumber, client);
+  if (rawRole === 'auto' || !['solver', 'qa', 'docs', 'alice', 'bob'].includes(rawRole)) {
+    const classification = new RoleClassifier().classify(issue);
+    if (!isJson) {
+      if (classification.isAmbiguous) {
+        console.log(`⚠️  Görev rolü belirsiz (Güven: %${classification.confidence} < %60)`);
+        console.log(` • Gerekçe: ${classification.reason}`);
+        console.log(` • Öneri: [${classification.role}]. Belirtmek için: aegis prompt <solver|qa|docs> ${issueNumber}`);
+      } else {
+        console.log(`🎯 Otomatik Rol Atandı: [${classification.role.toUpperCase()}] (Güven: %${classification.confidence})`);
+        console.log(` • Gerekçe: ${classification.reason}`);
+      }
+    }
+    return { role: classification.role, issueNumber, issue };
+  }
+  return { role: rawRole, issueNumber, issue };
+}
+
+export async function handlePrompt(agentArg?: string, issueArg?: string, flag?: string): Promise<void> {
+  const parsedArgs = parsePromptArgs(agentArg, issueArg, flag);
+  const isJson = parsedArgs.flag === '--json';
+  if (!isJson) showBanner();
+
+  if (!agentArg || agentArg === '--help' || agentArg === '-h') {
+    console.error('❌ Usage: aegis prompt [solver|qa|docs] <issueId> [--save|--json]');
     process.exit(1);
   }
 
-  const issueNumber = parseInt(issueArg, 10);
-  const result = await compilePrompt(agentArg, issueNumber);
+  const { role, issueNumber } = await resolveRoleAndIssue(parsedArgs.role, parsedArgs.issueNumber, isJson);
+  const result = await compilePrompt(role, issueNumber);
 
-  if (flag === '--json') {
+  if (isJson) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -98,15 +138,14 @@ export async function handlePrompt(agentArg?: string, issueArg?: string, flag?: 
   console.log(`🤖 Cerrahi Prompt Compiler: Agent [${result.agentName.toUpperCase()}] -> Issue #${issueNumber}`);
   console.log(` • Worktree:     ${result.worktreePath}`);
   console.log(` • Target Files: ${result.issue.targetFiles.join(', ')}`);
-  console.log(` • Total Chars:  ${result.context.totalCharacters} chars`);
-  console.log(` • Cached Chars: ${result.context.cachedCharacters} chars (${result.context.cacheRatioPercent}% prompt caching efficiency)`);
+  console.log(` • Cached Ratio: ${result.context.cacheRatioPercent}% efficiency (${result.context.cachedCharacters} chars)`);
 
-  if (flag === '--save') {
+  if (parsedArgs.flag === '--save') {
     const dir = path.resolve(process.cwd(), '.aegis', 'prompts');
     fs.mkdirSync(dir, { recursive: true });
-    const targetFile = path.resolve(dir, `${result.agentName}-issue-${issueNumber}.md`);
-    fs.writeFileSync(targetFile, result.promptMarkdown, 'utf8');
-    console.log(`✅ Compiled prompt saved to: ${targetFile}`);
+    const target = path.resolve(dir, `${result.agentName}-issue-${issueNumber}.md`);
+    fs.writeFileSync(target, result.promptMarkdown, 'utf8');
+    console.log(`✅ Compiled prompt saved to: ${target}`);
   } else {
     console.log('\n--- COMPILED SURGICAL PROMPT ---');
     console.log(result.promptMarkdown);
