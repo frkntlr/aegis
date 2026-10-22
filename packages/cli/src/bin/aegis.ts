@@ -34,9 +34,11 @@ import {
   handleProjectSync,
   handleWikiList,
   handleWikiShow,
-  handleWikiSync
+  handleWikiSync,
+  handleWikiStatus,
+  handleGhLocate
 } from '../commands/project-commands.js';
-import { handleNlmQuery } from '../commands/nlm-command.js';
+import { handleNlmQuery, handleNlmResearch } from '../commands/nlm-command.js';
 
 function handleHelp(): void {
   showBanner();
@@ -49,11 +51,14 @@ function handleHelp(): void {
   console.log('  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria');
   console.log('  aegis nlm:sync                         Export and synchronize architecture with NotebookLM');
   console.log('  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations');
+  console.log('  aegis nlm:research "<topic>" [mode]    Run automated NotebookLM research and stage in Wiki');
+  console.log('  aegis gh:locate [domain]               Resolve authoritative GitHub & Research locations');
   console.log('  aegis project:list [owner]             List GitHub Projects v2 boards');
   console.log('  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column');
-  console.log('  aegis wiki:list [dir]                  List living memory architecture wiki pages');
-  console.log('  aegis wiki:show <slug> [dir]           Display detailed context of living memory page');
-  console.log('  aegis wiki:sync [dir]                  Persist and export living memory to markdown');
+  console.log('  aegis wiki:list                        List living memory pages directly from GitHub Wiki');
+  console.log('  aegis wiki:show <slug>                 Display page content directly from GitHub Wiki');
+  console.log('  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo');
+  console.log('  aegis wiki:status                      Inspect GitHub Wiki remote git availability');
   console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
   console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
   console.log('  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix');
@@ -82,11 +87,14 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'rfc:triage': (a) => handleRfcTriage(a[1], a[2]),
   'nlm:sync': () => handleNlmSync(),
   'nlm:query': (a) => handleNlmQuery(a[1], a[2]),
+  'nlm:research': (a) => handleNlmResearch(a[1], a[2], a[3]),
+  'gh:locate': (a) => handleGhLocate(a[1]),
   'project:list': (a) => handleProjectList(a[1]),
   'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),
-  'wiki:list': (a) => handleWikiList(a[1]),
-  'wiki:show': (a) => handleWikiShow(a[1], a[2]),
-  'wiki:sync': (a) => handleWikiSync(a[1]),
+  'wiki:list': () => handleWikiList(),
+  'wiki:show': (a) => handleWikiShow(a[1]),
+  'wiki:sync': () => handleWikiSync(),
+  'wiki:status': () => handleWikiStatus(),
   merge: (a) => handleMerge(a[1], a[2]),
   dashboard: (a) => handleDashboard(a[1]),
   'ide:list': () => handleIdeList(),

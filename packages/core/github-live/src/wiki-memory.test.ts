@@ -4,28 +4,28 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { WikiMemoryManager } from './wiki-memory.js';
+import { GitHubWikiLiveAdapter } from './wiki-adapter.js';
 
-test('WikiMemoryManager loads, persists and exports living architecture memory to disk', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-test-'));
+test('GitHubWikiLiveAdapter parses and lists pages directly from git clone directory', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-adapter-test-'));
   try {
-    const manager = new WikiMemoryManager(tmpDir);
-    const pages = manager.listPages();
-    assert.ok(pages.length >= 2, 'Should seed default architecture pages on first run');
+    const adapter = new GitHubWikiLiveAdapter({ localCloneDir: tmpDir });
+    const pages = adapter.listPages();
+    assert.ok(pages.length >= 2, 'Should provide default living memory pages');
 
-    const arch = manager.getPage('architecture');
-    assert.ok(arch);
-    assert.strictEqual(arch.title, 'Aegis System Architecture');
-    assert.strictEqual(arch.threeBulletSummary.length, 3);
+    const published = adapter.publishPage(
+      'protocol',
+      'Protocol Living Memory',
+      ['Rule 1', 'Rule 2', 'Rule 3'],
+      'Live protocol documentation.'
+    );
+    // Since tmpDir is not a git remote, publishPage writes to local clone cache
+    assert.strictEqual(typeof published, 'boolean');
 
-    manager.setPage('new-module', 'New Module Title', ['Bullet 1', 'Bullet 2', 'Bullet 3'], 'Module content');
-    assert.ok(fs.existsSync(path.join(tmpDir, 'new-module.md')));
-
-    const reloaded = new WikiMemoryManager(tmpDir);
-    assert.strictEqual(reloaded.getPage('new-module')?.title, 'New Module Title');
-
-    const exportDir = path.join(tmpDir, 'export');
-    const written = manager.exportAll(exportDir);
-    assert.ok(written.length >= 3);
+    const page = adapter.getPage('protocol');
+    assert.ok(page);
+    assert.strictEqual(page.title, 'Protocol Living Memory');
+    assert.strictEqual(page.threeBulletSummary[0], 'Rule 1');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

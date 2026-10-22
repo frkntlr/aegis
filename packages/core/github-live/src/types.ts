@@ -19,6 +19,15 @@ export interface WikiPage {
   lastUpdated: string;
 }
 
+export interface WikiSyncStatus {
+  available: boolean;
+  url: string;
+  remoteRepo: string;
+  pageCount: number;
+  initializeUrl?: string;
+  message?: string;
+}
+
 export interface DiscussionItem {
   id: string;
   title: string;
@@ -45,4 +54,26 @@ export interface ProjectV2ItemInfo {
   issueNumber?: number;
   title: string;
   statusName?: string;
+}
+
+export type GitHubDomain = 'wiki' | 'projects' | 'issues' | 'discussions' | 'code' | 'research';
+
+export interface GitHubLocationInfo {
+  domain: GitHubDomain;
+  title: string;
+  url: string;
+  description: string;
+  accessProtocol: 'git' | 'graphql' | 'rest' | 'mcp';
+}
+
+export interface ResearchReport {
+  topic: string;
+  mode: 'fast' | 'deep';
+  taskId?: string;
+  sourcesCount: number;
+  sources: { title: string; url?: string }[];
+  synthesis: string;
+  citations: string[];
+  recommendedCriteria: string[];
+  createdAt: string;
 }

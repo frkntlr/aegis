@@ -1,4 +1,10 @@
-import { GitHubProjectsAdapter, WikiMemoryManager, GitHubTokenResolver } from '@aegis/github-live';
+import {
+  GitHubProjectsAdapter,
+  WikiMemoryManager,
+  GitHubTokenResolver,
+  GitHubContextRouter,
+  GitHubDomain
+} from '@aegis/github-live';
 import { showBanner } from './banner.js';
 
 export async function handleProjectList(ownerArg?: string): Promise<void> {
@@ -13,9 +19,7 @@ export async function handleProjectList(ownerArg?: string): Promise<void> {
     console.log(`\nFound ${projects.length} Project(s) for @${owner}:`);
     for (const p of projects) {
       const state = p.closed ? 'CLOSED' : 'OPEN';
-      console.log(` • [#${p.number}] ${p.title} (${state})`);
-      console.log(`   ID: ${p.id}`);
-      console.log(`   URL: ${p.url}`);
+      console.log(` • [#${p.number}] ${p.title} (${state})\n   ID: ${p.id}\n   URL: ${p.url}`);
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -45,59 +49,97 @@ export async function handleProjectSync(
   try {
     const adapter = new GitHubProjectsAdapter({ token: auth.token, owner });
     const result = await adapter.syncIssue(pNum, iNum, normalizedStatus);
-    console.log(`✅ Issue #${iNum} successfully mapped in Project #${pNum}!`);
-    console.log(` • Item ID: ${result.itemId}`);
-    console.log(` • Column:  ${result.status}`);
+    console.log(`✅ Issue #${iNum} successfully mapped in Project #${pNum}!\n • Item ID: ${result.itemId}\n • Column:  ${result.status}`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`❌ Project sync failed: ${msg}`);
   }
 }
 
-export function handleWikiList(dirArg = '.aegis/wiki'): void {
+export function handleWikiList(): void {
   showBanner();
-  console.log(`📖 Inspecting Living Memory Wiki Pages (${dirArg})...`);
-  const manager = new WikiMemoryManager(dirArg);
-  const pages = manager.listPages();
+  console.log('📖 Fetching Living Memory directly from GitHub Wiki...');
+  const manager = new WikiMemoryManager();
+  const status = manager.checkStatus();
+  console.log(` • Remote Repo: ${status.remoteRepo}\n • Web URL:     ${status.url}\n • Online:      ${status.available ? 'CONNECTED ✅' : 'PENDING INIT ⏳'}`);
 
+  const pages = manager.listPages();
   console.log(`\nFound ${pages.length} living memory page(s):`);
   for (const page of pages) {
-    console.log(`\n📘 [${page.slug}] ${page.title}`);
-    console.log(`   Last Updated: ${page.lastUpdated}`);
-    for (const bullet of page.threeBulletSummary) {
-      console.log(`   • ${bullet}`);
-    }
+    console.log(`\n📘 [${page.slug}] ${page.title}\n   Last Updated: ${page.lastUpdated}`);
+    for (const bullet of page.threeBulletSummary) console.log(`   • ${bullet}`);
   }
 }
 
-export function handleWikiShow(slug: string, dirArg = '.aegis/wiki'): void {
+export function handleWikiShow(slug: string): void {
   showBanner();
   if (!slug) {
-    console.error('❌ Usage: aegis wiki:show <slug> [dir]');
+    console.error('❌ Usage: aegis wiki:show <slug>');
     process.exit(1);
   }
-  const manager = new WikiMemoryManager(dirArg);
+  const manager = new WikiMemoryManager();
   const page = manager.getPage(slug);
   if (!page) {
-    console.error(`❌ Wiki page '${slug}' not found in ${dirArg}.`);
+    console.error(`❌ Wiki page '${slug}' not found in GitHub Wiki.`);
     return;
   }
 
-  console.log(`📘 ${page.title} (${page.slug})`);
-  console.log(`Last Updated: ${page.lastUpdated}\n`);
-  console.log('Living Memory (Three Bullets):');
+  console.log(`📘 ${page.title} (${page.slug})\nLast Updated: ${page.lastUpdated}\n\nLiving Memory (Three Bullets):`);
   for (const b of page.threeBulletSummary) console.log(` • ${b}`);
-  console.log('\n--- Content ---');
-  console.log(page.content);
+  console.log('\n--- Content ---\n' + page.content);
 }
 
-export function handleWikiSync(outputDir = '.aegis/wiki'): void {
+export function handleWikiSync(): void {
   showBanner();
-  console.log(`💾 Syncing Living Memory to Disk (${outputDir})...`);
-  const manager = new WikiMemoryManager(outputDir);
-  const exported = manager.exportAll(outputDir);
-  console.log(`✅ Successfully exported ${exported.length} living memory page(s):`);
-  for (const p of exported) {
-    console.log(` • ${p}`);
+  console.log('🔄 Synchronizing directly with GitHub Wiki remote repository...');
+  const manager = new WikiMemoryManager();
+  const status = manager.checkStatus();
+
+  if (!status.available) {
+    console.log('⚠️  GitHub Wiki remote repository is not yet initialized.');
+    console.log(`👉 Please initialize the first page at: ${status.initializeUrl || status.url}`);
+    console.log('   (GitHub requires this one-time step before git push is enabled).');
+    return;
   }
+
+  const success = manager.syncLive();
+  if (success) {
+    console.log(`✅ GitHub Wiki synchronized successfully! (Pages: ${manager.listPages().length})`);
+  } else {
+    console.log('⚠️  Could not pull from GitHub Wiki. Please check network/auth.');
+  }
+}
+
+export function handleWikiStatus(): void {
+  showBanner();
+  const manager = new WikiMemoryManager();
+  const status = manager.checkStatus();
+  console.log('🌐 GitHub Wiki Remote Status:');
+  console.log(` • Repository:     ${status.remoteRepo}`);
+  console.log(` • Web URL:        ${status.url}`);
+  console.log(` • Git Available:  ${status.available ? 'YES ✅' : 'NO (Needs 1-click init) ⏳'}`);
+  console.log(` • Active Pages:   ${status.pageCount}`);
+  if (status.initializeUrl) {
+    console.log(` • Initialize:     ${status.initializeUrl}`);
+  }
+}
+
+export function handleGhLocate(domainArg?: string): void {
+  showBanner();
+  const router = new GitHubContextRouter();
+  if (!domainArg || domainArg === 'all') {
+    console.log(router.describeSystemLocations());
+    return;
+  }
+
+  const validDomains: GitHubDomain[] = ['wiki', 'projects', 'issues', 'discussions', 'code', 'research'];
+  const domain = domainArg.toLowerCase() as GitHubDomain;
+  if (!validDomains.includes(domain)) {
+    console.error(`❌ Unknown domain: "${domainArg}". Valid domains: ${validDomains.join(', ')}, all`);
+    process.exit(1);
+  }
+
+  const loc = router.getLocation(domain);
+  console.log(`📍 Authoritative Location for [${loc.domain.toUpperCase()}]:`);
+  console.log(` • Title:    ${loc.title}\n • URL:      ${loc.url}\n • Protocol: ${loc.accessProtocol.toUpperCase()}\n • Purpose:  ${loc.description}`);
 }
