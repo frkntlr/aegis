@@ -181,10 +181,11 @@ export class GitHubLiveAdapter {
   }
 
   private resolveStatus(labels: string[], state?: string): GitHubIssue['status'] {
-    if (labels.includes('status:blocked')) return 'blocked';
-    if (labels.includes('status:in_progress')) return 'in_progress';
-    if (labels.includes('status:review')) return 'review';
     if (state === 'closed') return 'done';
+    if (labels.includes('status:blocked')) return 'blocked';
+    if (labels.includes('status:done')) return 'done';
+    if (labels.includes('status:review')) return 'review';
+    if (labels.includes('status:in_progress')) return 'in_progress';
     return 'ready';
   }
 

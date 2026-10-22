@@ -104,6 +104,9 @@ export class GitHubKanbanService {
       this.lastRateLimit = rateLimit;
       const mapped: SystemIssue[] = issues.map(iss => {
         const existing = this.issues.find(i => i.number === iss.number);
+        const isDone = iss.status === 'done';
+        const assignedAgent = isDone ? undefined : (iss.assignee || existing?.assignedAgent);
+        const assignedIde = isDone ? undefined : (assignedAgent ? (existing?.assignedIde || 'Google Antigravity') : undefined);
         return {
           id: iss.id,
           number: iss.number,
@@ -111,8 +114,8 @@ export class GitHubKanbanService {
           status: iss.status,
           targetFiles: iss.targetFiles,
           labels: iss.labels,
-          assignedAgent: existing?.assignedAgent ?? (iss.status === 'in_progress' ? 'solver' : undefined),
-          assignedIde: existing?.assignedIde ?? (iss.status === 'in_progress' ? 'Google Antigravity' : undefined),
+          assignedAgent,
+          assignedIde,
           body: iss.body,
           acceptanceCriteria: iss.acceptanceCriteria,
           url: iss.url || `https://github.com/${this.owner}/${this.repo}/issues/${iss.number}`
