@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { AgentWorktree } from '@aegis/shared';
 import { WorktreeManager } from '@aegis/orchestrator';
 
 export interface AgentSession {
@@ -54,12 +55,26 @@ export class SessionDetector {
     return { ideType: defaultIde, lastHeartbeat: new Date().toISOString() };
   }
 
+  private getBaselineWorktrees(): AgentWorktree[] {
+    const defaultAgents = ['alice', 'bob'];
+    return defaultAgents.map(name => ({
+      agentName: name,
+      branch: `aegis/${name}`,
+      path: path.resolve(this.repoRoot, 'worktrees', name),
+      status: 'idle' as const,
+      lockedFiles: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
   public detectSessions(): AgentSession[] {
     const list = this.wtManager.listWorktrees();
+    const wtList = list.worktrees.length > 0 ? list.worktrees : this.getBaselineWorktrees();
     const locks = this.wtManager.getLockedFiles();
     const sessions: AgentSession[] = [];
 
-    for (const wt of list.worktrees) {
+    for (const wt of wtList) {
       const lockedFiles: string[] = [];
       for (const [file, lockedAgent] of locks.entries()) {
         if (lockedAgent === wt.agentName) {
