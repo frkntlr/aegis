@@ -37,3 +37,9 @@ stryker.log
 scratch/
 tmp/
 *.tmp
+
+# IDE local workspace configurations
+.codeium/
+.gemini/
+.zed/
+.cursor/

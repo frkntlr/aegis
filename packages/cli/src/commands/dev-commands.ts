@@ -96,15 +96,30 @@ export function handleDiff(diffText?: string): void {
   }
 }
 
-export function handleInspect(): void {
+export function handleInspect(targetArg?: string): void {
   showBanner();
   console.log('📐 Zero-Token Telemetry UI Inspection (Mobile 390x844)...');
   const inspector = new BoundingBoxInspector();
-  const elements = [
+  let elements = [
     { id: 'header-nav', x: 0, y: 0, width: 390, height: 60 },
     { id: 'hero-banner', x: 0, y: 60, width: 390, height: 200 },
     { id: 'action-button', x: 20, y: 280, width: 350, height: 50 }
   ];
+  if (targetArg && fs.existsSync(targetArg)) {
+    try {
+      const raw = fs.readFileSync(targetArg, 'utf8');
+      if (targetArg.endsWith('.json')) {
+        elements = JSON.parse(raw);
+      } else if (targetArg.endsWith('.html')) {
+        let curY = 0;
+        elements = Array.from(raw.matchAll(/id=["']([^"']+)["']/g)).slice(0, 10).map((m) => {
+          const el = { id: m[1], x: 20, y: curY, width: 350, height: 50 };
+          curY += 60;
+          return el;
+        });
+      }
+    } catch { /* use fallback elements */ }
+  }
 
   const report = inspector.inspectLayout(elements, { width: 390, height: 844, name: 'Mobile' });
   console.log(` • Elements Checked: ${report.elementsScanned}`);

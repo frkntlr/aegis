@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 import { showBanner } from '../commands/banner.js';
-import { handleInit, handleStatus, handleAuto, handleDashboard, handleMerge } from '../commands/core-commands.js';
+import {
+  handleInit,
+  handleStatus,
+  handleAuto,
+  handleDashboard,
+  handleMerge,
+  handleIdeList,
+  handleIdeSync
+} from '../commands/core-commands.js';
 import { handlePrompt } from '../commands/prompt-command.js';
 import { handleContribute, handleRfcTriage, handleNlmSync } from '../commands/contribute-command.js';
 import {
@@ -34,6 +42,8 @@ function handleHelp(): void {
   console.log('  aegis nlm:sync                         Export and synchronize architecture with NotebookLM');
   console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
   console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
+  console.log('  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix');
+  console.log('  aegis ide:sync                         Synchronize MCP servers & Skills across all IDEs');
   console.log('  aegis gh:status [token]                Inspect live GitHub authentication & limits');
   console.log('  aegis gh:sync [token]                  Sync live issues & dispatch to agents');
   console.log('  aegis gh:comment <num> <msg> [token]   Post comment to GitHub issue');
@@ -59,11 +69,13 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'nlm:sync': () => handleNlmSync(),
   merge: (a) => handleMerge(a[1], a[2]),
   dashboard: (a) => handleDashboard(a[1]),
+  'ide:list': () => handleIdeList(),
+  'ide:sync': () => handleIdeSync(),
   'gh:status': (a) => handleGhStatus(a[1]),
   'gh:sync': (a) => handleGhSync(a[1]),
   'gh:comment': (a) => handleGhComment(a[1], a[2], a[3]),
   'gh:pr': (a) => handleGhPr(a[1], a[2], a[3], a[4], a[5]),
-  inspect: () => handleInspect(),
+  inspect: (a) => handleInspect(a[1]),
   mutate: (a) => handleMutate(a[1]),
   estimate: (a) => handleEstimate(a),
   verify: (a) => handleVerify(a[1]),

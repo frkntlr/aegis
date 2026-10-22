@@ -30,3 +30,11 @@ test('RfcTriager converts approved RFC into actionable GitHubIssue', () => {
   assert.ok(issue.labels.some(l => l.startsWith('lock:')));
   assert.strictEqual(issue.acceptanceCriteria.length >= 3, true);
 });
+
+test('RfcTriager parses support and compound language names', () => {
+  const triager = new RfcTriager();
+  const parsed = triager.parseRfc('RFC: Support Godot C# AST skeletons', 'We need C# roslyn AST parser in skeleton extractor', 99);
+  assert.strictEqual(parsed.category, 'language');
+  assert.strictEqual(parsed.targetName, 'Godot C#');
+  assert.ok(parsed.proposedFiles[0].includes('godotc'));
+});

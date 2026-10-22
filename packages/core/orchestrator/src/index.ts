@@ -4,3 +4,4 @@ export * from './merge-pipeline.js';
 export * from './ide-adapter.js';
 export * from './ide-launcher.js';
 export * from './toolchain-sync.js';
+export * from './mcp-skills-sync.js';

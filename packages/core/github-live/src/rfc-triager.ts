@@ -38,10 +38,17 @@ export class RfcTriager {
     return [`packages/core/tools/src/${slug}-plugin.ts`];
   }
 
+  private extractTargetName(title: string): string {
+    const clean = title.replace(/^RFC:\s*(\[[^\]]+\]\s*)?/i, '').trim();
+    const m = clean.match(/^(?:Add|Implement|Support|Integrate|Create|Feature|New)?\s*([A-Za-z0-9#+.-]+(?:\s+[A-Za-z0-9#+.-]+)?)/i);
+    if (!m || !m[1]) return 'Extension';
+    const stripped = m[1].replace(/\b(support|ast|skeleton|extractor|adapter|integration)\b/gi, '').trim();
+    return stripped || m[1].trim();
+  }
+
   public parseRfc(title: string, body: string, discussionNumber?: number): ParsedRfc {
     const category = this.detectCategory(`${title}\n${body}`);
-    const nameMatch = title.match(/RFC:\s*\[?(?:Extension|RFC)?\]?\s*(?:Add|Implement)?\s*([A-Za-z0-9#+.-]+)/i);
-    const targetName = nameMatch ? nameMatch[1].trim() : 'Extension';
+    const targetName = this.extractTargetName(title);
 
     const fileMatches = body.match(/packages\/[a-zA-Z0-9_\-\/.]+\.ts/g);
     const proposedFiles = fileMatches && fileMatches.length > 0

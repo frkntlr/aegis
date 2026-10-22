@@ -1,6 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+export interface IdeCapabilities {
+  supportsMcp: boolean;
+  supportsSkills: boolean;
+  supportsSubagents: boolean;
+  mcpConfigFile?: string;
+}
+
 export interface IdeExclusionResult {
   ideId: string;
   success: boolean;
@@ -10,85 +17,125 @@ export interface IdeExclusionResult {
 export interface IdeAdapter {
   readonly ideId: string;
   readonly name: string;
+  readonly capabilities: IdeCapabilities;
   setupExclusions(repoRoot: string): IdeExclusionResult;
+}
+
+function updateJsonSettings(filePath: string, mutator: (s: Record<string, any>) => void): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  let settings: Record<string, any> = {};
+  if (fs.existsSync(filePath)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+      settings = {};
+    }
+  }
+  mutator(settings);
+  fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+export class AntigravityAdapter implements IdeAdapter {
+  public readonly ideId = 'antigravity';
+  public readonly name = 'Google Antigravity IDE (MultiGravity)';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: true,
+    supportsSubagents: true,
+    mcpConfigFile: '.gemini/config/mcp_config.json'
+  };
+
+  public setupExclusions(repoRoot: string): IdeExclusionResult {
+    const settingsFile = path.resolve(repoRoot, '.gemini', 'settings.json');
+    updateJsonSettings(settingsFile, (s) => {
+      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
+      s['search.exclude'] = { ...(s['search.exclude'] || {}), 'experimental/**': true };
+      s['antigravity.multiAgent'] = true;
+    });
+    return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
+  }
 }
 
 export class VSCodeAdapter implements IdeAdapter {
   public readonly ideId = 'vscode';
-  public readonly name = 'VS Code / Google Antigravity';
+  public readonly name = 'Visual Studio Code';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: false,
+    supportsSubagents: false,
+    mcpConfigFile: '.vscode/mcp.json'
+  };
 
   public setupExclusions(repoRoot: string): IdeExclusionResult {
-    const vscodeDir = path.resolve(repoRoot, '.vscode');
-    const settingsFile = path.resolve(vscodeDir, 'settings.json');
-    fs.mkdirSync(vscodeDir, { recursive: true });
-
-    let settings: Record<string, any> = {};
-    if (fs.existsSync(settingsFile)) {
-      try {
-        settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-      } catch {
-        settings = {};
-      }
-    }
-
-    settings['files.exclude'] = {
-      ...(settings['files.exclude'] || {}),
-      'experimental/**': true
-    };
-    settings['search.exclude'] = {
-      ...(settings['search.exclude'] || {}),
-      'experimental/**': true
-    };
-
-    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2), 'utf8');
-    return {
-      ideId: this.ideId,
-      success: true,
-      configuredFiles: [settingsFile]
-    };
+    const settingsFile = path.resolve(repoRoot, '.vscode', 'settings.json');
+    updateJsonSettings(settingsFile, (s) => {
+      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
+      s['search.exclude'] = { ...(s['search.exclude'] || {}), 'experimental/**': true };
+    });
+    return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
   }
 }
 
 export class CursorAdapter implements IdeAdapter {
   public readonly ideId = 'cursor';
   public readonly name = 'Cursor AI IDE';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: true,
+    supportsSubagents: false,
+    mcpConfigFile: '.cursor/mcp.json'
+  };
 
   public setupExclusions(repoRoot: string): IdeExclusionResult {
-    const cursorDir = path.resolve(repoRoot, '.cursor');
-    const settingsFile = path.resolve(cursorDir, 'settings.json');
+    const settingsFile = path.resolve(repoRoot, '.cursor', 'settings.json');
     const rulesFile = path.resolve(repoRoot, '.cursorrules');
-    fs.mkdirSync(cursorDir, { recursive: true });
-
-    let settings: Record<string, any> = {};
-    if (fs.existsSync(settingsFile)) {
-      try {
-        settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-      } catch {
-        settings = {};
-      }
-    }
-
-    settings['files.exclude'] = {
-      ...(settings['files.exclude'] || {}),
-      'experimental/**': true
-    };
-    settings['search.exclude'] = {
-      ...(settings['search.exclude'] || {}),
-      'experimental/**': true
-    };
-
-    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2), 'utf8');
-
+    updateJsonSettings(settingsFile, (s) => {
+      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
+      s['search.exclude'] = { ...(s['search.exclude'] || {}), 'experimental/**': true };
+    });
     const ruleHeader = '# Aegis Autonomous Isolation Rule\nexperimental/**\n';
     if (!fs.existsSync(rulesFile) || !fs.readFileSync(rulesFile, 'utf8').includes('experimental/**')) {
       fs.appendFileSync(rulesFile, ruleHeader, 'utf8');
     }
+    return { ideId: this.ideId, success: true, configuredFiles: [settingsFile, rulesFile] };
+  }
+}
 
-    return {
-      ideId: this.ideId,
-      success: true,
-      configuredFiles: [settingsFile, rulesFile]
-    };
+export class WindsurfAdapter implements IdeAdapter {
+  public readonly ideId = 'windsurf';
+  public readonly name = 'Codeium Windsurf IDE';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: true,
+    supportsSubagents: false,
+    mcpConfigFile: '.codeium/windsurf/mcp_config.json'
+  };
+
+  public setupExclusions(repoRoot: string): IdeExclusionResult {
+    const settingsFile = path.resolve(repoRoot, '.windsurf', 'settings.json');
+    updateJsonSettings(settingsFile, (s) => {
+      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
+    });
+    return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
+  }
+}
+
+export class ZedAdapter implements IdeAdapter {
+  public readonly ideId = 'zed';
+  public readonly name = 'Zed Editor';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: false,
+    supportsSubagents: false,
+    mcpConfigFile: '.zed/settings.json'
+  };
+
+  public setupExclusions(repoRoot: string): IdeExclusionResult {
+    const settingsFile = path.resolve(repoRoot, '.zed', 'settings.json');
+    updateJsonSettings(settingsFile, (s) => {
+      s['file_scan_exclusions'] = [...(s['file_scan_exclusions'] || []), 'experimental/**'];
+    });
+    return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
   }
 }
 
@@ -96,8 +143,11 @@ export class IdeAdapterRegistry {
   private adapters: Map<string, IdeAdapter> = new Map();
 
   constructor() {
+    this.register(new AntigravityAdapter());
     this.register(new VSCodeAdapter());
     this.register(new CursorAdapter());
+    this.register(new WindsurfAdapter());
+    this.register(new ZedAdapter());
   }
 
   public register(adapter: IdeAdapter): void {
@@ -108,7 +158,11 @@ export class IdeAdapterRegistry {
     return this.adapters.get(ideId);
   }
 
-  public listAdapters(): string[] {
+  public listAdapters(): IdeAdapter[] {
+    return Array.from(this.adapters.values());
+  }
+
+  public listAdapterIds(): string[] {
     return Array.from(this.adapters.keys());
   }
 

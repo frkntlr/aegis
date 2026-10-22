@@ -1,5 +1,11 @@
 import * as path from 'node:path';
-import { WorktreeManager, TaskDispatcher, MergePipeline, IdeAdapterRegistry } from '@aegis/orchestrator';
+import {
+  WorktreeManager,
+  TaskDispatcher,
+  MergePipeline,
+  IdeAdapterRegistry,
+  McpSkillsSyncEngine
+} from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
 import { LoopBreaker } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
@@ -119,4 +125,46 @@ export async function handleDashboard(portArg?: string): Promise<void> {
   await server.start();
   console.log(`🌐 Aegis Web Command Center running at: http://localhost:${port}`);
   console.log(`   Press Ctrl+C to terminate server.`);
+}
+
+export function handleIdeList(): void {
+  showBanner();
+  console.log('💻 Supported IDEs and Multi-Agent Environments:');
+  const registry = new IdeAdapterRegistry();
+  for (const a of registry.listAdapters()) {
+    const mcp = a.capabilities.supportsMcp ? '✅ MCP' : '❌ No MCP';
+    const skills = a.capabilities.supportsSkills ? '✅ Skills' : '❌ No Skills';
+    const subagents = a.capabilities.supportsSubagents ? '✅ Subagents' : '❌ Single-agent';
+    console.log(` • [${a.ideId}] ${a.name}`);
+    console.log(`    Capabilities: ${mcp} | ${skills} | ${subagents}`);
+    if (a.capabilities.mcpConfigFile) {
+      console.log(`    Config:       ${a.capabilities.mcpConfigFile}`);
+    }
+  }
+}
+
+export function handleIdeSync(): void {
+  showBanner();
+  console.log('🔄 Synchronizing MCP Servers & Skills across all supported IDEs...');
+  const registry = new IdeAdapterRegistry();
+  const engine = new McpSkillsSyncEngine({
+    notebooklm: {
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      args: ['C:\\Users\\Lenovo\\Documents\\work\\notebooklm\\notebooklm-mcp-server\\dist\\index.js', 'server']
+    },
+    godot: {
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      args: ['C:\\Users\\Lenovo\\AppData\\Roaming\\npm\\node_modules\\godot-mcp-runtime\\dist\\index.js'],
+      env: { GODOT_MCP_DISABLE_ELICITATION: 'true' }
+    }
+  });
+
+  const results = engine.syncAll(registry.listAdapters(), process.cwd());
+  for (const r of results) {
+    if (r.supported) {
+      console.log(`✅ [${r.ideId}] ${r.message}`);
+    } else {
+      console.log(`⚠️  [${r.ideId}] ${r.message}`);
+    }
+  }
 }
