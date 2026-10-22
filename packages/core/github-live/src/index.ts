@@ -1,5 +1,6 @@
 export * from './types.js';
 export * from './github-client.js';
+export * from './wiki-suite.js';
 export * from './wiki-adapter.js';
 export * from './wiki-memory.js';
 export * from './token-resolver.js';

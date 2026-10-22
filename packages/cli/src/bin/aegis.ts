@@ -36,6 +36,7 @@ import {
   handleWikiShow,
   handleWikiSync,
   handleWikiStatus,
+  handleWikiSeed,
   handleGhLocate
 } from '../commands/project-commands.js';
 import { handleNlmQuery, handleNlmResearch } from '../commands/nlm-command.js';
@@ -57,6 +58,7 @@ function handleHelp(): void {
   console.log('  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column');
   console.log('  aegis wiki:list                        List living memory pages directly from GitHub Wiki');
   console.log('  aegis wiki:show <slug>                 Display page content directly from GitHub Wiki');
+  console.log('  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache');
   console.log('  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo');
   console.log('  aegis wiki:status                      Inspect GitHub Wiki remote git availability');
   console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
@@ -93,6 +95,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),
   'wiki:list': () => handleWikiList(),
   'wiki:show': (a) => handleWikiShow(a[1]),
+  'wiki:seed': () => handleWikiSeed(),
   'wiki:sync': () => handleWikiSync(),
   'wiki:status': () => handleWikiStatus(),
   merge: (a) => handleMerge(a[1], a[2]),

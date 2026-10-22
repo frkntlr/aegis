@@ -102,11 +102,34 @@ export function handleWikiSync(): void {
     return;
   }
 
-  const success = manager.syncLive();
-  if (success) {
-    console.log(`✅ GitHub Wiki synchronized successfully! (Pages: ${manager.listPages().length})`);
+  const pulled = manager.syncLive();
+  const pushed = manager.pushAllToRemote();
+  if (pulled || pushed.success) {
+    console.log(`✅ GitHub Wiki synchronized! Pages: ${manager.listPages().length}`);
   } else {
-    console.log('⚠️  Could not pull from GitHub Wiki. Please check network/auth.');
+    console.log(`⚠️  Sync status: ${pushed.message}`);
+  }
+}
+
+export function handleWikiSeed(): void {
+  showBanner();
+  console.log('🌱 Seeding living architecture suite into GitHub Wiki cache...');
+  const manager = new WikiMemoryManager();
+  const res = manager.seedSuite();
+  console.log(`✅ Seeded ${res.created} living architecture page(s) into .git/aegis-wiki:`);
+  for (const slug of res.pages) {
+    console.log(` • ${slug}`);
+  }
+
+  const status = manager.checkStatus();
+  if (status.available) {
+    console.log('\n🚀 Remote repository is online. Pushing all pages to GitHub Wiki...');
+    const pushRes = manager.pushAllToRemote();
+    console.log(pushRes.success ? `✅ ${pushRes.message}` : `⚠️  ${pushRes.message}`);
+  } else {
+    console.log('\n⏳ GitHub Wiki remote git repository is pending 1-click web initialization:');
+    console.log(`👉 ${status.initializeUrl || status.url}`);
+    console.log('   Once the first page is created on GitHub, run `aegis wiki:sync` to publish all 8 pages.');
   }
 }
 

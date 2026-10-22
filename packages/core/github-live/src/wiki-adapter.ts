@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { GitHubTokenResolver } from './token-resolver.js';
 import type { WikiPage, WikiSyncStatus } from './types.js';
+import { DEFAULT_WIKI_SUITE } from './wiki-suite.js';
 
 export interface WikiAdapterOptions {
   token?: string;
@@ -146,30 +147,82 @@ export class GitHubWikiLiveAdapter {
     };
   }
 
-  private getFallbackPages(): WikiPage[] {
-    return [
-      {
-        slug: 'architecture',
-        title: 'Aegis System Architecture',
-        threeBulletSummary: [
-          'Autonomous multi-worktree execution with Alice and Bob.',
-          'Deterministic Iron Cage quality gates (< 300 lines/file, < 40 lines/fn).',
-          'MultiGravity and cross-IDE MCP synchronization.'
-        ],
-        content: 'Living memory specification backed by GitHub Wiki.',
-        lastUpdated: new Date().toISOString()
-      },
-      {
-        slug: 'ast-skeleton',
-        title: 'AST Skeleton Prompt Caching',
-        threeBulletSummary: [
-          'Zero-token context reduction via skeleton maps (~82% savings).',
-          'Language extractors for TypeScript, Python, GDScript, Rust, and Go.',
-          'Surgical diff validation with zero hallucination.'
-        ],
-        content: 'Living memory specification backed by GitHub Wiki.',
-        lastUpdated: new Date().toISOString()
+  public seedComprehensiveWikiSuite(): { created: number; pages: string[] } {
+    fs.mkdirSync(this.cloneDir, { recursive: true });
+    this.ensureGitInitialized();
+    const createdSlugs: string[] = [];
+
+    for (const page of DEFAULT_WIKI_SUITE) {
+      const filePath = path.join(this.cloneDir, `${page.slug}.md`);
+      const md = [
+        `# ${page.title}`,
+        '',
+        '## Living Memory (Three Bullets)',
+        `• ${page.threeBullets[0]}`,
+        `• ${page.threeBullets[1]}`,
+        `• ${page.threeBullets[2]}`,
+        '',
+        page.content,
+        '',
+        `_Published to Aegis Living Memory on: ${new Date().toISOString()}_`
+      ].join('\n');
+      fs.writeFileSync(filePath, md, 'utf8');
+      createdSlugs.push(page.slug);
+    }
+
+    try {
+      execSync(`git -C "${this.cloneDir}" add .`, { stdio: 'pipe' });
+      execSync(`git -C "${this.cloneDir}" commit -m "docs(wiki): seed 8-page living architecture suite"`, { stdio: 'pipe' });
+    } catch {
+      // workspace already committed or clean
+    }
+    return { created: createdSlugs.length, pages: createdSlugs };
+  }
+
+  public pushAllToRemote(): { success: boolean; message: string } {
+    const status = this.checkRemoteAvailability();
+    if (!status.available) {
+      return {
+        success: false,
+        message: 'GitHub Wiki repository has not yet been initialized with its first page.'
+      };
+    }
+    try {
+      execSync(`git -C "${this.cloneDir}" push -u origin master --force`, { stdio: 'pipe', timeout: 15000 });
+      return { success: true, message: 'Successfully pushed all 8 pages to GitHub Wiki remote.' };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, message: `Git push failed: ${msg}` };
+    }
+  }
+
+  private ensureGitInitialized(): void {
+    const gitDir = path.join(this.cloneDir, '.git');
+    if (!fs.existsSync(gitDir)) {
+      execSync(`git -C "${this.cloneDir}" init -b master`, { stdio: 'pipe' });
+      execSync(`git -C "${this.cloneDir}" config user.name "Aegis Fleet"`, { stdio: 'pipe' });
+      execSync(`git -C "${this.cloneDir}" config user.email "aegis@local"`, { stdio: 'pipe' });
+    }
+    const remoteUrl = this.getWikiRemoteUrl();
+    try {
+      execSync(`git -C "${this.cloneDir}" remote get-url origin`, { stdio: 'pipe' });
+      execSync(`git -C "${this.cloneDir}" remote set-url origin "${remoteUrl}"`, { stdio: 'pipe' });
+    } catch {
+      try {
+        execSync(`git -C "${this.cloneDir}" remote add origin "${remoteUrl}"`, { stdio: 'pipe' });
+      } catch {
+        // remote already configured
       }
-    ];
+    }
+  }
+
+  private getFallbackPages(): WikiPage[] {
+    return DEFAULT_WIKI_SUITE.map(p => ({
+      slug: p.slug,
+      title: p.title,
+      threeBulletSummary: p.threeBullets,
+      content: p.content,
+      lastUpdated: new Date().toISOString()
+    }));
   }
 }

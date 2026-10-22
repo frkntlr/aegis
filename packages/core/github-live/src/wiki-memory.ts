@@ -73,4 +73,14 @@ export class WikiMemoryManager {
   public recordMergeSummary(slug: string, title: string, threeBullets: [string, string, string]): void {
     this.setPage(slug, title, threeBullets);
   }
+
+  public seedSuite(): { created: number; pages: string[] } {
+    const res = this.adapter.seedComprehensiveWikiSuite();
+    this.refreshPages();
+    return res;
+  }
+
+  public pushAllToRemote(): { success: boolean; message: string } {
+    return this.adapter.pushAllToRemote();
+  }
 }
