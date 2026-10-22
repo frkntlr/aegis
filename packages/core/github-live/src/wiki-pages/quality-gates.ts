@@ -6,7 +6,7 @@ export const QUALITY_GATES_PAGE: WikiSuitePage = {
   threeBullets: [
     'Demir Kafes Standartları: Fonksiyon başına maksimum 40 satır, dosya başına maksimum 300 satır.',
     'Mutasyon Test Kapısı: En az %70 mutant imha puanı şartıyla onaylanan commitler.',
-    'Değişmez Kâhin (Immutable Oracle) ve Sıfır-Token BoundingBox UI Geometri Denetimi.'
+    'Kendi Kendini Onaran Görev Nöbetçisi (OrphanTaskReclaimer) ve Değişmez Kâhin güvenliği.'
   ],
   content: [
     '## 🛡️ Deterministik Demir Kafes & Kalite Kapıları',
@@ -53,6 +53,14 @@ export const QUALITY_GATES_PAGE: WikiSuitePage = {
     'Aegis `aegis inspect` aracı ile:',
     '- UI elemanlarının koordinatlarını ve BoundingBox boyutlarını çıkarır.',
     '- Aynı Z-index katmanındaki çakışmaları (overlap) ve ekran taşmalarını (overflow) matematiksel olarak hesaplar.',
-    '- Mobil (375x667), Tablet (768x1024) ve Masaüstü (1920x1080) çözünürlüklerinde **0 LLM tokeni harcayarak** piksel ve yerleşim kusurlarını saptar!'
+    '- Mobil (375x667), Tablet (768x1024) ve Masaüstü (1920x1080) çözünürlüklerinde **0 LLM tokeni harcayarak** piksel ve yerleşim kusurlarını saptar!',
+    '',
+    '---',
+    '',
+    '### 5. Kendi Kendini Onaran Görev Nöbetçisi (`OrphanTaskReclaimer`)',
+    'Ajanların yarıda bıraktığı, oturumun çöktüğü veya dosya kilidi tutulmadan `in_progress` statüsünde asılı kalan "hayalet" görevleri otomatik olarak kurtarır:',
+    '- **Kilit Doğrulaması:** Ajanın hedef dosyalarda aktif `lock:<dosya>` tutup tutmadığını kontrol eder.',
+    '- **Kalp Atışı (Heartbeat) Denetimi:** 10 dakikadan uzun süredir telemetri üretmeyen ajanların görevlerini serbest bırakır.',
+    '- **Otomatik Sıfırlama:** Sahipsiz veya terk edilmiş görevleri `ready` (Todo) statüsüne geri döndürerek diğer ajanların almasını sağlar.'
   ].join('\n')
 };

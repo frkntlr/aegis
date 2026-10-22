@@ -1,6 +1,7 @@
 import * as http from 'node:http';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
 import { WorktreeManager, IdeLauncher, UniversalToolchainSync, RoleClassifier } from '@aegis/orchestrator';
+import { OrphanTaskReclaimer } from '@aegis/watchdog';
 import { SessionDetector } from './session-detector.js';
 import { RealtimeMetricsService } from './realtime-metrics.js';
 import { AegisEngineService } from './engine-service.js';
@@ -21,6 +22,7 @@ export class DashboardServer {
   private launcher: IdeLauncher;
   private toolchainSync: UniversalToolchainSync;
   private engineSvc: AegisEngineService;
+  private orphanReclaimer: OrphanTaskReclaimer;
   private sseClients = new Set<http.ServerResponse>();
 
   constructor(options: DashboardServerOptions = {}) {
@@ -32,6 +34,7 @@ export class DashboardServer {
     this.launcher = new IdeLauncher();
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);
     this.engineSvc = new AegisEngineService();
+    this.orphanReclaimer = new OrphanTaskReclaimer();
   }
 
   public getStatusPayload(): Record<string, any> {
@@ -155,13 +158,30 @@ export class DashboardServer {
     return { success: false, error: 'Bilinmeyen işlem' };
   }
 
+  private handleReclaimOrphans(): Record<string, any> {
+    const issues = this.metrics.getIssues();
+    const locks = this.wtManager.getLockedFiles();
+    const sessions = this.detector.detectSessions();
+    const { reclaimed } = this.orphanReclaimer.scanAndReclaim(issues, locks, sessions);
+    for (const r of reclaimed) {
+      this.metrics.moveTask(r.issueNumber, 'ready');
+      if (r.previousAgent) this.wtManager.releaseFileLocks(r.previousAgent);
+    }
+    const msg = reclaimed.length > 0
+      ? `${reclaimed.length} adet asılı görev kurtarılarak 'Ready' sütununa devredildi.`
+      : 'Tüm görevler tutarlı. Asılı veya yetim görev yok.';
+    return { success: true, count: reclaimed.length, reclaimed, message: msg };
+  }
+
   private async executeAction(action: string, payload: any): Promise<Record<string, any>> {
     if (action === 'auto') return this.handleAutoAction();
     if (action === 'move_task') return this.handleMoveTask(payload);
+    if (action === 'reclaim_orphans') return this.handleReclaimOrphans();
     if (action === 'sync_github') {
       const issues = await this.metrics.fetchLiveIssues();
+      this.handleReclaimOrphans();
       const status = this.metrics.getGitHubStatus();
-      return { success: true, issues, status, message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.` };
+      return { success: true, issues: this.metrics.getIssues(), status, message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.` };
     }
     if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings', 'set_primary_branch'].includes(action)) {
       return this.handleIdeAndSync(action, payload);

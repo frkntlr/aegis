@@ -6,7 +6,7 @@ export const KANBAN_PROTOCOL_PAGE: WikiSuitePage = {
   threeBullets: [
     'GitHub Projects v2 (Project 4) ile canlı GraphQL iki yönlü görev senkronizasyonu.',
     'Görev Durum Döngüsü: ready (Todo) -> in_progress -> review -> done (Tamamlandı).',
-    'Web Komuta Merkezi (localhost:3000): Gerçek zamanlı sürükle-bırak Kanban ve AST telemetrisi.'
+    'Self-Healing Nöbetçi & Web Komuta Merkezi: Asılı/hayalet görevleri otomatik kurtarma ve AST telemetrisi.'
   ],
   content: [
     '## 📋 GitHub Projects v2 & Otonom Görev Protokolü',
@@ -37,12 +37,21 @@ export const KANBAN_PROTOCOL_PAGE: WikiSuitePage = {
     '',
     '1. **Canlı Sürükle-Bırak (Drag-and-Drop) Kanban:** Kartları sütunlar arasında sürüklemek, anında GitHub Projects v2 API\'sini tetikleyerek uzaktaki panoyu günceller.',
     '2. **Ajan Oturum Algılayıcısı (`SessionDetector`):** Hangi worktree\'de hangi ajanın aktif olduğunu, son kalp atışı (heartbeat) ve açık dosya kilitlerini canlı gösterir.',
-    '3. **Gerçek Zamanlı AST & Token Tasarruf Telemetrisi:** Projedeki toplam satır sayısı, Demir Kafes uygunluk oranı ve prompt önbellekleme tasarruf yüzdesi hesaplanır.',
-    '4. **Çekirdek Araç Koşucusu:** `ide:sync`, `wiki:sync`, `cage:check` ve `inspect` gibi araçlar tek tıkla arayüzden çalıştırılabilir.',
+    '3. **Otonom Görev Kurtarma Butonu (Kurtar 🛡️):** Asılı veya sahipsiz kalan görevleri tek tıkla tarar ve `ready` durumuna döndürür.',
+    '4. **Gerçek Zamanlı AST & Token Tasarruf Telemetrisi:** Projedeki toplam satır sayısı, Demir Kafes uygunluk oranı ve prompt önbellekleme tasarruf yüzdesi hesaplanır.',
+    '5. **Çekirdek Araç Koşucusu:** `ide:sync`, `wiki:sync`, `cage:check` ve `inspect` gibi araçlar tek tıkla arayüzden çalıştırılabilir.',
     '',
     '---',
     '',
-    '### 4. Kanban CLI Komutları',
+    '### 4. Hayalet Görevleri Önleme & Kendi Kendini İyileştirme',
+    'Aegis CLI `auto` döngüsünde ya da Web Komuta Merkezi senkronizasyonunda:',
+    '- Sahipsiz `in_progress` görevleri otomatik tespit edilir.',
+    '- Kilit tutmayan veya oturumu kapanmış ajanların görevleri `ready` durumuna iade edilir.',
+    '- Bu sayede sistemde hiçbir görev sonsuza kadar "in progress" kalmaz.',
+    '',
+    '---',
+    '',
+    '### 5. Kanban CLI Komutları',
     '',
     '```powershell',
     '# Panoları listele',

@@ -21,6 +21,7 @@ test('getDashboardHtml renders essential dashboard sections and drag-drop suppor
   assert.ok(html.includes('modal-settings'));
   assert.ok(html.includes('set-primary-branch'));
   assert.ok(html.includes('branch-badge'));
+  assert.ok(html.includes('reclaim_orphans'));
   assert.ok(html.includes('handleDrop'));
 });
 
@@ -121,7 +122,6 @@ test('DashboardServer handles run_engine_tool and sync_toolchain via API', async
   const server = new DashboardServer({ port: 0, repoRoot: tmpDir });
   const port = await server.start();
   try {
-    assert.ok(port > 0);
     const toolRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -135,7 +135,17 @@ test('DashboardServer handles run_engine_tool and sync_toolchain via API', async
       body: JSON.stringify({ action: 'sync_toolchain' })
     });
     assert.strictEqual(syncRes.status, 200);
+  } finally {
+    await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
 
+test('DashboardServer handles save_settings and reclaim_orphans via API', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-dash-set-'));
+  const server = new DashboardServer({ port: 0, repoRoot: tmpDir });
+  const port = await server.start();
+  try {
     const setRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -144,6 +154,15 @@ test('DashboardServer handles run_engine_tool and sync_toolchain via API', async
     assert.strictEqual(setRes.status, 200);
     const setData = await setRes.json() as any;
     assert.strictEqual(setData.settings.primaryBranch, 'master');
+
+    const recRes = await fetch(`http://localhost:${port}/api/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reclaim_orphans' })
+    });
+    assert.strictEqual(recRes.status, 200);
+    const recData = await recRes.json() as any;
+    assert.strictEqual(recData.success, true);
   } finally {
     await server.stop();
     fs.rmSync(tmpDir, { recursive: true, force: true });

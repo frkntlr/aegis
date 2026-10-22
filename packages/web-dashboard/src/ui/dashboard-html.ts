@@ -27,6 +27,7 @@ export function getDashboardHtml(): string {
       <button class="btn btn-secondary" onclick="openModal('modal-engines')">Aegis Motorları ⚡</button>
       <button class="btn btn-secondary" onclick="openModal('modal-settings')">Ayarlar ⚙️</button>
       <button class="btn btn-secondary" onclick="openModal('modal-new-task')">Yeni Görev ➕</button>
+      <button class="btn btn-secondary" onclick="sendAction('reclaim_orphans')" title="Sahipsiz, kilit bağlantısı kopmuş veya asılı kalmış görevleri kurtarır">Kurtar 🛡️</button>
       <button class="btn btn-secondary" onclick="sendAction('release_locks')">Kilitleri Aç 🔓</button>
       <button class="btn" onclick="sendAction('auto')">Otonom Dağıtıcı (/auto) ▶</button>
     </div>

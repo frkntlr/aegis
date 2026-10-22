@@ -43,11 +43,9 @@ export class GitHubKanbanService {
         id: 1,
         number: 1,
         title: 'feat(kanban): Real-time GitHub Projects & Kanban Live Synchronization',
-        status: 'in_progress',
+        status: 'done',
         targetFiles: ['packages/web-dashboard/src/server/github-kanban.ts'],
-        labels: ['status:in_progress', 'aegis:task'],
-        assignedAgent: 'solver',
-        assignedIde: 'Google Antigravity'
+        labels: ['status:done', 'aegis:task']
       },
       {
         id: 2,

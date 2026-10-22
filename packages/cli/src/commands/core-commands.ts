@@ -8,7 +8,7 @@ import {
   McpSkillsSyncEngine
 } from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
-import { LoopBreaker } from '@aegis/watchdog';
+import { LoopBreaker, OrphanTaskReclaimer } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
 import { showBanner } from './banner.js';
 
@@ -56,6 +56,19 @@ export function handleStatus(): void {
   }
 }
 
+async function reclaimStaleTasks(ghClient: GitHubClient, wtManager: WorktreeManager): Promise<void> {
+  const all = ghClient.listAllIssues();
+  const locks = wtManager.getLockedFiles();
+  const reclaimer = new OrphanTaskReclaimer();
+  const { reclaimed } = reclaimer.scanAndReclaim(all, locks);
+  if (reclaimed.length > 0) {
+    console.log(`🛡️  Watchdog: ${reclaimed.length} asılı görev kurtarıldı (Ready havuzuna devredildi).`);
+    for (const r of reclaimed) {
+      ghClient.updateIssueStatus(r.issueNumber, 'ready');
+    }
+  }
+}
+
 export async function handleAuto(): Promise<void> {
   showBanner();
   console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
@@ -66,6 +79,7 @@ export async function handleAuto(): Promise<void> {
 
   if (ghClient.isLive()) {
     await ghClient.syncFromLive();
+    await reclaimStaleTasks(ghClient, wtManager);
   } else {
     ghClient.registerIssue({
       id: 101,

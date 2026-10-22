@@ -62,6 +62,10 @@ export class GitHubClient {
     return Array.from(this.issues.values()).filter(i => i.status === 'ready');
   }
 
+  public listAllIssues(): GitHubIssue[] {
+    return Array.from(this.issues.values());
+  }
+
   public getIssue(issueNumber: number): GitHubIssue | undefined {
     return this.issues.get(issueNumber);
   }
