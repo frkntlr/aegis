@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { IronCageValidator } from '@aegis/iron-cage';
-import { TypeScriptSkeletonExtractor, DiffEngine } from '@aegis/ast-skeleton';
+import { SkeletonGenerator, DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
 import { showBanner } from './banner.js';
@@ -68,8 +68,8 @@ export function handleSkeleton(targetFile?: string): void {
   }
 
   const content = fs.readFileSync(fullPath, 'utf8');
-  const extractor = new TypeScriptSkeletonExtractor();
-  const res = extractor.extract(targetFile, content);
+  const generator = new SkeletonGenerator();
+  const res = generator.extractFile(targetFile, content);
 
   console.log(`🗺️  AST Skeleton for: ${targetFile}`);
   console.log(` • Original Size: ${res.originalLength} chars`);
