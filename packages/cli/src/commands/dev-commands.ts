@@ -85,8 +85,9 @@ export function handleDiff(diffText?: string): void {
     console.error('❌ Usage: aegis diff <diffStringOrFile>');
     process.exit(1);
   }
+  const diffContent = (diffText && fs.existsSync(diffText)) ? fs.readFileSync(diffText, 'utf8') : (diffText || '');
   const engine = new DiffEngine();
-  const parsed = engine.parseAndValidate(diffText);
+  const parsed = engine.parseAndValidate(diffContent);
   if (parsed.isSurgical) {
     console.log(`✅ Diff is Surgical: +${parsed.addedLinesCount} / -${parsed.deletedLinesCount} lines`);
   } else {

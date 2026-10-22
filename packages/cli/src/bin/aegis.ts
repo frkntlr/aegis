@@ -70,7 +70,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'cage:check': (a) => handleCageCheck(a[1]),
   skeleton: (a) => handleSkeleton(a[1]),
   'skeleton:scan': (a) => handleSkeletonScan(a[1]),
-  diff: (a) => handleDiff(a[1]),
+  diff: (a) => handleDiff(a.length > 2 ? a.slice(1).join(' ') : a[1]),
   audit: (a) => handleAudit(a[1])
 };
 

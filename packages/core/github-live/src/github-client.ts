@@ -66,6 +66,19 @@ export class GitHubClient {
     return this.issues.get(issueNumber);
   }
 
+  public async fetchIssue(issueNumber: number): Promise<GitHubIssue | undefined> {
+    const existing = this.issues.get(issueNumber);
+    if (existing) return existing;
+    if (!this.liveAdapter) return undefined;
+    try {
+      const { issues } = await this.liveAdapter.listIssues(undefined, undefined, 'all');
+      for (const i of issues) this.registerIssue(i);
+      return this.issues.get(issueNumber);
+    } catch {
+      return undefined;
+    }
+  }
+
   public claimIssue(issueNumber: number, agentName: string): { success: boolean; issue?: GitHubIssue; error?: string } {
     const issue = this.issues.get(issueNumber);
     if (!issue) {

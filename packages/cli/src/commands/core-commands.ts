@@ -45,34 +45,42 @@ export function handleStatus(): void {
   }
 }
 
-export function handleAuto(): void {
+export async function handleAuto(): Promise<void> {
   showBanner();
   console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
-  const ghClient = new GitHubClient();
+  const ghClient = new GitHubClient({ autoConnectLive: true });
   const wtManager = new WorktreeManager({ persistLocks: true });
   const loopBreaker = new LoopBreaker();
   const dispatcher = new TaskDispatcher(wtManager, loopBreaker);
 
-  ghClient.registerIssue({
-    id: 101,
-    number: 101,
-    title: 'Implement User Avatar Component',
-    body: 'Create avatar with fallback initials',
-    labels: ['status:ready', 'lock:src/Avatar.tsx', 'wiki:ui-components'],
-    status: 'ready',
-    targetFiles: ['src/Avatar.tsx'],
-    acceptanceCriteria: ['Pass unit tests', 'No spagetti code']
-  });
+  if (ghClient.isLive()) {
+    await ghClient.syncFromLive();
+  } else {
+    ghClient.registerIssue({
+      id: 101,
+      number: 101,
+      title: 'Implement User Avatar Component',
+      body: 'Create avatar with fallback initials',
+      labels: ['status:ready', 'lock:src/Avatar.tsx', 'wiki:ui-components'],
+      status: 'ready',
+      targetFiles: ['src/Avatar.tsx'],
+      acceptanceCriteria: ['Pass unit tests', 'No spagetti code']
+    });
+  }
 
   const ready = ghClient.listReadyIssues();
   const result = dispatcher.dispatchNextTask(['alice', 'bob'], ready);
 
   if (result.dispatched && result.agentName && result.issue) {
-    ghClient.claimIssue(result.issue.number, result.agentName);
+    if (ghClient.isLive()) {
+      await ghClient.claimLiveIssue(result.issue.number, result.agentName);
+    } else {
+      ghClient.claimIssue(result.issue.number, result.agentName);
+    }
     console.log(`🎯 Task Claimed!`);
     console.log(` • Agent:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
     console.log(` • Issue:  #${result.issue.number} - "${result.issue.title}"`);
-    console.log(` • Target: ${result.issue.targetFiles.join(', ')} (Locked)`);
+    console.log(` • Target: ${result.issue.targetFiles.join(', ') || 'General repository'} (Locked)`);
   } else {
     console.log(`⏸️  No dispatchable tasks: ${result.reason}`);
   }

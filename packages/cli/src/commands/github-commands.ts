@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { GitHubTokenResolver, GitHubLiveAdapter, GitHubClient } from '@aegis/github-live';
 import { WorktreeManager, TaskDispatcher } from '@aegis/orchestrator';
 import { showBanner } from './banner.js';
@@ -54,7 +56,17 @@ export async function handleGhSync(tokenArg?: string): Promise<void> {
     await client.claimLiveIssue(dispatchResult.issue.number, dispatchResult.agentName);
     console.log(`🎯 Live Issue #${dispatchResult.issue.number} Claimed!`);
     console.log(` • Agent: ${dispatchResult.agentName.toUpperCase()} in experimental/${dispatchResult.agentName}`);
-    console.log(` • Locks: ${dispatchResult.issue.targetFiles.join(', ')}`);
+    console.log(` • Locks: ${dispatchResult.issue.targetFiles.join(', ') || 'General'}`);
+    const pDir = path.resolve(process.cwd(), '.aegis', 'prompts');
+    fs.mkdirSync(pDir, { recursive: true });
+    const pFile = path.resolve(pDir, `${dispatchResult.agentName}-issue-${dispatchResult.issue.number}.md`);
+    const pContent = `# 🎯 Task: #${dispatchResult.issue.number} ${dispatchResult.issue.title}\n` +
+      `Agent: @${dispatchResult.agentName.toUpperCase()} | Status: IN_PROGRESS\n` +
+      `Target Files: ${dispatchResult.issue.targetFiles.join(', ') || 'General'}\n\n` +
+      `## Acceptance Criteria\n` +
+      dispatchResult.issue.acceptanceCriteria.map(c => `- [ ] ${c}`).join('\n');
+    fs.writeFileSync(pFile, pContent, 'utf8');
+    console.log(` • Prompt: ${pFile}`);
   } else {
     console.log(`⏸️  No tasks dispatched: ${dispatchResult.reason}`);
   }

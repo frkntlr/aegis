@@ -13,9 +13,11 @@ export interface PromptResult {
   promptMarkdown: string;
 }
 
-function resolveIssue(issueNumber: number, client: GitHubClient): GitHubIssue {
+async function resolveIssue(issueNumber: number, client: GitHubClient): Promise<GitHubIssue> {
   const existing = client.getIssue(issueNumber);
   if (existing) return existing;
+  const fetched = await client.fetchIssue(issueNumber);
+  if (fetched) return fetched;
 
   const mock: GitHubIssue = {
     id: issueNumber,
@@ -46,14 +48,14 @@ function formatTaskDescription(agentName: string, issue: GitHubIssue): string {
   return lines.join('\n');
 }
 
-export function compilePrompt(
+export async function compilePrompt(
   agentName: string,
   issueNumber: number,
-  client = new GitHubClient()
-): PromptResult {
+  client = new GitHubClient({ autoConnectLive: true })
+): Promise<PromptResult> {
   const wtManager = new WorktreeManager();
   const worktreePath = wtManager.getWorktreePath(agentName);
-  const issue = resolveIssue(issueNumber, client);
+  const issue = await resolveIssue(issueNumber, client);
 
   const generator = new SkeletonGenerator();
   const skeletonResult = generator.generateForFiles(issue.targetFiles, process.cwd());
@@ -76,7 +78,7 @@ export function compilePrompt(
   return { agentName, issue, worktreePath, context, promptMarkdown };
 }
 
-export function handlePrompt(agentArg?: string, issueArg?: string, flag?: string): void {
+export async function handlePrompt(agentArg?: string, issueArg?: string, flag?: string): Promise<void> {
   if (flag !== '--json') {
     showBanner();
   }
@@ -86,7 +88,7 @@ export function handlePrompt(agentArg?: string, issueArg?: string, flag?: string
   }
 
   const issueNumber = parseInt(issueArg, 10);
-  const result = compilePrompt(agentArg, issueNumber);
+  const result = await compilePrompt(agentArg, issueNumber);
 
   if (flag === '--json') {
     console.log(JSON.stringify(result, null, 2));
