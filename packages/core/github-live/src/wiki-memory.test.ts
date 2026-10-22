@@ -61,7 +61,7 @@ test('GitHubWikiLiveAdapter seeds 8-page living architecture suite into git cach
 
     const home = adapter.getPage('Home');
     assert.ok(home);
-    assert.ok(home.content.includes('Welcome to the Aegis Living Architecture Wiki'));
+    assert.ok(home.content.includes('Aegis Yaşayan Mimari Dokümantasyonuna Hoş Geldiniz'));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

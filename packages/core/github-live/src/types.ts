@@ -19,6 +19,13 @@ export interface WikiPage {
   lastUpdated: string;
 }
 
+export interface WikiSuitePage {
+  slug: string;
+  title: string;
+  threeBullets: [string, string, string];
+  content: string;
+}
+
 export interface WikiSyncStatus {
   available: boolean;
   url: string;
