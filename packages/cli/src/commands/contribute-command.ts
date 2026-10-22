@@ -69,3 +69,36 @@ export function handleRfcTriage(titleArg?: string, bodyArg?: string): void {
   console.log(`📚 NotebookLM Research Note: ${note.filePath}`);
   console.log(`✅ Ready to convert to GitHub Issue with labels: ${issue.labels.join(', ')}`);
 }
+
+export function handleNlmSync(): void {
+  showBanner();
+  console.log('📚 Synchronizing Aegis Architecture & Research with NotebookLM...');
+  const researchDir = path.resolve(process.cwd(), '.aegis', 'research');
+  fs.mkdirSync(researchDir, { recursive: true });
+
+  const bundleFile = path.resolve(researchDir, 'aegis-collective-knowledge.md');
+  const bundleContent = [
+    '# 🛡️ Aegis Collective Knowledge & Ecosystem Architecture',
+    `*Generated on ${new Date().toISOString()}*`,
+    '',
+    '## 1. Multi-Editor & Mulgravity Support',
+    '- Detects Google Antigravity (mulgravity), Cursor AI, and VS Code workspaces.',
+    '- Worktrees: experimental/alice, experimental/bob, experimental/contributor.',
+    '',
+    '## 2. Deterministic Iron Cage (Demir Kafes)',
+    '- Max 40 lines per function, max 300 lines per file.',
+    '- Pre-commit quality gate strictly enforces 100% compliance before landing commits.',
+    '',
+    '## 3. AST Skeleton & Token Savings',
+    '- Supported Languages: TypeScript, Python, GDScript, Rust.',
+    '- Average Token Savings: 67% - 95%.',
+    '',
+    '## 4. GitHub RFC & Self-Evolving Ecosystem',
+    '- Discussions RFC triage via RfcTriager.',
+    '- 4-Step Atomic Merge Pipeline: Test -> Rebase -> Merge -> Sibling Sync.'
+  ].join('\n');
+
+  fs.writeFileSync(bundleFile, bundleContent, 'utf8');
+  console.log(`✅ Knowledge Bundle Exported: ${bundleFile}`);
+  console.log('📖 Ready for direct sync & query with NotebookLM (3767b1fc-5759-416d-b938-495b8138ccd7).');
+}
