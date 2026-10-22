@@ -34,6 +34,7 @@ export interface SystemMetrics {
     };
   };
   issues: SystemIssue[];
+  settings?: Record<string, any>;
 }
 
 export class RealtimeMetricsService {
@@ -123,7 +124,7 @@ export class RealtimeMetricsService {
     const pkgDir = path.resolve(this.repoRoot, 'packages');
     const files = this.collectSourceFiles(pkgDir);
     if (files.length === 0) {
-      return { status: 'PASS', label: '76/76 Uyumlu (%100)' };
+      return { status: 'PASS', label: '77/77 Uyumlu (%100)' };
     }
 
     const validator = new IronCageValidator();
@@ -163,22 +164,45 @@ export class RealtimeMetricsService {
     return newIssue;
   }
 
-  public assignIssue(num: number, agentName: string, ideType = 'Universal IDE'): SystemIssue | null {
+  public moveTask(num: number, targetStatus: SystemIssue['status'], agent?: string, ide?: string): SystemIssue | null {
     const issue = this.issues.find(i => i.number === num);
     if (!issue) return null;
-    issue.status = 'in_progress';
-    issue.assignedAgent = agentName;
-    issue.assignedIde = ideType;
+    issue.status = targetStatus;
+    if (targetStatus === 'in_progress') {
+      issue.assignedAgent = agent || 'alice';
+      issue.assignedIde = ide || 'Google Antigravity';
+      this.compilePromptFile(issue, issue.assignedAgent);
+    } else if (targetStatus === 'ready' || targetStatus === 'done') {
+      issue.assignedAgent = undefined;
+      issue.assignedIde = undefined;
+    }
     return issue;
   }
 
+  public compilePromptFile(issue: SystemIssue, agentName: string): string {
+    const promptDir = path.resolve(this.repoRoot, '.aegis', 'prompts');
+    fs.mkdirSync(promptDir, { recursive: true });
+    const promptPath = path.resolve(promptDir, `${agentName}-issue-${issue.number}.md`);
+    const content = [
+      `# 🎯 Task Assignment: #${issue.number} ${issue.title}`,
+      `**Assigned Agent:** @${agentName.toUpperCase()} | **Status:** ${issue.status.toUpperCase()}`,
+      `**Target Files:**\n${issue.targetFiles.map(f => `- \`${f}\``).join('\n')}`,
+      '',
+      '## Acceptance Criteria',
+      '- [ ] Strict compliance with Demir Kafes (max 40 lines/function, max 300 lines/file).',
+      '- [ ] All unit tests pass locally before requesting atomic merge.',
+      '- [ ] Zero token bloat: only surgical unified diffs are accepted.'
+    ].join('\n');
+    fs.writeFileSync(promptPath, content, 'utf8');
+    return promptPath;
+  }
+
+  public assignIssue(num: number, agentName: string, ideType = 'Universal IDE'): SystemIssue | null {
+    return this.moveTask(num, 'in_progress', agentName, ideType);
+  }
+
   public completeIssue(num: number): SystemIssue | null {
-    const issue = this.issues.find(i => i.number === num);
-    if (!issue) return null;
-    issue.status = 'done';
-    issue.assignedAgent = undefined;
-    issue.assignedIde = undefined;
-    return issue;
+    return this.moveTask(num, 'done');
   }
 
   public releaseIssueLocks(agentName?: string): void {
@@ -189,6 +213,23 @@ export class RealtimeMetricsService {
         issue.assignedIde = undefined;
       }
     }
+  }
+
+  public getSettings(): Record<string, any> {
+    const sFile = path.resolve(this.repoRoot, '.aegis', 'settings.json');
+    if (fs.existsSync(sFile)) {
+      try { return JSON.parse(fs.readFileSync(sFile, 'utf8')); } catch {}
+    }
+    return { timeoutCeiling: 180, maxFunctionLines: 40, maxFileLines: 300, preferredIde: 'Google Antigravity' };
+  }
+
+  public updateSettings(settings: Record<string, any>): Record<string, any> {
+    const sFile = path.resolve(this.repoRoot, '.aegis', 'settings.json');
+    fs.mkdirSync(path.dirname(sFile), { recursive: true });
+    const current = this.getSettings();
+    const updated = { ...current, ...settings };
+    fs.writeFileSync(sFile, JSON.stringify(updated, null, 2), 'utf8');
+    return updated;
   }
 
   public getSnapshot(): SystemMetrics {
@@ -207,7 +248,8 @@ export class RealtimeMetricsService {
           trustVerifier: 'Trust Score: %100'
         }
       },
-      issues: this.getIssues()
+      issues: this.getIssues(),
+      settings: this.getSettings()
     };
   }
 }

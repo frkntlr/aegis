@@ -24,9 +24,11 @@ export const DASHBOARD_CSS = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     border-bottom: 1px solid var(--border);
     padding-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
   }
   .logo-group { display: flex; align-items: center; gap: 0.75rem; }
   .logo-badge {
@@ -108,7 +110,7 @@ export const DASHBOARD_CSS = `
     justify-content: space-between;
     align-items: center;
   }
-  .agent-name { font-weight: 600; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .agent-name { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
   .status-badge {
     padding: 0.2rem 0.6rem;
     border-radius: 12px;
@@ -127,7 +129,12 @@ export const DASHBOARD_CSS = `
     background: #21262d;
     border-radius: 6px;
     padding: 0.75rem;
-    min-height: 200px;
+    min-height: 220px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .kanban-col.drag-over {
+    background: #2a323d;
+    outline: 2px dashed var(--accent);
   }
   .kanban-col-header {
     font-size: 0.8rem;
@@ -140,19 +147,25 @@ export const DASHBOARD_CSS = `
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 0.6rem;
+    padding: 0.7rem;
     font-size: 0.85rem;
     margin-bottom: 0.5rem;
+    cursor: grab;
+    user-select: none;
+    transition: transform 0.15s, border-color 0.15s;
   }
+  .kanban-card:active { cursor: grabbing; opacity: 0.75; transform: scale(0.98); }
+  .gh-link { color: var(--accent); text-decoration: none; font-size: 0.75rem; }
+  .gh-link:hover { text-decoration: underline; }
   .btn {
     background: var(--green);
     color: white;
     border: 1px solid rgba(240,246,252,0.1);
-    padding: 0.5rem 1rem;
+    padding: 0.45rem 0.9rem;
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     transition: background 0.2s;
   }
   .btn:hover { background: #2ea043; }
@@ -162,6 +175,7 @@ export const DASHBOARD_CSS = `
     border: 1px solid var(--border);
   }
   .btn-secondary:hover { background: #30363d; }
+  .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.7rem; }
   .log-box {
     background: #090d13;
     border: 1px solid var(--border);
@@ -169,7 +183,52 @@ export const DASHBOARD_CSS = `
     padding: 0.75rem;
     font-family: monospace;
     font-size: 0.8rem;
-    height: 120px;
+    height: 130px;
+    overflow-y: auto;
+  }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+  .modal-dialog {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-width: 620px;
+    width: 90%;
+    padding: 1.5rem;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  .form-control {
+    width: 100%;
+    background: #090d13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.55rem;
+    margin-top: 0.35rem;
+    margin-bottom: 0.85rem;
+    font-family: var(--font);
+    font-size: 0.85rem;
+  }
+  .tool-result {
+    background: #090d13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+    font-family: monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    max-height: 180px;
     overflow-y: auto;
   }
 `;

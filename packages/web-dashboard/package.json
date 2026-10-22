@@ -15,7 +15,10 @@
     "@aegis/github-live": "*",
     "@aegis/mcp-security": "*",
     "@aegis/ast-skeleton": "*",
-    "@aegis/iron-cage": "*"
+    "@aegis/iron-cage": "*",
+    "@aegis/telemetry-tester": "*",
+    "@aegis/watchdog": "*",
+    "@aegis/trust-verifier": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

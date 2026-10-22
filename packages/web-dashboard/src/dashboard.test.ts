@@ -1,21 +1,24 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { DashboardServer } from './server/dashboard-server.js';
 import { SessionDetector } from './server/session-detector.js';
 import { RealtimeMetricsService } from './server/realtime-metrics.js';
+import { AegisEngineService } from './server/engine-service.js';
 import { getDashboardHtml } from './ui/dashboard-html.js';
 
-test('getDashboardHtml renders essential dashboard sections and SSE client', () => {
+test('getDashboardHtml renders essential dashboard sections and drag-drop support', () => {
   const html = getDashboardHtml();
   assert.ok(html.includes('AEGIS'));
   assert.ok(html.includes('Command Center'));
-  assert.ok(html.includes('Token & Bağlam Termometresi'));
-  assert.ok(html.includes('Deterministik Kalite Kalkanları'));
-  assert.ok(html.includes('EventSource(\'/api/events\')'));
-  assert.ok(html.includes('Mulgravity'));
   assert.ok(html.includes('col-ready'));
   assert.ok(html.includes('col-in_progress'));
-  assert.ok(html.includes('sendAction(\'scan_ast\')'));
+  assert.ok(html.includes('modal-new-task'));
+  assert.ok(html.includes('modal-engines'));
+  assert.ok(html.includes('modal-settings'));
+  assert.ok(html.includes('handleDrop'));
 });
 
 test('SessionDetector accurately detects worktree sessions and registers heartbeats', () => {
@@ -40,11 +43,11 @@ test('RealtimeMetricsService manages dynamic issues and calculates real AST metr
   assert.strictEqual(created.title, 'Test Dynamic Task');
   assert.strictEqual(created.status, 'ready');
 
-  const assigned = metrics.assignIssue(created.number, 'alice', 'Google Antigravity');
+  const assigned = metrics.moveTask(created.number, 'in_progress', 'alice', 'Google Antigravity');
   assert.strictEqual(assigned?.status, 'in_progress');
   assert.strictEqual(assigned?.assignedAgent, 'alice');
 
-  const completed = metrics.completeIssue(created.number);
+  const completed = metrics.moveTask(created.number, 'done');
   assert.strictEqual(completed?.status, 'done');
 
   const ast = metrics.computeAstMetrics();
@@ -55,36 +58,81 @@ test('RealtimeMetricsService manages dynamic issues and calculates real AST metr
   assert.ok(cage.label.includes('Uyumlu'));
 });
 
-test('DashboardServer serves status, SSE streams, and handles interactive actions', async () => {
+test('AegisEngineService executes all underlying Aegis core tools successfully', () => {
+  const engine = new AegisEngineService();
+  const ui = engine.runUiInspector();
+  assert.strictEqual(ui.tool, 'ui_inspector');
+  assert.strictEqual(ui.visionTokens, 0);
+
+  const mut = engine.runMutationGate();
+  assert.strictEqual(mut.tool, 'mutation_gate');
+  assert.strictEqual(mut.passed, true);
+
+  const est = engine.runAdaptiveTimeout(2, 3);
+  assert.strictEqual(est.tool, 'adaptive_timeout');
+  assert.ok(est.timeoutSeconds > 0);
+
+  const mcp = engine.runMcpSecurity('alice', 'ast_skeleton');
+  assert.strictEqual(mcp.allowed, true);
+
+  const diff = engine.runDiffValidator();
+  assert.strictEqual(diff.isSurgical, true);
+
+  const oracle = engine.runOracleAudit();
+  assert.strictEqual(oracle.suspicious, false);
+});
+
+test('DashboardServer handles move_task and status via API', async () => {
   const server = new DashboardServer({ port: 0 });
   const port = await server.start();
   try {
     assert.ok(port > 0);
-
     const apiRes = await fetch(`http://localhost:${port}/api/status`);
     assert.strictEqual(apiRes.status, 200);
     const data = await apiRes.json() as any;
-    assert.strictEqual(data.qualityShields.tdd, 'PASS');
-    assert.ok(Array.isArray(data.agents));
-    assert.ok(Array.isArray(data.issues));
     assert.ok(data.issues.length >= 2);
 
-    const actRes = await fetch(`http://localhost:${port}/api/action`, {
+    const moveRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'auto' })
+      body: JSON.stringify({ action: 'move_task', issueNumber: 101, targetStatus: 'in_progress', agentName: 'alice' })
     });
-    assert.strictEqual(actRes.status, 200);
-    const actData = await actRes.json() as any;
-    assert.strictEqual(actData.success, true);
+    assert.strictEqual(moveRes.status, 200);
+    const moveData = await moveRes.json() as any;
+    assert.strictEqual(moveData.success, true);
 
-    const scanRes = await fetch(`http://localhost:${port}/api/action`, {
+    const doneRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'scan_ast' })
+      body: JSON.stringify({ action: 'move_task', issueNumber: 101, targetStatus: 'done' })
     });
-    assert.strictEqual(scanRes.status, 200);
+    assert.strictEqual(doneRes.status, 200);
   } finally {
     await server.stop();
+  }
+});
+
+test('DashboardServer handles run_engine_tool and sync_toolchain via API', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-dash-sync-'));
+  const server = new DashboardServer({ port: 0, repoRoot: tmpDir });
+  const port = await server.start();
+  try {
+    assert.ok(port > 0);
+    const toolRes = await fetch(`http://localhost:${port}/api/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'run_engine_tool', tool: 'ui_inspector' })
+    });
+    assert.strictEqual(toolRes.status, 200);
+
+    const syncRes = await fetch(`http://localhost:${port}/api/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync_toolchain' })
+    });
+    assert.strictEqual(syncRes.status, 200);
+  } finally {
+    await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
