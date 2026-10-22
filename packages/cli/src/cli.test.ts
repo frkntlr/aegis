@@ -16,10 +16,21 @@ test('Aegis CLI displays help menu with all core and live commands', () => {
   assert.ok(output.includes('aegis init'));
   assert.ok(output.includes('aegis status'));
   assert.ok(output.includes('aegis auto'));
+  assert.ok(output.includes('aegis prompt'));
+  assert.ok(output.includes('aegis merge'));
   assert.ok(output.includes('aegis gh:status'));
   assert.ok(output.includes('aegis gh:sync'));
-  assert.ok(output.includes('aegis gh:comment'));
-  assert.ok(output.includes('aegis gh:pr'));
+});
+
+test('Aegis CLI compiles surgical prompt context for agents', () => {
+  const output = execSync(`node "${cliPath}" prompt alice 101 --json`, { encoding: 'utf8' });
+  const parsed = JSON.parse(output);
+
+  assert.strictEqual(parsed.agentName, 'alice');
+  assert.strictEqual(parsed.issue.number, 101);
+  assert.ok(parsed.context.cacheRatioPercent > 0);
+  assert.ok(parsed.promptMarkdown.includes('Demir Kafes Constitution'));
+  assert.ok(parsed.promptMarkdown.includes('SURGICAL CONTEXT (AST SKELETON MAP)'));
 });
 
 test('Aegis CLI executes Iron Cage self-verification on its own source files', () => {

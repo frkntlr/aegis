@@ -109,6 +109,34 @@ export class GitHubClient {
     return true;
   }
 
+  public async blockIssue(
+    issueNumber: number,
+    reason: string
+  ): Promise<{ success: boolean; issue?: GitHubIssue; error?: string }> {
+    const issue = this.issues.get(issueNumber);
+    if (!issue) {
+      return { success: false, error: `Issue #${issueNumber} not found.` };
+    }
+
+    issue.status = 'blocked';
+    issue.labels = issue.labels.filter(l => !l.startsWith('status:'));
+    issue.labels.push('status:blocked');
+
+    if (this.liveAdapter) {
+      try {
+        await this.liveAdapter.updateIssue(issueNumber, { labels: issue.labels });
+        await this.liveAdapter.addComment(
+          issueNumber,
+          `🛑 **Aegis Loop Breaker**: Task halted after repeated failures.\n**Reason**: ${reason}\nLocks released.`
+        );
+      } catch {
+        // Soft-fail: retain local blocked state
+      }
+    }
+
+    return { success: true, issue };
+  }
+
   public spawnSubIssue(parentIssueNumber: number, title: string, body: string, targetFiles: string[]): { success: boolean; createdIssue?: GitHubIssue; error?: string } {
     const currentSpawns = this.selfSpawnCounter.get(parentIssueNumber) ?? 0;
     if (currentSpawns >= this.maxSelfSpawned) {

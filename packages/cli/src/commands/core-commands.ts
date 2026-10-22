@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { WorktreeManager, TaskDispatcher, MergePipeline } from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
+import { LoopBreaker } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
 import { showBanner } from './banner.js';
 
@@ -66,7 +67,8 @@ export function handleAuto(): void {
   console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
   const ghClient = new GitHubClient();
   const wtManager = new WorktreeManager({ persistLocks: true });
-  const dispatcher = new TaskDispatcher(wtManager);
+  const loopBreaker = new LoopBreaker();
+  const dispatcher = new TaskDispatcher(wtManager, loopBreaker);
 
   ghClient.registerIssue({
     id: 101,

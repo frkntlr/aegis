@@ -44,6 +44,26 @@ test('GitHubClient blocks self-spawning beyond limit', () => {
   assert.ok(spawn3.error?.includes('limit reached'));
 });
 
+test('GitHubClient blocks failed issue and assigns status:blocked', async () => {
+  const client = new GitHubClient();
+  client.registerIssue({
+    id: 42,
+    number: 42,
+    title: 'Failing Task',
+    body: 'Fails repeatedly',
+    labels: ['status:in_progress'],
+    status: 'in_progress',
+    targetFiles: ['src/Buggy.ts'],
+    acceptanceCriteria: ['Fix test']
+  });
+
+  const result = await client.blockIssue(42, '3 consecutive test failures');
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(result.issue?.status, 'blocked');
+  assert.ok(result.issue?.labels.includes('status:blocked'));
+  assert.ok(!result.issue?.labels.includes('status:in_progress'));
+});
+
 test('WikiMemoryManager extracts selective tagged memory summaries', () => {
   const wiki = new WikiMemoryManager();
   wiki.setPage('ui-header', 'Navigation Header', [
