@@ -1,0 +1,40 @@
+name: "Aegis Ecosystem RFC (Language / IDE Extension)"
+description: "Propose a new language AST extractor or IDE isolation adapter for Aegis"
+title: "RFC: [Extension] "
+labels: ["rfc:proposal", "needs-triage"]
+body:
+  - type: dropdown
+    id: extension_type
+    attributes:
+      label: "Extension Category"
+      description: "Select which layer of Aegis this RFC enhances"
+      options:
+        - "Language Extractor (AST Skeleton Map)"
+        - "IDE Adapter (Isolation & Workspace)"
+        - "Security / Quality Gate Plugin"
+    validations:
+      required: true
+  - type: input
+    id: target_name
+    attributes:
+      label: "Target Name"
+      description: "e.g., Go, Kotlin, C#, Zed, JetBrains Fleet"
+      placeholder: "Kotlin"
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: "Rationale & AI Use Case"
+      description: "Explain why this extension is needed and how AI vibe coding benefits from it"
+      placeholder: "Kotlin multiplatform developers need AST skeleton maps to reduce context bloat..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_files
+    attributes:
+      label: "Proposed Target Files"
+      description: "List the isolated files to be created or modified"
+      value: "packages/core/ast-skeleton/src/kotlin-extractor.ts"
+    validations:
+      required: false

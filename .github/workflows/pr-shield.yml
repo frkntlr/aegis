@@ -1,0 +1,40 @@
+name: "Aegis Community PR Shield & Iron Cage Gate"
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  pr-review-gate:
+    name: "PR Gate: Iron Cage, Immutable Oracle & Unit Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: "Checkout Pull Request Code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Setup Node.js 24"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: "Install Monorepo Dependencies"
+        run: npm ci
+
+      - name: "Monorepo Build (TypeScript)"
+        run: npm run build
+
+      - name: "Deterministic Demir Kafes (Iron Cage) Audit"
+        run: npm run aegis -- cage:check
+
+      - name: "Monorepo Unit Test Suite (All Workspaces)"
+        run: npm test
+
+      - name: "Mutation Testing Gate (Min: 70% Kill Rate)"
+        run: npm run aegis -- mutate packages/core/watchdog/src/pre-execution-estimator.ts

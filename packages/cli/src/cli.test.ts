@@ -17,6 +17,8 @@ test('Aegis CLI displays help menu with all core and live commands', () => {
   assert.ok(output.includes('aegis status'));
   assert.ok(output.includes('aegis auto'));
   assert.ok(output.includes('aegis prompt'));
+  assert.ok(output.includes('aegis contribute'));
+  assert.ok(output.includes('aegis rfc:triage'));
   assert.ok(output.includes('aegis merge'));
   assert.ok(output.includes('aegis gh:status'));
   assert.ok(output.includes('aegis gh:sync'));
@@ -31,6 +33,15 @@ test('Aegis CLI compiles surgical prompt context for agents', () => {
   assert.ok(parsed.context.cacheRatioPercent > 0);
   assert.ok(parsed.promptMarkdown.includes('Demir Kafes Constitution'));
   assert.ok(parsed.promptMarkdown.includes('SURGICAL CONTEXT (AST SKELETON MAP)'));
+});
+
+test('Aegis CLI executes rfc:triage command and formats issue preview', () => {
+  const output = execSync(`node "${cliPath}" rfc:triage "RFC: Add Go AST Extractor" "Go language support"`, { encoding: 'utf8' });
+
+  assert.ok(output.includes('RFC Discussion Triaged'));
+  assert.ok(output.includes('LANGUAGE'));
+  assert.ok(output.includes('Go'));
+  assert.ok(output.includes('packages/core/ast-skeleton/src/go-extractor.ts'));
 });
 
 test('Aegis CLI executes Iron Cage self-verification on its own source files', () => {

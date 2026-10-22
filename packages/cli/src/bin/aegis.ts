@@ -3,6 +3,7 @@
 import { showBanner } from '../commands/banner.js';
 import { handleInit, handleStatus, handleAuto, handleDashboard, handleMerge } from '../commands/core-commands.js';
 import { handlePrompt } from '../commands/prompt-command.js';
+import { handleContribute, handleRfcTriage } from '../commands/contribute-command.js';
 import {
   handleEstimate,
   handleVerify,
@@ -28,6 +29,8 @@ function handleHelp(): void {
   console.log('  aegis status                           View worktrees and active file locks');
   console.log('  aegis auto                             Run autonomous task queue & dispatcher');
   console.log('  aegis prompt <alice|bob> <id>          Compile surgical AST prompt caching context');
+  console.log('  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution');
+  console.log('  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria');
   console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
   console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
   console.log('  aegis gh:status [token]                Inspect live GitHub authentication & limits');
@@ -50,6 +53,8 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   status: () => handleStatus(),
   auto: () => handleAuto(),
   prompt: (a) => handlePrompt(a[1], a[2], a[3]),
+  contribute: (a) => handleContribute(a[1], a[2]),
+  'rfc:triage': (a) => handleRfcTriage(a[1], a[2]),
   merge: (a) => handleMerge(a[1], a[2]),
   dashboard: (a) => handleDashboard(a[1]),
   'gh:status': (a) => handleGhStatus(a[1]),
