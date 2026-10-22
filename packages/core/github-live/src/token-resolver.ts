@@ -4,7 +4,7 @@ export interface GitHubAuthContext {
   token?: string;
   owner?: string;
   repo?: string;
-  source: 'env' | 'gh-cli' | 'none';
+  source: 'env' | 'gh-cli' | 'git-credential' | 'none';
   hasCredentials: boolean;
 }
 
@@ -44,6 +44,26 @@ export class GitHubTokenResolver {
       }
     } catch {
       // gh CLI not installed or not logged in
+    }
+
+    // 4. Git Credential Manager fallback
+    try {
+      const credOutput = execSync('git credential fill', {
+        input: 'protocol=https\nhost=github.com\n\n',
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+      const match = credOutput.match(/password=([^\r\n]+)/);
+      if (match && match[1]) {
+        return {
+          token: match[1].trim(),
+          ...this.detectRepo(),
+          source: 'git-credential',
+          hasCredentials: true
+        };
+      }
+    } catch {
+      // Git credential helper not available or no stored password
     }
 
     return {
