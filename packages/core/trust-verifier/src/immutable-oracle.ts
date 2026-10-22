@@ -8,38 +8,41 @@ export interface AuditInput {
 }
 
 export class ImmutableOracle {
-  public audit(input: AuditInput): TrustAuditReport {
-    const details: string[] = [];
+  private findTamperedTests(modifiedFiles: string[], details: string[]): string[] {
     const tamperedTestFiles: string[] = [];
-    let vacuousAssertionsFound = 0;
-
-    // Check 1: Test Tampering Detection
-    for (const file of input.modifiedFiles) {
+    for (const file of modifiedFiles) {
       if (file.match(/\.(test|spec)\.(ts|js|jsx|tsx|py)$/) || file.includes('__tests__')) {
         tamperedTestFiles.push(file);
         details.push(`Suspicious: Existing test file was modified by agent: ${file}`);
       }
     }
+    return tamperedTestFiles;
+  }
 
-    // Check 2: Vacuous Assertion Detection
-    if (input.newTestContents) {
-      for (const { filePath, content } of input.newTestContents) {
-        const lines = content.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          // Heuristic patterns for vacuous tests:
-          // expect(true).toBe(true), expect(x).toBe(x), assert.equal(1, 1), etc.
-          if (line.match(/expect\(([^)]+)\)\.(toBe|toEqual)\(\1\)/) ||
-              line.match(/assert\.(strictEqual|equal)\(([^,]+),\s*\2\)/) ||
-              line.includes('expect(true).toBe(true)')) {
-            vacuousAssertionsFound++;
-            details.push(`Vacuous assertion detected in ${filePath} at line ${i + 1}: "${line}"`);
-          }
+  private countVacuousAssertions(newTestContents: { filePath: string; content: string }[] | undefined, details: string[]): number {
+    if (!newTestContents) return 0;
+    let count = 0;
+    for (const { filePath, content } of newTestContents) {
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        const isVacuous = line.match(/expect\(([^)]+)\)\.(toBe|toEqual)\(\1\)/) ||
+          line.match(/assert\.(strictEqual|equal)\(([^,]+),\s*\2\)/) ||
+          line.includes('expect(true).toBe(true)');
+        if (isVacuous) {
+          count++;
+          details.push(`Vacuous assertion detected in ${filePath} at line ${i + 1}: "${line}"`);
         }
       }
     }
+    return count;
+  }
 
-    // Check 3: Self-Report vs Reality Check
+  public audit(input: AuditInput): TrustAuditReport {
+    const details: string[] = [];
+    const tamperedTestFiles = this.findTamperedTests(input.modifiedFiles, details);
+    const vacuousAssertionsFound = this.countVacuousAssertions(input.newTestContents, details);
+
     if (input.reportedFailedCount > 0) {
       details.push(`Agent self-reported ${input.reportedFailedCount} failing tests. Cannot approve.`);
     }
@@ -59,7 +62,7 @@ export class ImmutableOracle {
       suspicious,
       tamperedTestFiles,
       vacuousAssertionsFound,
-      mutationScorePercent: 100, // baseline
+      mutationScorePercent: 100,
       verdict,
       details
     };

@@ -15,6 +15,33 @@ export class HeartbeatMonitor {
     this.extensionStepMs = options.extensionStepMs ?? 30_000;
   }
 
+  private checkWatchdogTimer(
+    child: ChildProcess,
+    lastActivityTimeMs: number,
+    currentDeadlineMs: number,
+    timeoutSeconds: number,
+    interval: NodeJS.Timeout,
+    flags: { stagnated: boolean; timedOut: boolean },
+    onProgress?: (msg: string) => void
+  ): void {
+    const now = Date.now();
+    const timeSinceActivity = now - lastActivityTimeMs;
+
+    if (timeSinceActivity > this.stagnationThresholdMs && child.exitCode === null) {
+      flags.stagnated = true;
+      clearInterval(interval);
+      if (onProgress) onProgress(`[Aegis Watchdog] Stagnation detected (${timeSinceActivity / 1000}s silence). Terminating.`);
+      child.kill('SIGTERM');
+    }
+
+    if (now > currentDeadlineMs && child.exitCode === null) {
+      flags.timedOut = true;
+      clearInterval(interval);
+      if (onProgress) onProgress(`[Aegis Watchdog] Dynamic timeout limit reached (${timeoutSeconds}s). Hard killing process.`);
+      child.kill('SIGKILL');
+    }
+  }
+
   public async monitor(
     child: ChildProcess,
     timeoutSeconds: number,
@@ -25,26 +52,19 @@ export class HeartbeatMonitor {
     let lastActivityTimeMs = Date.now();
     let stdoutLinesCount = 0;
     let stderrLinesCount = 0;
-    let timedOut = false;
-    let stagnated = false;
+    const flags = { timedOut: false, stagnated: false };
 
     return new Promise((resolve) => {
       const handleData = (isStderr: boolean, chunk: Buffer | string) => {
         lastActivityTimeMs = Date.now();
         const lines = chunk.toString().split('\n').length;
-        if (isStderr) {
-          stderrLinesCount += lines;
-        } else {
-          stdoutLinesCount += lines;
-        }
+        if (isStderr) stderrLinesCount += lines;
+        else stdoutLinesCount += lines;
 
-        // Active output detected near deadline: stretch deadline
         const now = Date.now();
         if (currentDeadlineMs - now < 15_000) {
           currentDeadlineMs += this.extensionStepMs;
-          if (onProgress) {
-            onProgress(`[Aegis Watchdog] Output streaming detected. Extended deadline by ${this.extensionStepMs / 1000}s`);
-          }
+          if (onProgress) onProgress(`[Aegis Watchdog] Output streaming detected. Extended deadline by ${this.extensionStepMs / 1000}s`);
         }
       };
 
@@ -52,28 +72,7 @@ export class HeartbeatMonitor {
       child.stderr?.on('data', (d) => handleData(true, d));
 
       const interval = setInterval(() => {
-        const now = Date.now();
-        const timeSinceActivity = now - lastActivityTimeMs;
-
-        // Condition 1: Stagnation (complete silence)
-        if (timeSinceActivity > this.stagnationThresholdMs && child.exitCode === null) {
-          stagnated = true;
-          clearInterval(interval);
-          if (onProgress) {
-            onProgress(`[Aegis Watchdog] Stagnation detected (${timeSinceActivity / 1000}s silence). Terminating process.`);
-          }
-          child.kill('SIGTERM');
-        }
-
-        // Condition 2: Absolute deadline exceeded
-        if (now > currentDeadlineMs && child.exitCode === null) {
-          timedOut = true;
-          clearInterval(interval);
-          if (onProgress) {
-            onProgress(`[Aegis Watchdog] Dynamic timeout limit reached (${timeoutSeconds}s). Hard killing process.`);
-          }
-          child.kill('SIGKILL');
-        }
+        this.checkWatchdogTimer(child, lastActivityTimeMs, currentDeadlineMs, timeoutSeconds, interval, flags, onProgress);
       }, 1000);
 
       child.on('close', (exitCode) => {
@@ -83,9 +82,9 @@ export class HeartbeatMonitor {
           startTimeMs,
           endTimeMs,
           durationMs: endTimeMs - startTimeMs,
+          timedOut: flags.timedOut,
+          stagnated: flags.stagnated,
           exitCode,
-          timedOut,
-          stagnated,
           stdoutLinesCount,
           stderrLinesCount
         });

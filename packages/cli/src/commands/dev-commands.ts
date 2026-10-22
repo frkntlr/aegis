@@ -198,6 +198,7 @@ export function handleCageCheck(targetDir?: string): void {
     for (const v of violations) {
       console.log(`   - [${v.rule}] ${v.file}: ${v.msg}`);
     }
+    process.exit(1);
   }
 }
 

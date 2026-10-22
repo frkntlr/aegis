@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Aegis - Autonomous Vibe Coding Engine for Antigravity IDE and Web",
+  "packageManager": "npm@11.8.0",
   "workspaces": [
     "packages/*",
     "packages/core/*",

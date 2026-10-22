@@ -9,10 +9,23 @@ if command -v npm.cmd >/dev/null 2>&1; then
   NPM_CMD="npm.cmd"
 fi
 
+echo "🔍 [1/3] Running Iron Cage Architecture & Complexity Gate..."
+$NPM_CMD run aegis -- cage:check || {
+  echo "❌ [Aegis] Pre-commit rejected: Iron Cage violations detected (max 40 lines/function, max 300 lines/file)."
+  exit 1
+}
+
+echo "🧪 [2/3] Running Monorepo Unit Test Suite..."
 $NPM_CMD run test --workspaces || {
   echo "❌ [Aegis] Pre-commit rejected: One or more unit tests failed."
   exit 1
 }
 
-echo "✅ [Aegis] All 32 quality gate tests passed. Commit approved."
+echo "🔬 [3/3] Running Mutation Testing Gate..."
+$NPM_CMD run aegis -- mutate packages/core/watchdog/src/pre-execution-estimator.ts || {
+  echo "❌ [Aegis] Pre-commit rejected: Mutation testing threshold not reached."
+  exit 1
+}
+
+echo "✅ [Aegis] All Iron Cage quality gates passed. Commit approved."
 exit 0

@@ -19,9 +19,7 @@ export class WorktreeManager {
     this.repoRoot = options.repoRoot ?? process.cwd();
     this.worktreePrefix = options.worktreePrefix ?? 'experimental';
     this.persistLocks = options.persistLocks ?? false;
-    if (this.persistLocks) {
-      this.loadLocks();
-    }
+    if (this.persistLocks) this.loadLocks();
   }
 
   private getLockFilePath(): string {
@@ -45,8 +43,7 @@ export class WorktreeManager {
     try {
       const lockFile = this.getLockFilePath();
       fs.mkdirSync(path.dirname(lockFile), { recursive: true });
-      const obj = Object.fromEntries(this.activeLocks.entries());
-      fs.writeFileSync(lockFile, JSON.stringify(obj, null, 2), 'utf8');
+      fs.writeFileSync(lockFile, JSON.stringify(Object.fromEntries(this.activeLocks.entries()), null, 2), 'utf8');
     } catch {
       // Ignore write errors gracefully
     }
@@ -63,13 +60,11 @@ export class WorktreeManager {
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(path.dirname(targetDir), { recursive: true });
       try {
-        // Create worktree if it does not exist
         execSync(`git worktree add "${targetDir}" -B "${branchName}" "${baseBranch}"`, {
           cwd: this.repoRoot,
           stdio: 'pipe'
         });
       } catch (err: unknown) {
-        // Fallback: If already checked out, recover or reuse
         const message = err instanceof Error ? err.message : String(err);
         if (!message.includes('already exists') && !message.includes('already checked out')) {
           throw err;
@@ -88,45 +83,37 @@ export class WorktreeManager {
     };
   }
 
+  private parseWorktreeBlock(block: string): AgentWorktree | null {
+    if (!block.trim()) return null;
+    const lines = block.split('\n');
+    const worktreeLine = lines.find(l => l.startsWith('worktree '));
+    const branchLine = lines.find(l => l.startsWith('branch '));
+    if (!worktreeLine) return null;
+
+    const wtPath = worktreeLine.replace('worktree ', '').trim();
+    const branch = branchLine ? branchLine.replace('branch refs/heads/', '').trim() : 'HEAD';
+    if (!wtPath.includes(this.worktreePrefix)) return null;
+
+    return {
+      agentName: path.basename(wtPath),
+      branch,
+      path: wtPath,
+      status: 'idle',
+      lockedFiles: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  }
+
   public listWorktrees(): WorktreeListResult {
     try {
-      const output = execSync('git worktree list --porcelain', {
-        cwd: this.repoRoot,
-        encoding: 'utf8'
-      });
+      const output = execSync('git worktree list --porcelain', { cwd: this.repoRoot, encoding: 'utf8' });
+      const worktrees = output
+        .split('\n\n')
+        .map(b => this.parseWorktreeBlock(b))
+        .filter((wt): wt is AgentWorktree => Boolean(wt));
 
-      const worktrees: AgentWorktree[] = [];
-      const blocks = output.split('\n\n');
-
-      for (const block of blocks) {
-        if (!block.trim()) continue;
-        const lines = block.split('\n');
-        const worktreeLine = lines.find(l => l.startsWith('worktree '));
-        const branchLine = lines.find(l => l.startsWith('branch '));
-
-        if (worktreeLine) {
-          const wtPath = worktreeLine.replace('worktree ', '').trim();
-          const branch = branchLine ? branchLine.replace('branch refs/heads/', '').trim() : 'HEAD';
-          
-          if (wtPath.includes(this.worktreePrefix)) {
-            const agentName = path.basename(wtPath);
-            worktrees.push({
-              agentName,
-              branch,
-              path: wtPath,
-              status: 'idle',
-              lockedFiles: [],
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            });
-          }
-        }
-      }
-
-      return {
-        worktrees,
-        activeCount: worktrees.length
-      };
+      return { worktrees, activeCount: worktrees.length };
     } catch {
       return { worktrees: [], activeCount: 0 };
     }
@@ -134,31 +121,24 @@ export class WorktreeManager {
 
   public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
     const conflictingFiles: string[] = [];
-
     for (const file of files) {
       const existingOwner = this.activeLocks.get(file);
       if (existingOwner && existingOwner !== agentName) {
         conflictingFiles.push(file);
       }
     }
-
-    if (conflictingFiles.length > 0) {
-      return { success: false, conflictingFiles };
-    }
+    if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
 
     for (const file of files) {
       this.activeLocks.set(file, agentName);
     }
     this.saveLocks();
-
     return { success: true, conflictingFiles: [] };
   }
 
   public releaseFileLocks(agentName: string): void {
     for (const [file, owner] of this.activeLocks.entries()) {
-      if (owner === agentName) {
-        this.activeLocks.delete(file);
-      }
+      if (owner === agentName) this.activeLocks.delete(file);
     }
     this.saveLocks();
   }

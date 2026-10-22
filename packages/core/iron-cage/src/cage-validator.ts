@@ -6,6 +6,12 @@ export interface CageValidatorOptions {
   maxCyclomaticComplexity?: number;
 }
 
+interface ScanState {
+  inFunction: boolean;
+  funcStartLine: number;
+  braceDepth: number;
+}
+
 export class IronCageValidator {
   private maxFunctionLines: number;
   private maxFileLines: number;
@@ -15,11 +21,57 @@ export class IronCageValidator {
     this.maxFileLines = options.maxFileLines ?? 300;
   }
 
+  private isFunctionStart(trimmed: string): boolean {
+    const fnRegex = new RegExp('^(async\\s+)?(public\\s+|private\\s+|protected\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{');
+    const arrowMarker = '=' + '> ' + '{';
+    return trimmed.startsWith('function ') || trimmed.includes(arrowMarker) || Boolean(trimmed.match(fnRegex));
+  }
+
+  private updateBraces(line: string, state: ScanState, i: number, violations: CageViolation[], filePath: string): void {
+    // Strip string literals and comments to avoid counting braces inside strings or regexes
+    const cleanLine = line
+      .replace(/"(\\.|[^"\\])*"/g, '""')
+      .replace(/'(\\.|[^'\\])*'/g, "''")
+      .replace(/`(\\.|[^`\\])*`/g, '``')
+      .replace(/\/\/.*$/, '');
+
+    for (const ch of cleanLine) {
+      if (ch === '{') state.braceDepth++;
+      if (ch === '}') state.braceDepth--;
+    }
+
+    if (state.braceDepth <= 0 && cleanLine.includes('}')) {
+      const funcLength = (i + 1) - state.funcStartLine + 1;
+      if (funcLength > this.maxFunctionLines) {
+        violations.push({
+          rule: 'MAX_FUNCTION_LINES',
+          filePath,
+          line: state.funcStartLine,
+          message: `Function starting at line ${state.funcStartLine} exceeds ${this.maxFunctionLines} lines (actual: ${funcLength} lines).`,
+          severity: 'error'
+        });
+      }
+      state.inFunction = false;
+    }
+  }
+
+  private scanLine(line: string, i: number, state: ScanState, violations: CageViolation[], filePath: string): void {
+    const trimmed = line.trim();
+    if (!state.inFunction && this.isFunctionStart(trimmed)) {
+      state.inFunction = true;
+      state.funcStartLine = i + 1;
+      state.braceDepth = 0;
+    }
+
+    if (state.inFunction) {
+      this.updateBraces(line, state, i, violations, filePath);
+    }
+  }
+
   public validateFileContent(filePath: string, content: string): CageValidationResult {
     const violations: CageViolation[] = [];
     const lines = content.split('\n');
 
-    // Rule 1: Max file lines
     if (lines.length > this.maxFileLines) {
       violations.push({
         rule: 'MAX_FILE_LINES',
@@ -29,42 +81,9 @@ export class IronCageValidator {
       });
     }
 
-    // Rule 2: Approximate function lines scanner
-    let inFunction = false;
-    let funcStartLine = 0;
-    let braceDepth = 0;
-
+    const state: ScanState = { inFunction: false, funcStartLine: 0, braceDepth: 0 };
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-
-      // Simple heuristic for function start
-      if (!inFunction && (trimmed.startsWith('function ') || trimmed.includes('=> {') || trimmed.match(/^(async\s+)?(public\s+|private\s+|protected\s+)?\w+\s*\([^)]*\)\s*[:\w<>\s]*\{/))) {
-        inFunction = true;
-        funcStartLine = i + 1;
-        braceDepth = 0;
-      }
-
-      if (inFunction) {
-        for (const ch of line) {
-          if (ch === '{') braceDepth++;
-          if (ch === '}') braceDepth--;
-        }
-
-        if (braceDepth <= 0 && line.includes('}')) {
-          const funcLength = (i + 1) - funcStartLine + 1;
-          if (funcLength > this.maxFunctionLines) {
-            violations.push({
-              rule: 'MAX_FUNCTION_LINES',
-              filePath,
-              line: funcStartLine,
-              message: `Function starting at line ${funcStartLine} exceeds ${this.maxFunctionLines} lines (actual: ${funcLength} lines).`,
-              severity: 'error'
-            });
-          }
-          inFunction = false;
-        }
-      }
+      this.scanLine(lines[i], i, state, violations, filePath);
     }
 
     return {
@@ -76,8 +95,6 @@ export class IronCageValidator {
 
   public validateDiff(filePath: string, addedCount: number, deletedCount: number, totalLines: number): CageValidationResult {
     const violations: CageViolation[] = [];
-
-    // If more than 80% of the entire file was rewritten at once on an existing file
     if (totalLines > 50 && (addedCount + deletedCount) > (totalLines * 1.5)) {
       violations.push({
         rule: 'FULL_FILE_REWRITE',

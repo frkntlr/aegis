@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { showBanner } from '../commands/banner.js';
-import { handleInit, handleStatus, handleAuto, handleDashboard } from '../commands/core-commands.js';
+import { handleInit, handleStatus, handleAuto, handleDashboard, handleMerge } from '../commands/core-commands.js';
 import {
   handleEstimate,
   handleVerify,
@@ -26,6 +26,7 @@ function handleHelp(): void {
   console.log('  aegis init                             Initialize worktrees and environment');
   console.log('  aegis status                           View worktrees and active file locks');
   console.log('  aegis auto                             Run autonomous task queue & dispatcher');
+  console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
   console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
   console.log('  aegis gh:status [token]                Inspect live GitHub authentication & limits');
   console.log('  aegis gh:sync [token]                  Sync live issues & dispatch to agents');
@@ -46,6 +47,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   init: () => handleInit(),
   status: () => handleStatus(),
   auto: () => handleAuto(),
+  merge: (a) => handleMerge(a[1], a[2]),
   dashboard: (a) => handleDashboard(a[1]),
   'gh:status': (a) => handleGhStatus(a[1]),
   'gh:sync': (a) => handleGhSync(a[1]),
