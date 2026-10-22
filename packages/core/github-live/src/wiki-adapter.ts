@@ -67,12 +67,24 @@ export class GitHubWikiLiveAdapter {
     const url = this.getWikiRemoteUrl();
 
     if (!fs.existsSync(path.join(this.cloneDir, '.git'))) {
-      if (fs.existsSync(this.cloneDir)) fs.rmSync(this.cloneDir, { recursive: true });
-      execSync(`git clone "${url}" "${this.cloneDir}"`, { stdio: 'pipe', timeout: 15000 });
-    } else {
-      execSync(`git -C "${this.cloneDir}" pull origin master`, { stdio: 'pipe', timeout: 10000 });
+      return this.cloneWikiRemote(url);
     }
-    return true;
+    try {
+      execSync(`git -C "${this.cloneDir}" pull origin master --allow-unrelated-histories`, { stdio: 'pipe', timeout: 15000 });
+      return true;
+    } catch {
+      return this.cloneWikiRemote(url);
+    }
+  }
+
+  private cloneWikiRemote(url: string): boolean {
+    try {
+      if (fs.existsSync(this.cloneDir)) fs.rmSync(this.cloneDir, { recursive: true, force: true });
+      execSync(`git clone "${url}" "${this.cloneDir}"`, { stdio: 'pipe', timeout: 20000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   public listPages(): WikiPage[] {
@@ -187,12 +199,19 @@ export class GitHubWikiLiveAdapter {
         message: 'GitHub Wiki repository has not yet been initialized with its first page.'
       };
     }
+    this.ensureGitInitialized();
     try {
-      execSync(`git -C "${this.cloneDir}" push -u origin master --force`, { stdio: 'pipe', timeout: 15000 });
-      return { success: true, message: 'Successfully pushed all 8 pages to GitHub Wiki remote.' };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { success: false, message: `Git push failed: ${msg}` };
+      execSync(`git -C "${this.cloneDir}" push -u origin master`, { stdio: 'pipe', timeout: 15000 });
+      return { success: true, message: 'Successfully pushed all wiki pages to GitHub remote.' };
+    } catch {
+      try {
+        execSync(`git -C "${this.cloneDir}" pull origin master --allow-unrelated-histories`, { stdio: 'pipe', timeout: 10000 });
+        execSync(`git -C "${this.cloneDir}" push -u origin master`, { stdio: 'pipe', timeout: 15000 });
+        return { success: true, message: 'Successfully merged and pushed all pages to GitHub remote.' };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { success: false, message: `Git push failed: ${msg}` };
+      }
     }
   }
 
