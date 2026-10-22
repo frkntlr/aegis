@@ -107,7 +107,7 @@ export async function handleMerge(agentName?: string, baseBranch = 'master'): Pr
 export async function handleDashboard(portArg?: string): Promise<void> {
   showBanner();
   const port = parseInt(portArg || '3000', 10);
-  const server = new DashboardServer({ port });
+  const server = new DashboardServer({ port, persistLocks: true });
   await server.start();
   console.log(`🌐 Aegis Web Command Center running at: http://localhost:${port}`);
   console.log(`   Press Ctrl+C to terminate server.`);

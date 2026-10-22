@@ -1,13 +1,14 @@
 import * as http from 'node:http';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
-import { WorktreeManager, TaskDispatcher } from '@aegis/orchestrator';
-import { GitHubClient } from '@aegis/github-live';
+import { WorktreeManager } from '@aegis/orchestrator';
 import { SessionDetector } from './session-detector.js';
+import { RealtimeMetricsService } from './realtime-metrics.js';
 
 export interface DashboardServerOptions {
   port?: number;
   repoRoot?: string;
-  ghClient?: GitHubClient;
+  persistLocks?: boolean;
+  metricsService?: RealtimeMetricsService;
 }
 
 export class DashboardServer {
@@ -15,47 +16,35 @@ export class DashboardServer {
   private port: number;
   private wtManager: WorktreeManager;
   private detector: SessionDetector;
-  private ghClient: GitHubClient;
+  private metrics: RealtimeMetricsService;
   private sseClients = new Set<http.ServerResponse>();
 
   constructor(options: DashboardServerOptions = {}) {
     this.port = options.port ?? 3000;
-    this.wtManager = new WorktreeManager({ repoRoot: options.repoRoot, persistLocks: true });
+    const persistLocks = options.persistLocks ?? false;
+    this.wtManager = new WorktreeManager({ repoRoot: options.repoRoot, persistLocks });
     this.detector = new SessionDetector(options.repoRoot, this.wtManager);
-    this.ghClient = options.ghClient ?? this.createDefaultGhClient();
-  }
-
-  private createDefaultGhClient(): GitHubClient {
-    const client = new GitHubClient();
-    client.registerIssue({
-      id: 101,
-      number: 101,
-      title: 'Implement Multi-Editor Live Stream',
-      body: 'Coordinate multiple Antigravity IDEs with real-time SSE telemetry',
-      labels: ['status:ready', 'lock:packages/web-dashboard/src/server/dashboard-server.ts'],
-      status: 'ready',
-      targetFiles: ['packages/web-dashboard/src/server/dashboard-server.ts'],
-      acceptanceCriteria: ['Pass SSE tests', 'Demir Kafes 100% clean']
-    });
-    return client;
+    this.metrics = options.metricsService ?? new RealtimeMetricsService(options.repoRoot);
   }
 
   public getStatusPayload(): Record<string, any> {
     const list = this.wtManager.listWorktrees();
     const locks = this.wtManager.getLockedFiles();
     const sessions = this.detector.detectSessions();
+    const snapshot = this.metrics.getSnapshot();
     const lockEntries: Record<string, string> = {};
     for (const [file, agent] of locks.entries()) {
       lockEntries[file] = agent;
     }
 
     return {
-      activeWorktrees: list.activeCount,
+      activeWorktrees: list.activeCount || sessions.length,
       activeLocks: locks.size,
       lockedFiles: lockEntries,
       agents: sessions,
-      tokenMetrics: { usedTokens: 4800, cachedTokens: 14200, savingsPercent: 74 },
-      qualityShields: { tdd: 'PASS', ironCage: 'PASS', deadCode: 'PASS', trustVerifier: 'PASS' },
+      tokenMetrics: snapshot.tokenMetrics,
+      qualityShields: snapshot.qualityShields,
+      issues: snapshot.issues,
       timestamp: new Date().toISOString()
     };
   }
@@ -85,26 +74,70 @@ export class DashboardServer {
     });
   }
 
-  private executeAction(action: string, payload: any): Record<string, any> {
-    if (action === 'auto') {
-      const dispatcher = new TaskDispatcher(this.wtManager);
-      const ready = this.ghClient.listReadyIssues();
-      const res = dispatcher.dispatchNextTask(['alice', 'bob'], ready);
-      if (res.dispatched && res.agentName && res.issue) {
-        this.ghClient.claimIssue(res.issue.number, res.agentName);
-      }
-      return { success: true, result: res };
+  private handleAutoAction(): Record<string, any> {
+    const ready = this.metrics.getIssues().filter(i => i.status === 'ready');
+    if (ready.length === 0) return { success: true, message: 'Ready sütununda bekleyen görev yok.' };
+    const sessions = this.detector.detectSessions();
+    const idle = sessions.find(s => s.status === 'idle') || sessions[0];
+    const target = ready[0];
+    const lockRes = this.wtManager.acquireFileLocks(idle.agentName, target.targetFiles);
+    if (!lockRes.success) {
+      return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
     }
+    this.metrics.assignIssue(target.number, idle.agentName, idle.ideType);
+    return { success: true, message: `Görev #${target.number} [@${idle.agentName}] (${idle.ideType}) atandı.` };
+  }
+
+  private handleTaskAction(action: string, payload: any): Record<string, any> {
+    if (action === 'create_task') {
+      const issue = this.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
+      return { success: true, message: `Yeni görev #${issue.number} oluşturuldu.`, issue };
+    }
+    if (action === 'complete_task') {
+      const num = parseInt(payload.issueNumber, 10);
+      const issue = this.metrics.getIssues().find(i => i.number === num);
+      if (issue?.assignedAgent) this.wtManager.releaseFileLocks(issue.assignedAgent);
+      this.metrics.completeIssue(num);
+      return { success: true, message: `Görev #${num} tamamlandı ve Done sütununa alındı.` };
+    }
+    return { success: false, error: 'Bilinmeyen görev işlemi' };
+  }
+
+  private handleScanAction(action: string): Record<string, any> {
+    if (action === 'scan_ast') {
+      const ast = this.metrics.computeAstMetrics(true);
+      return { success: true, message: `AST İskelet: %${ast.savingsPercent} tasarruf (${ast.filesScanned} dosya)` };
+    }
+    if (action === 'verify_cage') {
+      const cage = this.metrics.computeCageMetrics(true);
+      return { success: true, message: `Demir Kafes denetimi: ${cage.label}` };
+    }
+    return { success: false, error: 'Bilinmeyen tarama işlemi' };
+  }
+
+  private executeAction(action: string, payload: any): Record<string, any> {
+    if (action === 'auto') return this.handleAutoAction();
+    if (action === 'create_task' || action === 'complete_task') return this.handleTaskAction(action, payload);
+    if (action === 'scan_ast' || action === 'verify_cage') return this.handleScanAction(action);
     if (action === 'release_locks') {
-      const agent = payload.agentName || 'alice';
-      this.wtManager.releaseFileLocks(agent);
-      return { success: true, message: `Locks released for agent [${agent}]` };
+      const agent = payload.agentName;
+      if (agent) {
+        this.wtManager.releaseFileLocks(agent);
+        this.metrics.releaseIssueLocks(agent);
+      } else {
+        const locked = this.wtManager.getLockedFiles();
+        for (const owner of new Set(locked.values())) {
+          this.wtManager.releaseFileLocks(owner);
+        }
+        this.metrics.releaseIssueLocks();
+      }
+      return { success: true, message: 'Tüm kilitler boşaltıldı ve görevler Ready sütununa alındı.' };
     }
     if (action === 'heartbeat') {
       this.detector.registerHeartbeat(payload.agentName, payload.ideType);
       return { success: true };
     }
-    return { success: false, error: 'Unknown action' };
+    return { success: false, error: 'Bilinmeyen aksiyon: ' + action };
   }
 
   private handleActionApi(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -152,7 +185,11 @@ export class DashboardServer {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => this.handleRoutes(req, res));
       this.server.on('error', (err) => reject(err));
-      this.server.listen(this.port, () => resolve(this.port));
+      this.server.listen(this.port, () => {
+        const addr = this.server?.address();
+        const p = typeof addr === 'object' && addr ? addr.port : this.port;
+        resolve(p);
+      });
     });
   }
 

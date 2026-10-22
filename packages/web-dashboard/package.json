@@ -13,7 +13,9 @@
     "@aegis/shared": "*",
     "@aegis/orchestrator": "*",
     "@aegis/github-live": "*",
-    "@aegis/mcp-security": "*"
+    "@aegis/mcp-security": "*",
+    "@aegis/ast-skeleton": "*",
+    "@aegis/iron-cage": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
