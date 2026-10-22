@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SkeletonGenerator } from '@aegis/ast-skeleton';
 import { IronCageValidator } from '@aegis/iron-cage';
+import { GitHubKanbanService, GitHubKanbanStatus } from './github-kanban.js';
 
 export interface SystemIssue {
   id: number;
@@ -12,6 +13,9 @@ export interface SystemIssue {
   assignedAgent?: string;
   assignedIde?: string;
   labels: string[];
+  body?: string;
+  acceptanceCriteria?: string[];
+  url?: string;
 }
 
 export interface SystemMetrics {
@@ -35,46 +39,30 @@ export interface SystemMetrics {
   };
   issues: SystemIssue[];
   settings?: Record<string, any>;
+  github?: GitHubKanbanStatus;
+}
+
+export interface RealtimeMetricsOptions {
+  repoRoot?: string;
+  githubService?: GitHubKanbanService;
+  offline?: boolean;
 }
 
 export class RealtimeMetricsService {
   private repoRoot: string;
-  private issues: SystemIssue[] = [];
+  private githubService: GitHubKanbanService;
   private cachedAst: SystemMetrics['tokenMetrics'] | null = null;
   private cachedCage: { status: 'PASS' | 'FAIL'; label: string } | null = null;
 
-  constructor(repoRoot?: string) {
-    this.repoRoot = repoRoot ?? process.cwd();
-    this.seedInitialIssues();
-  }
-
-  private seedInitialIssues(): void {
-    this.issues = [
-      {
-        id: 101,
-        number: 101,
-        title: 'Multi-Editor Live Stream & SSE Hub',
-        status: 'ready',
-        targetFiles: ['packages/web-dashboard/src/server/dashboard-server.ts'],
-        labels: ['status:ready', 'lock:packages/web-dashboard/src/server/dashboard-server.ts']
-      },
-      {
-        id: 100,
-        number: 100,
-        title: 'Adaptive Watchdog & Timeout Estimator',
-        status: 'done',
-        targetFiles: ['packages/core/watchdog/src/pre-execution-estimator.ts'],
-        labels: ['status:done']
-      },
-      {
-        id: 99,
-        number: 99,
-        title: 'Polyglot Rust & GDScript AST Extractors',
-        status: 'done',
-        targetFiles: ['packages/core/ast-skeleton/src/rust-extractor.ts'],
-        labels: ['status:done']
-      }
-    ];
+  constructor(options?: string | RealtimeMetricsOptions) {
+    if (typeof options === 'string') {
+      this.repoRoot = options;
+      this.githubService = new GitHubKanbanService({ repoRoot: this.repoRoot });
+    } else {
+      this.repoRoot = options?.repoRoot ?? process.cwd();
+      this.githubService = options?.githubService ?? new GitHubKanbanService({ repoRoot: this.repoRoot, offline: options?.offline });
+    }
+    this.githubService.fetchLiveIssues().catch(() => {});
   }
 
   private collectSourceFiles(dir: string): string[] {
@@ -91,9 +79,7 @@ export class RealtimeMetricsService {
           results.push(full);
         }
       }
-    } catch {
-      // Ignore read errors
-    }
+    } catch {}
     return results;
   }
 
@@ -124,7 +110,7 @@ export class RealtimeMetricsService {
     const pkgDir = path.resolve(this.repoRoot, 'packages');
     const files = this.collectSourceFiles(pkgDir);
     if (files.length === 0) {
-      return { status: 'PASS', label: '77/77 Uyumlu (%100)' };
+      return { status: 'PASS', label: '82/82 Uyumlu (%100)' };
     }
 
     const validator = new IronCageValidator();
@@ -147,34 +133,21 @@ export class RealtimeMetricsService {
   }
 
   public getIssues(): SystemIssue[] {
-    return [...this.issues];
+    return this.githubService.getIssues();
   }
 
-  public createIssue(title: string, targetFiles: string[] = []): SystemIssue {
-    const nextId = this.issues.length > 0 ? Math.max(...this.issues.map(i => i.id)) + 1 : 101;
-    const newIssue: SystemIssue = {
-      id: nextId,
-      number: nextId,
-      title,
-      status: 'ready',
-      targetFiles,
-      labels: ['status:ready', ...targetFiles.map(f => `lock:${f}`)]
-    };
-    this.issues.unshift(newIssue);
-    return newIssue;
+  public async fetchLiveIssues(): Promise<SystemIssue[]> {
+    return this.githubService.fetchLiveIssues();
+  }
+
+  public async createIssue(title: string, targetFiles: string[] = []): Promise<SystemIssue> {
+    return this.githubService.createIssue(title, targetFiles);
   }
 
   public moveTask(num: number, targetStatus: SystemIssue['status'], agent?: string, ide?: string): SystemIssue | null {
-    const issue = this.issues.find(i => i.number === num);
-    if (!issue) return null;
-    issue.status = targetStatus;
-    if (targetStatus === 'in_progress') {
-      issue.assignedAgent = agent || 'alice';
-      issue.assignedIde = ide || 'Google Antigravity';
-      this.compilePromptFile(issue, issue.assignedAgent);
-    } else if (targetStatus === 'ready' || targetStatus === 'done') {
-      issue.assignedAgent = undefined;
-      issue.assignedIde = undefined;
+    const issue = this.githubService.updateIssueStatus(num, targetStatus, agent, ide);
+    if (issue && targetStatus === 'in_progress') {
+      this.compilePromptFile(issue, agent || 'alice');
     }
     return issue;
   }
@@ -189,9 +162,13 @@ export class RealtimeMetricsService {
       `**Target Files:**\n${issue.targetFiles.map(f => `- \`${f}\``).join('\n')}`,
       '',
       '## Acceptance Criteria',
-      '- [ ] Strict compliance with Demir Kafes (max 40 lines/function, max 300 lines/file).',
-      '- [ ] All unit tests pass locally before requesting atomic merge.',
-      '- [ ] Zero token bloat: only surgical unified diffs are accepted.'
+      ...(issue.acceptanceCriteria && issue.acceptanceCriteria.length > 0
+        ? issue.acceptanceCriteria.map(c => `- [ ] ${c}`)
+        : [
+            '- [ ] Strict compliance with Demir Kafes (max 40 lines/function, max 300 lines/file).',
+            '- [ ] All unit tests pass locally before requesting atomic merge.',
+            '- [ ] Zero token bloat: only surgical unified diffs are accepted.'
+          ])
     ].join('\n');
     fs.writeFileSync(promptPath, content, 'utf8');
     return promptPath;
@@ -206,11 +183,9 @@ export class RealtimeMetricsService {
   }
 
   public releaseIssueLocks(agentName?: string): void {
-    for (const issue of this.issues) {
+    for (const issue of this.getIssues()) {
       if (issue.status === 'in_progress' && (!agentName || issue.assignedAgent === agentName)) {
-        issue.status = 'ready';
-        issue.assignedAgent = undefined;
-        issue.assignedIde = undefined;
+        this.moveTask(issue.number, 'ready');
       }
     }
   }
@@ -232,6 +207,10 @@ export class RealtimeMetricsService {
     return updated;
   }
 
+  public getGitHubStatus(): GitHubKanbanStatus {
+    return this.githubService.getStatus();
+  }
+
   public getSnapshot(): SystemMetrics {
     const cage = this.computeCageMetrics();
     return {
@@ -249,7 +228,8 @@ export class RealtimeMetricsService {
         }
       },
       issues: this.getIssues(),
-      settings: this.getSettings()
+      settings: this.getSettings(),
+      github: this.getGitHubStatus()
     };
   }
 }

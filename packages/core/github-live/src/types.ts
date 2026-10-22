@@ -8,6 +8,7 @@ export interface GitHubIssue {
   assignee?: string;
   targetFiles: string[];
   acceptanceCriteria: string[];
+  url?: string;
 }
 
 export interface WikiPage {

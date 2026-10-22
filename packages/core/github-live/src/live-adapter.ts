@@ -154,30 +154,46 @@ export class GitHubLiveAdapter {
     return res.data.data;
   }
 
-  public transformRawIssue(raw: any): GitHubIssue {
-    const labels = Array.isArray(raw.labels) ? raw.labels.map((l: any) => (typeof l === 'string' ? l : l.name)) : [];
-    const body = raw.body || '';
+  public async ensureLabel(name: string, color = '0E8A16', description = ''): Promise<void> {
+    if (!this.owner || !this.repo) return;
+    try {
+      await this.request(`/repos/${this.owner}/${this.repo}/labels`, {
+        method: 'POST',
+        body: JSON.stringify({ name, color, description })
+      });
+    } catch {
+      // Ignored if label exists
+    }
+  }
 
-    // Extract file locks from labels: lock:src/Header.tsx
-    const targetFiles = labels
-      .filter((l: string) => l.startsWith('lock:'))
-      .map((l: string) => l.replace('lock:', '').trim());
-
-    // Extract acceptance criteria from markdown checkboxes: - [ ] or - [x]
+  private extractBodyDetails(body: string, targetFiles: string[]): string[] {
     const criteria: string[] = [];
-    const lines = body.split('\n');
-    for (const line of lines) {
+    for (const line of body.split('\n')) {
       const match = line.trim().match(/^-\s*\[([ xX])\]\s*(.+)$/);
       if (match) {
         criteria.push(match[2].trim());
+      } else {
+        const fileMatch = line.trim().match(/^-\s*`([^`]+)`/);
+        if (fileMatch) targetFiles.push(fileMatch[1].trim());
       }
     }
+    return criteria;
+  }
 
-    let status: GitHubIssue['status'] = 'ready';
-    if (labels.includes('status:blocked')) status = 'blocked';
-    else if (labels.includes('status:in_progress')) status = 'in_progress';
-    else if (labels.includes('status:review')) status = 'review';
-    else if (raw.state === 'closed') status = 'done';
+  private resolveStatus(labels: string[], state?: string): GitHubIssue['status'] {
+    if (labels.includes('status:blocked')) return 'blocked';
+    if (labels.includes('status:in_progress')) return 'in_progress';
+    if (labels.includes('status:review')) return 'review';
+    if (state === 'closed') return 'done';
+    return 'ready';
+  }
+
+  public transformRawIssue(raw: any): GitHubIssue {
+    const labels = Array.isArray(raw.labels) ? raw.labels.map((l: any) => (typeof l === 'string' ? l : l.name)) : [];
+    const body = raw.body || '';
+    const targetFiles = labels.filter((l: string) => l.startsWith('lock:')).map((l: string) => l.replace('lock:', '').trim());
+    const criteria = this.extractBodyDetails(body, targetFiles);
+    const status = this.resolveStatus(labels, raw.state);
 
     return {
       id: raw.id,
@@ -188,7 +204,8 @@ export class GitHubLiveAdapter {
       status,
       assignee: raw.assignee ? raw.assignee.login : undefined,
       targetFiles,
-      acceptanceCriteria: criteria.length > 0 ? criteria : ['Pass unit tests', 'No dead code']
+      acceptanceCriteria: criteria.length > 0 ? criteria : ['Pass unit tests', 'No dead code'],
+      url: raw.html_url || (raw.number && this.owner && this.repo ? `https://github.com/${this.owner}/${this.repo}/issues/${raw.number}` : undefined)
     };
   }
 }

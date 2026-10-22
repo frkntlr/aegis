@@ -20,6 +20,8 @@ export function getDashboardHtml(): string {
     </div>
     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
       <span id="sse-badge" style="font-size: 0.75rem; background: rgba(63,185,80,0.15); color: var(--green-glow); padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(63,185,80,0.3);">● SSE CANLI</span>
+      <span id="gh-badge" style="font-size: 0.75rem; background: rgba(88,166,255,0.15); color: var(--accent); padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(88,166,255,0.3);">🐙 GitHub: frkntlr/aegis</span>
+      <button class="btn btn-secondary" onclick="sendAction('sync_github')" title="GitHub Issues ve Projeleri ile iki yönlü canlı senkronizasyon">GitHub Sync 🔄</button>
       <button class="btn btn-secondary" onclick="sendAction('sync_toolchain')">Toolchain Eşitle 🔄</button>
       <button class="btn btn-secondary" onclick="openModal('modal-engines')">Aegis Motorları ⚡</button>
       <button class="btn btn-secondary" onclick="openModal('modal-settings')">Ayarlar ⚙️</button>
@@ -160,7 +162,8 @@ export function getDashboardHtml(): string {
         listEl.innerHTML = matching.map(i => {
           const files = i.targetFiles?.length ? '<br><small style="color:var(--text-muted);">' + i.targetFiles[0] + '</small>' : '';
           const assignee = i.assignedAgent ? '<br><small style="color:var(--accent);">Atandı: ' + i.assignedAgent.toUpperCase() + ' (' + (i.assignedIde || 'Universal') + ')</small>' : '';
-          const ghLink = '<br><a href="https://github.com/frkntlr/aegis/issues/' + i.number + '" target="_blank" class="gh-link">GitHub #' + i.number + ' ↗</a>';
+          const ghUrl = i.url || ('https://github.com/frkntlr/aegis/issues/' + i.number);
+          const ghLink = '<br><a href="' + ghUrl + '" target="_blank" class="gh-link">GitHub #' + i.number + ' ↗</a>';
           const act = col === 'in_progress' ? '<div style="margin-top:0.35rem;"><button class="btn btn-secondary btn-sm" onclick="sendAction(\\'move_task\\', { issueNumber: ' + i.number + ', targetStatus: \\'done\\' })">Tamamla ✓</button></div>' : '';
           return '<div class="kanban-card" draggable="true" ondragstart="onDragStart(event, ' + i.number + ')" style="' + (col === 'in_progress' ? 'border-color:var(--accent);' : '') + '"><strong>#' + i.number + ' ' + i.title + '</strong>' + files + assignee + ghLink + act + '</div>';
         }).join('');
@@ -196,6 +199,14 @@ export function getDashboardHtml(): string {
       if (payload.issues) renderKanban(payload.issues);
       if (payload.tokenMetrics) renderMetrics(payload.tokenMetrics);
       if (payload.qualityShields) renderShields(payload.qualityShields);
+      if (payload.github) {
+        const gh = payload.github;
+        const b = document.getElementById('gh-badge');
+        if (b) {
+          b.innerText = '🐙 ' + (gh.user ? '@' + gh.user : 'GitHub') + ' (' + gh.repo + ') ' + (gh.connected ? '● CANLI' : '○ LOKAL');
+          b.style.borderColor = gh.connected ? 'var(--green-glow)' : '#d29922';
+        }
+      }
     }
 
     function connectSSE() {

@@ -7,6 +7,7 @@ import { DashboardServer } from './server/dashboard-server.js';
 import { SessionDetector } from './server/session-detector.js';
 import { RealtimeMetricsService } from './server/realtime-metrics.js';
 import { AegisEngineService } from './server/engine-service.js';
+import { GitHubKanbanService } from './server/github-kanban.js';
 import { getDashboardHtml } from './ui/dashboard-html.js';
 
 test('getDashboardHtml renders essential dashboard sections and drag-drop support', () => {
@@ -34,12 +35,12 @@ test('SessionDetector accurately detects worktree sessions and registers heartbe
   assert.strictEqual(alice?.ideType, 'Google Antigravity');
 });
 
-test('RealtimeMetricsService manages dynamic issues and calculates real AST metrics', () => {
+test('RealtimeMetricsService manages dynamic issues and calculates real AST metrics', async () => {
   const metrics = new RealtimeMetricsService();
   const initial = metrics.getIssues();
   assert.ok(initial.length >= 2);
 
-  const created = metrics.createIssue('Test Dynamic Task', ['src/test.ts']);
+  const created = await metrics.createIssue('Test Dynamic Task', ['src/test.ts']);
   assert.strictEqual(created.title, 'Test Dynamic Task');
   assert.strictEqual(created.status, 'ready');
 
@@ -91,11 +92,12 @@ test('DashboardServer handles move_task and status via API', async () => {
     assert.strictEqual(apiRes.status, 200);
     const data = await apiRes.json() as any;
     assert.ok(data.issues.length >= 2);
+    const testNum = data.issues[0].number;
 
     const moveRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'move_task', issueNumber: 101, targetStatus: 'in_progress', agentName: 'alice' })
+      body: JSON.stringify({ action: 'move_task', issueNumber: testNum, targetStatus: 'in_progress', agentName: 'alice' })
     });
     assert.strictEqual(moveRes.status, 200);
     const moveData = await moveRes.json() as any;
@@ -104,7 +106,7 @@ test('DashboardServer handles move_task and status via API', async () => {
     const doneRes = await fetch(`http://localhost:${port}/api/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'move_task', issueNumber: 101, targetStatus: 'done' })
+      body: JSON.stringify({ action: 'move_task', issueNumber: testNum, targetStatus: 'done' })
     });
     assert.strictEqual(doneRes.status, 200);
   } finally {
@@ -134,5 +136,34 @@ test('DashboardServer handles run_engine_tool and sync_toolchain via API', async
   } finally {
     await server.stop();
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('GitHubKanbanService manages issues and sync_github responds via API', async () => {
+  const kanban = new GitHubKanbanService({ offline: true });
+  const issues = await kanban.fetchLiveIssues();
+  assert.ok(issues.length >= 2);
+  const created = await kanban.createIssue('Test Offline Issue', ['src/off.ts']);
+  assert.strictEqual(created.title, 'Test Offline Issue');
+  assert.strictEqual(created.status, 'ready');
+
+  const moved = kanban.updateIssueStatus(created.number, 'in_progress', 'alice');
+  assert.strictEqual(moved?.status, 'in_progress');
+  assert.strictEqual(moved?.assignedAgent, 'alice');
+
+  const server = new DashboardServer({ port: 0 });
+  const port = await server.start();
+  try {
+    const res = await fetch(`http://localhost:${port}/api/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync_github' })
+    });
+    assert.strictEqual(res.status, 200);
+    const d = await res.json() as any;
+    assert.strictEqual(d.success, true);
+    assert.ok(d.issues.length >= 2);
+  } finally {
+    await server.stop();
   }
 });

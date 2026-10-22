@@ -53,6 +53,7 @@ export class DashboardServer {
       qualityShields: snapshot.qualityShields,
       issues: snapshot.issues,
       settings: snapshot.settings,
+      github: snapshot.github,
       timestamp: new Date().toISOString()
     };
   }
@@ -142,18 +143,23 @@ export class DashboardServer {
     return { success: false, error: 'Bilinmeyen işlem' };
   }
 
-  private executeAction(action: string, payload: any): Record<string, any> {
+  private async executeAction(action: string, payload: any): Promise<Record<string, any>> {
     if (action === 'auto') return this.handleAutoAction();
     if (action === 'move_task') return this.handleMoveTask(payload);
+    if (action === 'sync_github') {
+      const issues = await this.metrics.fetchLiveIssues();
+      const status = this.metrics.getGitHubStatus();
+      return { success: true, issues, status, message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.` };
+    }
     if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings'].includes(action)) {
       return this.handleIdeAndSync(action, payload);
     }
     if (action === 'create_task') {
-      const issue = this.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
+      const issue = await this.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
       if (payload.launchIde && payload.ideType) {
         this.launcher.launchIde({ ideType: payload.ideType, worktreePath: `experimental/${payload.agentName || 'alice'}` });
       }
-      return { success: true, message: `Yeni görev #${issue.number} oluşturuldu.`, issue };
+      return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu.`, issue };
     }
     if (action === 'complete_task') return this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' });
     if (action === 'scan_ast') {
@@ -186,10 +192,10 @@ export class DashboardServer {
   private handleActionApi(req: http.IncomingMessage, res: http.ServerResponse): void {
     let bodyStr = '';
     req.on('data', chunk => { bodyStr += chunk; });
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
         const body = bodyStr ? JSON.parse(bodyStr) : {};
-        const result = this.executeAction(body.action, body);
+        const result = await this.executeAction(body.action, body);
         this.broadcast('update', this.getStatusPayload());
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
