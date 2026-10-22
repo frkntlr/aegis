@@ -25,3 +25,24 @@ export interface DiscussionItem {
   body: string;
   convertedToIssueIds: number[];
 }
+
+export interface ProjectV2Info {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  closed: boolean;
+  itemCount?: number;
+}
+
+export interface ProjectStatusOption {
+  id: string;
+  name: string;
+}
+
+export interface ProjectV2ItemInfo {
+  id: string;
+  issueNumber?: number;
+  title: string;
+  statusName?: string;
+}

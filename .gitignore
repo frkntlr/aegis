@@ -40,6 +40,8 @@ tmp/
 
 # IDE local workspace configurations
 .codeium/
+.windsurf/
 .gemini/
 .zed/
 .cursor/
+.vscode/

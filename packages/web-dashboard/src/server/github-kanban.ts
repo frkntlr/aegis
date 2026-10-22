@@ -1,10 +1,12 @@
-import { GitHubLiveAdapter, GitHubTokenResolver, RateLimitInfo } from '@aegis/github-live';
+import { GitHubLiveAdapter, GitHubProjectsAdapter, GitHubTokenResolver, RateLimitInfo } from '@aegis/github-live';
 import type { SystemIssue } from './realtime-metrics.js';
 
 export interface GitHubKanbanOptions {
   repoRoot?: string;
   offline?: boolean;
   adapter?: GitHubLiveAdapter;
+  projectsAdapter?: GitHubProjectsAdapter;
+  projectNumber?: number;
 }
 
 export interface GitHubKanbanStatus {
@@ -18,6 +20,8 @@ export interface GitHubKanbanStatus {
 
 export class GitHubKanbanService {
   private adapter?: GitHubLiveAdapter;
+  private projectsAdapter?: GitHubProjectsAdapter;
+  private projectNumber: number = 4;
   private owner: string = 'frkntlr';
   private repo: string = 'aegis';
   private user: string = 'autonomous-agent';
@@ -26,9 +30,10 @@ export class GitHubKanbanService {
   private lastRateLimit?: RateLimitInfo;
 
   constructor(options: GitHubKanbanOptions = {}) {
+    this.projectNumber = options.projectNumber ?? 4;
     this.initOfflineDefaults();
     if (!options.offline) {
-      this.initAdapter(options.adapter);
+      this.initAdapter(options.adapter, options.projectsAdapter);
     }
   }
 
@@ -55,9 +60,10 @@ export class GitHubKanbanService {
     ];
   }
 
-  private initAdapter(customAdapter?: GitHubLiveAdapter): void {
+  private initAdapter(customAdapter?: GitHubLiveAdapter, customProj?: GitHubProjectsAdapter): void {
     if (customAdapter) {
       this.adapter = customAdapter;
+      this.projectsAdapter = customProj;
       this.connected = true;
       return;
     }
@@ -66,6 +72,11 @@ export class GitHubKanbanService {
       this.owner = auth.owner || this.owner;
       this.repo = auth.repo || this.repo;
       this.adapter = new GitHubLiveAdapter({
+        token: auth.token,
+        owner: this.owner,
+        repo: this.repo
+      });
+      this.projectsAdapter = new GitHubProjectsAdapter({
         token: auth.token,
         owner: this.owner,
         repo: this.repo
@@ -135,6 +146,9 @@ export class GitHubKanbanService {
           url: issue.url || `https://github.com/${this.owner}/${this.repo}/issues/${issue.number}`
         };
         this.issues.unshift(newIssue);
+        if (this.projectsAdapter && issue.number) {
+          this.projectsAdapter.syncIssue(this.projectNumber, issue.number, 'ready').catch(() => {});
+        }
         return newIssue;
       } catch {}
     }
@@ -200,6 +214,11 @@ export class GitHubKanbanService {
         this.adapter?.addComment(num, `🛑 **Aegis Loop Breaker**: Task marked as blocked. Locks released.`);
       }
     }).catch(() => {});
+
+    if (this.projectsAdapter) {
+      const pStatus = targetStatus === 'in_progress' ? 'in_progress' : targetStatus === 'done' ? 'done' : 'ready';
+      this.projectsAdapter.syncIssue(this.projectNumber, num, pStatus).catch(() => {});
+    }
   }
 
   public getIssues(): SystemIssue[] {

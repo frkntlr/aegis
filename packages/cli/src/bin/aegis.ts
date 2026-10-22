@@ -29,6 +29,14 @@ import {
   handleGhComment,
   handleGhPr
 } from '../commands/github-commands.js';
+import {
+  handleProjectList,
+  handleProjectSync,
+  handleWikiList,
+  handleWikiShow,
+  handleWikiSync
+} from '../commands/project-commands.js';
+import { handleNlmQuery } from '../commands/nlm-command.js';
 
 function handleHelp(): void {
   showBanner();
@@ -40,6 +48,12 @@ function handleHelp(): void {
   console.log('  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution');
   console.log('  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria');
   console.log('  aegis nlm:sync                         Export and synchronize architecture with NotebookLM');
+  console.log('  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations');
+  console.log('  aegis project:list [owner]             List GitHub Projects v2 boards');
+  console.log('  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column');
+  console.log('  aegis wiki:list [dir]                  List living memory architecture wiki pages');
+  console.log('  aegis wiki:show <slug> [dir]           Display detailed context of living memory page');
+  console.log('  aegis wiki:sync [dir]                  Persist and export living memory to markdown');
   console.log('  aegis merge <alice|bob> [branch]       4-step atomic merge & sibling synchronization');
   console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
   console.log('  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix');
@@ -67,6 +81,12 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   contribute: (a) => handleContribute(a[1], a[2]),
   'rfc:triage': (a) => handleRfcTriage(a[1], a[2]),
   'nlm:sync': () => handleNlmSync(),
+  'nlm:query': (a) => handleNlmQuery(a[1], a[2]),
+  'project:list': (a) => handleProjectList(a[1]),
+  'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),
+  'wiki:list': (a) => handleWikiList(a[1]),
+  'wiki:show': (a) => handleWikiShow(a[1], a[2]),
+  'wiki:sync': (a) => handleWikiSync(a[1]),
   merge: (a) => handleMerge(a[1], a[2]),
   dashboard: (a) => handleDashboard(a[1]),
   'ide:list': () => handleIdeList(),

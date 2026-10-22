@@ -1,10 +1,20 @@
 {
-  "servers": {
-    "aegis-engine": {
-      "command": "node",
+  "mcpServers": {
+    "notebooklm": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
-        "packages/cli/dist/bin/aegis.js"
+        "C:\\Users\\Lenovo\\Documents\\work\\notebooklm\\notebooklm-mcp-server\\dist\\index.js",
+        "server"
       ]
+    },
+    "godot": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\Users\\Lenovo\\AppData\\Roaming\\npm\\node_modules\\godot-mcp-runtime\\dist\\index.js"
+      ],
+      "env": {
+        "GODOT_MCP_DISABLE_ELICITATION": "true"
+      }
     }
   }
 }
