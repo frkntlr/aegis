@@ -150,3 +150,67 @@ export function handleAudit(modifiedFilesStr?: string): void {
     console.log(`   - ${d}`);
   }
 }
+
+function collectSourceFiles(dir: string): string[] {
+  const results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (['node_modules', 'dist', '.git', 'experimental'].includes(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...collectSourceFiles(full));
+    } else if (/\.(ts|tsx|py|gd)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+export function handleCageCheck(targetDir?: string): void {
+  showBanner();
+  const base = targetDir ? path.resolve(process.cwd(), targetDir) : path.resolve(process.cwd(), 'packages');
+  console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(process.cwd(), base) || '.'}...`);
+  const files = collectSourceFiles(base);
+  const validator = new IronCageValidator();
+  let passedCount = 0;
+  const violations: { file: string; rule: string; msg: string }[] = [];
+
+  for (const file of files) {
+    const rel = path.relative(process.cwd(), file).replace(/\\/g, '/');
+    const content = fs.readFileSync(file, 'utf8');
+    const res = validator.validateFileContent(rel, content);
+    if (res.passed) {
+      passedCount++;
+    } else {
+      for (const v of res.violations) {
+        violations.push({ file: rel, rule: v.rule, msg: v.message });
+      }
+    }
+  }
+
+  console.log(` • Files Scanned: ${files.length}`);
+  console.log(` • Compliant:     ${passedCount} / ${files.length} (${Math.round((passedCount / files.length) * 100)}%)`);
+  if (violations.length === 0) {
+    console.log('✅ Demir Kafes (Iron Cage): 100% CLEAN - No violations found!');
+  } else {
+    console.log(`⚠️  Violations Found (${violations.length}):`);
+    for (const v of violations) {
+      console.log(`   - [${v.rule}] ${v.file}: ${v.msg}`);
+    }
+  }
+}
+
+export function handleSkeletonScan(targetDir?: string): void {
+  showBanner();
+  const base = targetDir ? path.resolve(process.cwd(), targetDir) : path.resolve(process.cwd(), 'packages');
+  console.log(`🗺️  Generating Global AST Skeleton Map for: ${path.relative(process.cwd(), base) || '.'}...`);
+  const files = collectSourceFiles(base);
+  const generator = new SkeletonGenerator();
+  const report = generator.generateForFiles(files, process.cwd());
+
+  console.log(` • Files Indexed:       ${report.filesScanned}`);
+  console.log(` • Original Code Size:  ${Math.round(report.totalOriginalBytes / 1024)} KB`);
+  console.log(` • AST Skeleton Size:   ${Math.round(report.totalSkeletonBytes / 1024)} KB`);
+  console.log(` • Total Token Savings: ~${report.overallSavingsPercent}% (Massive Context Window Reduction!)`);
+}

@@ -6,7 +6,7 @@ import { showBanner } from './banner.js';
 export function handleInit(): void {
   showBanner();
   console.log('🚀 Initializing Aegis environment...');
-  const wtManager = new WorktreeManager();
+  const wtManager = new WorktreeManager({ persistLocks: true });
   const alice = wtManager.ensureWorktree('alice');
   const bob = wtManager.ensureWorktree('bob');
   console.log(`✅ Worktree ready: ${alice.agentName} -> ${alice.path}`);
@@ -17,7 +17,7 @@ export function handleInit(): void {
 
 export function handleStatus(): void {
   showBanner();
-  const wtManager = new WorktreeManager();
+  const wtManager = new WorktreeManager({ persistLocks: true });
   const list = wtManager.listWorktrees();
   console.log(`Active Worktrees: ${list.activeCount}`);
   for (const wt of list.worktrees) {
@@ -34,7 +34,7 @@ export function handleAuto(): void {
   showBanner();
   console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
   const ghClient = new GitHubClient();
-  const wtManager = new WorktreeManager();
+  const wtManager = new WorktreeManager({ persistLocks: true });
   const dispatcher = new TaskDispatcher(wtManager);
 
   ghClient.registerIssue({

@@ -40,7 +40,7 @@ export async function handleGhSync(tokenArg?: string): Promise<void> {
 
   const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
   const client = new GitHubClient({ liveAdapter: adapter });
-  const wtManager = new WorktreeManager();
+  const wtManager = new WorktreeManager({ persistLocks: true });
   const dispatcher = new TaskDispatcher(wtManager);
 
   const syncedCount = await client.syncFromLive();

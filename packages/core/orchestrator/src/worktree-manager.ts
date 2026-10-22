@@ -6,16 +6,50 @@ import type { AgentWorktree, WorktreeListResult } from '@aegis/shared';
 export interface WorktreeManagerOptions {
   repoRoot?: string;
   worktreePrefix?: string;
+  persistLocks?: boolean;
 }
 
 export class WorktreeManager {
   private repoRoot: string;
   private worktreePrefix: string;
+  private persistLocks: boolean;
   private activeLocks: Map<string, string> = new Map(); // filePath -> agentName
 
   constructor(options: WorktreeManagerOptions = {}) {
     this.repoRoot = options.repoRoot ?? process.cwd();
     this.worktreePrefix = options.worktreePrefix ?? 'experimental';
+    this.persistLocks = options.persistLocks ?? false;
+    if (this.persistLocks) {
+      this.loadLocks();
+    }
+  }
+
+  private getLockFilePath(): string {
+    return path.resolve(this.repoRoot, '.aegis', 'locks.json');
+  }
+
+  private loadLocks(): void {
+    const lockFile = this.getLockFilePath();
+    if (fs.existsSync(lockFile)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+        this.activeLocks = new Map(Object.entries(data));
+      } catch {
+        this.activeLocks = new Map();
+      }
+    }
+  }
+
+  private saveLocks(): void {
+    if (!this.persistLocks) return;
+    try {
+      const lockFile = this.getLockFilePath();
+      fs.mkdirSync(path.dirname(lockFile), { recursive: true });
+      const obj = Object.fromEntries(this.activeLocks.entries());
+      fs.writeFileSync(lockFile, JSON.stringify(obj, null, 2), 'utf8');
+    } catch {
+      // Ignore write errors gracefully
+    }
   }
 
   public getWorktreePath(agentName: string): string {
@@ -115,6 +149,7 @@ export class WorktreeManager {
     for (const file of files) {
       this.activeLocks.set(file, agentName);
     }
+    this.saveLocks();
 
     return { success: true, conflictingFiles: [] };
   }
@@ -125,6 +160,7 @@ export class WorktreeManager {
         this.activeLocks.delete(file);
       }
     }
+    this.saveLocks();
   }
 
   public getLockedFiles(): Map<string, string> {

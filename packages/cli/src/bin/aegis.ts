@@ -9,7 +9,9 @@ import {
   handleDiff,
   handleInspect,
   handleMutate,
-  handleAudit
+  handleAudit,
+  handleCageCheck,
+  handleSkeletonScan
 } from '../commands/dev-commands.js';
 import {
   handleGhStatus,
@@ -34,6 +36,8 @@ function handleHelp(): void {
   console.log('  aegis estimate <files> <tests>         Compute adaptive timeout for build/test');
   console.log('  aegis verify <filepath>                Run deterministic Iron Cage validation');
   console.log('  aegis skeleton <filepath>              Generate token-saving AST Skeleton Map');
+  console.log('  aegis skeleton:scan [dir]              Scan project and compute total token savings');
+  console.log('  aegis cage:check [dir]                 Run Demir Kafes audit across all project code');
   console.log('  aegis diff <diff>                      Validate surgical unified diff compliance');
   console.log('  aegis audit <files>                    Run Immutable Oracle trust verification');
 }
@@ -51,7 +55,9 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   mutate: (a) => handleMutate(a[1]),
   estimate: (a) => handleEstimate(a),
   verify: (a) => handleVerify(a[1]),
+  'cage:check': (a) => handleCageCheck(a[1]),
   skeleton: (a) => handleSkeleton(a[1]),
+  'skeleton:scan': (a) => handleSkeletonScan(a[1]),
   diff: (a) => handleDiff(a[1]),
   audit: (a) => handleAudit(a[1])
 };
