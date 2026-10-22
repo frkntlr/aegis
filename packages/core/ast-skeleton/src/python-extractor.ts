@@ -1,6 +1,10 @@
 import type { SkeletonResult } from './ts-extractor.js';
+import type { LanguageExtractor } from './extractor-registry.js';
 
-export class PythonSkeletonExtractor {
+export class PythonSkeletonExtractor implements LanguageExtractor {
+  public readonly languageId = 'python';
+  public readonly supportedExtensions = ['.py'];
+
   public extract(_filePath: string, sourceCode: string): SkeletonResult {
     const lines = sourceCode.split(/\r?\n/);
     const skeletonLines = this.processLines(lines);
@@ -30,110 +34,99 @@ export class PythonSkeletonExtractor {
         i++;
         continue;
       }
+
       if (trimmed.startsWith('@')) {
         pendingDecorators.push(line);
         i++;
         continue;
       }
-      if (this.isImport(trimmed)) {
-        output.push(line);
-        i++;
-        continue;
-      }
-      if (this.isClassHeader(trimmed)) {
-        this.flushDecorators(pendingDecorators, output);
-        output.push(line);
-        i++;
-        continue;
-      }
-      if (this.isFunctionHeader(trimmed)) {
-        i = this.handleFunction(lines, i, pendingDecorators, output);
-        continue;
-      }
-      if (this.isVariableOrConstant(trimmed)) {
-        this.flushDecorators(pendingDecorators, output);
-        output.push(line);
-      }
-      i++;
+
+      i = this.handleDeclaration(lines, i, line, trimmed, pendingDecorators, output);
     }
+
     return output;
   }
 
-  private handleFunction(lines: string[], i: number, decorators: string[], output: string[]): number {
-    this.flushDecorators(decorators, output);
-    const { header, nextIndex, indent } = this.consumeFunctionHeader(lines, i);
-    output.push(header);
-    output.push(`${' '.repeat(indent + 4)}...`);
-    return this.skipIndentedBody(lines, nextIndex, indent);
+  private handleDeclaration(
+    lines: string[],
+    i: number,
+    line: string,
+    trimmed: string,
+    pendingDecorators: string[],
+    output: string[]
+  ): number {
+    if (trimmed.startsWith('def ') || trimmed.startsWith('async def ')) {
+      this.flushDecorators(pendingDecorators, output);
+      const defLine = this.consumeUntilColon(lines, i);
+      const indent = line.match(/^\s*/)?.[0] ?? '';
+      output.push(defLine);
+      output.push(`${indent}    ...`);
+      return this.skipBlock(lines, i);
+    }
+
+    if (trimmed.startsWith('class ')) {
+      this.flushDecorators(pendingDecorators, output);
+      output.push(this.consumeUntilColon(lines, i));
+      return i + 1;
+    }
+
+    if (trimmed.startsWith('import ') || trimmed.startsWith('from ')) {
+      this.flushDecorators(pendingDecorators, output);
+      output.push(line);
+      return i + 1;
+    }
+
+    if (trimmed.includes('=') && !trimmed.startsWith('self.')) {
+      this.flushDecorators(pendingDecorators, output);
+      output.push(line);
+      return i + 1;
+    }
+
+    pendingDecorators.length = 0;
+    return i + 1;
   }
 
-  private flushDecorators(decorators: string[], output: string[]): void {
-    while (decorators.length > 0) {
-      output.push(decorators.shift()!);
+  private flushDecorators(pending: string[], output: string[]): void {
+    if (pending.length > 0) {
+      output.push(...pending);
+      pending.length = 0;
     }
   }
 
-  private isImport(trimmed: string): boolean {
-    return trimmed.startsWith('import ') || trimmed.startsWith('from ');
-  }
-
-  private isClassHeader(trimmed: string): boolean {
-    return trimmed.startsWith('class ') && trimmed.endsWith(':');
-  }
-
-  private isFunctionHeader(trimmed: string): boolean {
-    return (trimmed.startsWith('def ') || trimmed.startsWith('async def ')) &&
-      (trimmed.includes('(') || trimmed.endsWith(':'));
-  }
-
-  private isVariableOrConstant(trimmed: string): boolean {
-    if (trimmed.startsWith('def ') || trimmed.startsWith('class ')) return false;
-    // Common Python type annotations or assignments: VAR: Type = val or VAR = val
-    return /^[A-Za-z_][A-Za-z0-9_]*(\s*:\s*[^=]+)?\s*=/.test(trimmed) ||
-           /^[A-Za-z_][A-Za-z0-9_]*\s*:\s*[A-Za-z0-9_\[\], ]+$/.test(trimmed);
-  }
-
-  private getIndentation(line: string): number {
-    const match = line.match(/^(\s*)/);
-    return match ? match[1].length : 0;
-  }
-
-  private consumeFunctionHeader(lines: string[], startIndex: number): { header: string; nextIndex: number; indent: number } {
-    const indent = this.getIndentation(lines[startIndex]);
-    const headerLines: string[] = [];
+  private consumeUntilColon(lines: string[], startIndex: number): string {
+    const parts: string[] = [];
     let i = startIndex;
+    while (i < lines.length) {
+      parts.push(lines[i]);
+      if (lines[i].includes(':')) break;
+      i++;
+    }
+    return parts.join('\n');
+  }
+
+  private skipBlock(lines: string[], startIndex: number): number {
+    const baseIndent = lines[startIndex].match(/^\s*/)?.[0].length ?? 0;
+    let i = startIndex + 1;
+
+    // consume multi-line signature
+    while (i < lines.length && !lines[i - 1].includes(':')) {
+      i++;
+    }
 
     while (i < lines.length) {
       const line = lines[i];
-      headerLines.push(line);
-      i++;
-      if (line.trim().endsWith(':')) {
-        break;
-      }
-    }
-
-    return {
-      header: headerLines.join('\n'),
-      nextIndex: i,
-      indent
-    };
-  }
-
-  private skipIndentedBody(lines: string[], startIndex: number, baseIndent: number): number {
-    let j = startIndex;
-    while (j < lines.length) {
-      const line = lines[j];
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) {
-        j++;
+        i++;
         continue;
       }
-      const currentIndent = this.getIndentation(line);
-      if (currentIndent <= baseIndent) {
+      const indent = line.match(/^\s*/)?.[0].length ?? 0;
+      if (indent <= baseIndent) {
         break;
       }
-      j++;
+      i++;
     }
-    return j;
+
+    return i;
   }
 }

@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import type { LanguageExtractor } from './extractor-registry.js';
 
 export interface SkeletonResult {
   originalLength: number;
@@ -7,7 +8,10 @@ export interface SkeletonResult {
   skeletonContent: string;
 }
 
-export class TypeScriptSkeletonExtractor {
+export class TypeScriptSkeletonExtractor implements LanguageExtractor {
+  public readonly languageId = 'typescript';
+  public readonly supportedExtensions = ['.ts', '.tsx', '.js', '.jsx'];
+
   private formatFunction(node: ts.FunctionDeclaration, sf: ts.SourceFile): string {
     const modifiers = ts.canHaveModifiers(node) && ts.getModifiers(node)
       ? ts.getModifiers(node)!.map(m => m.getText(sf)).join(' ') + ' '
@@ -23,41 +27,32 @@ export class TypeScriptSkeletonExtractor {
     const modifiers = ts.canHaveModifiers(node) && ts.getModifiers(node)
       ? ts.getModifiers(node)!.map(m => m.getText(sf)).join(' ') + ' '
       : '';
-    const declarations = node.declarationList.declarations.map(dec => {
-      const varName = dec.name.getText(sf);
-      const varType = dec.type ? `: ${dec.type.getText(sf)}` : '';
-      if (dec.initializer && (ts.isArrowFunction(dec.initializer) || ts.isFunctionExpression(dec.initializer))) {
-        const fn = dec.initializer;
-        const params = fn.parameters.map(p => p.getText(sf)).join(', ');
-        const retType = fn.type ? `: ${fn.type.getText(sf)}` : '';
-        return `${varName}${varType} = (${params})${retType} => { /* [omitted] */ }`;
-      }
-      return `${varName}${varType}${dec.initializer ? ' = ...' : ''}`;
+    const decls = node.declarationList.declarations.map(d => {
+      const type = d.type ? `: ${d.type.getText(sf)}` : '';
+      return `${d.name.getText(sf)}${type} = ...;`;
     }).join(', ');
-    const kind = node.declarationList.flags & ts.NodeFlags.Const ? 'const' : 'let';
-    return `${modifiers}${kind} ${declarations};`;
+    return `${modifiers}const ${decls}`;
   }
 
-  private formatClassMember(member: ts.ClassElement, sf: ts.SourceFile): string | null {
-    const memModifiers = ts.canHaveModifiers(member) && ts.getModifiers(member)
-      ? ts.getModifiers(member)!.map(m => m.getText(sf)).join(' ') + ' '
-      : '';
-    if (ts.isPropertyDeclaration(member)) {
-      const propName = member.name.getText(sf);
-      const propType = member.type ? `: ${member.type.getText(sf)}` : '';
-      return `  ${memModifiers}${propName}${propType};`;
+  private formatClassMember(m: ts.ClassElement, sf: ts.SourceFile): string {
+    if (ts.isMethodDeclaration(m)) {
+      const isStatic = ts.canHaveModifiers(m) && ts.getModifiers(m)?.some(x => x.kind === ts.SyntaxKind.StaticKeyword) ? 'static ' : '';
+      const name = m.name.getText(sf);
+      const params = m.parameters.map(p => p.getText(sf)).join(', ');
+      const returnType = m.type ? `: ${m.type.getText(sf)}` : '';
+      return `  ${isStatic}${name}(${params})${returnType};`;
     }
-    if (ts.isMethodDeclaration(member)) {
-      const methodName = member.name.getText(sf);
-      const params = member.parameters.map(p => p.getText(sf)).join(', ');
-      const retType = member.type ? `: ${member.type.getText(sf)}` : '';
-      return `  ${memModifiers}${methodName}(${params})${retType};`;
+    if (ts.isPropertyDeclaration(m)) {
+      const isStatic = ts.canHaveModifiers(m) && ts.getModifiers(m)?.some(x => x.kind === ts.SyntaxKind.StaticKeyword) ? 'static ' : '';
+      const name = m.name.getText(sf);
+      const type = m.type ? `: ${m.type.getText(sf)}` : '';
+      return `  ${isStatic}${name}${type};`;
     }
-    if (ts.isConstructorDeclaration(member)) {
-      const params = member.parameters.map(p => p.getText(sf)).join(', ');
-      return `  ${memModifiers}constructor(${params});`;
+    if (ts.isConstructorDeclaration(m)) {
+      const params = m.parameters.map(p => p.getText(sf)).join(', ');
+      return `  constructor(${params});`;
     }
-    return null;
+    return '';
   }
 
   private formatClass(node: ts.ClassDeclaration, sf: ts.SourceFile): string {
@@ -66,27 +61,35 @@ export class TypeScriptSkeletonExtractor {
       : '';
     const name = node.name ? node.name.text : 'AnonymousClass';
     const heritage = node.heritageClauses ? ' ' + node.heritageClauses.map(h => h.getText(sf)).join(' ') : '';
-    const memberLines = node.members
-      .map(m => this.formatClassMember(m, sf))
-      .filter((line): line is string => Boolean(line));
-    return `${modifiers}class ${name}${heritage} {\n${memberLines.join('\n')}\n}`;
+    const members: string[] = [];
+
+    for (const m of node.members) {
+      const memStr = this.formatClassMember(m, sf);
+      if (memStr) members.push(memStr);
+    }
+    return `${modifiers}class ${name}${heritage} {\n${members.join('\n')}\n}`;
   }
 
-  public extract(filePath: string, sourceCode: string): SkeletonResult {
-    const isTsx = filePath.endsWith('.tsx') || filePath.endsWith('.jsx');
-    const sf = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true, isTsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  private formatAstNode(node: ts.Node, sf: ts.SourceFile, skeletonLines: string[]): void {
+    if (ts.isImportDeclaration(node)) {
+      skeletonLines.push(node.getText(sf));
+    } else if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node)) {
+      skeletonLines.push(node.getText(sf));
+    } else if (ts.isFunctionDeclaration(node)) {
+      skeletonLines.push(this.formatFunction(node, sf));
+    } else if (ts.isClassDeclaration(node)) {
+      skeletonLines.push(this.formatClass(node, sf));
+    } else if (ts.isVariableStatement(node)) {
+      skeletonLines.push(this.formatVariables(node, sf));
+    }
+  }
+
+  public extract(_relativePath: string, sourceCode: string): SkeletonResult {
+    const sourceFile = ts.createSourceFile('temp.ts', sourceCode, ts.ScriptTarget.Latest, true);
     const skeletonLines: string[] = [];
 
-    ts.forEachChild(sf, (node) => {
-      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isEnumDeclaration(node)) {
-        skeletonLines.push(sf.text.substring(node.pos, node.end).trim());
-      } else if (ts.isFunctionDeclaration(node)) {
-        skeletonLines.push(this.formatFunction(node, sf));
-      } else if (ts.isVariableStatement(node)) {
-        skeletonLines.push(this.formatVariables(node, sf));
-      } else if (ts.isClassDeclaration(node)) {
-        skeletonLines.push(this.formatClass(node, sf));
-      }
+    ts.forEachChild(sourceFile, (node) => {
+      this.formatAstNode(node, sourceFile, skeletonLines);
     });
 
     const skeletonContent = skeletonLines.join('\n\n');

@@ -1,8 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { ExtractorRegistry, type LanguageExtractor } from './extractor-registry.js';
 import { TypeScriptSkeletonExtractor, type SkeletonResult } from './ts-extractor.js';
 import { PythonSkeletonExtractor } from './python-extractor.js';
 import { GDScriptSkeletonExtractor } from './gdscript-extractor.js';
+import { RustSkeletonExtractor } from './rust-extractor.js';
 
 export interface ProjectSkeletonMap {
   filesScanned: number;
@@ -14,21 +16,34 @@ export interface ProjectSkeletonMap {
 }
 
 export class SkeletonGenerator {
-  private tsExtractor = new TypeScriptSkeletonExtractor();
-  private pyExtractor = new PythonSkeletonExtractor();
-  private gdExtractor = new GDScriptSkeletonExtractor();
+  private registry: ExtractorRegistry;
+
+  constructor(customRegistry?: ExtractorRegistry) {
+    if (customRegistry) {
+      this.registry = customRegistry;
+    } else {
+      this.registry = new ExtractorRegistry();
+      this.registry.register(new TypeScriptSkeletonExtractor());
+      this.registry.register(new PythonSkeletonExtractor());
+      this.registry.register(new GDScriptSkeletonExtractor());
+      this.registry.register(new RustSkeletonExtractor());
+    }
+  }
+
+  public registerExtractor(extractor: LanguageExtractor): void {
+    this.registry.register(extractor);
+  }
+
+  public getRegistry(): ExtractorRegistry {
+    return this.registry;
+  }
 
   public extractFile(relativePath: string, content: string): SkeletonResult {
-    if (relativePath.endsWith('.ts') || relativePath.endsWith('.tsx') ||
-        relativePath.endsWith('.js') || relativePath.endsWith('.jsx')) {
-      return this.tsExtractor.extract(relativePath, content);
+    const extractor = this.registry.getExtractor(relativePath);
+    if (extractor) {
+      return extractor.extract(relativePath, content);
     }
-    if (relativePath.endsWith('.py')) {
-      return this.pyExtractor.extract(relativePath, content);
-    }
-    if (relativePath.endsWith('.gd')) {
-      return this.gdExtractor.extract(relativePath, content);
-    }
+
     return {
       originalLength: content.length,
       skeletonLength: content.length,

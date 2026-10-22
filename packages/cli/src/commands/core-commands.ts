@@ -1,35 +1,19 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { WorktreeManager, TaskDispatcher, MergePipeline } from '@aegis/orchestrator';
+import { WorktreeManager, TaskDispatcher, MergePipeline, IdeAdapterRegistry } from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
 import { LoopBreaker } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
 import { showBanner } from './banner.js';
 
 function setupIdeExclusions(repoRoot: string): void {
-  const vscodeDir = path.resolve(repoRoot, '.vscode');
-  const settingsFile = path.resolve(vscodeDir, 'settings.json');
-  fs.mkdirSync(vscodeDir, { recursive: true });
-
-  let settings: Record<string, any> = {};
-  if (fs.existsSync(settingsFile)) {
-    try {
-      settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-    } catch {
-      settings = {};
+  const registry = new IdeAdapterRegistry();
+  const results = registry.setupAll(repoRoot);
+  for (const r of results) {
+    if (r.success) {
+      const fileNames = r.configuredFiles.map(f => path.basename(f)).join(', ');
+      console.log(`✅ IDE isolation rules configured for [${r.ideId}] (${fileNames}).`);
     }
   }
-
-  settings['files.exclude'] = {
-    ...(settings['files.exclude'] || {}),
-    'experimental/**': true
-  };
-  settings['search.exclude'] = {
-    ...(settings['search.exclude'] || {}),
-    'experimental/**': true
-  };
-
-  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2), 'utf8');
 }
 
 export function handleInit(): void {
@@ -42,7 +26,6 @@ export function handleInit(): void {
   console.log(`✅ Worktree ready: ${bob.agentName} -> ${bob.path}`);
 
   setupIdeExclusions(process.cwd());
-  console.log('✅ Antigravity & IDE isolation rules configured (.vscode/settings.json).');
   console.log('✅ Constitution & Toolchain loaded.');
   console.log('🎯 Aegis initialization complete.');
 }

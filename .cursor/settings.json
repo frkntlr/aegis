@@ -1,0 +1,8 @@
+{
+  "files.exclude": {
+    "experimental/**": true
+  },
+  "search.exclude": {
+    "experimental/**": true
+  }
+}
