@@ -193,9 +193,12 @@ export class RealtimeMetricsService {
   public getSettings(): Record<string, any> {
     const sFile = path.resolve(this.repoRoot, '.aegis', 'settings.json');
     if (fs.existsSync(sFile)) {
-      try { return JSON.parse(fs.readFileSync(sFile, 'utf8')); } catch {}
+      try {
+        const parsed = JSON.parse(fs.readFileSync(sFile, 'utf8'));
+        return { primaryBranch: parsed.primaryBranch || 'master', ...parsed };
+      } catch {}
     }
-    return { timeoutCeiling: 180, maxFunctionLines: 40, maxFileLines: 300, preferredIde: 'Google Antigravity' };
+    return { primaryBranch: 'master', timeoutCeiling: 180, maxFunctionLines: 40, maxFileLines: 300, preferredIde: 'Google Antigravity' };
   }
 
   public updateSettings(settings: Record<string, any>): Record<string, any> {

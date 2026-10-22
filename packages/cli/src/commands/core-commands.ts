@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   WorktreeManager,
@@ -96,13 +97,25 @@ export async function handleAuto(): Promise<void> {
   }
 }
 
-export async function handleMerge(agentName?: string, baseBranch = 'master'): Promise<void> {
+function getPrimaryBranch(): string {
+  const sFile = path.resolve(process.cwd(), '.aegis', 'settings.json');
+  if (fs.existsSync(sFile)) {
+    try {
+      const s = JSON.parse(fs.readFileSync(sFile, 'utf8'));
+      if (s.primaryBranch) return s.primaryBranch;
+    } catch {}
+  }
+  return 'master';
+}
+
+export async function handleMerge(agentName?: string, baseBranchArg?: string): Promise<void> {
   showBanner();
   if (!agentName || agentName === '--help' || agentName === '-h') {
     console.error('❌ Usage: aegis merge <solver|qa|docs> [baseBranch]');
     process.exit(1);
   }
 
+  const baseBranch = baseBranchArg || getPrimaryBranch();
   const pipeline = new MergePipeline({ baseBranch });
   const wtManager = new WorktreeManager({ persistLocks: true });
   console.log(`🔀 Running 4-Step Atomic Merge Pipeline for Agent [${agentName}] into [${baseBranch}]...`);

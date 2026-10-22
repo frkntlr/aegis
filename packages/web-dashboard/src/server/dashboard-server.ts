@@ -144,8 +144,13 @@ export class DashboardServer {
       else res = { error: 'Bilinmeyen araç: ' + t };
       return { success: true, result: res, message: res.summary || 'Motor aracı çalıştırıldı.' };
     }
-    if (action === 'save_settings') {
-      return { success: true, settings: this.metrics.updateSettings(payload.settings || {}), message: 'Ayarlar kaydedildi.' };
+    if (action === 'save_settings' || action === 'update_settings') {
+      const s = this.metrics.updateSettings(payload.settings || payload);
+      return { success: true, settings: s, message: `Ayarlar kaydedildi (Ana Dal: ${s.primaryBranch || 'master'}).` };
+    }
+    if (action === 'set_primary_branch') {
+      const s = this.metrics.updateSettings({ primaryBranch: payload.primaryBranch || 'master' });
+      return { success: true, settings: s, message: `Ana dal '${s.primaryBranch}' olarak güncellendi.` };
     }
     return { success: false, error: 'Bilinmeyen işlem' };
   }
@@ -158,7 +163,7 @@ export class DashboardServer {
       const status = this.metrics.getGitHubStatus();
       return { success: true, issues, status, message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.` };
     }
-    if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings'].includes(action)) {
+    if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings', 'set_primary_branch'].includes(action)) {
       return this.handleIdeAndSync(action, payload);
     }
     if (action === 'create_task') {

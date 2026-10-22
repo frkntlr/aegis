@@ -4,7 +4,7 @@ description: >-
   Autonomous Vibe Coding Engine command center and slash command (/aegis).
   Use this skill whenever the user invokes /aegis, /aegis auto, /aegis dashboard,
   /aegis status, /aegis skeleton, /aegis cage:check, or asks to manage autonomous
-  worktrees (alice/bob), dispatch tasks, run quality gates, or inspect UI telemetry.
+  worktrees (solver/qa/docs), dispatch tasks, run quality gates, or inspect UI telemetry.
 ---
 
 # Aegis Autonomous Vibe Coding Engine (/aegis)
@@ -32,5 +32,5 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 
 ## Core Principles
 1. **Iron Cage Enforcement**: Maximum 300 lines per file, maximum 40 lines per function.
-2. **Conflict-Free Isolation**: Multi-agent tasks run in dedicated worktrees (`experimental/alice`, `experimental/bob`).
+2. **Conflict-Free Isolation**: Multi-agent tasks run in dedicated worktrees (`experimental/solver`, `experimental/qa`, `experimental/docs`).
 3. **Immutable Verification**: Pre-commit quality gate strictly enforces that zero commits can land without 100% test pass.

@@ -21,6 +21,7 @@ export function getDashboardHtml(): string {
     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
       <span id="sse-badge" style="font-size: 0.75rem; background: rgba(63,185,80,0.15); color: var(--green-glow); padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(63,185,80,0.3);">● SSE CANLI</span>
       <span id="gh-badge" style="font-size: 0.75rem; background: rgba(88,166,255,0.15); color: var(--accent); padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(88,166,255,0.3);">🐙 GitHub: frkntlr/aegis</span>
+      <span id="branch-badge" style="font-size: 0.75rem; background: rgba(210,153,34,0.15); color: #d29922; padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(210,153,34,0.3);">🌿 Ana Dal: master</span>
       <button class="btn btn-secondary" onclick="sendAction('sync_github')" title="GitHub Issues ve Projeleri ile iki yönlü canlı senkronizasyon">GitHub Sync 🔄</button>
       <button class="btn btn-secondary" onclick="sendAction('sync_toolchain')">Toolchain Eşitle 🔄</button>
       <button class="btn btn-secondary" onclick="openModal('modal-engines')">Aegis Motorları ⚡</button>
@@ -116,6 +117,15 @@ export function getDashboardHtml(): string {
   <div id="modal-settings" class="modal-backdrop">
     <div class="modal-dialog">
       <h3 style="margin-bottom: 1rem;">⚙️ Aegis Genel Ayarları</h3>
+      <label>Ana / Hedef Dal (Primary Branch):</label>
+      <div style="display: flex; gap: 0.4rem; margin-bottom: 0.5rem;">
+        <select id="set-primary-branch" class="form-control" onchange="toggleCustomBranch(this.value)">
+          <option value="master">master (Depo Standardı)</option>
+          <option value="main">main</option>
+          <option value="custom">Özel Dal Belirt...</option>
+        </select>
+        <input id="set-custom-branch" class="form-control" style="display: none;" placeholder="Örn: release/v1" />
+      </div>
       <label>Demir Kafes Maksimum Fonksiyon Satırı:</label><input id="set-func-lines" class="form-control" type="number" value="40" />
       <label>Demir Kafes Maksimum Dosya Satırı:</label><input id="set-file-lines" class="form-control" type="number" value="300" />
       <label>Adaptif Timeout Maksimum Tavan (Saniye):</label><input id="set-timeout" class="form-control" type="number" value="180" />
@@ -199,6 +209,16 @@ export function getDashboardHtml(): string {
       if (payload.issues) renderKanban(payload.issues);
       if (payload.tokenMetrics) renderMetrics(payload.tokenMetrics);
       if (payload.qualityShields) renderShields(payload.qualityShields);
+      if (payload.settings) {
+        const s = payload.settings;
+        const b = document.getElementById('branch-badge');
+        if (b && s.primaryBranch) b.innerText = '🌿 Ana Dal: ' + s.primaryBranch;
+        const pb = document.getElementById('set-primary-branch');
+        if (pb && s.primaryBranch) {
+          if (['master', 'main'].includes(s.primaryBranch)) { pb.value = s.primaryBranch; }
+          else { pb.value = 'custom'; const ci = document.getElementById('set-custom-branch'); if (ci) { ci.style.display = 'block'; ci.value = s.primaryBranch; } }
+        }
+      }
       if (payload.github) {
         const gh = payload.github;
         const b = document.getElementById('gh-badge');
@@ -244,8 +264,16 @@ export function getDashboardHtml(): string {
       closeModal('modal-new-task');
     }
 
+    function toggleCustomBranch(v) {
+      const el = document.getElementById('set-custom-branch');
+      if (el) el.style.display = (v === 'custom') ? 'block' : 'none';
+    }
+
     function saveSettings() {
+      let pb = document.getElementById('set-primary-branch').value;
+      if (pb === 'custom') pb = document.getElementById('set-custom-branch').value.trim() || 'master';
       const s = {
+        primaryBranch: pb,
         maxFunctionLines: parseInt(document.getElementById('set-func-lines').value, 10),
         maxFileLines: parseInt(document.getElementById('set-file-lines').value, 10),
         timeoutCeiling: parseInt(document.getElementById('set-timeout').value, 10),
