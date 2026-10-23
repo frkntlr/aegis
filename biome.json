@@ -1,0 +1,40 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+  "files": {
+    "includes": [
+      "packages/**/src/**/*.ts",
+      "packages/**/src/**/*.js"
+    ],
+    "ignoreUnknown": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noEmptyBlockStatements": "off",
+        "noUselessEscapeInString": "off",
+        "noGlobalIsNan": "off"
+      },
+      "complexity": {
+        "noBannedTypes": "off",
+        "noThisInStatic": "off",
+        "noStaticOnlyClass": "off",
+        "useLiteralKeys": "off",
+        "noUselessEscapeInRegex": "off",
+        "useOptionalChain": "off",
+        "useRegexLiterals": "off"
+      },
+      "correctness": {
+        "noInnerDeclarations": "off"
+      },
+      "style": {
+        "useTemplate": "off",
+        "useImportType": "off",
+        "useExportType": "off",
+        "noNonNullAssertion": "off"
+      }
+    }
+  }
+}

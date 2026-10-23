@@ -8,8 +8,11 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/bundle.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test dist/**/*.test.js"
   },
@@ -24,10 +27,12 @@
     "@aegis/trust-verifier": "*",
     "@aegis/mcp-security": "*",
     "@aegis/web-dashboard": "*",
-    "@aegis/telemetry-tester": "*"
+    "@aegis/telemetry-tester": "*",
+    "typescript": "^5.7.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
+    "esbuild": "^0.28.2",
     "typescript": "^5.7.2"
   }
 }

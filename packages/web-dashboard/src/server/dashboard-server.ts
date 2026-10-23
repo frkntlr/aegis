@@ -26,9 +26,7 @@ export class DashboardServer {
   constructor(options: DashboardServerOptions = {}) {
     this.port = options.port ?? 3000;
     this.hub = new ProjectHub(options.repoRoot);
-    if (options.metricsService) {
-      this.hub.getActiveContext().metrics = options.metricsService;
-    }
+    if (options.metricsService) this.hub.getActiveContext().metrics = options.metricsService;
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);
     this.hub.discoverProjects().catch(() => {});
   }
@@ -56,11 +54,8 @@ export class DashboardServer {
       github: snapshot.github,
       projects: this.hub.listProjects(),
       activeProject: {
-        id: ctx.id,
-        name: ctx.name,
-        projectNumber: ctx.projectNumber,
-        localPath: ctx.localPath,
-        isLocalBound: ctx.isLocalBound
+        id: ctx.id, name: ctx.name, projectNumber: ctx.projectNumber,
+        localPath: ctx.localPath, isLocalBound: ctx.isLocalBound
       },
       timestamp: new Date().toISOString()
     };
@@ -211,41 +206,44 @@ export class DashboardServer {
     return { success: false, error: 'Bilinmeyen aksiyon: ' + action };
   }
 
-  private handleActionApi(req: http.IncomingMessage, res: http.ServerResponse): void {
-    let bodyStr = '';
-    req.on('data', chunk => { bodyStr += chunk; });
-    req.on('end', async () => {
-      try {
-        const body = bodyStr ? JSON.parse(bodyStr) : {};
-        const result = await this.executeAction(body.action, body);
-        this.broadcast('update', this.getStatusPayload());
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: err.message }));
-      }
+  private readJsonBody(req: http.IncomingMessage): Promise<any> {
+    return new Promise((resolve, reject) => {
+      let bodyStr = '';
+      req.on('data', chunk => { bodyStr += chunk; });
+      req.on('end', () => {
+        try { resolve(bodyStr ? JSON.parse(bodyStr) : {}); } catch (err) { reject(err); }
+      });
+      req.on('error', reject);
     });
   }
 
-  private handleFocusApi(req: http.IncomingMessage, res: http.ServerResponse): void {
-    let bodyStr = '';
-    req.on('data', chunk => { bodyStr += chunk; });
-    req.on('end', () => {
-      try {
-        const body = bodyStr ? JSON.parse(bodyStr) : {};
-        const result = this.hub.handleFocus(body.workspacePath || process.cwd());
-        if (result.switched) {
-          this.broadcast('context_switched', result);
-          this.broadcast('update', this.getStatusPayload());
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, ...result }));
-      } catch (err: any) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: err.message }));
+  private async handleActionApi(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    try {
+      const body = await this.readJsonBody(req);
+      const result = await this.executeAction(body.action, body);
+      this.broadcast('update', this.getStatusPayload());
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+  }
+
+  private async handleFocusApi(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    try {
+      const body = await this.readJsonBody(req);
+      const result = this.hub.handleFocus(body.workspacePath || process.cwd());
+      if (result.switched) {
+        this.broadcast('context_switched', result);
+        this.broadcast('update', this.getStatusPayload());
       }
-    });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, ...result }));
+    } catch (err: any) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
   }
 
   private handleRoutes(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -253,23 +251,22 @@ export class DashboardServer {
     if (url === '/' || url === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(getDashboardHtml());
-      return;
-    }
-    if (url === '/api/events') return this.handleEventsSse(req, res);
-    if (url === '/api/status' && req.method === 'GET') {
+    } else if (url === '/api/events') {
+      this.handleEventsSse(req, res);
+    } else if (url === '/api/status' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(this.getStatusPayload()));
-      return;
-    }
-    if (url === '/api/projects' && req.method === 'GET') {
+    } else if (url === '/api/projects' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ projects: this.hub.listProjects(), active: this.hub.getActiveContext().id }));
-      return;
+    } else if (url === '/api/projects/focus' && req.method === 'POST') {
+      this.handleFocusApi(req, res);
+    } else if (url === '/api/action' && req.method === 'POST') {
+      this.handleActionApi(req, res);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not Found');
     }
-    if (url === '/api/projects/focus' && req.method === 'POST') return this.handleFocusApi(req, res);
-    if (url === '/api/action' && req.method === 'POST') return this.handleActionApi(req, res);
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
   }
 
   public start(): Promise<number> {

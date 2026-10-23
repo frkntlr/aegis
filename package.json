@@ -12,13 +12,15 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "biome lint packages/",
     "typecheck": "turbo run typecheck",
     "aegis": "node packages/cli/dist/bin/aegis.js",
     "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .githooks', {stdio: 'ignore'}) } catch {}\""
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.2",
     "@types/node": "^22.10.1",
+    "esbuild": "^0.28.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   },
