@@ -5,6 +5,7 @@ export interface AuditInput {
   newTestContents?: { filePath: string; content: string }[];
   reportedPassedCount: number;
   reportedFailedCount: number;
+  mutationScorePercent?: number;
 }
 
 export class ImmutableOracle {
@@ -47,13 +48,18 @@ export class ImmutableOracle {
       details.push(`Agent self-reported ${input.reportedFailedCount} failing tests. Cannot approve.`);
     }
 
+    const mutationScore = input.mutationScorePercent ?? 100;
+    if (mutationScore < 70) {
+      details.push(`Mutation score ${mutationScore}% is below required 70% threshold.`);
+    }
+
     let verdict: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW_REQUIRED' = 'APPROVED';
     let suspicious = false;
 
     if (tamperedTestFiles.length > 0) {
       suspicious = true;
       verdict = 'MANUAL_REVIEW_REQUIRED';
-    } else if (vacuousAssertionsFound > 0 || input.reportedFailedCount > 0) {
+    } else if (vacuousAssertionsFound > 0 || input.reportedFailedCount > 0 || mutationScore < 70) {
       suspicious = true;
       verdict = 'REJECTED';
     }
@@ -62,7 +68,7 @@ export class ImmutableOracle {
       suspicious,
       tamperedTestFiles,
       vacuousAssertionsFound,
-      mutationScorePercent: 100,
+      mutationScorePercent: mutationScore,
       verdict,
       details
     };

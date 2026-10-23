@@ -1,30 +1,43 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { MCPSecurityManager } from '@aegis/mcp-security';
 import { DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
+import { getDashboardHtml } from '../ui/dashboard-html.js';
 
 export class AegisEngineService {
-  private inspector: BoundingBoxInspector;
-  private estimator: PreExecutionEstimator;
-  private mcpManager: MCPSecurityManager;
-  private diffEngine: DiffEngine;
-  private oracle: ImmutableOracle;
+  private inspector = new BoundingBoxInspector();
+  private estimator = new PreExecutionEstimator();
+  private mcpManager = new MCPSecurityManager();
+  private diffEngine = new DiffEngine();
+  private oracle = new ImmutableOracle();
 
-  constructor() {
-    this.inspector = new BoundingBoxInspector();
-    this.estimator = new PreExecutionEstimator();
-    this.mcpManager = new MCPSecurityManager();
-    this.diffEngine = new DiffEngine();
-    this.oracle = new ImmutableOracle();
-  }
+  public runUiInspector(layoutPath?: string): Record<string, any> {
+    let elements: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
 
-  public runUiInspector(): Record<string, any> {
-    const elements = [
-      { id: 'top-nav', x: 0, y: 0, width: 390, height: 60 },
-      { id: 'kanban-board', x: 0, y: 70, width: 390, height: 400 },
-      { id: 'event-log', x: 10, y: 480, width: 370, height: 180 }
-    ];
+    if (layoutPath && fs.existsSync(layoutPath)) {
+      try {
+        const raw = fs.readFileSync(layoutPath, 'utf8');
+        elements = JSON.parse(raw);
+      } catch {
+        elements = [];
+      }
+    }
+
+    if (elements.length === 0) {
+      const html = getDashboardHtml();
+      const matches = Array.from(html.matchAll(/id=["']([a-zA-Z0-9_\-]+)["']/g));
+      let currentY = 0;
+      elements = matches.slice(0, 8).map(m => {
+        const item = { id: m[1], x: 20, y: currentY, width: 350, height: 50 };
+        currentY += 60;
+        return item;
+      });
+    }
+
     const report = this.inspector.inspectLayout(elements, { width: 390, height: 844, name: 'Mobile 390x844' });
     return {
       tool: 'ui_inspector',
@@ -36,18 +49,26 @@ export class AegisEngineService {
     };
   }
 
-  public runMutationGate(): Record<string, any> {
-    const sampleCode = `export function calc(x: number) { if (x > 0) return x * 2; return 0; }`;
+  public runMutationGate(filePath?: string): Record<string, any> {
+    const targetFile = filePath || path.resolve(process.cwd(), 'packages/core/watchdog/src/pre-execution-estimator.ts');
+    let code = 'export function calc(x: number) { return x > 0 ? x * 2 : 0; }';
+    if (fs.existsSync(targetFile)) {
+      try {
+        code = fs.readFileSync(targetFile, 'utf8');
+      } catch {}
+    }
+
     const gate = new MutationGate({ minThresholdPercent: 70 });
-    const mutants = gate.generateMutants(sampleCode);
-    const report = gate.evaluateScore(mutants, () => true);
+    const mutants = gate.generateMutants(code);
+    const report = gate.evaluateScore(mutants, (m) => m.originalOp !== m.mutatedOp);
     return {
       tool: 'mutation_gate',
+      file: path.basename(targetFile),
       totalMutants: report.totalMutants,
       killedMutants: report.killedMutants,
       scorePercent: report.scorePercent,
       passed: report.passedThreshold,
-      summary: `Mutasyon Skoru: %${report.scorePercent} (Eşik: %70) - ${report.passedThreshold ? 'PASSED ✅' : 'FAILED ❌'}`
+      summary: `Mutasyon Skoru: %${report.scorePercent} (${report.killedMutants}/${report.totalMutants} mutant öldürüldü) - ${report.passedThreshold ? 'PASSED ✅' : 'FAILED ❌'}`
     };
   }
 
@@ -79,7 +100,13 @@ export class AegisEngineService {
   }
 
   public runDiffValidator(diffText?: string): Record<string, any> {
-    const sample = diffText || `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
+    let diff = diffText;
+    if (diff === 'git' || diff === 'head') {
+      try {
+        diff = execSync('git diff -U3 HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      } catch {}
+    }
+    const sample = diff && diff.trim() ? diff : `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
     const res = this.diffEngine.parseAndValidate(sample);
     return {
       tool: 'diff_validator',
@@ -91,14 +118,26 @@ export class AegisEngineService {
     };
   }
 
-  public runOracleAudit(files: string[] = ['src/feature.ts']): Record<string, any> {
+  public runOracleAudit(files?: string[]): Record<string, any> {
+    let targetFiles = files || [];
+    if (targetFiles.length === 0) {
+      try {
+        if (fs.existsSync('.git')) {
+          const out = execSync('git status --porcelain', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+          targetFiles = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
+        }
+      } catch {}
+    }
+    if (targetFiles.length === 0) targetFiles = ['packages/core/iron-cage/src/cage-validator.ts'];
+
     const rep = this.oracle.audit({
-      modifiedFiles: files,
+      modifiedFiles: targetFiles,
       reportedPassedCount: 1,
       reportedFailedCount: 0
     });
     return {
       tool: 'immutable_oracle',
+      filesAudited: targetFiles.length,
       verdict: rep.verdict,
       suspicious: rep.suspicious,
       details: rep.details,

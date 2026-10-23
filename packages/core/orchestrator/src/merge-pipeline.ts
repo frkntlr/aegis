@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 
@@ -27,10 +28,20 @@ export class MergePipeline {
   private worktreePrefix: string;
   private baseBranch: string;
 
+  private detectCurrentBranch(): string {
+    try {
+      if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
+        const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: this.repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        if (branch && branch !== 'HEAD') return branch;
+      } 
+    } catch {}
+    return 'master';
+  }
+
   constructor(options: MergePipelineOptions = {}) {
     this.repoRoot = options.repoRoot ?? process.cwd();
     this.worktreePrefix = options.worktreePrefix ?? 'experimental';
-    this.baseBranch = options.baseBranch ?? 'master';
+    this.baseBranch = options.baseBranch ?? this.detectCurrentBranch();
   }
 
   public async executePipeline(

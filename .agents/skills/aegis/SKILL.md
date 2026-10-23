@@ -26,6 +26,11 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis verify <file>` | Validate single file against Demir Kafes | `npm run aegis -- verify <file>` |
 | `/aegis gh:status [token]` | Inspect live GitHub API auth & rate limits | `npm run aegis -- gh:status [token]` |
 | `/aegis gh:sync [token]` | Download live GitHub issues & dispatch to agents | `npm run aegis -- gh:sync [token]` |
+| `/aegis rfc:create "<t>" [d]` | Create RFC blueprint, sync Wiki & publish Discussion | `npm run aegis -- rfc:create "<t>" [d]` |
+| `/aegis rfc:decompose <id>` | Decompose RFC acceptance criteria into GitHub Issues | `npm run aegis -- rfc:decompose <id>` |
+| `/aegis wiki:sync` | Auto-sync & push living memory directly to Wiki repo | `npm run aegis -- wiki:sync` |
+| `/aegis nlm:query "<q>"` | Query ground-truth knowledge via NotebookLM | `npm run aegis -- nlm:query "<q>"` |
+| `/aegis nlm:research "<t>"` | Deep architectural research & stage Wiki via NotebookLM | `npm run aegis -- nlm:research "<t>"` |
 | `/aegis inspect` | Zero-token bounding box layout inspection | `npm run aegis -- inspect` |
 | `/aegis mutate <file>` | Run mutation testing gate | `npm run aegis -- mutate <file>` |
 | `/aegis estimate <files> <tests>` | Pre-execution adaptive timeout estimation | `npm run aegis -- estimate <files> <tests>` |
@@ -33,4 +38,6 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 ## Core Principles
 1. **Iron Cage Enforcement**: Maximum 300 lines per file, maximum 40 lines per function.
 2. **Conflict-Free Isolation**: Multi-agent tasks run in dedicated worktrees (`experimental/solver`, `experimental/qa`, `experimental/docs`).
-3. **Immutable Verification**: Pre-commit quality gate strictly enforces that zero commits can land without 100% test pass.
+3. **Headless Git Safety**: `$env:GIT_TERMINAL_PROMPT=0` mandatory; git push requires prior auth verification and explicit permission.
+4. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
+5. **Immutable Verification**: Pre-commit quality gate strictly enforces that zero commits can land without 100% test pass.

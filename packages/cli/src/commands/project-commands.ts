@@ -93,15 +93,6 @@ export function handleWikiSync(): void {
   showBanner();
   console.log('🔄 Synchronizing directly with GitHub Wiki remote repository...');
   const manager = new WikiMemoryManager();
-  const status = manager.checkStatus();
-
-  if (!status.available) {
-    console.log('⚠️  GitHub Wiki remote repository is not yet initialized.');
-    console.log(`👉 Please initialize the first page at: ${status.initializeUrl || status.url}`);
-    console.log('   (GitHub requires this one-time step before git push is enabled).');
-    return;
-  }
-
   const pulled = manager.syncLive();
   const pushed = manager.pushAllToRemote();
   if (pulled || pushed.success) {

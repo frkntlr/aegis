@@ -12,6 +12,7 @@ import {
 } from '../commands/core-commands.js';
 import { handlePrompt } from '../commands/prompt-command.js';
 import { handleContribute, handleRfcTriage, handleNlmSync } from '../commands/contribute-command.js';
+import { handleRfcCreate, handleRfcDecompose } from '../commands/rfc-commands.js';
 import {
   handleEstimate,
   handleVerify,
@@ -40,6 +41,7 @@ import {
   handleGhLocate
 } from '../commands/project-commands.js';
 import { handleNlmQuery, handleNlmResearch } from '../commands/nlm-command.js';
+import { notifyDashboardFocus } from '../commands/focus-notifier.js';
 
 function handleHelp(): void {
   showBanner();
@@ -50,6 +52,8 @@ function handleHelp(): void {
   console.log('  aegis prompt [role|id] [id]         Compile surgical AST prompt caching context');
   console.log('  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution');
   console.log('  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria');
+  console.log('  aegis rfc:create "<title>" [desc]      Create architectural RFC, publish Wiki & GitHub Discussion');
+  console.log('  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues');
   console.log('  aegis nlm:sync                         Export and synchronize architecture with NotebookLM');
   console.log('  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations');
   console.log('  aegis nlm:research "<topic>" [mode]    Run automated NotebookLM research and stage in Wiki');
@@ -87,6 +91,10 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   prompt: (a) => handlePrompt(a[1], a[2], a[3]),
   contribute: (a) => handleContribute(a[1], a[2]),
   'rfc:triage': (a) => handleRfcTriage(a[1], a[2]),
+  'rfc:create': (a) => handleRfcCreate(a[1], a[2]),
+  rfc: (a) => handleRfcCreate(a[1], a[2]),
+  ideate: (a) => handleRfcCreate(a[1], a[2]),
+  'rfc:decompose': (a) => handleRfcDecompose(a[1]),
   'nlm:sync': () => handleNlmSync(),
   'nlm:query': (a) => handleNlmQuery(a[1], a[2]),
   'nlm:research': (a) => handleNlmResearch(a[1], a[2], a[3]),
@@ -117,7 +125,35 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   audit: (a) => handleAudit(a[1])
 };
 
+function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {
+  if (args.length === 0) return { isIdea: false, title: '' };
+  const first = args[0].toLowerCase();
+  const rawJoin = args.join(' ');
+  const ideaPrefixes = ['idea', 'fikir', 'oneri', 'öneri', 'rfc', 'feature', 'concept', 'propose'];
+
+  if (ideaPrefixes.includes(first)) {
+    const title = args[1] || 'New Architectural Proposal';
+    const desc = args.slice(2).join(' ') || title;
+    return { isIdea: true, title, desc };
+  }
+
+  const triggers = ['bir fikrim var', 'yeni fikir', 'yeni bir fikir', 'fikrim şu', 'şunu ekleyelim', 'we should add', 'how about'];
+  for (const trigger of triggers) {
+    if (rawJoin.toLowerCase().includes(trigger)) {
+      const clean = rawJoin.replace(new RegExp(trigger, 'i'), '').trim().replace(/^[:,-]\s*/, '');
+      return { isIdea: true, title: clean || 'New Architectural Idea', desc: rawJoin };
+    }
+  }
+
+  if (args[0].includes(' ') || (args.length >= 3 && !args[0].startsWith('-'))) {
+    return { isIdea: true, title: args[0], desc: args.slice(1).join(' ') || args[0] };
+  }
+
+  return { isIdea: false, title: '' };
+}
+
 async function main(): Promise<void> {
+  notifyDashboardFocus();
   const args = process.argv.slice(2);
   const command = args[0] || 'help';
   const handler = commandMap[command];
@@ -125,7 +161,14 @@ async function main(): Promise<void> {
   if (handler) {
     await handler(args);
   } else {
-    handleHelp();
+    const idea = detectIdeaIntent(args);
+    if (idea.isIdea) {
+      console.log(`💡 Idea Intent Detected: "${idea.title}"`);
+      console.log(`🚀 Routing directly to Aegis RFC & Ideation Pipeline...\n`);
+      await handleRfcCreate(idea.title, idea.desc);
+    } else {
+      handleHelp();
+    }
   }
 }
 

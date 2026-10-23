@@ -85,7 +85,11 @@ export class RfcTriager {
 
   public convertToIssue(rfc: ParsedRfc, issueNumber: number): GitHubIssue {
     const acceptanceCriteria = this.generateAcceptanceCriteria(rfc);
-    const lockLabels = rfc.proposedFiles.map(f => `lock:${f}`);
+    const lockLabels = rfc.proposedFiles.map(f => {
+      const base = f.includes('/') ? f.split('/').pop()! : f;
+      const label = `lock:${base}`;
+      return label.length > 50 ? label.slice(0, 50) : label;
+    });
 
     return {
       id: issueNumber,

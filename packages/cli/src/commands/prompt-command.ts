@@ -13,24 +13,50 @@ export interface PromptResult {
   promptMarkdown: string;
 }
 
+function loadFromPromptDir(issueNumber: number): GitHubIssue | undefined {
+  const promptDir = path.resolve(process.cwd(), '.aegis', 'prompts');
+  if (!fs.existsSync(promptDir)) return undefined;
+  const files = fs.readdirSync(promptDir).filter(f => f.includes(`-${issueNumber}.md`));
+  if (files.length === 0) return undefined;
+  const raw = fs.readFileSync(path.join(promptDir, files[0]), 'utf8');
+  const targetMatches = raw.match(/Target Files:\s*([^\r\n]+)/);
+  const targetFiles = targetMatches ? targetMatches[1].split(',').map(s => s.trim()).filter(Boolean) : ['packages/cli/src/bin/aegis.ts'];
+  return {
+    id: issueNumber,
+    number: issueNumber,
+    title: `Task #${issueNumber}`,
+    body: raw,
+    labels: ['status:ready'],
+    status: 'ready',
+    targetFiles,
+    acceptanceCriteria: ['Pass unit tests', 'Demir Kafes 100% compliance']
+  };
+}
+
 async function resolveIssue(issueNumber: number, client: GitHubClient): Promise<GitHubIssue> {
   const existing = client.getIssue(issueNumber);
   if (existing) return existing;
   const fetched = await client.fetchIssue(issueNumber);
   if (fetched) return fetched;
 
-  const mock: GitHubIssue = {
+  const diskIssue = loadFromPromptDir(issueNumber);
+  if (diskIssue) {
+    client.registerIssue(diskIssue);
+    return diskIssue;
+  }
+
+  const fallback: GitHubIssue = {
     id: issueNumber,
     number: issueNumber,
-    title: `Issue #${issueNumber}`,
+    title: `Task #${issueNumber}`,
     body: `Autonomous task implementation for Issue #${issueNumber}`,
     labels: ['status:ready'],
     status: 'ready',
     targetFiles: ['packages/cli/src/bin/aegis.ts'],
     acceptanceCriteria: ['Pass unit tests', 'Demir Kafes 100% compliance']
   };
-  client.registerIssue(mock);
-  return mock;
+  client.registerIssue(fallback);
+  return fallback;
 }
 
 function formatTaskDescription(agentName: string, issue: GitHubIssue): string {
@@ -100,7 +126,7 @@ async function resolveRoleAndIssue(
   client = new GitHubClient({ autoConnectLive: true })
 ): Promise<{ role: string; issueNumber: number; issue: GitHubIssue }> {
   const issue = await resolveIssue(issueNumber, client);
-  if (rawRole === 'auto' || !['solver', 'qa', 'docs', 'alice', 'bob'].includes(rawRole)) {
+  if (rawRole === 'auto' || !['solver', 'qa', 'docs', 'contributor', 'alice', 'bob'].includes(rawRole)) {
     const classification = new RoleClassifier().classify(issue);
     if (!isJson) {
       if (classification.isAmbiguous) {

@@ -81,16 +81,15 @@ export async function handleAuto(): Promise<void> {
     await ghClient.syncFromLive();
     await reclaimStaleTasks(ghClient, wtManager);
   } else {
-    ghClient.registerIssue({
-      id: 101,
-      number: 101,
-      title: 'Implement User Avatar Component',
-      body: 'Create avatar with fallback initials',
-      labels: ['status:ready', 'lock:src/Avatar.tsx', 'wiki:ui-components'],
-      status: 'ready',
-      targetFiles: ['src/Avatar.tsx'],
-      acceptanceCriteria: ['Pass unit tests', 'No spagetti code']
-    });
+    const localIssuesFile = path.resolve(process.cwd(), '.aegis', 'issues.json');
+    if (fs.existsSync(localIssuesFile)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(localIssuesFile, 'utf8'));
+        if (Array.isArray(raw)) {
+          for (const item of raw) ghClient.registerIssue(item);
+        }
+      } catch {}
+    }
   }
 
   const ready = ghClient.listReadyIssues();
@@ -119,7 +118,8 @@ function getPrimaryBranch(): string {
       if (s.primaryBranch) return s.primaryBranch;
     } catch {}
   }
-  return 'master';
+  const wt = new WorktreeManager();
+  return wt.detectCurrentBranch();
 }
 
 export async function handleMerge(agentName?: string, baseBranchArg?: string): Promise<void> {

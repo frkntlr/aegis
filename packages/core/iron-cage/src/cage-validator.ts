@@ -22,9 +22,10 @@ export class IronCageValidator {
   }
 
   private isFunctionStart(trimmed: string): boolean {
-    const fnRegex = new RegExp('^(async\\s+)?(public\\s+|private\\s+|protected\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{');
+    const stripped = trimmed.replace(/^export\s+(default\s+)?/, '');
+    const fnRegex = new RegExp('^(public\\s+|private\\s+|protected\\s+|static\\s+)*(async\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{');
     const arrowMarker = '=' + '> ' + '{';
-    return trimmed.startsWith('function ') || trimmed.includes(arrowMarker) || Boolean(trimmed.match(fnRegex));
+    return stripped.startsWith('function ') || stripped.startsWith('async function ') || trimmed.includes(arrowMarker) || Boolean(stripped.match(fnRegex));
   }
 
   private updateBraces(line: string, state: ScanState, i: number, violations: CageViolation[], filePath: string): void {

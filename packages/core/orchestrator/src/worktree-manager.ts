@@ -53,9 +53,24 @@ export class WorktreeManager {
     return path.resolve(this.repoRoot, this.worktreePrefix, agentName);
   }
 
-  public ensureWorktree(agentName: string, baseBranch = 'master'): AgentWorktree {
+  public detectCurrentBranch(): string {
+    try {
+      if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
+        const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+          cwd: this.repoRoot,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore']
+        }).trim();
+        if (branch && branch !== 'HEAD') return branch;
+      }
+    } catch {}
+    return 'master';
+  }
+
+  public ensureWorktree(agentName: string, baseBranchArg?: string): AgentWorktree {
     const targetDir = this.getWorktreePath(agentName);
     const branchName = `aegis/${agentName}`;
+    const baseBranch = baseBranchArg || this.detectCurrentBranch();
 
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(path.dirname(targetDir), { recursive: true });
@@ -130,7 +145,14 @@ export class WorktreeManager {
 
   public listWorktrees(): WorktreeListResult {
     try {
-      const output = execSync('git worktree list --porcelain', { cwd: this.repoRoot, encoding: 'utf8' });
+      if (!fs.existsSync(path.join(this.repoRoot, '.git'))) {
+        return { worktrees: [], activeCount: 0 };
+      }
+      const output = execSync('git worktree list --porcelain', {
+        cwd: this.repoRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      });
       const worktrees = output
         .split('\n\n')
         .map(b => this.parseWorktreeBlock(b))

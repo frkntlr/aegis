@@ -1,10 +1,10 @@
 import * as http from 'node:http';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
-import { WorktreeManager, IdeLauncher, UniversalToolchainSync, RoleClassifier } from '@aegis/orchestrator';
+import { IdeLauncher, UniversalToolchainSync, RoleClassifier } from '@aegis/orchestrator';
 import { OrphanTaskReclaimer } from '@aegis/watchdog';
-import { SessionDetector } from './session-detector.js';
-import { RealtimeMetricsService } from './realtime-metrics.js';
 import { AegisEngineService } from './engine-service.js';
+import { ProjectHub } from './project-hub.js';
+import { RealtimeMetricsService } from './realtime-metrics.js';
 
 export interface DashboardServerOptions {
   port?: number;
@@ -16,32 +16,29 @@ export interface DashboardServerOptions {
 export class DashboardServer {
   private server: http.Server | null = null;
   private port: number;
-  private wtManager: WorktreeManager;
-  private detector: SessionDetector;
-  private metrics: RealtimeMetricsService;
-  private launcher: IdeLauncher;
+  private hub: ProjectHub;
+  private launcher = new IdeLauncher();
   private toolchainSync: UniversalToolchainSync;
-  private engineSvc: AegisEngineService;
-  private orphanReclaimer: OrphanTaskReclaimer;
+  private engineSvc = new AegisEngineService();
+  private orphanReclaimer = new OrphanTaskReclaimer();
   private sseClients = new Set<http.ServerResponse>();
 
   constructor(options: DashboardServerOptions = {}) {
     this.port = options.port ?? 3000;
-    const persistLocks = options.persistLocks ?? false;
-    this.wtManager = new WorktreeManager({ repoRoot: options.repoRoot, persistLocks });
-    this.detector = new SessionDetector(options.repoRoot, this.wtManager);
-    this.metrics = options.metricsService ?? new RealtimeMetricsService(options.repoRoot);
-    this.launcher = new IdeLauncher();
+    this.hub = new ProjectHub(options.repoRoot);
+    if (options.metricsService) {
+      this.hub.getActiveContext().metrics = options.metricsService;
+    }
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);
-    this.engineSvc = new AegisEngineService();
-    this.orphanReclaimer = new OrphanTaskReclaimer();
+    this.hub.discoverProjects().catch(() => {});
   }
 
-  public getStatusPayload(): Record<string, any> {
-    const list = this.wtManager.listWorktrees();
-    const locks = this.wtManager.getLockedFiles();
-    const sessions = this.detector.detectSessions();
-    const snapshot = this.metrics.getSnapshot();
+  public getStatusPayload(projectId?: string): Record<string, any> {
+    const ctx = projectId ? (this.hub.getContext(projectId) || this.hub.getActiveContext()) : this.hub.getActiveContext();
+    const list = ctx.wtManager.listWorktrees();
+    const locks = ctx.wtManager.getLockedFiles();
+    const sessions = ctx.detector.detectSessions();
+    const snapshot = ctx.metrics.getSnapshot();
     const runningIdes = this.launcher.detectRunningIdes();
     const lockEntries: Record<string, string> = {};
     for (const [file, agent] of locks.entries()) lockEntries[file] = agent;
@@ -57,6 +54,14 @@ export class DashboardServer {
       issues: snapshot.issues,
       settings: snapshot.settings,
       github: snapshot.github,
+      projects: this.hub.listProjects(),
+      activeProject: {
+        id: ctx.id,
+        name: ctx.name,
+        projectNumber: ctx.projectNumber,
+        localPath: ctx.localPath,
+        isLocalBound: ctx.isLocalBound
+      },
       timestamp: new Date().toISOString()
     };
   }
@@ -76,58 +81,58 @@ export class DashboardServer {
   }
 
   private handleMoveTask(payload: any): Record<string, any> {
+    const ctx = this.hub.getActiveContext();
     const num = parseInt(payload.issueNumber, 10);
     const targetStatus = payload.targetStatus;
-    const issue = this.metrics.getIssues().find(i => i.number === num);
+    const issue = ctx.metrics.getIssues().find(i => i.number === num);
     if (!issue) return { success: false, message: `Görev #${num} bulunamadı.` };
 
     if (targetStatus === 'in_progress') {
       let agent = payload.agentName;
-      if (!agent || agent === 'auto' || agent === 'alice') {
+      if (!agent || agent === 'auto') {
         const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
         agent = inf.role;
       }
       const ide = payload.ideType || 'Google Antigravity';
-      const lockRes = this.wtManager.acquireFileLocks(agent, issue.targetFiles);
+      const lockRes = ctx.wtManager.acquireFileLocks(agent, issue.targetFiles);
       if (!lockRes.success) {
         return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
       }
-      this.metrics.moveTask(num, 'in_progress', agent, ide);
+      ctx.metrics.moveTask(num, 'in_progress', agent, ide);
       return { success: true, message: `Görev #${num} [@${agent}] (${ide}) atandı.` };
     }
 
     if (targetStatus === 'done' || targetStatus === 'ready') {
-      if (issue.assignedAgent) this.wtManager.releaseFileLocks(issue.assignedAgent);
-      this.metrics.moveTask(num, targetStatus);
-      return { success: true, message: `Görev #${num} '${targetStatus}' durumuna taşındı.` };
+      if (issue.assignedAgent) ctx.wtManager.releaseFileLocks(issue.assignedAgent);
     }
-
-    this.metrics.moveTask(num, targetStatus);
+    ctx.metrics.moveTask(num, targetStatus);
     return { success: true, message: `Görev #${num} '${targetStatus}' sütununa alındı.` };
   }
 
   private handleAutoAction(): Record<string, any> {
-    const ready = this.metrics.getIssues().filter(i => i.status === 'ready');
+    const ctx = this.hub.getActiveContext();
+    const ready = ctx.metrics.getIssues().filter(i => i.status === 'ready');
     if (ready.length === 0) return { success: true, message: 'Ready sütununda bekleyen görev yok.' };
-    const sessions = this.detector.detectSessions();
+    const sessions = ctx.detector.detectSessions();
     const target = ready[0];
     const inf = new RoleClassifier().classify({ title: target.title, targetFiles: target.targetFiles });
     const idle = sessions.find(s => s.agentName === inf.role && s.status === 'idle')
       || sessions.find(s => s.status === 'idle')
       || sessions[0];
-    const lockRes = this.wtManager.acquireFileLocks(idle.agentName, target.targetFiles);
+    const lockRes = ctx.wtManager.acquireFileLocks(idle.agentName, target.targetFiles);
     if (!lockRes.success) {
       return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
     }
-    this.metrics.assignIssue(target.number, idle.agentName, idle.ideType);
+    ctx.metrics.assignIssue(target.number, idle.agentName, idle.ideType);
     return { success: true, message: `Görev #${target.number} [@${idle.agentName}] (${idle.ideType}) atandı.` };
   }
 
   private handleIdeAndSync(action: string, payload: any): Record<string, any> {
+    const ctx = this.hub.getActiveContext();
     if (action === 'launch_ide') {
       return this.launcher.launchIde({
         ideType: payload.ideType || 'Google Antigravity',
-        worktreePath: payload.worktreePath || 'experimental/solver',
+        worktreePath: payload.worktreePath || `${ctx.localPath}/experimental/solver`,
         focusFile: payload.focusFile
       });
     }
@@ -148,24 +153,21 @@ export class DashboardServer {
       return { success: true, result: res, message: res.summary || 'Motor aracı çalıştırıldı.' };
     }
     if (action === 'save_settings' || action === 'update_settings') {
-      const s = this.metrics.updateSettings(payload.settings || payload);
+      const s = ctx.metrics.updateSettings(payload.settings || payload);
       return { success: true, settings: s, message: `Ayarlar kaydedildi (Ana Dal: ${s.primaryBranch || 'master'}).` };
-    }
-    if (action === 'set_primary_branch') {
-      const s = this.metrics.updateSettings({ primaryBranch: payload.primaryBranch || 'master' });
-      return { success: true, settings: s, message: `Ana dal '${s.primaryBranch}' olarak güncellendi.` };
     }
     return { success: false, error: 'Bilinmeyen işlem' };
   }
 
   private handleReclaimOrphans(): Record<string, any> {
-    const issues = this.metrics.getIssues();
-    const locks = this.wtManager.getLockedFiles();
-    const sessions = this.detector.detectSessions();
+    const ctx = this.hub.getActiveContext();
+    const issues = ctx.metrics.getIssues();
+    const locks = ctx.wtManager.getLockedFiles();
+    const sessions = ctx.detector.detectSessions();
     const { reclaimed } = this.orphanReclaimer.scanAndReclaim(issues, locks, sessions);
     for (const r of reclaimed) {
-      this.metrics.moveTask(r.issueNumber, 'ready');
-      if (r.previousAgent) this.wtManager.releaseFileLocks(r.previousAgent);
+      ctx.metrics.moveTask(r.issueNumber, 'ready');
+      if (r.previousAgent) ctx.wtManager.releaseFileLocks(r.previousAgent);
     }
     const msg = reclaimed.length > 0
       ? `${reclaimed.length} adet asılı görev kurtarılarak 'Ready' sütununa devredildi.`
@@ -174,54 +176,37 @@ export class DashboardServer {
   }
 
   private async executeAction(action: string, payload: any): Promise<Record<string, any>> {
+    const ctx = this.hub.getActiveContext();
+    if (action === 'switch_project') {
+      const res = this.hub.switchProject(payload.projectId);
+      this.broadcast('context_switched', res);
+      return { success: true, ...res };
+    }
+    if (action === 'focus_project') {
+      const res = this.hub.handleFocus(payload.workspacePath);
+      if (res.switched) this.broadcast('context_switched', res);
+      return { success: true, ...res };
+    }
     if (action === 'auto') return this.handleAutoAction();
     if (action === 'move_task') return this.handleMoveTask(payload);
     if (action === 'reclaim_orphans') return this.handleReclaimOrphans();
     if (action === 'sync_github') {
-      const issues = await this.metrics.fetchLiveIssues();
+      const issues = await ctx.metrics.fetchLiveIssues();
       this.handleReclaimOrphans();
-      const status = this.metrics.getGitHubStatus();
-      return { success: true, issues: this.metrics.getIssues(), status, message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.` };
+      return { success: true, issues: ctx.metrics.getIssues(), status: ctx.metrics.getGitHubStatus(), message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.` };
     }
-    if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings', 'set_primary_branch'].includes(action)) {
+    if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings'].includes(action)) {
       return this.handleIdeAndSync(action, payload);
     }
     if (action === 'create_task') {
-      const issue = await this.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
-      let targetAgent = payload.agentName;
-      if (!targetAgent || targetAgent === 'auto') {
-        const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
-        targetAgent = inf.role;
-      }
-      if (payload.launchIde && payload.ideType) {
-        this.launcher.launchIde({ ideType: payload.ideType, worktreePath: `experimental/${targetAgent}` });
-      }
-      return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu (@${targetAgent}).`, issue };
+      const issue = await ctx.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
+      return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu.`, issue };
     }
     if (action === 'complete_task') return this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' });
-    if (action === 'scan_ast') {
-      const ast = this.metrics.computeAstMetrics(true);
-      return { success: true, message: `AST İskelet: %${ast.savingsPercent} tasarruf (${ast.filesScanned} dosya)` };
-    }
-    if (action === 'verify_cage') {
-      const cage = this.metrics.computeCageMetrics(true);
-      return { success: true, message: `Demir Kafes denetimi: ${cage.label}` };
-    }
     if (action === 'release_locks') {
-      const agent = payload.agentName;
-      if (agent) {
-        this.wtManager.releaseFileLocks(agent);
-        this.metrics.releaseIssueLocks(agent);
-      } else {
-        const locked = this.wtManager.getLockedFiles();
-        for (const owner of new Set(locked.values())) this.wtManager.releaseFileLocks(owner);
-        this.metrics.releaseIssueLocks();
-      }
-      return { success: true, message: 'Tüm kilitler boşaltıldı ve görevler Ready sütununa alındı.' };
-    }
-    if (action === 'heartbeat') {
-      this.detector.registerHeartbeat(payload.agentName, payload.ideType);
-      return { success: true };
+      ctx.wtManager.releaseFileLocks(payload.agentName || 'solver');
+      ctx.metrics.releaseIssueLocks(payload.agentName);
+      return { success: true, message: 'Kilitler boşaltıldı.' };
     }
     return { success: false, error: 'Bilinmeyen aksiyon: ' + action };
   }
@@ -243,6 +228,26 @@ export class DashboardServer {
     });
   }
 
+  private handleFocusApi(req: http.IncomingMessage, res: http.ServerResponse): void {
+    let bodyStr = '';
+    req.on('data', chunk => { bodyStr += chunk; });
+    req.on('end', () => {
+      try {
+        const body = bodyStr ? JSON.parse(bodyStr) : {};
+        const result = this.hub.handleFocus(body.workspacePath || process.cwd());
+        if (result.switched) {
+          this.broadcast('context_switched', result);
+          this.broadcast('update', this.getStatusPayload());
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, ...result }));
+      } catch (err: any) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+  }
+
   private handleRoutes(req: http.IncomingMessage, res: http.ServerResponse): void {
     const url = req.url || '/';
     if (url === '/' || url === '/index.html') {
@@ -256,6 +261,12 @@ export class DashboardServer {
       res.end(JSON.stringify(this.getStatusPayload()));
       return;
     }
+    if (url === '/api/projects' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ projects: this.hub.listProjects(), active: this.hub.getActiveContext().id }));
+      return;
+    }
+    if (url === '/api/projects/focus' && req.method === 'POST') return this.handleFocusApi(req, res);
     if (url === '/api/action' && req.method === 'POST') return this.handleActionApi(req, res);
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
@@ -279,11 +290,8 @@ export class DashboardServer {
         try { client.end(); } catch {}
       }
       this.sseClients.clear();
-      if (this.server) {
-        this.server.close(() => resolve());
-      } else {
-        resolve();
-      }
+      if (this.server) this.server.close(() => resolve());
+      else resolve();
     });
   }
 }

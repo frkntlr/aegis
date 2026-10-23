@@ -15,6 +15,16 @@ function resolveClientModulePath(): string {
   return localPath;
 }
 
+async function resolveNotebookId(client: any, notebookIdArg?: string): Promise<string> {
+  if (notebookIdArg) return notebookIdArg;
+  console.log('🔍 Resolving Aegis Notebook ID...');
+  const notebooks = await client.listNotebooks();
+  const aegisNb = notebooks.find((n: any) => n.title?.toLowerCase().includes('aegis'));
+  const id = aegisNb ? aegisNb.id : '3767b1fc-5759-416d-b938-495b8138ccd7';
+  console.log(` • Selected Notebook: "${aegisNb?.title || 'Aegis Architecture'}" (${id})`);
+  return id;
+}
+
 export async function handleNlmQuery(questionArg?: string, notebookIdArg?: string): Promise<void> {
   showBanner();
   if (!questionArg) {
@@ -34,15 +44,7 @@ export async function handleNlmQuery(questionArg?: string, notebookIdArg?: strin
     const fileUrl = pathToFileURL(modulePath).href;
     const { NotebookLMClient } = await import(fileUrl);
     const client = new NotebookLMClient();
-
-    let notebookId = notebookIdArg;
-    if (!notebookId) {
-      console.log('🔍 Resolving Aegis Notebook ID...');
-      const notebooks = await client.listNotebooks();
-      const aegisNb = notebooks.find((n: any) => n.title?.toLowerCase().includes('aegis'));
-      notebookId = aegisNb ? aegisNb.id : '3767b1fc-5759-416d-b938-495b8138ccd7';
-      console.log(` • Selected Notebook: "${aegisNb?.title || 'Aegis Architecture'}" (${notebookId})`);
-    }
+    const notebookId = await resolveNotebookId(client, notebookIdArg);
 
     console.log(`💬 Query: "${questionArg}"\n⏳ Synthesizing AI response with source ground truth...\n`);
     const result = await client.query(notebookId, questionArg);

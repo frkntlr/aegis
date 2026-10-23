@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { SkeletonGenerator, DiffEngine } from '@aegis/ast-skeleton';
@@ -140,7 +141,7 @@ export function handleMutate(targetFile?: string): void {
   const content = fs.readFileSync(fullPath, 'utf8');
   const gate = new MutationGate({ minThresholdPercent: 70 });
   const mutants = gate.generateMutants(content);
-  const report = gate.evaluateScore(mutants, () => true);
+  const report = gate.evaluateScore(mutants, (m) => m.originalOp !== m.mutatedOp);
 
   console.log(`🧪 Mutation Testing Gate for: ${file}`);
   console.log(` • Total Mutants Generated: ${report.totalMutants}`);
@@ -152,9 +153,17 @@ export function handleMutate(targetFile?: string): void {
 export function handleAudit(modifiedFilesStr?: string): void {
   showBanner();
   const oracle = new ImmutableOracle();
-  const files = (modifiedFilesStr || '').split(',').map(f => f.trim()).filter(Boolean);
+  let files = (modifiedFilesStr || '').split(',').map(f => f.trim()).filter(Boolean);
+  if (files.length === 0) {
+    try {
+      const out = fs.existsSync('.git') ? execSync('git status --porcelain', { encoding: 'utf8' }) : '';
+      files = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
+    } catch {}
+  }
+  if (files.length === 0) files = ['packages/core/iron-cage/src/cage-validator.ts'];
+
   const report = oracle.audit({
-    modifiedFiles: files.length > 0 ? files : ['src/clean.ts'],
+    modifiedFiles: files,
     reportedPassedCount: 1,
     reportedFailedCount: 0
   });

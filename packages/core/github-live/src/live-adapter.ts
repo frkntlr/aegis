@@ -87,7 +87,10 @@ export class GitHubLiveAdapter {
     return { issue: this.transformRawIssue(res.data), rateLimit: res.rateLimit };
   }
 
-  public async updateIssue(issueNumber: number, updates: { state?: 'open' | 'closed'; labels?: string[] }): Promise<{ issue: GitHubIssue; rateLimit: RateLimitInfo }> {
+  public async updateIssue(
+    issueNumber: number,
+    updates: { state?: 'open' | 'closed'; labels?: string[]; body?: string; title?: string }
+  ): Promise<{ issue: GitHubIssue; rateLimit: RateLimitInfo }> {
     if (!this.owner || !this.repo) throw new Error('Repository owner and name must be specified.');
 
     const res = await this.request<any>(`/repos/${this.owner}/${this.repo}/issues/${issueNumber}`, {

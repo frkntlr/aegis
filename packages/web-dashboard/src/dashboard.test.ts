@@ -39,7 +39,7 @@ test('SessionDetector accurately detects worktree sessions and registers heartbe
 });
 
 test('RealtimeMetricsService manages dynamic issues and calculates real AST metrics', async () => {
-  const metrics = new RealtimeMetricsService();
+  const metrics = new RealtimeMetricsService({ offline: true });
   const initial = metrics.getIssues();
   assert.ok(initial.length >= 2);
 

@@ -9,68 +9,46 @@ export interface GitHubAuthContext {
 }
 
 export class GitHubTokenResolver {
-  public static resolve(customToken?: string): GitHubAuthContext {
-    // 1. Direct custom token
-    if (customToken && customToken.trim()) {
-      return {
-        token: customToken.trim(),
-        ...this.detectRepo(),
-        source: 'env',
-        hasCredentials: true
-      };
-    }
-
-    // 2. Environment variables GITHUB_TOKEN or GH_TOKEN
-    const envToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-    if (envToken && envToken.trim()) {
-      return {
-        token: envToken.trim(),
-        ...this.detectRepo(),
-        source: 'env',
-        hasCredentials: true
-      };
-    }
-
-    // 3. GitHub CLI fallback
+  private static resolveFromCli(): string | undefined {
     try {
       const ghToken = execSync('gh auth token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-      if (ghToken) {
-        return {
-          token: ghToken,
-          ...this.detectRepo(),
-          source: 'gh-cli',
-          hasCredentials: true
-        };
-      }
+      return ghToken || undefined;
     } catch {
-      // gh CLI not installed or not logged in
+      return undefined;
     }
+  }
 
-    // 4. Git Credential Manager fallback
+  private static resolveFromGitCredentials(): string | undefined {
     try {
       const credOutput = execSync('git credential fill', {
-        input: 'protocol=https\nhost=github.com\n\n',
+        input: 'protocol=https\\nhost=github.com\\n\\n',
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore']
       });
-      const match = credOutput.match(/password=([^\r\n]+)/);
-      if (match && match[1]) {
-        return {
-          token: match[1].trim(),
-          ...this.detectRepo(),
-          source: 'git-credential',
-          hasCredentials: true
-        };
-      }
+      const match = credOutput.match(/password=([^\\r\\n]+)/);
+      return match ? match[1].trim() : undefined;
     } catch {
-      // Git credential helper not available or no stored password
+      return undefined;
+    }
+  }
+
+  public static resolve(customToken?: string): GitHubAuthContext {
+    const raw = customToken?.trim() || process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim();
+    if (raw) {
+      return { token: raw, ...this.detectRepo(), source: 'env', hasCredentials: true };
     }
 
-    return {
-      ...this.detectRepo(),
-      source: 'none',
-      hasCredentials: false
-    };
+    const cliToken = this.resolveFromCli();
+    if (cliToken) {
+      return { token: cliToken, ...this.detectRepo(), source: 'gh-cli', hasCredentials: true };
+    }
+
+    const gitToken = this.resolveFromGitCredentials();
+    if (gitToken) {
+      return { token: gitToken, ...this.detectRepo(), source: 'git-credential', hasCredentials: true };
+    }
+
+    return { ...this.detectRepo(), source: 'none', hasCredentials: false };
   }
 
   public static detectRepo(): { owner?: string; repo?: string } {
