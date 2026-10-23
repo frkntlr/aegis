@@ -4,7 +4,7 @@
 - **Durum:** Güncellendi (Review Pending — User Feedback Incorporated)
 - **Tarih:** 2026-10-23
 - **Yazar:** Aegis Autonomous Architecture Guild & @frkntlr
-- **Kapsam:** `@aegis/web-dashboard`, `@aegis/orchestrator`, `@aegis/github-live`, `aegis-cli`
+- **Kapsam:** `@aegis/web-dashboard`, `@aegis/orchestrator`, `@aegis/github-live`, `@aegis/cli`
 
 ---
 

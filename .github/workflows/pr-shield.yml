@@ -5,6 +5,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   pr-review-gate:
     name: "PR Gate: Iron Cage, Immutable Oracle & Unit Tests"
@@ -29,11 +32,23 @@ jobs:
       - name: "Monorepo Build (TypeScript)"
         run: npm run build
 
+      - name: "Monorepo Typecheck"
+        run: npm run typecheck
+
+      - name: "Monorepo Lint"
+        run: npm run lint
+
       - name: "Deterministic Demir Kafes (Iron Cage) Audit"
-        run: npm run aegis -- cage:check
+        run: node packages/cli/dist/bin/aegis.js cage:check
+
+      - name: "Iron Cage Verification"
+        run: node packages/cli/dist/bin/aegis.js verify
 
       - name: "Monorepo Unit Test Suite (All Workspaces)"
-        run: npm test
+        run: npm run test --workspaces
 
-      - name: "Mutation Testing Gate (Min: 70% Kill Rate)"
-        run: npm run aegis -- mutate packages/core/watchdog/src/pre-execution-estimator.ts
+      - name: "Zero-Token UI Layout Inspection"
+        run: node packages/cli/dist/bin/aegis.js inspect
+
+      - name: "Mutation Testing Gate"
+        run: node packages/cli/dist/bin/aegis.js mutate
