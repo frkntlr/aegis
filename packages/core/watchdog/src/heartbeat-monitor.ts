@@ -42,37 +42,45 @@ export class HeartbeatMonitor {
     }
   }
 
+  private setupDataListeners(
+    child: ChildProcess,
+    state: { lastActivityTimeMs: number; stdoutLinesCount: number; stderrLinesCount: number; currentDeadlineMs: number },
+    onProgress?: (msg: string) => void
+  ): void {
+    const handleData = (isStderr: boolean, chunk: Buffer | string) => {
+      state.lastActivityTimeMs = Date.now();
+      const count = chunk.toString().split('\n').length;
+      if (isStderr) state.stderrLinesCount += count;
+      else state.stdoutLinesCount += count;
+
+      if (state.currentDeadlineMs - Date.now() < 15_000) {
+        state.currentDeadlineMs += this.extensionStepMs;
+        if (onProgress) onProgress(`[Aegis Watchdog] Output streaming detected. Extended deadline by ${this.extensionStepMs / 1000}s`);
+      }
+    };
+
+    child.stdout?.on('data', (d) => handleData(false, d));
+    child.stderr?.on('data', (d) => handleData(true, d));
+  }
+
   public async monitor(
     child: ChildProcess,
     timeoutSeconds: number,
     onProgress?: (msg: string) => void
   ): Promise<ProcessRunMetrics> {
     const startTimeMs = Date.now();
-    let currentDeadlineMs = startTimeMs + (timeoutSeconds * 1000);
-    let lastActivityTimeMs = Date.now();
-    let stdoutLinesCount = 0;
-    let stderrLinesCount = 0;
+    const state = {
+      currentDeadlineMs: startTimeMs + (timeoutSeconds * 1000),
+      lastActivityTimeMs: Date.now(),
+      stdoutLinesCount: 0,
+      stderrLinesCount: 0
+    };
     const flags = { timedOut: false, stagnated: false };
 
     return new Promise((resolve) => {
-      const handleData = (isStderr: boolean, chunk: Buffer | string) => {
-        lastActivityTimeMs = Date.now();
-        const lines = chunk.toString().split('\n').length;
-        if (isStderr) stderrLinesCount += lines;
-        else stdoutLinesCount += lines;
-
-        const now = Date.now();
-        if (currentDeadlineMs - now < 15_000) {
-          currentDeadlineMs += this.extensionStepMs;
-          if (onProgress) onProgress(`[Aegis Watchdog] Output streaming detected. Extended deadline by ${this.extensionStepMs / 1000}s`);
-        }
-      };
-
-      child.stdout?.on('data', (d) => handleData(false, d));
-      child.stderr?.on('data', (d) => handleData(true, d));
-
+      this.setupDataListeners(child, state, onProgress);
       const interval = setInterval(() => {
-        this.checkWatchdogTimer(child, lastActivityTimeMs, currentDeadlineMs, timeoutSeconds, interval, flags, onProgress);
+        this.checkWatchdogTimer(child, state.lastActivityTimeMs, state.currentDeadlineMs, timeoutSeconds, interval, flags, onProgress);
       }, 1000);
 
       child.on('close', (exitCode) => {
@@ -85,8 +93,8 @@ export class HeartbeatMonitor {
           timedOut: flags.timedOut,
           stagnated: flags.stagnated,
           exitCode,
-          stdoutLinesCount,
-          stderrLinesCount
+          stdoutLinesCount: state.stdoutLinesCount,
+          stderrLinesCount: state.stderrLinesCount
         });
       });
     });

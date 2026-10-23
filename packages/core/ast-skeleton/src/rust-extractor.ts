@@ -47,6 +47,16 @@ export class RustSkeletonExtractor implements LanguageExtractor {
     return output;
   }
 
+  private isItemDeclaration(trimmed: string): boolean {
+    const prefixes = ['use ', 'pub use ', 'mod ', 'pub mod ', 'type ', 'pub type ', 'const ', 'pub const '];
+    return prefixes.some(p => trimmed.startsWith(p));
+  }
+
+  private isTypeDefOrImpl(trimmed: string): boolean {
+    const prefixes = ['struct ', 'pub struct ', 'enum ', 'pub enum ', 'trait ', 'pub trait ', 'impl ', 'pub impl '];
+    return prefixes.some(p => trimmed.startsWith(p));
+  }
+
   private handleDeclaration(
     lines: string[],
     i: number,
@@ -62,25 +72,7 @@ export class RustSkeletonExtractor implements LanguageExtractor {
       return this.skipBlock(lines, i);
     }
 
-    if (
-      trimmed.startsWith('use ') ||
-      trimmed.startsWith('pub use ') ||
-      trimmed.startsWith('mod ') ||
-      trimmed.startsWith('pub mod ') ||
-      trimmed.startsWith('type ') ||
-      trimmed.startsWith('pub type ') ||
-      trimmed.startsWith('const ') ||
-      trimmed.startsWith('pub const ')
-    ) {
-      this.flushAttributes(pendingAttributes, output);
-      output.push(line);
-      return i + 1;
-    }
-
-    if (trimmed.startsWith('struct ') || trimmed.startsWith('pub struct ') ||
-        trimmed.startsWith('enum ') || trimmed.startsWith('pub enum ') ||
-        trimmed.startsWith('trait ') || trimmed.startsWith('pub trait ') ||
-        trimmed.startsWith('impl ') || trimmed.startsWith('pub impl ')) {
+    if (this.isItemDeclaration(trimmed) || this.isTypeDefOrImpl(trimmed)) {
       this.flushAttributes(pendingAttributes, output);
       output.push(line);
       return i + 1;

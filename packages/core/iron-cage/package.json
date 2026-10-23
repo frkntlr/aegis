@@ -10,10 +10,10 @@
     "test": "node --test dist/**/*.test.js"
   },
   "dependencies": {
-    "@aegis/shared": "*"
+    "@aegis/shared": "*",
+    "typescript": "^5.7.2"
   },
   "devDependencies": {
-    "@types/node": "^22.10.1",
-    "typescript": "^5.7.2"
+    "@types/node": "^22.10.1"
   }
 }

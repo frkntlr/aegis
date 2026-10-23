@@ -21,8 +21,8 @@ $NPM_CMD run test --workspaces || {
   exit 1
 }
 
-echo "🔬 [3/3] Running Mutation Testing Gate..."
-$NPM_CMD run aegis -- mutate packages/core/watchdog/src/pre-execution-estimator.ts || {
+echo "🔬 [3/3] Running Mutation Testing Gate on Staged Code Changes..."
+$NPM_CMD run aegis -- mutate || {
   echo "❌ [Aegis] Pre-commit rejected: Mutation testing threshold not reached."
   exit 1
 }

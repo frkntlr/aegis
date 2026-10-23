@@ -1,0 +1,25 @@
+#!/bin/sh
+# Aegis Pre-Push Hook (Deterministic Iron Cage & Test Suite)
+echo "🛡️  [Aegis] Pre-push Quality Shield running..."
+
+export PATH="$PATH:/c/Users/user/AppData/Roaming/Antigravity/bin:/c/Program Files/nodejs"
+
+NPM_CMD="npm"
+if command -v npm.cmd >/dev/null 2>&1; then
+  NPM_CMD="npm.cmd"
+fi
+
+echo "🔍 [1/2] Running Deterministic Demir Kafes Audit..."
+$NPM_CMD run aegis -- cage:check || {
+  echo "❌ [Aegis] Pre-push rejected: Iron Cage violations detected."
+  exit 1
+}
+
+echo "🧪 [2/2] Running Monorepo Unit Test Suite..."
+$NPM_CMD run test --workspaces || {
+  echo "❌ [Aegis] Pre-push rejected: One or more unit tests failed."
+  exit 1
+}
+
+echo "✅ [Aegis] All pre-push checks passed."
+exit 0

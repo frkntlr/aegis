@@ -61,7 +61,8 @@ Tarayıcınızda `http://localhost:3000` adresine giderek canlı Mulgravity otur
 | `aegis contribute <issueId>` | Dış katkıcı / AI için izole worktree ve cerrahi prompt hazırlar |
 | `aegis rfc:triage "<title>"` | GitHub Discussions RFC başlığını parse edip kabul kriterlerine dönüştürür |
 | `aegis nlm:sync` | Aegis mimarisini ve RFC araştırmalarını NotebookLM bilgi paketine aktarır |
-| `aegis cage:check` | Tüm projeyi Demir Kafes (40 satır/fonksiyon, 300 satır/dosya) için denetler |
+| `aegis cage:check` | Tüm projeyi Demir Kafes (40 satır/fonksiyon, 300 satır/dosya) için AST ile denetler (`node scripts/validate-compliance.js`) |
+| `aegis merge <agent>` | 4 adımlı atomik merge pipeline koşturur (`node scripts/iron-cage-merge.js`) |
 | `aegis skeleton:scan` | Tüm çalışma alanını tarayıp AST token tasarrufunu hesaplar |
 | `aegis estimate <files> <tests>` | Adaptif dinamik süre tahmini yapar |
 | `aegis verify <file>` | Dosyayı Demir Kafes kurallarına göre doğrular |
@@ -69,7 +70,7 @@ Tarayıcınızda `http://localhost:3000` adresine giderek canlı Mulgravity otur
 | `aegis diff <diff>` | Cerrahi Unified Diff formatını doğrular |
 | `aegis audit <files>` | Immutable Oracle güven denetimini koşturur |
 | `aegis inspect` | Sıfır-token BoundingBox UI düzen denetimi yapar |
-| `aegis mutate [file]` | Mutation Testing skoru değerlendirmesi yapar |
+| `aegis mutate [file]` | Mutation Testing skoru değerlendirmesi yapar (staged dosyaları otomatik algılar) |
 | `aegis gh:status` | Canlı GitHub Issues durumunu ve kilitlerini raporlar |
 | `aegis gh:sync` | GitHub Issues ve Discussions verilerini yerel önbellekle senkronize eder |
 

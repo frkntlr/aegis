@@ -33,3 +33,49 @@ test('IronCageValidator detects full file rewrites', () => {
   assert.strictEqual(result.passed, false);
   assert.ok(result.violations.some(v => v.rule === 'FULL_FILE_REWRITE'));
 });
+
+test('IronCageValidator accurately parses AST with multi-line signatures, template strings and callbacks', () => {
+  const validator = new IronCageValidator({ maxFunctionLines: 40, maxFileLines: 300 });
+  const complexTs = `
+export async function complexHandler(
+  paramA: string,
+  paramB: number,
+  options: {
+    verbose: boolean;
+    tags: string[];
+  }
+): Promise<{ success: boolean; data: string }> {
+  const template = \`
+    {
+      "nested": "\${paramA}",
+      "calc": \${paramB + 10}
+    }
+  \`;
+  const items = [1, 2, 3].map(item => {
+    return { id: item, str: \`item-\${item}\` };
+  });
+  return { success: true, data: template };
+}
+  `.trim();
+
+  const result = validator.validateFileContent('src/complex.ts', complexTs);
+  assert.strictEqual(result.passed, true);
+  assert.strictEqual(result.violations.length, 0);
+});
+
+test('IronCageValidator flags oversized function using true TypeScript AST', () => {
+  const validator = new IronCageValidator({ maxFunctionLines: 10, maxFileLines: 300 });
+  const lines: string[] = ['function oversizedProcessor() {'];
+  for (let i = 0; i < 15; i++) {
+    lines.push(`  const step${i} = ${i};`);
+  }
+  lines.push('  return true;');
+  lines.push('}');
+  const content = lines.join('\n');
+
+  const result = validator.validateFileContent('src/oversized.ts', content);
+  assert.strictEqual(result.passed, false);
+  assert.strictEqual(result.violations.length, 1);
+  assert.strictEqual(result.violations[0].rule, 'MAX_FUNCTION_LINES');
+  assert.ok(result.violations[0].message.includes('oversizedProcessor'));
+});

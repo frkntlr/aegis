@@ -129,17 +129,26 @@ export function handleInspect(targetArg?: string): void {
   console.log(` • Verdict:          ${report.passed ? 'PASSED ✅' : 'FAILED ❌'}`);
 }
 
-export function handleMutate(targetFile?: string): void {
-  showBanner();
-  const file = targetFile || 'packages/core/watchdog/src/pre-execution-estimator.ts';
+function getStagedSourceFiles(): string[] {
+  try {
+    if (!fs.existsSync('.git')) return [];
+    const out = execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' });
+    return out
+      .split('\n')
+      .map(l => l.trim().replace(/\\/g, '/'))
+      .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && fs.existsSync(f));
+  } catch {
+    return [];
+  }
+}
+
+function runMutationGateOnFile(file: string, gate: MutationGate): boolean {
   const fullPath = path.resolve(process.cwd(), file);
   if (!fs.existsSync(fullPath)) {
     console.error(`❌ File not found: ${fullPath}`);
-    process.exit(1);
+    return false;
   }
-
   const content = fs.readFileSync(fullPath, 'utf8');
-  const gate = new MutationGate({ minThresholdPercent: 70 });
   const mutants = gate.generateMutants(content);
   const report = gate.evaluateScore(mutants, (m) => m.originalOp !== m.mutatedOp);
 
@@ -148,6 +157,35 @@ export function handleMutate(targetFile?: string): void {
   console.log(` • Mutants Killed:          ${report.killedMutants}`);
   console.log(` • Mutation Score:          ${report.scorePercent}% (Min: ${report.minThresholdPercent}%)`);
   console.log(` • Verdict:                 ${report.passedThreshold ? 'PASSED ✅' : 'REJECTED ❌'}`);
+  return report.passedThreshold;
+}
+
+export function handleMutate(targetFile?: string): void {
+  showBanner();
+  const gate = new MutationGate({ minThresholdPercent: 70 });
+
+  if (targetFile) {
+    const passed = runMutationGateOnFile(targetFile, gate);
+    if (!passed) process.exit(1);
+    return;
+  }
+
+  const stagedFiles = getStagedSourceFiles();
+  if (stagedFiles.length > 0) {
+    console.log(`🔍 Detected ${stagedFiles.length} staged TypeScript source file(s) for mutation testing:`);
+    let allPassed = true;
+    for (const file of stagedFiles) {
+      if (!runMutationGateOnFile(file, gate)) allPassed = false;
+    }
+    if (!allPassed) process.exit(1);
+    console.log('✅ All staged files passed the Mutation Testing Gate!');
+    return;
+  }
+
+  const fallback = 'packages/core/watchdog/src/pre-execution-estimator.ts';
+  console.log(`ℹ️ No staged TypeScript source files detected. Running baseline on: ${fallback}`);
+  const passed = runMutationGateOnFile(fallback, gate);
+  if (!passed) process.exit(1);
 }
 
 export function handleAudit(modifiedFilesStr?: string): void {

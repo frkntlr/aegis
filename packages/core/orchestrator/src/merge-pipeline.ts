@@ -33,7 +33,7 @@ export class MergePipeline {
       if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
         const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: this.repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
         if (branch && branch !== 'HEAD') return branch;
-      } 
+      }
     } catch {}
     return 'master';
   }
@@ -44,38 +44,26 @@ export class MergePipeline {
     this.baseBranch = options.baseBranch ?? this.detectCurrentBranch();
   }
 
-  public async executePipeline(
-    mergingAgent: string,
-    siblingAgents: string[],
-    preMergeCheckPassed = true
-  ): Promise<MergeResult> {
-    const steps: MergeStepReport[] = [];
-    const agentDir = path.resolve(this.repoRoot, this.worktreePrefix, mergingAgent);
-
-    // Step 1: Local Iron Cage & Pre-merge verification
-    if (!preMergeCheckPassed) {
+  private step1PreMergeCheck(mergingAgent: string, passed: boolean, steps: MergeStepReport[]): boolean {
+    if (!passed) {
       steps.push({
         step: 1,
         name: 'Iron Cage & Pre-Merge Verification',
         passed: false,
-        message: 'Pre-merge quality gate or tests failed.'
+        message: `Pre-merge quality gate or tests failed for ${mergingAgent}.`
       });
-      return {
-        success: false,
-        agentName: mergingAgent,
-        steps,
-        rollbackExecuted: false,
-        error: 'Pre-merge verification failed.'
-      };
+      return false;
     }
     steps.push({
       step: 1,
       name: 'Iron Cage & Pre-Merge Verification',
       passed: true,
-      message: 'Quality gates passed cleanly.'
+      message: `Quality gates passed cleanly for ${mergingAgent}.`
     });
+    return true;
+  }
 
-    // Step 2: Rebase against base branch
+  private step2Rebase(mergingAgent: string, agentDir: string, steps: MergeStepReport[]): boolean {
     try {
       execSync(`git -C "${agentDir}" rebase "${this.baseBranch}"`, { stdio: 'pipe' });
       steps.push({
@@ -84,25 +72,20 @@ export class MergePipeline {
         passed: true,
         message: `Successfully rebased ${mergingAgent} on top of ${this.baseBranch}.`
       });
+      return true;
     } catch {
-      // Abort rebase on conflict
-      try { execSync(`git -C "${agentDir}" rebase --abort`, { stdio: 'pipe' }); } catch { /* ignore */ }
+      try { execSync(`git -C "${agentDir}" rebase --abort`, { stdio: 'pipe' }); } catch {}
       steps.push({
         step: 2,
         name: 'Rebase against base branch',
         passed: false,
         message: 'Rebase encountered conflicts. Aborted.'
       });
-      return {
-        success: false,
-        agentName: mergingAgent,
-        steps,
-        rollbackExecuted: true,
-        error: 'Merge conflict detected during rebase.'
-      };
+      return false;
     }
+  }
 
-    // Step 3: Fast-forward / merge into baseBranch
+  private step3Merge(mergingAgent: string, steps: MergeStepReport[]): boolean {
     try {
       execSync(`git merge --ff-only "aegis/${mergingAgent}"`, { cwd: this.repoRoot, stdio: 'pipe' });
       steps.push({
@@ -111,6 +94,7 @@ export class MergePipeline {
         passed: true,
         message: `Merged aegis/${mergingAgent} into ${this.baseBranch}.`
       });
+      return true;
     } catch {
       steps.push({
         step: 3,
@@ -118,16 +102,11 @@ export class MergePipeline {
         passed: false,
         message: 'Fast-forward merge failed. Non-linear history detected.'
       });
-      return {
-        success: false,
-        agentName: mergingAgent,
-        steps,
-        rollbackExecuted: true,
-        error: 'Merge failed.'
-      };
+      return false;
     }
+  }
 
-    // Step 4: Sibling Agent Synchronization
+  private step4SyncSiblings(siblingAgents: string[], mergingAgent: string, steps: MergeStepReport[]): void {
     for (const sibling of siblingAgents) {
       if (sibling === mergingAgent) continue;
       const siblingDir = path.resolve(this.repoRoot, this.worktreePrefix, sibling);
@@ -148,12 +127,30 @@ export class MergePipeline {
         });
       }
     }
+  }
 
-    return {
-      success: true,
-      agentName: mergingAgent,
-      steps,
-      rollbackExecuted: false
-    };
+  public async executePipeline(
+    mergingAgent: string,
+    siblingAgents: string[],
+    preMergeCheckPassed = true
+  ): Promise<MergeResult> {
+    const steps: MergeStepReport[] = [];
+    const agentDir = path.resolve(this.repoRoot, this.worktreePrefix, mergingAgent);
+
+    if (!this.step1PreMergeCheck(mergingAgent, preMergeCheckPassed, steps)) {
+      return { success: false, agentName: mergingAgent, steps, rollbackExecuted: false, error: 'Pre-merge verification failed.' };
+    }
+
+    if (!this.step2Rebase(mergingAgent, agentDir, steps)) {
+      return { success: false, agentName: mergingAgent, steps, rollbackExecuted: true, error: 'Merge conflict detected during rebase.' };
+    }
+
+    if (!this.step3Merge(mergingAgent, steps)) {
+      return { success: false, agentName: mergingAgent, steps, rollbackExecuted: true, error: 'Merge failed.' };
+    }
+
+    this.step4SyncSiblings(siblingAgents, mergingAgent, steps);
+
+    return { success: true, agentName: mergingAgent, steps, rollbackExecuted: false };
   }
 }
