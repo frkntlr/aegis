@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --test dist/**/*.test.js"
+    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x));if(f.length)process.exit(cp.spawnSync(process.execPath,['--test',...f],{stdio:'inherit'}).status||0)\""
   },
   "dependencies": {
     "@aegis/shared": "*"
