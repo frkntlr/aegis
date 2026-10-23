@@ -15,7 +15,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "aegis": "node packages/cli/dist/bin/aegis.js",
-    "prepare": "git config core.hooksPath .githooks 2>nul || true"
+    "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .githooks', {stdio: 'ignore'}) } catch {}\""
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

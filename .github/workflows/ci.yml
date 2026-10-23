@@ -2,9 +2,9 @@ name: Aegis CI / CD Engine Verification
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master ]
 
 jobs:
   verify:
@@ -25,6 +25,15 @@ jobs:
 
       - name: Monorepo Build (TypeScript)
         run: npm run build
+
+      - name: Monorepo Typecheck
+        run: npm run typecheck
+
+      - name: Monorepo Lint
+        run: npm run lint
+
+      - name: Deterministic Demir Kafes (Iron Cage) Audit
+        run: node packages/cli/dist/bin/aegis.js cage:check
 
       - name: Iron Cage Verification
         run: node packages/cli/dist/bin/aegis.js verify packages/cli/src/bin/aegis.ts

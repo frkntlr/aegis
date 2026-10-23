@@ -59,7 +59,10 @@ export class UniversalToolchainSync {
 
   public discoverMcpServers(): McpServerDefinition[] {
     const servers: McpServerDefinition[] = [];
-    const cursorMcp = path.resolve(this.repoRoot, '.cursor', 'mcp.json');
+    let cursorMcp = path.resolve(this.repoRoot, '.cursor', 'mcp.json');
+    if (!fs.existsSync(cursorMcp)) {
+      cursorMcp = path.resolve(this.repoRoot, '.cursor', 'mcp.example.json');
+    }
     if (fs.existsSync(cursorMcp)) {
       try {
         const data = JSON.parse(fs.readFileSync(cursorMcp, 'utf8'));

@@ -29,3 +29,23 @@ test('UniversalToolchainSync discovers skills and executes cross-IDE synchroniza
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('UniversalToolchainSync falls back to mcp.example.json when mcp.json is missing', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mcp-example-'));
+  try {
+    const cursorDir = path.join(tmpDir, '.cursor');
+    fs.mkdirSync(cursorDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(cursorDir, 'mcp.example.json'),
+      JSON.stringify({ mcpServers: { 'example-server': { command: 'node', args: ['example.js'] } } }),
+      'utf8'
+    );
+
+    const sync = new UniversalToolchainSync(tmpDir);
+    const mcps = sync.discoverMcpServers();
+    assert.strictEqual(mcps.length, 1);
+    assert.strictEqual(mcps[0].name, 'example-server');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

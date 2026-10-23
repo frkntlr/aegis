@@ -43,5 +43,8 @@ tmp/
 .windsurf/
 .gemini/
 .zed/
-.cursor/
+.cursor/*
+!.cursor/mcp.example.json
+!.cursor/settings.json
+.cursor/mcp.json
 .vscode/

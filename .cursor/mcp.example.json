@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "node",
+      "args": [
+        "${NOTEBOOKLM_MCP_PATH:-./packages/plugins/notebooklm/dist/index.js}",
+        "server"
+      ]
+    },
+    "godot": {
+      "command": "node",
+      "args": [
+        "${GODOT_MCP_PATH:-godot-mcp-runtime/dist/index.js}"
+      ],
+      "env": {
+        "GODOT_MCP_DISABLE_ELICITATION": "true"
+      }
+    },
+    "aegis-engine": {
+      "command": "node",
+      "args": [
+        "packages/cli/dist/bin/aegis.js"
+      ]
+    }
+  }
+}
