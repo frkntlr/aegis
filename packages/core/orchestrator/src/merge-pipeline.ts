@@ -39,7 +39,7 @@ export class MergePipeline {
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
-    } catch {}
+    } catch { /* ignore */ }
     return 'master';
   }
 
@@ -87,7 +87,7 @@ export class MergePipeline {
           stdio: 'pipe',
           env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
         });
-      } catch {}
+      } catch { /* ignore */ }
       steps.push({
         step: 2,
         name: 'Rebase against base branch',

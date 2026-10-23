@@ -62,7 +62,7 @@ test('RealtimeMetricsService manages dynamic issues and calculates real AST metr
   assert.ok(cage.label.includes('Uyumlu'));
 });
 
-test('AegisEngineService executes all underlying Aegis core tools successfully', () => {
+test('AegisEngineService executes all underlying Aegis core tools successfully', async () => {
   const engine = new AegisEngineService();
   const ui = engine.runUiInspector();
   assert.strictEqual(ui.tool, 'ui_inspector');
@@ -79,15 +79,15 @@ test('AegisEngineService executes all underlying Aegis core tools successfully',
   const mcp = engine.runMcpSecurity('solver', 'ast_skeleton');
   assert.strictEqual(mcp.allowed, true);
 
-  const diff = engine.runDiffValidator();
+  const diff = await engine.runDiffValidator();
   assert.strictEqual(diff.isSurgical, true);
 
-  const oracle = engine.runOracleAudit();
+  const oracle = await engine.runOracleAudit();
   assert.strictEqual(oracle.suspicious, false);
 });
 
 test('DashboardServer handles move_task and status via API', async () => {
-  const server = new DashboardServer({ port: 0 });
+  const server = new DashboardServer({ port: 0, offline: true });
   const port = await server.start();
   try {
     assert.ok(port > 0);
@@ -119,7 +119,7 @@ test('DashboardServer handles move_task and status via API', async () => {
 
 test('DashboardServer handles run_engine_tool and sync_toolchain via API', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-dash-sync-'));
-  const server = new DashboardServer({ port: 0, repoRoot: tmpDir });
+  const server = new DashboardServer({ port: 0, repoRoot: tmpDir, offline: true });
   const port = await server.start();
   try {
     const toolRes = await fetch(`http://localhost:${port}/api/action`, {
@@ -143,7 +143,7 @@ test('DashboardServer handles run_engine_tool and sync_toolchain via API', async
 
 test('DashboardServer handles save_settings and reclaim_orphans via API', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-dash-set-'));
-  const server = new DashboardServer({ port: 0, repoRoot: tmpDir });
+  const server = new DashboardServer({ port: 0, repoRoot: tmpDir, offline: true });
   const port = await server.start();
   try {
     const setRes = await fetch(`http://localhost:${port}/api/action`, {
@@ -181,7 +181,7 @@ test('GitHubKanbanService manages issues and sync_github responds via API', asyn
   assert.strictEqual(moved?.status, 'in_progress');
   assert.strictEqual(moved?.assignedAgent, 'solver');
 
-  const server = new DashboardServer({ port: 0 });
+  const server = new DashboardServer({ port: 0, offline: true });
   const port = await server.start();
   try {
     const res = await fetch(`http://localhost:${port}/api/action`, {

@@ -1,12 +1,15 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { MCPSecurityManager } from '@aegis/mcp-security';
 import { DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
+
+const execFileAsync = promisify(execFile);
 
 export class AegisEngineService {
   private inspector = new BoundingBoxInspector();
@@ -55,7 +58,7 @@ export class AegisEngineService {
     if (fs.existsSync(targetFile)) {
       try {
         code = fs.readFileSync(targetFile, 'utf8');
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     const gate = new MutationGate({ minThresholdPercent: 70 });
@@ -99,16 +102,16 @@ export class AegisEngineService {
     };
   }
 
-  public runDiffValidator(diffText?: string): Record<string, any> {
+  public async runDiffValidator(diffText?: string): Promise<Record<string, unknown>> {
     let diff = diffText;
     if (diff === 'git' || diff === 'head') {
       try {
-        diff = execFileSync('git', ['diff', '-U3', 'HEAD'], {
+        const { stdout } = await execFileAsync('git', ['diff', '-U3', 'HEAD'], {
           encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
           env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
         });
-      } catch {}
+        diff = stdout;
+      } catch { /* ignore */ }
     }
     const sample = diff && diff.trim() ? diff : `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
     const res = this.diffEngine.parseAndValidate(sample);
@@ -122,19 +125,18 @@ export class AegisEngineService {
     };
   }
 
-  public runOracleAudit(files?: string[]): Record<string, any> {
+  public async runOracleAudit(files?: string[]): Promise<Record<string, unknown>> {
     let targetFiles = files || [];
     if (targetFiles.length === 0) {
       try {
         if (fs.existsSync('.git')) {
-          const out = execFileSync('git', ['status', '--porcelain'], {
+          const { stdout } = await execFileAsync('git', ['status', '--porcelain'], {
             encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'ignore'],
             env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
           });
-          targetFiles = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
+          targetFiles = stdout.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
     if (targetFiles.length === 0) targetFiles = ['packages/core/iron-cage/src/cage-validator.ts'];
 

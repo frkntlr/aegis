@@ -15,11 +15,20 @@ function resolveClientModulePath(): string {
   return localPath;
 }
 
-async function resolveNotebookId(client: any, notebookIdArg?: string): Promise<string> {
+interface NotebookSummary {
+  id: string;
+  title?: string;
+}
+
+interface NotebookClient {
+  listNotebooks(): Promise<NotebookSummary[]>;
+}
+
+async function resolveNotebookId(client: NotebookClient, notebookIdArg?: string): Promise<string> {
   if (notebookIdArg) return notebookIdArg;
   console.log('🔍 Resolving Aegis Notebook ID...');
   const notebooks = await client.listNotebooks();
-  const aegisNb = notebooks.find((n: any) => n.title?.toLowerCase().includes('aegis'));
+  const aegisNb = notebooks.find((n: NotebookSummary) => n.title?.toLowerCase().includes('aegis'));
   const id = aegisNb ? aegisNb.id : '3767b1fc-5759-416d-b938-495b8138ccd7';
   console.log(` • Selected Notebook: "${aegisNb?.title || 'Aegis Architecture'}" (${id})`);
   return id;

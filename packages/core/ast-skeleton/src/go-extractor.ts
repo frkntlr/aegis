@@ -63,28 +63,46 @@ export class GoSkeletonExtractor implements LanguageExtractor {
     return parts.join('\n');
   }
 
+  private skipString(chars: string, j: number): number {
+    const q = chars[j++];
+    while (j < chars.length && chars[j] !== q) {
+      if (chars[j] === '\\') j += 2;
+      else j++;
+    }
+    return j + 1;
+  }
+
   private skipBlock(lines: string[], startIndex: number): number {
     let braceCount = 0;
     let foundOpen = false;
+    let inComment = false;
+    let inRaw = false;
     let i = startIndex;
 
     while (i < lines.length) {
-      const line = lines[i];
-      for (const char of line) {
-        if (char === '{') {
-          braceCount++;
-          foundOpen = true;
-        } else if (char === '}') {
-          braceCount--;
+      const s = lines[i];
+      let j = 0;
+      while (j < s.length) {
+        if (inComment) {
+          if (s[j] === '*' && s[j + 1] === '/') { inComment = false; j += 2; }
+          else j++;
+          continue;
         }
+        if (inRaw) {
+          if (s[j++] === '`') inRaw = false;
+          continue;
+        }
+        if (s[j] === '/' && s[j + 1] === '/') break;
+        if (s[j] === '/' && s[j + 1] === '*') { inComment = true; j += 2; continue; }
+        if (s[j] === '`') { inRaw = true; j++; continue; }
+        if (s[j] === '"' || s[j] === "'") { j = this.skipString(s, j); continue; }
+        if (s[j] === '{') { braceCount++; foundOpen = true; }
+        else if (s[j] === '}') braceCount--;
+        j++;
       }
-
-      if (foundOpen && braceCount <= 0) {
-        return i + 1;
-      }
+      if (foundOpen && braceCount <= 0) return i + 1;
       i++;
     }
-
     return i + 1;
   }
 

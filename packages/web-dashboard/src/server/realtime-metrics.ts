@@ -62,7 +62,7 @@ export class RealtimeMetricsService {
       this.repoRoot = options?.repoRoot ?? process.cwd();
       this.githubService = options?.githubService ?? new GitHubKanbanService({ repoRoot: this.repoRoot, offline: options?.offline });
     }
-    this.githubService.fetchLiveIssues().catch(() => {});
+    this.githubService.fetchLiveIssues().catch(() => { /* no-op */ });
   }
 
   private collectSourceFiles(dir: string): string[] {
@@ -79,7 +79,7 @@ export class RealtimeMetricsService {
           results.push(full);
         }
       }
-    } catch {}
+    } catch { /* ignore */ }
     return results;
   }
 
@@ -206,7 +206,7 @@ export class RealtimeMetricsService {
       try {
         const parsed = JSON.parse(fs.readFileSync(sFile, 'utf8'));
         return { primaryBranch: parsed.primaryBranch || 'master', ...parsed };
-      } catch {}
+      } catch { /* ignore */ }
     }
     return { primaryBranch: 'master', timeoutCeiling: 180, maxFunctionLines: 40, maxFileLines: 300, preferredIde: 'Google Antigravity' };
   }
@@ -238,7 +238,7 @@ export class RealtimeMetricsService {
           results.push(full);
         }
       }
-    } catch {}
+    } catch { /* ignore */ }
     return results;
   }
 

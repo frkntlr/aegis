@@ -3,7 +3,7 @@ import * as assert from 'node:assert';
 import { DashboardServer } from './dashboard-server.js';
 
 test('DashboardServer returns 404 for unknown routes', async () => {
-  const server = new DashboardServer({ port: 0 });
+  const server = new DashboardServer({ port: 0, offline: true });
   const port = await server.start();
   try {
     const res = await fetch(`http://localhost:${port}/unknown-path-12345`);
@@ -14,7 +14,7 @@ test('DashboardServer returns 404 for unknown routes', async () => {
 });
 
 test('DashboardServer rejects invalid JSON on /api/action with 400', async () => {
-  const server = new DashboardServer({ port: 0 });
+  const server = new DashboardServer({ port: 0, offline: true });
   const port = await server.start();
   try {
     const res = await fetch(`http://localhost:${port}/api/action`, {
@@ -31,7 +31,7 @@ test('DashboardServer rejects invalid JSON on /api/action with 400', async () =>
 });
 
 test('DashboardServer serves SSE event stream on /api/events', async () => {
-  const server = new DashboardServer({ port: 0 });
+  const server = new DashboardServer({ port: 0, offline: true });
   const port = await server.start();
   try {
     const controller = new AbortController();

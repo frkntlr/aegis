@@ -36,7 +36,11 @@ export class GitHubKanbanService {
     this.repoRoot = options.repoRoot ?? process.cwd();
     this.projectNumber = options.projectNumber ?? 4;
     this.initOfflineDefaults();
-    const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.npm_lifecycle_event === 'test');
+    const isTest =
+      process.env.NODE_ENV === 'test' ||
+      process.env.npm_lifecycle_event === 'test' ||
+      Boolean(process.env.NODE_TEST_CONTEXT) ||
+      process.execArgv.includes('--test');
     if (!options.offline && !isTest) {
       this.initAdapter(options.adapter, options.projectsAdapter);
     }
@@ -51,7 +55,7 @@ export class GitHubKanbanService {
           this.issues = raw;
           return;
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
     this.issues = [
       {
@@ -163,10 +167,10 @@ export class GitHubKanbanService {
         };
         this.issues.unshift(newIssue);
         if (this.projectsAdapter && issue.number) {
-          this.projectsAdapter.syncIssue(this.projectNumber, issue.number, 'ready').catch(() => {});
+          this.projectsAdapter.syncIssue(this.projectNumber, issue.number, 'ready').catch(() => { /* no-op */ });
         }
         return newIssue;
-      } catch {}
+      } catch { /* ignore */ }
     }
     const nextNum = this.issues.length > 0 ? Math.max(...this.issues.map(i => i.number)) + 1 : 1;
     const localIssue: SystemIssue = {
@@ -244,11 +248,11 @@ export class GitHubKanbanService {
       } else if (targetStatus === 'blocked') {
         this.adapter?.addComment(num, `🛑 **Aegis Loop Breaker**: Task marked as blocked. Locks released.`);
       }
-    }).catch(() => {});
+    }).catch(() => { /* no-op */ });
 
     if (this.projectsAdapter) {
       const pStatus = targetStatus === 'in_progress' ? 'in_progress' : targetStatus === 'done' ? 'done' : 'ready';
-      this.projectsAdapter.syncIssue(this.projectNumber, num, pStatus).catch(() => {});
+      this.projectsAdapter.syncIssue(this.projectNumber, num, pStatus).catch(() => { /* no-op */ });
     }
   }
 

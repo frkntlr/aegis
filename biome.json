@@ -12,8 +12,8 @@
     "rules": {
       "preset": "recommended",
       "suspicious": {
-        "noExplicitAny": "off",
-        "noEmptyBlockStatements": "off",
+        "noExplicitAny": "warn",
+        "noEmptyBlockStatements": "error",
         "noUselessEscapeInString": "off",
         "noGlobalIsNan": "off"
       },

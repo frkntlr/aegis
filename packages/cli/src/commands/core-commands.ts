@@ -88,7 +88,7 @@ export async function handleAuto(): Promise<void> {
         if (Array.isArray(raw)) {
           for (const item of raw) ghClient.registerIssue(item);
         }
-      } catch {}
+      } catch { /* ignore */ }
     }
   }
 
@@ -116,7 +116,7 @@ function getPrimaryBranch(): string {
     try {
       const s = JSON.parse(fs.readFileSync(sFile, 'utf8'));
       if (s.primaryBranch) return s.primaryBranch;
-    } catch {}
+    } catch { /* ignore */ }
   }
   const wt = new WorktreeManager();
   return wt.detectCurrentBranch();

@@ -92,20 +92,20 @@ export const DASHBOARD_JS = `
         const res = await fetch('/api/status');
         const data = await res.json();
         updateState(data);
-      } catch {}
+      } catch { /* ignore */ }
     }
 
     function connectSSE() {
       const es = new EventSource('/api/events');
-      es.onmessage = e => { try { updateState(JSON.parse(e.data)); } catch(err) {} };
-      es.addEventListener('snapshot', e => { try { updateState(JSON.parse(e.data)); } catch(err) {} });
-      es.addEventListener('update', e => { try { updateState(JSON.parse(e.data)); } catch(err) {} });
+      es.onmessage = e => { try { updateState(JSON.parse(e.data)); } catch { /* ignore */ } };
+      es.addEventListener('snapshot', e => { try { updateState(JSON.parse(e.data)); } catch { /* ignore */ } });
+      es.addEventListener('update', e => { try { updateState(JSON.parse(e.data)); } catch { /* ignore */ } });
       es.addEventListener('context_switched', e => {
         try {
           const p = JSON.parse(e.data);
           appendLog('[Auto-Follow IDE] Proje değişti: ' + (p.activeProject?.name || ''));
           fetchStatus();
-        } catch(err) {}
+        } catch { /* ignore */ }
       });
       es.onerror = () => { document.getElementById('sse-badge').innerText = '○ YENİDEN BAĞLANIYOR'; document.getElementById('sse-badge').style.color = '#d29922'; };
       es.onopen = () => { document.getElementById('sse-badge').innerText = '● SSE CANLI'; document.getElementById('sse-badge').style.color = 'var(--green-glow)'; };

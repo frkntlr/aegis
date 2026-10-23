@@ -29,31 +29,33 @@ export function handleEstimate(args: string[]): void {
   console.log(` • Reasoning:     ${est.reasoning}`);
 }
 
+function verifyFile(file: string, validator: IronCageValidator): boolean {
+  const full = path.resolve(process.cwd(), file);
+  if (!fs.existsSync(full)) {
+    console.error(`❌ File not found: ${full}`);
+    return false;
+  }
+  const res = validator.validateFileContent(file, fs.readFileSync(full, 'utf8'));
+  if (res.passed) {
+    console.log(`✅ Iron Cage: PASSED for ${file}`);
+    return true;
+  }
+  console.error(`❌ Iron Cage: REJECTED (${res.violations.length} violations) for ${file}`);
+  for (const v of res.violations) console.error(` • [${v.rule}] ${v.message}`);
+  return false;
+}
+
 export function handleVerify(targetFile?: string): void {
   showBanner();
-  if (!targetFile) {
-    console.error('❌ Usage: aegis verify <filepath>');
-    process.exit(1);
-  }
-  const fullPath = path.resolve(process.cwd(), targetFile);
-  if (!fs.existsSync(fullPath)) {
-    console.error(`❌ File not found: ${fullPath}`);
-    process.exit(1);
-  }
-
-  const content = fs.readFileSync(fullPath, 'utf8');
   const validator = new IronCageValidator();
-  const res = validator.validateFileContent(targetFile, content);
-
-  if (res.passed) {
-    console.log(`✅ Iron Cage: PASSED for ${targetFile}`);
-  } else {
-    console.error(`❌ Iron Cage: REJECTED (${res.violations.length} violations)`);
-    for (const v of res.violations) {
-      console.error(` • [${v.rule}] ${v.message}`);
-    }
-    process.exit(1);
+  if (targetFile) {
+    if (!verifyFile(targetFile, validator)) process.exit(1);
+    return;
   }
+  const targets = getChangedSourceFiles();
+  const list = targets.length > 0 ? targets : ['packages/cli/src/bin/aegis.ts'];
+  console.log(`🔍 Verifying ${list.length} target file(s) against Demir Kafes...`);
+  if (!list.every(f => verifyFile(f, validator))) process.exit(1);
 }
 
 export function handleSkeleton(targetFile?: string): void {
@@ -129,20 +131,21 @@ export function handleInspect(targetArg?: string): void {
   console.log(` • Verdict:          ${report.passed ? 'PASSED ✅' : 'FAILED ❌'}`);
 }
 
-function getStagedSourceFiles(): string[] {
-  try {
-    if (!fs.existsSync('.git')) return [];
-    const out = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'], {
-      encoding: 'utf8',
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
-    });
-    return out
-      .split('\n')
-      .map(l => l.trim().replace(/\\/g, '/'))
-      .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && fs.existsSync(f));
-  } catch {
-    return [];
+function getChangedSourceFiles(): string[] {
+  if (!fs.existsSync('.git')) return [];
+  const diffs = [
+    ['diff', '--cached', '--name-only', '--diff-filter=ACM'],
+    ['diff', '--name-only', 'origin/master...HEAD', '--diff-filter=ACM'],
+    ['diff', '--name-only', 'HEAD~1...HEAD', '--diff-filter=ACM']
+  ];
+  for (const args of diffs) {
+    try {
+      const out = execFileSync('git', args, { encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+      const files = out.split('\n').map(l => l.trim().replace(/\\/g, '/')).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && fs.existsSync(f));
+      if (files.length > 0) return files;
+    } catch { /* ignore */ }
   }
+  return [];
 }
 
 function runMutationGateOnFile(file: string, gate: MutationGate): boolean {
@@ -168,27 +171,21 @@ export function handleMutate(targetFile?: string): void {
   const gate = new MutationGate({ minThresholdPercent: 70 });
 
   if (targetFile) {
-    const passed = runMutationGateOnFile(targetFile, gate);
-    if (!passed) process.exit(1);
+    if (!runMutationGateOnFile(targetFile, gate)) process.exit(1);
     return;
   }
 
-  const stagedFiles = getStagedSourceFiles();
-  if (stagedFiles.length > 0) {
-    console.log(`🔍 Detected ${stagedFiles.length} staged TypeScript source file(s) for mutation testing:`);
-    let allPassed = true;
-    for (const file of stagedFiles) {
-      if (!runMutationGateOnFile(file, gate)) allPassed = false;
-    }
-    if (!allPassed) process.exit(1);
-    console.log('✅ All staged files passed the Mutation Testing Gate!');
+  const changedFiles = getChangedSourceFiles();
+  if (changedFiles.length > 0) {
+    console.log(`🔍 Detected ${changedFiles.length} changed TypeScript source file(s) for mutation testing:`);
+    if (!changedFiles.every(file => runMutationGateOnFile(file, gate))) process.exit(1);
+    console.log('✅ All changed files passed the Mutation Testing Gate!');
     return;
   }
 
   const fallback = 'packages/core/watchdog/src/pre-execution-estimator.ts';
-  console.log(`ℹ️ No staged TypeScript source files detected. Running baseline on: ${fallback}`);
-  const passed = runMutationGateOnFile(fallback, gate);
-  if (!passed) process.exit(1);
+  console.log(`ℹ️ No changed TypeScript source files detected. Running baseline on: ${fallback}`);
+  if (!runMutationGateOnFile(fallback, gate)) process.exit(1);
 }
 
 export function handleAudit(modifiedFilesStr?: string): void {
@@ -204,7 +201,7 @@ export function handleAudit(modifiedFilesStr?: string): void {
           })
         : '';
       files = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
-    } catch {}
+    } catch { /* ignore */ }
   }
   if (files.length === 0) files = ['packages/core/iron-cage/src/cage-validator.ts'];
 

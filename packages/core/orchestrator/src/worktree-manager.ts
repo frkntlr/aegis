@@ -28,29 +28,43 @@ export class WorktreeManager {
 
   private acquireMutex(): () => void {
     const lockDir = `${this.getLockFilePath()}.lock`;
+    const pidFile = path.join(lockDir, 'pid');
     fs.mkdirSync(path.dirname(lockDir), { recursive: true });
-    const maxRetries = 60;
-    const retryDelay = 25;
+    const maxRetries = 120;
+    const retryDelay = 50;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         fs.mkdirSync(lockDir);
+        fs.writeFileSync(pidFile, String(process.pid), 'utf8');
         return () => {
-          try { fs.rmdirSync(lockDir); } catch {}
+          try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch { /* ignore */ }
         };
-      } catch (err: any) {
-        if (err?.code !== 'EEXIST') throw err;
-        try {
-          const stat = fs.statSync(lockDir);
-          if (Date.now() - stat.mtimeMs > 10000) {
-            fs.rmdirSync(lockDir);
-            continue;
-          }
-        } catch {}
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (code !== 'EEXIST') throw err;
+        if (this.isLockStale(lockDir, pidFile)) {
+          try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch { /* ignore */ }
+          continue;
+        }
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay);
       }
     }
-    return () => {};
+    return () => { /* no-op */ };
+  }
+
+  private isLockStale(lockDir: string, pidFile: string): boolean {
+    try {
+      const rawPid = fs.readFileSync(pidFile, 'utf8').trim();
+      const ownerPid = parseInt(rawPid, 10);
+      if (!Number.isFinite(ownerPid) || ownerPid <= 0) return true;
+      process.kill(ownerPid, 0);
+      return false;
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === 'ESRCH') return true;
+      const stat = fs.statSync(lockDir, { throwIfNoEntry: false });
+      return stat ? Date.now() - stat.mtimeMs > 30000 : true;
+    }
   }
 
   private withLock<T>(fn: () => T): T {
@@ -89,9 +103,9 @@ export class WorktreeManager {
         fs.renameSync(tmpFile, lockFile);
       } catch {
         fs.copyFileSync(tmpFile, lockFile);
-        try { fs.rmSync(tmpFile, { force: true }); } catch {}
+        try { fs.rmSync(tmpFile, { force: true }); } catch { /* ignore */ }
       }
-    } catch {}
+    } catch { /* ignore */ }
   }
 
   public getWorktreePath(agentName: string): string {
@@ -109,7 +123,7 @@ export class WorktreeManager {
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
-    } catch {}
+    } catch { /* ignore */ }
     return 'master';
   }
 
@@ -156,14 +170,14 @@ export class WorktreeManager {
       return true;
     } catch {
       if (fs.existsSync(targetDir)) {
-        try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch {}
+        try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch { /* ignore */ }
         try {
           execFileSync('git', ['worktree', 'prune'], {
             cwd: this.repoRoot,
             stdio: 'pipe',
             env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
           });
-        } catch {}
+        } catch { /* ignore */ }
         return true;
       }
       return false;

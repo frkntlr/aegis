@@ -10,8 +10,8 @@ function captureOutput(fn: () => void): string {
   const originalLog = console.log;
   const originalErr = console.error;
   let logs = '';
-  console.log = (...args: any[]) => { logs += args.join(' ') + '\n'; };
-  console.error = (...args: any[]) => { logs += args.join(' ') + '\n'; };
+  console.log = (...args: unknown[]) => { logs += args.join(' ') + '\n'; };
+  console.error = (...args: unknown[]) => { logs += args.join(' ') + '\n'; };
   try {
     fn();
     return logs;

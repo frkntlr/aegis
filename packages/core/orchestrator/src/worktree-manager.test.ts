@@ -60,3 +60,19 @@ test('WorktreeManager safely synchronizes locks across multiple instances withou
     fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
+
+test('WorktreeManager cleans up stale lock when owner PID is dead', () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-locks-stale-'));
+  try {
+    const lockDir = path.resolve(tmpRepo, '.aegis', 'locks.json.lock');
+    fs.mkdirSync(lockDir, { recursive: true });
+    fs.writeFileSync(path.join(lockDir, 'pid'), '99999999', 'utf8');
+
+    const manager = new WorktreeManager({ repoRoot: tmpRepo, persistLocks: true });
+    const res = manager.acquireFileLocks('solver', ['src/recovered.ts']);
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(manager.getLockedFiles().get('src/recovered.ts'), 'solver');
+  } finally {
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
+  }
+});

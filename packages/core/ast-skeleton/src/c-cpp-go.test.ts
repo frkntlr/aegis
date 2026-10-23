@@ -60,3 +60,46 @@ test('SkeletonGenerator correctly routes Go and C/C++ files', () => {
   const headerExt = reg.getExtractor('types.hpp');
   assert.strictEqual(headerExt?.languageId, 'cpp');
 });
+
+test('GoSkeletonExtractor correctly handles braces in strings, raw strings, and comments', () => {
+  const code = `
+package main
+import "fmt"
+func First() {
+    fmt.Println("{")
+    // {
+    /* {
+       } */
+    raw := \`{\`
+    fmt.Println(raw)
+}
+func Second() int {
+    return 42
+}
+`.trim();
+
+  const extractor = new GoSkeletonExtractor();
+  const res = extractor.extract('test.go', code);
+  assert.ok(res.skeletonContent.includes('func First() { /* body omitted */ }'));
+  assert.ok(res.skeletonContent.includes('func Second() int { /* body omitted */ }'));
+});
+
+test('CppSkeletonExtractor correctly handles braces in strings and comments', () => {
+  const code = `
+#include <iostream>
+void first() {
+    std::cout << "{" << '{' << std::endl;
+    // {
+    /* {
+    } */
+}
+int second() {
+    return 100;
+}
+`.trim();
+
+  const extractor = new CppSkeletonExtractor();
+  const res = extractor.extract('test.cpp', code);
+  assert.ok(res.skeletonContent.includes('void first() { /* body omitted */ }'));
+  assert.ok(res.skeletonContent.includes('int second() { /* body omitted */ }'));
+});

@@ -14,7 +14,7 @@ export function notifyDashboardFocus(workspacePath: string = process.cwd()): voi
       },
       timeout: 300
     });
-    req.on('error', () => {});
+    req.on('error', () => { /* no-op */ });
     req.on('timeout', () => { req.destroy(); });
     req.write(postData);
     req.end();

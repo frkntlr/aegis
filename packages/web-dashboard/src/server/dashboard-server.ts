@@ -10,6 +10,7 @@ export interface DashboardServerOptions {
   port?: number;
   repoRoot?: string;
   persistLocks?: boolean;
+  offline?: boolean;
   metricsService?: RealtimeMetricsService;
 }
 
@@ -25,10 +26,10 @@ export class DashboardServer {
 
   constructor(options: DashboardServerOptions = {}) {
     this.port = options.port ?? 3000;
-    this.hub = new ProjectHub(options.repoRoot);
+    this.hub = new ProjectHub(options.repoRoot, options.offline);
     if (options.metricsService) this.hub.getActiveContext().metrics = options.metricsService;
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);
-    this.hub.discoverProjects().catch(() => {});
+    this.hub.discoverProjects().catch(() => { /* no-op */ });
   }
 
   public getStatusPayload(projectId?: string): Record<string, any> {
@@ -122,7 +123,7 @@ export class DashboardServer {
     return { success: true, message: `Görev #${target.number} [@${idle.agentName}] (${idle.ideType}) atandı.` };
   }
 
-  private handleIdeAndSync(action: string, payload: any): Record<string, any> {
+  private async handleIdeAndSync(action: string, payload: any): Promise<Record<string, any>> {
     const ctx = this.hub.getActiveContext();
     if (action === 'launch_ide') {
       return this.launcher.launchIde({
@@ -142,8 +143,8 @@ export class DashboardServer {
       else if (t === 'mutation_gate') res = this.engineSvc.runMutationGate();
       else if (t === 'adaptive_timeout') res = this.engineSvc.runAdaptiveTimeout(payload.files, payload.tests);
       else if (t === 'mcp_security') res = this.engineSvc.runMcpSecurity(payload.agent, payload.mcpTool);
-      else if (t === 'diff_validator') res = this.engineSvc.runDiffValidator(payload.diffText);
-      else if (t === 'immutable_oracle') res = this.engineSvc.runOracleAudit(payload.files);
+      else if (t === 'diff_validator') res = await this.engineSvc.runDiffValidator(payload.diffText);
+      else if (t === 'immutable_oracle') res = await this.engineSvc.runOracleAudit(payload.files);
       else res = { error: 'Bilinmeyen araç: ' + t };
       return { success: true, result: res, message: res.summary || 'Motor aracı çalıştırıldı.' };
     }
@@ -284,7 +285,7 @@ export class DashboardServer {
   public stop(): Promise<void> {
     return new Promise((resolve) => {
       for (const client of this.sseClients) {
-        try { client.end(); } catch {}
+        try { client.end(); } catch { /* ignore */ }
       }
       this.sseClients.clear();
       if (this.server) this.server.close(() => resolve());
