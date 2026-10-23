@@ -41,3 +41,4 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 3. **Headless Git Safety**: `$env:GIT_TERMINAL_PROMPT=0` mandatory; git push requires prior auth verification and explicit permission.
 4. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
 5. **Immutable Verification**: Pre-commit quality gate strictly enforces that zero commits can land without 100% test pass.
+6. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.

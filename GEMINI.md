@@ -30,6 +30,12 @@ Whenever the user requests planning, research, architectural analysis, or issue 
 3. **Phase 2 - Issue Decomposition**: Decompose the plan into atomic, well-specified GitHub Issues / Aegis task files (`.aegis/prompts/`).
 4. **Phase 3 - Isolated Implementation**: Implementation code is ONLY written after Phase 2 is validated, exclusively within isolated worktrees (`HakeGame-solver`, `experimental/solver`).
 
+## Aegis Meta-Reflex Protocol (Recursive Self-Improvement)
+Whenever the user or agent proposes an improvement, feature, toolchain gap, or architectural feedback concerning Aegis itself (regardless of the active project workspace):
+1. **Zero-Prompt Upstream Detection**: The agent must recognize that the feedback targets the central Aegis engine (`frkntlr/aegis`).
+2. **Autonomous Discussion & RFC Sync**: Automatically publish an RFC and GitHub Discussion under `Ideas` on `frkntlr/aegis` (`npm run aegis -- rfc:create "<title>" [desc]`). Never leave engine feedback lost in local conversation context!
+3. **Traceability**: Link the originating project context or prompt in the published RFC.
+
 ## Code Quality Standards (Demir Kafes)
 All code modifications in this project must strictly comply with:
 1. Max 300 lines per source file.
