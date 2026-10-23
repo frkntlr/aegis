@@ -67,7 +67,8 @@ export class UniversalToolchainSync {
       try {
         const data = JSON.parse(fs.readFileSync(cursorMcp, 'utf8'));
         if (data.mcpServers) {
-          for (const [name, cfg] of Object.entries<any>(data.mcpServers)) {
+          interface RawMcpServerCfg { command?: string; args?: string[]; url?: string; }
+          for (const [name, cfg] of Object.entries<RawMcpServerCfg>(data.mcpServers)) {
             servers.push({
               name,
               command: cfg.command,
@@ -91,7 +92,7 @@ export class UniversalToolchainSync {
     try {
       const cursorDir = path.resolve(this.repoRoot, '.cursor');
       fs.mkdirSync(cursorDir, { recursive: true });
-      const mcpConfig: Record<string, any> = { mcpServers: {} };
+      const mcpConfig: { mcpServers: Record<string, unknown> } = { mcpServers: {} };
       for (const m of mcps) {
         mcpConfig.mcpServers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
       }
@@ -104,8 +105,9 @@ export class UniversalToolchainSync {
         fs.writeFileSync(rulesFile, header + (fs.existsSync(rulesFile) ? fs.readFileSync(rulesFile, 'utf8') : ''), 'utf8');
       }
       return true;
-    } catch (e: any) {
-      warnings.push(`Cursor senkronizasyon hatası: ${e.message}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      warnings.push(`Cursor senkronizasyon hatası: ${msg}`);
       return false;
     }
   }
@@ -114,14 +116,15 @@ export class UniversalToolchainSync {
     try {
       const vscodeDir = path.resolve(this.repoRoot, '.vscode');
       fs.mkdirSync(vscodeDir, { recursive: true });
-      const mcpConfig: Record<string, any> = { servers: {} };
+      const mcpConfig: { servers: Record<string, unknown> } = { servers: {} };
       for (const m of mcps) {
         mcpConfig.servers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
       }
       fs.writeFileSync(path.join(vscodeDir, 'mcp.json'), JSON.stringify(mcpConfig, null, 2), 'utf8');
       return true;
-    } catch (e: any) {
-      warnings.push(`VS Code senkronizasyon hatası: ${e.message}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      warnings.push(`VS Code senkronizasyon hatası: ${msg}`);
       return false;
     }
   }

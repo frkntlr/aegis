@@ -52,7 +52,9 @@ test('GitHubLiveAdapter parses markdown acceptance criteria and lock labels', ()
 function createMockFetch(): typeof fetch {
   return async (url, init) => {
     const urlStr = url.toString();
-    const auth = (init?.headers as any)?.get?.('Authorization') || (init?.headers as any)?.Authorization;
+    const auth = init?.headers instanceof Headers
+      ? (init.headers.get('Authorization') || '')
+      : ((init?.headers as Record<string, string>)?.[`Authorization`] || '');
     assert.ok(auth.includes('Bearer secret_token_abc'));
 
     if (urlStr.includes('/user')) {

@@ -79,3 +79,36 @@ test('IronCageValidator flags oversized function using true TypeScript AST', () 
   assert.strictEqual(result.violations[0].rule, 'MAX_FUNCTION_LINES');
   assert.ok(result.violations[0].message.includes('oversizedProcessor'));
 });
+
+test('IronCageValidator accurately handles Python and GDScript indentation-based function lines', () => {
+  const validator = new IronCageValidator({ maxFunctionLines: 5, maxFileLines: 300 });
+
+  const pyValid = `
+def short_func():
+    a = 1
+    b = 2
+    return a + b
+`.trim();
+  assert.strictEqual(validator.validateFileContent('script.py', pyValid).passed, true);
+
+  const pyOversized = `
+def long_func():
+    x1 = 1
+    x2 = 2
+    x3 = 3
+    x4 = 4
+    x5 = 5
+    x6 = 6
+    return x1 + x6
+`.trim();
+  const pyRes = validator.validateFileContent('script.py', pyOversized);
+  assert.strictEqual(pyRes.passed, false);
+  assert.strictEqual(pyRes.violations[0].rule, 'MAX_FUNCTION_LINES');
+
+  const gdValid = `
+func short_player_logic():
+\tvelocity.x = 100
+\tmove_and_slide()
+`.trim();
+  assert.strictEqual(validator.validateFileContent('player.gd', gdValid).passed, true);
+});

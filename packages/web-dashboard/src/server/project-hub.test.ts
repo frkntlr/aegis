@@ -80,7 +80,7 @@ test('DashboardServer handles /api/projects and /api/projects/focus endpoints', 
     // 1. GET /api/projects
     const projRes = await fetch(`http://localhost:${port}/api/projects`);
     assert.strictEqual(projRes.status, 200);
-    const projData = await projRes.json() as any;
+    const projData = (await projRes.json()) as { projects: unknown[]; active: string };
     assert.ok(Array.isArray(projData.projects));
     assert.ok(projData.active);
 
@@ -93,7 +93,7 @@ test('DashboardServer handles /api/projects and /api/projects/focus endpoints', 
       body: JSON.stringify({ workspacePath: newWorkspace })
     });
     assert.strictEqual(focusRes.status, 200);
-    const focusData = await focusRes.json() as any;
+    const focusData = (await focusRes.json()) as { success: boolean; switched: boolean; activeProject: { localPath: string } };
     assert.strictEqual(focusData.success, true);
     assert.strictEqual(focusData.switched, true);
     assert.strictEqual(focusData.activeProject.localPath, newWorkspace);

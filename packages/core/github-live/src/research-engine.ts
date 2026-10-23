@@ -4,6 +4,11 @@ import * as path from 'node:path';
 import type { ResearchReport } from './types.js';
 import type { GitHubWikiLiveAdapter } from './wiki-adapter.js';
 
+interface NotebookLMClientInstance {
+  startResearch?: (nbId: string, topic: string, source: string, mode: string) => Promise<{ task_id?: string }>;
+  query: (nbId: string, prompt: string) => Promise<string | { answer?: string; citations?: Array<{ title?: string; sourceId?: string }> }>;
+}
+
 export class NotebookLmResearchEngine {
   private defaultNotebookId: string;
 
@@ -18,7 +23,7 @@ export class NotebookLmResearchEngine {
     return path.resolve(appData, 'npm', 'node_modules', 'notebooklm-mcp-server', 'dist', 'client.js');
   }
 
-  public async getClientInstance(): Promise<any> {
+  public async getClientInstance(): Promise<NotebookLMClientInstance> {
     const modPath = this.resolveClientPath();
     if (!fs.existsSync(modPath)) {
       throw new Error(`NotebookLM client module not found at: ${modPath}`);
@@ -34,7 +39,7 @@ export class NotebookLmResearchEngine {
     let taskId: string | undefined;
     let sourcesCount = 0;
     try {
-      const res = await client.startResearch(nbId, topic, 'web', mode);
+      const res = client.startResearch ? await client.startResearch(nbId, topic, 'web', mode) : undefined;
       taskId = res?.task_id;
     } catch {
       // Fallback directly to synthesized query if startResearch RPC is busy
@@ -44,7 +49,8 @@ export class NotebookLmResearchEngine {
     const queryRes = await client.query(nbId, queryPrompt);
 
     const synthesis = typeof queryRes === 'string' ? queryRes : queryRes.answer || 'Research complete.';
-    const citations = (queryRes.citations || []).map((c: any) => c.title || c.sourceId || 'Source');
+    const rawCitations = typeof queryRes === 'object' && queryRes && Array.isArray(queryRes.citations) ? queryRes.citations : [];
+    const citations = rawCitations.map((c: { title?: string; sourceId?: string }) => c.title || c.sourceId || 'Source');
     sourcesCount = citations.length || 3;
 
     return {

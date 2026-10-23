@@ -78,10 +78,11 @@ test('McpSkillsSyncEngine syncs MCP server definitions across capable IDEs', () 
 
     assert.strictEqual(results.length, 5);
     const agResult = results.find(r => r.ideId === 'antigravity');
-    assert.ok(agResult && agResult.supported);
+    assert.ok(agResult?.supported);
     assert.strictEqual(agResult.syncedServersCount, 2);
 
-    const writtenJson = JSON.parse(fs.readFileSync(agResult.targetFile!, 'utf8'));
+    const targetFile = agResult?.targetFile || '';
+    const writtenJson = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
     assert.ok(writtenJson.mcpServers.notebooklm);
     assert.ok(writtenJson.mcpServers.godot);
   } finally {

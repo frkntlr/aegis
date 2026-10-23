@@ -63,7 +63,8 @@ export class IdeLauncher {
 
   private resolveCommand(ideType: string): string {
     const key = ideType.toLowerCase();
-    if (this.customCommands.has(key)) return this.customCommands.get(key)!;
+    const custom = this.customCommands.get(key);
+    if (custom) return custom;
     if (key.includes('cursor')) return 'cursor';
     if (key.includes('antigravity')) return 'antigravity';
     return 'code';
@@ -99,11 +100,12 @@ export class IdeLauncher {
         message: `${options.ideType} başlatıldı: ${options.worktreePath}`,
         pid: child.pid
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         command: cmd,
-        message: `IDE başlatılamadı (${err.message}). Komut: ${cmd}`
+        message: `IDE başlatılamadı (${msg}). Komut: ${cmd}`
       };
     }
   }

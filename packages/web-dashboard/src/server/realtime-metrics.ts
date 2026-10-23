@@ -38,7 +38,7 @@ export interface SystemMetrics {
     };
   };
   issues: SystemIssue[];
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
   github?: GitHubKanbanStatus;
 }
 
@@ -200,7 +200,7 @@ export class RealtimeMetricsService {
     }
   }
 
-  public getSettings(): Record<string, any> {
+  public getSettings(): Record<string, unknown> {
     const sFile = path.resolve(this.repoRoot, '.aegis', 'settings.json');
     if (fs.existsSync(sFile)) {
       try {
@@ -211,7 +211,7 @@ export class RealtimeMetricsService {
     return { primaryBranch: 'master', timeoutCeiling: 180, maxFunctionLines: 40, maxFileLines: 300, preferredIde: 'Google Antigravity' };
   }
 
-  public updateSettings(settings: Record<string, any>): Record<string, any> {
+  public updateSettings(settings: Record<string, unknown>): Record<string, unknown> {
     const sFile = path.resolve(this.repoRoot, '.aegis', 'settings.json');
     fs.mkdirSync(path.dirname(sFile), { recursive: true });
     const current = this.getSettings();

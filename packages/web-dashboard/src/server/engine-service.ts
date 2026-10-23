@@ -11,6 +11,14 @@ import { getDashboardHtml } from '../ui/dashboard-html.js';
 
 const execFileAsync = promisify(execFile);
 
+export interface AdaptiveTimeoutReport {
+  tool: string;
+  timeoutSeconds: number;
+  confidence: string;
+  reasoning: string;
+  summary: string;
+}
+
 export class AegisEngineService {
   private inspector = new BoundingBoxInspector();
   private estimator = new PreExecutionEstimator();
@@ -18,7 +26,7 @@ export class AegisEngineService {
   private diffEngine = new DiffEngine();
   private oracle = new ImmutableOracle();
 
-  public runUiInspector(layoutPath?: string): Record<string, any> {
+  public runUiInspector(layoutPath?: string): Record<string, unknown> {
     let elements: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
 
     if (layoutPath && fs.existsSync(layoutPath)) {
@@ -52,7 +60,7 @@ export class AegisEngineService {
     };
   }
 
-  public runMutationGate(filePath?: string): Record<string, any> {
+  public runMutationGate(filePath?: string): Record<string, unknown> {
     const targetFile = filePath || path.resolve(process.cwd(), 'packages/core/watchdog/src/pre-execution-estimator.ts');
     let code = 'export function calc(x: number) { return x > 0 ? x * 2 : 0; }';
     if (fs.existsSync(targetFile)) {
@@ -75,7 +83,7 @@ export class AegisEngineService {
     };
   }
 
-  public runAdaptiveTimeout(files = 2, tests = 4): Record<string, any> {
+  public runAdaptiveTimeout(files = 2, tests = 4): AdaptiveTimeoutReport {
     const est = this.estimator.estimate({
       blastRadiusFiles: files,
       affectedTestCount: tests,
@@ -90,7 +98,7 @@ export class AegisEngineService {
     };
   }
 
-  public runMcpSecurity(agent = 'solver', tool = 'ast_skeleton'): Record<string, any> {
+  public runMcpSecurity(agent = 'solver', tool = 'ast_skeleton'): Record<string, unknown> {
     const auth = this.mcpManager.authorizeToolCall(agent, tool);
     return {
       tool: 'mcp_security',
@@ -113,7 +121,7 @@ export class AegisEngineService {
         diff = stdout;
       } catch { /* ignore */ }
     }
-    const sample = diff && diff.trim() ? diff : `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
+    const sample = diff?.trim() ? diff : `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
     const res = this.diffEngine.parseAndValidate(sample);
     return {
       tool: 'diff_validator',

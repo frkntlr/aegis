@@ -38,7 +38,7 @@ export class McpSkillsSyncEngine {
     return obj;
   }
 
-  private writeConfigFile(targetPath: string, content: any): void {
+  private writeConfigFile(targetPath: string, content: unknown): void {
     const dir = path.dirname(targetPath);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(targetPath, JSON.stringify(content, null, 2), 'utf8');

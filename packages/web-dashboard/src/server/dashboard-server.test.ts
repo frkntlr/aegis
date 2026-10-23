@@ -23,7 +23,7 @@ test('DashboardServer rejects invalid JSON on /api/action with 400', async () =>
       body: 'invalid json {'
     });
     assert.strictEqual(res.status, 400);
-    const body = await res.json() as any;
+    const body = (await res.json()) as { error?: string };
     assert.ok(body.error);
   } finally {
     await server.stop();

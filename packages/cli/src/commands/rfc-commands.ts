@@ -49,20 +49,37 @@ function generateRfcContent(num: number, title: string, desc: string): string {
   ].join('\n');
 }
 
+interface RepoDiscussionData {
+  repository?: {
+    id: string;
+    discussionCategories?: {
+      nodes: Array<{ id: string; name: string }>;
+    };
+  };
+}
+
+interface CreateDiscussionData {
+  createDiscussion?: {
+    discussion?: {
+      url: string;
+    };
+  };
+}
+
 async function publishDiscussion(auth: { token?: string; owner?: string; repo?: string }, title: string, body: string): Promise<string | undefined> {
   if (!auth.token || !auth.owner || !auth.repo) return undefined;
   const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
   try {
-    const repoData = await adapter.graphqlQuery<any>(
+    const repoData = await adapter.graphqlQuery<RepoDiscussionData>(
       `query($o: String!, $r: String!) { repository(owner: $o, name: $r) { id discussionCategories(first: 10) { nodes { id name } } } }`,
       { o: auth.owner, r: auth.repo }
     );
     const repoId = repoData.repository?.id;
     const cats = repoData.repository?.discussionCategories?.nodes || [];
-    const ideasCat = cats.find((c: any) => c.name.toLowerCase() === 'ideas') || cats[0];
+    const ideasCat = cats.find((c: { name: string }) => c.name.toLowerCase() === 'ideas') || cats[0];
     if (!repoId || !ideasCat) return undefined;
 
-    const res = await adapter.graphqlQuery<any>(
+    const res = await adapter.graphqlQuery<CreateDiscussionData>(
       `mutation($repo: ID!, $cat: ID!, $t: String!, $b: String!) {
         createDiscussion(input: { repositoryId: $repo, categoryId: $cat, title: $t, body: $b }) { discussion { url } }
       }`,
@@ -109,7 +126,11 @@ export async function handleRfcCreate(titleArg?: string, descArg?: string): Prom
   await stageWikiAndDiscussion(slug, padNum, titleArg, descArg || titleArg, md);
 }
 
-async function dispatchLiveIssue(auth: any, issue: any, fileSlug: string): Promise<boolean> {
+async function dispatchLiveIssue(
+  auth: { hasCredentials?: boolean; token?: string; owner?: string; repo?: string },
+  issue: { title: string; body: string; labels: string[] },
+  fileSlug: string
+): Promise<boolean> {
   if (!auth.hasCredentials || !auth.token || !auth.owner || !auth.repo) return false;
   const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
   console.log(`🚀 Creating GitHub Issue from ${fileSlug}...`);

@@ -7,6 +7,24 @@ export interface ProjectsAdapterOptions {
   repo?: string;
 }
 
+interface FieldNode {
+  name: string;
+  id: string;
+  options?: Array<{ id: string; name: string }>;
+}
+
+interface ProjectDetailsResponse {
+  user?: {
+    projectV2?: {
+      id: string;
+      title: string;
+      fields?: {
+        nodes?: FieldNode[];
+      };
+    };
+  };
+}
+
 export class GitHubProjectsAdapter {
   private token: string;
   private owner: string;
@@ -19,7 +37,7 @@ export class GitHubProjectsAdapter {
     this.repo = options.repo || resolved.repo || 'aegis';
   }
 
-  private async executeGraphQL(query: string, variables: Record<string, any> = {}): Promise<any> {
+  private async executeGraphQL<T = Record<string, unknown>>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
     const res = await fetch('https://api.github.com/graphql', {
       method: 'POST',
       headers: {
@@ -32,11 +50,11 @@ export class GitHubProjectsAdapter {
     if (!res.ok) {
       throw new Error(`GitHub GraphQL HTTP ${res.status}: ${res.statusText}`);
     }
-    const data: any = await res.json();
+    const data = (await res.json()) as { data?: T; errors?: Array<{ message: string }> };
     if (data.errors && data.errors.length > 0) {
       throw new Error(`GraphQL Error: ${data.errors[0].message}`);
     }
-    return data.data;
+    return data.data as T;
   }
 
   public async listProjects(owner = this.owner): Promise<ProjectV2Info[]> {
@@ -47,9 +65,9 @@ export class GitHubProjectsAdapter {
         }
       }
     }`;
-    const data = await this.executeGraphQL(query, { owner });
+    const data = await this.executeGraphQL<{ user?: { projectsV2?: { nodes?: ProjectV2Info[] } } }>(query, { owner });
     const nodes = data?.user?.projectsV2?.nodes || [];
-    return nodes.map((n: any) => ({
+    return nodes.map((n: ProjectV2Info) => ({
       id: n.id,
       number: n.number,
       title: n.title,
@@ -73,11 +91,11 @@ export class GitHubProjectsAdapter {
         }
       }
     }`;
-    const data = await this.executeGraphQL(query, { owner, num: projectNumber });
+    const data = await this.executeGraphQL<ProjectDetailsResponse>(query, { owner, num: projectNumber });
     const proj = data?.user?.projectV2;
     if (!proj) throw new Error(`Project #${projectNumber} not found for ${owner}.`);
 
-    const statusField = (proj.fields?.nodes || []).find((f: any) => f.name === 'Status');
+    const statusField = (proj.fields?.nodes || []).find((f: FieldNode) => f.name === 'Status');
     return {
       id: proj.id,
       title: proj.title,
@@ -92,8 +110,8 @@ export class GitHubProjectsAdapter {
         item { id }
       }
     }`;
-    const data = await this.executeGraphQL(query, { projectId, contentId: issueNodeId });
-    return data?.addProjectV2ItemById?.item?.id;
+    const data = await this.executeGraphQL<{ addProjectV2ItemById?: { item?: { id: string } } }>(query, { projectId, contentId: issueNodeId });
+    return data?.addProjectV2ItemById?.item?.id || '';
   }
 
   public async setItemStatus(projectId: string, itemId: string, fieldId: string, optionId: string): Promise<void> {
@@ -115,7 +133,7 @@ export class GitHubProjectsAdapter {
     const issueRes = await fetch(`https://api.github.com/repos/${this.owner}/${this.repo}/issues/${issueNumber}`, {
       headers: { 'Authorization': `Bearer ${this.token}`, 'User-Agent': 'Aegis-Autonomous-Engine' }
     });
-    const issueData: any = await issueRes.json();
+    const issueData = (await issueRes.json()) as { node_id?: string };
     if (!issueData.node_id) throw new Error(`Could not fetch node_id for issue #${issueNumber}`);
 
     const itemId = await this.addIssueToProject(details.id, issueData.node_id);

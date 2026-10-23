@@ -4,7 +4,7 @@ import { IdeLauncher, UniversalToolchainSync, RoleClassifier } from '@aegis/orch
 import { OrphanTaskReclaimer } from '@aegis/watchdog';
 import { AegisEngineService } from './engine-service.js';
 import { ProjectHub } from './project-hub.js';
-import { RealtimeMetricsService } from './realtime-metrics.js';
+import { RealtimeMetricsService, type SystemIssue } from './realtime-metrics.js';
 
 export interface DashboardServerOptions {
   port?: number;
@@ -32,7 +32,7 @@ export class DashboardServer {
     this.hub.discoverProjects().catch(() => { /* no-op */ });
   }
 
-  public getStatusPayload(projectId?: string): Record<string, any> {
+  public getStatusPayload(projectId?: string): Record<string, unknown> {
     const ctx = projectId ? (this.hub.getContext(projectId) || this.hub.getActiveContext()) : this.hub.getActiveContext();
     const list = ctx.wtManager.listWorktrees();
     const locks = ctx.wtManager.getLockedFiles();
@@ -62,7 +62,7 @@ export class DashboardServer {
     };
   }
 
-  public broadcast(event: string, payload: any): void {
+  public broadcast(event: string, payload: unknown): void {
     const msg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
     for (const client of this.sseClients) {
       try { client.write(msg); } catch { this.sseClients.delete(client); }
@@ -76,20 +76,20 @@ export class DashboardServer {
     req.on('close', () => { this.sseClients.delete(res); });
   }
 
-  private handleMoveTask(payload: any): Record<string, any> {
+  private handleMoveTask(payload: Record<string, unknown>): Record<string, unknown> {
     const ctx = this.hub.getActiveContext();
-    const num = parseInt(payload.issueNumber, 10);
-    const targetStatus = payload.targetStatus;
+    const num = parseInt(String(payload.issueNumber), 10);
+    const targetStatus = payload.targetStatus as SystemIssue['status'];
     const issue = ctx.metrics.getIssues().find(i => i.number === num);
     if (!issue) return { success: false, message: `Görev #${num} bulunamadı.` };
 
     if (targetStatus === 'in_progress') {
-      let agent = payload.agentName;
+      let agent = payload.agentName as string | undefined;
       if (!agent || agent === 'auto') {
         const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
         agent = inf.role;
       }
-      const ide = payload.ideType || 'Google Antigravity';
+      const ide = (payload.ideType as string) || 'Google Antigravity';
       const lockRes = ctx.wtManager.acquireFileLocks(agent, issue.targetFiles);
       if (!lockRes.success) {
         return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
@@ -105,7 +105,7 @@ export class DashboardServer {
     return { success: true, message: `Görev #${num} '${targetStatus}' sütununa alındı.` };
   }
 
-  private handleAutoAction(): Record<string, any> {
+  private handleAutoAction(): Record<string, unknown> {
     const ctx = this.hub.getActiveContext();
     const ready = ctx.metrics.getIssues().filter(i => i.status === 'ready');
     if (ready.length === 0) return { success: true, message: 'Ready sütununda bekleyen görev yok.' };
@@ -123,14 +123,15 @@ export class DashboardServer {
     return { success: true, message: `Görev #${target.number} [@${idle.agentName}] (${idle.ideType}) atandı.` };
   }
 
-  private async handleIdeAndSync(action: string, payload: any): Promise<Record<string, any>> {
+  private async handleIdeAndSync(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const ctx = this.hub.getActiveContext();
     if (action === 'launch_ide') {
-      return this.launcher.launchIde({
-        ideType: payload.ideType || 'Google Antigravity',
-        worktreePath: payload.worktreePath || `${ctx.localPath}/experimental/solver`,
-        focusFile: payload.focusFile
+      const res = this.launcher.launchIde({
+        ideType: ((payload.ideType as string) || 'Google Antigravity') as 'Google Antigravity' | 'Cursor AI' | 'VS Code' | 'Universal IDE',
+        worktreePath: (payload.worktreePath as string) || `${ctx.localPath}/experimental/solver`,
+        focusFile: payload.focusFile as string | undefined
       });
+      return { success: res.success, command: res.command, message: res.message, pid: res.pid };
     }
     if (action === 'sync_toolchain') {
       const rep = this.toolchainSync.syncAll();
@@ -138,24 +139,24 @@ export class DashboardServer {
     }
     if (action === 'run_engine_tool') {
       const t = payload.tool;
-      let res: any;
+      let res: Record<string, unknown>;
       if (t === 'ui_inspector') res = this.engineSvc.runUiInspector();
       else if (t === 'mutation_gate') res = this.engineSvc.runMutationGate();
-      else if (t === 'adaptive_timeout') res = this.engineSvc.runAdaptiveTimeout(payload.files, payload.tests);
-      else if (t === 'mcp_security') res = this.engineSvc.runMcpSecurity(payload.agent, payload.mcpTool);
-      else if (t === 'diff_validator') res = await this.engineSvc.runDiffValidator(payload.diffText);
-      else if (t === 'immutable_oracle') res = await this.engineSvc.runOracleAudit(payload.files);
+      else if (t === 'adaptive_timeout') res = { ...this.engineSvc.runAdaptiveTimeout(Number(payload.files ?? 2), Number(payload.tests ?? 4)) };
+      else if (t === 'mcp_security') res = this.engineSvc.runMcpSecurity(payload.agent as string, payload.mcpTool as string);
+      else if (t === 'diff_validator') res = await this.engineSvc.runDiffValidator(payload.diffText as string);
+      else if (t === 'immutable_oracle') res = await this.engineSvc.runOracleAudit(payload.files as string[]);
       else res = { error: 'Bilinmeyen araç: ' + t };
-      return { success: true, result: res, message: res.summary || 'Motor aracı çalıştırıldı.' };
+      return { success: true, result: res, message: (res.summary as string) || 'Motor aracı çalıştırıldı.' };
     }
     if (action === 'save_settings' || action === 'update_settings') {
-      const s = ctx.metrics.updateSettings(payload.settings || payload);
+      const s = ctx.metrics.updateSettings((payload.settings || payload) as Record<string, unknown>);
       return { success: true, settings: s, message: `Ayarlar kaydedildi (Ana Dal: ${s.primaryBranch || 'master'}).` };
     }
     return { success: false, error: 'Bilinmeyen işlem' };
   }
 
-  private handleReclaimOrphans(): Record<string, any> {
+  private handleReclaimOrphans(): Record<string, unknown> {
     const ctx = this.hub.getActiveContext();
     const issues = ctx.metrics.getIssues();
     const locks = ctx.wtManager.getLockedFiles();
@@ -171,15 +172,15 @@ export class DashboardServer {
     return { success: true, count: reclaimed.length, reclaimed, message: msg };
   }
 
-  private async executeAction(action: string, payload: any): Promise<Record<string, any>> {
+  private async executeAction(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const ctx = this.hub.getActiveContext();
     if (action === 'switch_project') {
-      const res = this.hub.switchProject(payload.projectId);
+      const res = this.hub.switchProject(payload.projectId as string);
       this.broadcast('context_switched', res);
       return { success: true, ...res };
     }
     if (action === 'focus_project') {
-      const res = this.hub.handleFocus(payload.workspacePath);
+      const res = this.hub.handleFocus(payload.workspacePath as string);
       if (res.switched) this.broadcast('context_switched', res);
       return { success: true, ...res };
     }
@@ -195,19 +196,19 @@ export class DashboardServer {
       return this.handleIdeAndSync(action, payload);
     }
     if (action === 'create_task') {
-      const issue = await ctx.metrics.createIssue(payload.title || 'Yeni Görev', payload.targetFiles || []);
+      const issue = await ctx.metrics.createIssue((payload.title as string) || 'Yeni Görev', (payload.targetFiles as string[]) || []);
       return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu.`, issue };
     }
     if (action === 'complete_task') return this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' });
     if (action === 'release_locks') {
-      ctx.wtManager.releaseFileLocks(payload.agentName || 'solver');
-      ctx.metrics.releaseIssueLocks(payload.agentName);
+      ctx.wtManager.releaseFileLocks((payload.agentName as string) || 'solver');
+      ctx.metrics.releaseIssueLocks(payload.agentName as string);
       return { success: true, message: 'Kilitler boşaltıldı.' };
     }
     return { success: false, error: 'Bilinmeyen aksiyon: ' + action };
   }
 
-  private readJsonBody(req: http.IncomingMessage): Promise<any> {
+  private readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
     return new Promise((resolve, reject) => {
       let bodyStr = '';
       req.on('data', chunk => { bodyStr += chunk; });
@@ -221,29 +222,31 @@ export class DashboardServer {
   private async handleActionApi(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
       const body = await this.readJsonBody(req);
-      const result = await this.executeAction(body.action, body);
+      const result = await this.executeAction(body.action as string, body);
       this.broadcast('update', this.getStatusPayload());
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: err.message }));
+      res.end(JSON.stringify({ success: false, error: msg }));
     }
   }
 
   private async handleFocusApi(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
       const body = await this.readJsonBody(req);
-      const result = this.hub.handleFocus(body.workspacePath || process.cwd());
+      const result = this.hub.handleFocus((body.workspacePath as string) || process.cwd());
       if (result.switched) {
         this.broadcast('context_switched', result);
         this.broadcast('update', this.getStatusPayload());
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, ...result }));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: err.message }));
+      res.end(JSON.stringify({ success: false, error: msg }));
     }
   }
 

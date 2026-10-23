@@ -12,6 +12,18 @@ export interface RateLimitInfo {
   resetDate: string;
 }
 
+export interface RawGitHubIssue {
+  id: number;
+  number: number;
+  title: string;
+  body?: string;
+  state?: string;
+  html_url?: string;
+  url?: string;
+  assignee?: { login?: string } | null;
+  labels?: Array<string | { name: string }>;
+}
+
 export interface LiveAdapterOptions {
   token: string;
   owner?: string;
@@ -70,7 +82,7 @@ export class GitHubLiveAdapter {
     const r = repo ?? this.repo;
     if (!o || !r) throw new Error('Repository owner and name must be specified.');
 
-    const res = await this.request<any[]>(`/repos/${o}/${r}/issues?state=${state}`);
+    const res = await this.request<RawGitHubIssue[]>(`/repos/${o}/${r}/issues?state=${state}`);
     const issues: GitHubIssue[] = res.data.map(raw => this.transformRawIssue(raw));
 
     return { issues, rateLimit: res.rateLimit };
@@ -79,7 +91,7 @@ export class GitHubLiveAdapter {
   public async createIssue(title: string, body: string, labels: string[] = []): Promise<{ issue: GitHubIssue; rateLimit: RateLimitInfo }> {
     if (!this.owner || !this.repo) throw new Error('Repository owner and name must be specified.');
 
-    const res = await this.request<any>(`/repos/${this.owner}/${this.repo}/issues`, {
+    const res = await this.request<RawGitHubIssue>(`/repos/${this.owner}/${this.repo}/issues`, {
       method: 'POST',
       body: JSON.stringify({ title, body, labels })
     });
@@ -93,7 +105,7 @@ export class GitHubLiveAdapter {
   ): Promise<{ issue: GitHubIssue; rateLimit: RateLimitInfo }> {
     if (!this.owner || !this.repo) throw new Error('Repository owner and name must be specified.');
 
-    const res = await this.request<any>(`/repos/${this.owner}/${this.repo}/issues/${issueNumber}`, {
+    const res = await this.request<RawGitHubIssue>(`/repos/${this.owner}/${this.repo}/issues/${issueNumber}`, {
       method: 'PATCH',
       body: JSON.stringify(updates)
     });
@@ -144,8 +156,8 @@ export class GitHubLiveAdapter {
     return { number: res.data.number, htmlUrl: res.data.html_url, rateLimit: res.rateLimit };
   }
 
-  public async graphqlQuery<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
-    const res = await this.request<{ data: T; errors?: any[] }>('/graphql', {
+  public async graphqlQuery<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+    const res = await this.request<{ data: T; errors?: unknown[] }>('/graphql', {
       method: 'POST',
       body: JSON.stringify({ query, variables })
     });
@@ -192,8 +204,8 @@ export class GitHubLiveAdapter {
     return 'ready';
   }
 
-  public transformRawIssue(raw: any): GitHubIssue {
-    const labels = Array.isArray(raw.labels) ? raw.labels.map((l: any) => (typeof l === 'string' ? l : l.name)) : [];
+  public transformRawIssue(raw: RawGitHubIssue): GitHubIssue {
+    const labels = Array.isArray(raw.labels) ? raw.labels.map((l: string | { name: string }) => (typeof l === 'string' ? l : l.name)) : [];
     const body = raw.body || '';
     const targetFiles = labels.filter((l: string) => l.startsWith('lock:')).map((l: string) => l.replace('lock:', '').trim());
     const criteria = this.extractBodyDetails(body, targetFiles);

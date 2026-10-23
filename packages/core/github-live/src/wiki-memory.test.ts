@@ -75,7 +75,7 @@ test('GitHubWikiLiveAdapter backs up conflicting local wiki before re-cloning', 
 
   try {
     const adapter = new GitHubWikiLiveAdapter({ localCloneDir: cloneDir });
-    (adapter as any).cloneWikiRemote('https://invalid.example/repo.wiki.git');
+    (adapter as unknown as { cloneWikiRemote: (url: string) => void }).cloneWikiRemote('https://invalid.example/repo.wiki.git');
 
     const aegisDir = path.resolve(process.cwd(), '.aegis');
     const backups = fs.existsSync(aegisDir)

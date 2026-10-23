@@ -14,7 +14,7 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
 
   private formatFunction(node: ts.FunctionDeclaration, sf: ts.SourceFile): string {
     const modifiers = ts.canHaveModifiers(node) && ts.getModifiers(node)
-      ? ts.getModifiers(node)!.map(m => m.getText(sf)).join(' ') + ' '
+      ? ts.getModifiers(node)?.map(m => m.getText(sf)).join(' ') + ' '
       : '';
     const name = node.name ? node.name.text : 'anonymous';
     const typeParams = node.typeParameters ? `<${node.typeParameters.map(p => p.getText(sf)).join(', ')}>` : '';
@@ -25,7 +25,7 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
 
   private formatVariables(node: ts.VariableStatement, sf: ts.SourceFile): string {
     const modifiers = ts.canHaveModifiers(node) && ts.getModifiers(node)
-      ? ts.getModifiers(node)!.map(m => m.getText(sf)).join(' ') + ' '
+      ? ts.getModifiers(node)?.map(m => m.getText(sf)).join(' ') + ' '
       : '';
     const decls = node.declarationList.declarations.map(d => {
       const type = d.type ? `: ${d.type.getText(sf)}` : '';
@@ -57,7 +57,7 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
 
   private formatClass(node: ts.ClassDeclaration, sf: ts.SourceFile): string {
     const modifiers = ts.canHaveModifiers(node) && ts.getModifiers(node)
-      ? ts.getModifiers(node)!.map(m => m.getText(sf)).join(' ') + ' '
+      ? ts.getModifiers(node)?.map(m => m.getText(sf)).join(' ') + ' '
       : '';
     const name = node.name ? node.name.text : 'AnonymousClass';
     const heritage = node.heritageClauses ? ' ' + node.heritageClauses.map(h => h.getText(sf)).join(' ') : '';

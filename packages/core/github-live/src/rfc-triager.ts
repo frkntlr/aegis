@@ -41,7 +41,7 @@ export class RfcTriager {
   private extractTargetName(title: string): string {
     const clean = title.replace(/^RFC:\s*(\[[^\]]+\]\s*)?/i, '').trim();
     const m = clean.match(/^(?:Add|Implement|Support|Integrate|Create|Feature|New)?\s*([A-Za-z0-9#+.-]+(?:\s+[A-Za-z0-9#+.-]+)?)/i);
-    if (!m || !m[1]) return 'Extension';
+    if (!m?.[1]) return 'Extension';
     const stripped = m[1].replace(/\b(support|ast|skeleton|extractor|adapter|integration)\b/gi, '').trim();
     return stripped || m[1].trim();
   }
@@ -86,7 +86,7 @@ export class RfcTriager {
   public convertToIssue(rfc: ParsedRfc, issueNumber: number): GitHubIssue {
     const acceptanceCriteria = this.generateAcceptanceCriteria(rfc);
     const lockLabels = rfc.proposedFiles.map(f => {
-      const base = f.includes('/') ? f.split('/').pop()! : f;
+      const base = f.includes('/') ? (f.split('/').pop() || f) : f;
       const label = `lock:${base}`;
       return label.length > 50 ? label.slice(0, 50) : label;
     });

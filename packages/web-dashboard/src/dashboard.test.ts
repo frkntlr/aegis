@@ -93,7 +93,7 @@ test('DashboardServer handles move_task and status via API', async () => {
     assert.ok(port > 0);
     const apiRes = await fetch(`http://localhost:${port}/api/status`);
     assert.strictEqual(apiRes.status, 200);
-    const data = await apiRes.json() as any;
+    const data = (await apiRes.json()) as { issues: Array<{ number: number }> };
     assert.ok(data.issues.length >= 2);
     const testNum = data.issues[0].number;
 
@@ -103,7 +103,7 @@ test('DashboardServer handles move_task and status via API', async () => {
       body: JSON.stringify({ action: 'move_task', issueNumber: testNum, targetStatus: 'in_progress', agentName: 'solver' })
     });
     assert.strictEqual(moveRes.status, 200);
-    const moveData = await moveRes.json() as any;
+    const moveData = (await moveRes.json()) as { success: boolean };
     assert.strictEqual(moveData.success, true);
 
     const doneRes = await fetch(`http://localhost:${port}/api/action`, {
@@ -152,7 +152,7 @@ test('DashboardServer handles save_settings and reclaim_orphans via API', async 
       body: JSON.stringify({ action: 'save_settings', settings: { primaryBranch: 'master' } })
     });
     assert.strictEqual(setRes.status, 200);
-    const setData = await setRes.json() as any;
+    const setData = (await setRes.json()) as { settings: { primaryBranch: string } };
     assert.strictEqual(setData.settings.primaryBranch, 'master');
 
     const recRes = await fetch(`http://localhost:${port}/api/action`, {
@@ -161,7 +161,7 @@ test('DashboardServer handles save_settings and reclaim_orphans via API', async 
       body: JSON.stringify({ action: 'reclaim_orphans' })
     });
     assert.strictEqual(recRes.status, 200);
-    const recData = await recRes.json() as any;
+    const recData = (await recRes.json()) as { success: boolean };
     assert.strictEqual(recData.success, true);
   } finally {
     await server.stop();
@@ -190,7 +190,7 @@ test('GitHubKanbanService manages issues and sync_github responds via API', asyn
       body: JSON.stringify({ action: 'sync_github' })
     });
     assert.strictEqual(res.status, 200);
-    const d = await res.json() as any;
+    const d = (await res.json()) as { success: boolean; issues: unknown[] };
     assert.strictEqual(d.success, true);
     assert.ok(d.issues.length >= 2);
   } finally {

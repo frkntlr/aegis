@@ -21,9 +21,17 @@ export interface IdeAdapter {
   setupExclusions(repoRoot: string): IdeExclusionResult;
 }
 
-function updateJsonSettings(filePath: string, mutator: (s: Record<string, any>) => void): void {
+function asObj(val: unknown): Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val) ? (val as Record<string, unknown>) : {};
+}
+
+function asArr(val: unknown): unknown[] {
+  return Array.isArray(val) ? val : [];
+}
+
+function updateJsonSettings(filePath: string, mutator: (s: Record<string, unknown>) => void): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  let settings: Record<string, any> = {};
+  let settings: Record<string, unknown> = {};
   if (fs.existsSync(filePath)) {
     try {
       settings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -48,8 +56,8 @@ export class AntigravityAdapter implements IdeAdapter {
   public setupExclusions(repoRoot: string): IdeExclusionResult {
     const settingsFile = path.resolve(repoRoot, '.gemini', 'settings.json');
     updateJsonSettings(settingsFile, (s) => {
-      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
-      s['search.exclude'] = { ...(s['search.exclude'] || {}), 'experimental/**': true };
+      s['files.exclude'] = { ...asObj(s['files.exclude']), 'experimental/**': true };
+      s['search.exclude'] = { ...asObj(s['search.exclude']), 'experimental/**': true };
       s['antigravity.multiAgent'] = true;
     });
     return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
@@ -69,8 +77,8 @@ export class VSCodeAdapter implements IdeAdapter {
   public setupExclusions(repoRoot: string): IdeExclusionResult {
     const settingsFile = path.resolve(repoRoot, '.vscode', 'settings.json');
     updateJsonSettings(settingsFile, (s) => {
-      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
-      s['search.exclude'] = { ...(s['search.exclude'] || {}), 'experimental/**': true };
+      s['files.exclude'] = { ...asObj(s['files.exclude']), 'experimental/**': true };
+      s['search.exclude'] = { ...asObj(s['search.exclude']), 'experimental/**': true };
     });
     return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
   }
@@ -90,8 +98,8 @@ export class CursorAdapter implements IdeAdapter {
     const settingsFile = path.resolve(repoRoot, '.cursor', 'settings.json');
     const rulesFile = path.resolve(repoRoot, '.cursorrules');
     updateJsonSettings(settingsFile, (s) => {
-      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
-      s['search.exclude'] = { ...(s['search.exclude'] || {}), 'experimental/**': true };
+      s['files.exclude'] = { ...asObj(s['files.exclude']), 'experimental/**': true };
+      s['search.exclude'] = { ...asObj(s['search.exclude']), 'experimental/**': true };
     });
     const ruleHeader = '# Aegis Autonomous Isolation Rule\nexperimental/**\n';
     if (!fs.existsSync(rulesFile) || !fs.readFileSync(rulesFile, 'utf8').includes('experimental/**')) {
@@ -114,7 +122,7 @@ export class WindsurfAdapter implements IdeAdapter {
   public setupExclusions(repoRoot: string): IdeExclusionResult {
     const settingsFile = path.resolve(repoRoot, '.windsurf', 'settings.json');
     updateJsonSettings(settingsFile, (s) => {
-      s['files.exclude'] = { ...(s['files.exclude'] || {}), 'experimental/**': true };
+      s['files.exclude'] = { ...asObj(s['files.exclude']), 'experimental/**': true };
     });
     return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
   }
@@ -133,7 +141,7 @@ export class ZedAdapter implements IdeAdapter {
   public setupExclusions(repoRoot: string): IdeExclusionResult {
     const settingsFile = path.resolve(repoRoot, '.zed', 'settings.json');
     updateJsonSettings(settingsFile, (s) => {
-      s['file_scan_exclusions'] = [...(s['file_scan_exclusions'] || []), 'experimental/**'];
+      s['file_scan_exclusions'] = [...asArr(s['file_scan_exclusions']), 'experimental/**'];
     });
     return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
   }

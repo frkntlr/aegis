@@ -12,18 +12,18 @@
     "rules": {
       "preset": "recommended",
       "suspicious": {
-        "noExplicitAny": "warn",
+        "noExplicitAny": "error",
         "noEmptyBlockStatements": "error",
         "noUselessEscapeInString": "off",
         "noGlobalIsNan": "off"
       },
       "complexity": {
-        "noBannedTypes": "off",
+        "noBannedTypes": "error",
         "noThisInStatic": "off",
         "noStaticOnlyClass": "off",
         "useLiteralKeys": "off",
         "noUselessEscapeInRegex": "off",
-        "useOptionalChain": "off",
+        "useOptionalChain": "error",
         "useRegexLiterals": "off"
       },
       "correctness": {
@@ -33,7 +33,7 @@
         "useTemplate": "off",
         "useImportType": "off",
         "useExportType": "off",
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "error"
       }
     }
   }

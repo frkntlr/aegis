@@ -26,6 +26,17 @@ export class WorktreeManager {
     return path.resolve(this.repoRoot, '.aegis', 'locks.json');
   }
 
+  private safeUnlock(lockDir: string): () => void {
+    return () => {
+      for (let i = 0; i < 3; i++) {
+        try {
+          fs.rmSync(lockDir, { recursive: true, force: true });
+          break;
+        } catch { /* ignore */ }
+      }
+    };
+  }
+
   private acquireMutex(): () => void {
     const lockDir = `${this.getLockFilePath()}.lock`;
     const pidFile = path.join(lockDir, 'pid');
@@ -37,9 +48,7 @@ export class WorktreeManager {
       try {
         fs.mkdirSync(lockDir);
         fs.writeFileSync(pidFile, String(process.pid), 'utf8');
-        return () => {
-          try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch { /* ignore */ }
-        };
+        return this.safeUnlock(lockDir);
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
         if (code !== 'EEXIST') throw err;
@@ -50,20 +59,27 @@ export class WorktreeManager {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay);
       }
     }
-    return () => { /* no-op */ };
+    throw new Error('Aegis Mutex Timeout: Failed to acquire lock within 6000ms');
   }
 
   private isLockStale(lockDir: string, pidFile: string): boolean {
+    const stat = fs.statSync(lockDir, { throwIfNoEntry: false });
+    if (!stat) return true;
+    const age = Date.now() - stat.mtimeMs;
+
     try {
       const rawPid = fs.readFileSync(pidFile, 'utf8').trim();
       const ownerPid = parseInt(rawPid, 10);
-      if (!Number.isFinite(ownerPid) || ownerPid <= 0) return true;
+      if (!Number.isFinite(ownerPid) || ownerPid <= 0) {
+        return age > 5000;
+      }
       process.kill(ownerPid, 0);
       return false;
     } catch (err: unknown) {
-      if ((err as { code?: string })?.code === 'ESRCH') return true;
-      const stat = fs.statSync(lockDir, { throwIfNoEntry: false });
-      return stat ? Date.now() - stat.mtimeMs > 30000 : true;
+      const code = (err as { code?: string })?.code;
+      if (code === 'ESRCH') return true;
+      if (code === 'EPERM') return false;
+      return age > 30000;
     }
   }
 

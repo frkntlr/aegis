@@ -90,11 +90,36 @@ export class IronCageValidator {
     walk(sourceFile);
   }
 
+  private checkFunctionLimit(
+    funcStart: number,
+    funcLength: number,
+    filePath: string,
+    violations: CageViolation[]
+  ): void {
+    if (funcLength > this.maxFunctionLines) {
+      violations.push({
+        rule: 'MAX_FUNCTION_LINES',
+        filePath,
+        line: funcStart,
+        message: `Function starting at line ${funcStart} exceeds ${this.maxFunctionLines} lines (actual: ${funcLength} lines).`,
+        severity: 'error'
+      });
+    }
+  }
+
   private isLineFunctionStart(trimmed: string): boolean {
     const stripped = trimmed.replace(/^export\s+(default\s+)?/, '');
-    const fnRegex = new RegExp('^(public\\s+|private\\s+|protected\\s+|static\\s+)*(async\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{');
+    const fnRegex = new RegExp('^(public\\s+|private\\s+|protected\\s+|static\\s+)*(async\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{?');
     const arrowMarker = '=' + '> ' + '{';
-    return stripped.startsWith('function ') || stripped.startsWith('async function ') || trimmed.includes(arrowMarker) || Boolean(stripped.match(fnRegex));
+    return stripped.startsWith('function ') ||
+      stripped.startsWith('async function ') ||
+      stripped.startsWith('func ') ||
+      stripped.startsWith('func(') ||
+      stripped.startsWith('fn ') ||
+      stripped.startsWith('pub fn ') ||
+      stripped.startsWith('async fn ') ||
+      trimmed.includes(arrowMarker) ||
+      Boolean(stripped.match(fnRegex));
   }
 
   private updateBraces(line: string, state: ScanState, i: number, violations: CageViolation[], filePath: string): void {
@@ -110,17 +135,37 @@ export class IronCageValidator {
     }
 
     if (state.braceDepth <= 0 && cleanLine.includes('}')) {
-      const funcLength = (i + 1) - state.funcStartLine + 1;
-      if (funcLength > this.maxFunctionLines) {
-        violations.push({
-          rule: 'MAX_FUNCTION_LINES',
-          filePath,
-          line: state.funcStartLine,
-          message: `Function starting at line ${state.funcStartLine} exceeds ${this.maxFunctionLines} lines (actual: ${funcLength} lines).`,
-          severity: 'error'
-        });
-      }
+      this.checkFunctionLimit(state.funcStartLine, (i + 1) - state.funcStartLine + 1, filePath, violations);
       state.inFunction = false;
+    }
+  }
+
+  private validateIndentationBased(filePath: string, lines: string[], violations: CageViolation[]): void {
+    let inFunction = false;
+    let funcStart = 0;
+    let baseIndent = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const isDef = trimmed.startsWith('def ') || trimmed.startsWith('async def ') ||
+        trimmed.startsWith('func ') || trimmed.startsWith('static func ');
+      const indent = (line.match(/^(\t|\s)*/)?.[0] ?? '').length;
+
+      if (inFunction && indent <= baseIndent) {
+        this.checkFunctionLimit(funcStart + 1, i - funcStart, filePath, violations);
+        inFunction = false;
+      }
+      if (!inFunction && isDef) {
+        inFunction = true;
+        funcStart = i;
+        baseIndent = indent;
+      }
+    }
+    if (inFunction) {
+      this.checkFunctionLimit(funcStart + 1, lines.length - funcStart, filePath, violations);
     }
   }
 
@@ -153,12 +198,16 @@ export class IronCageValidator {
     }
 
     const isTsOrJs = /\.[jt]sx?$/i.test(filePath);
+    const isIndentBased = /\.(py|gd)$/i.test(filePath);
+
     if (isTsOrJs) {
       try {
         this.validateTypeScriptAst(filePath, content, violations);
       } catch {
         this.validateLineBased(filePath, lines, violations);
       }
+    } else if (isIndentBased) {
+      this.validateIndentationBased(filePath, lines, violations);
     } else {
       this.validateLineBased(filePath, lines, violations);
     }

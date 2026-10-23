@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { GoSkeletonExtractor } from './go-extractor.js';
 import { CppSkeletonExtractor } from './cpp-extractor.js';
+import { RustSkeletonExtractor } from './rust-extractor.js';
 import { SkeletonGenerator } from './skeleton-generator.js';
 
 const sampleGoCode = `
@@ -102,4 +103,26 @@ int second() {
   const res = extractor.extract('test.cpp', code);
   assert.ok(res.skeletonContent.includes('void first() { /* body omitted */ }'));
   assert.ok(res.skeletonContent.includes('int second() { /* body omitted */ }'));
+});
+
+test('RustSkeletonExtractor correctly handles braces in strings, chars, raw strings, and comments', () => {
+  const code = `
+use std::fmt;
+pub fn first() {
+    let s = "{";
+    let c = '{';
+    let raw = r#"{"#;
+    // {
+    /* {
+    } */
+}
+pub fn second() -> i32 {
+    42
+}
+`.trim();
+
+  const extractor = new RustSkeletonExtractor();
+  const res = extractor.extract('test.rs', code);
+  assert.ok(res.skeletonContent.includes('pub fn first() { /* body omitted */ }'));
+  assert.ok(res.skeletonContent.includes('pub fn second() -> i32 { /* body omitted */ }'));
 });
