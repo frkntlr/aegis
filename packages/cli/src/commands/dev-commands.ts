@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { SkeletonGenerator, DiffEngine } from '@aegis/ast-skeleton';
@@ -132,7 +132,10 @@ export function handleInspect(targetArg?: string): void {
 function getStagedSourceFiles(): string[] {
   try {
     if (!fs.existsSync('.git')) return [];
-    const out = execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' });
+    const out = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACM'], {
+      encoding: 'utf8',
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+    });
     return out
       .split('\n')
       .map(l => l.trim().replace(/\\/g, '/'))
@@ -194,7 +197,12 @@ export function handleAudit(modifiedFilesStr?: string): void {
   let files = (modifiedFilesStr || '').split(',').map(f => f.trim()).filter(Boolean);
   if (files.length === 0) {
     try {
-      const out = fs.existsSync('.git') ? execSync('git status --porcelain', { encoding: 'utf8' }) : '';
+      const out = fs.existsSync('.git')
+        ? execFileSync('git', ['status', '--porcelain'], {
+            encoding: 'utf8',
+            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          })
+        : '';
       files = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
     } catch {}
   }

@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import * as path from 'node:path';
 
 export interface RunningIdeProcess {
@@ -35,7 +35,10 @@ export class IdeLauncher {
   public detectRunningIdes(): RunningIdeProcess[] {
     const list: RunningIdeProcess[] = [];
     try {
-      const output = execSync('tasklist /FO CSV /NH', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const isWin = process.platform === 'win32';
+      const output = isWin
+        ? execFileSync('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
+        : execFileSync('ps', ['-eo', 'pid,comm'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
       const lines = output.split('\n');
       for (const line of lines) {
         const parts = line.split(',').map(p => p.replace(/"/g, '').trim());

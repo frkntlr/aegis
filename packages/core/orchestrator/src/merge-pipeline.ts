@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 
 export interface MergePipelineOptions {
@@ -31,7 +31,12 @@ export class MergePipeline {
   private detectCurrentBranch(): string {
     try {
       if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
-        const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: this.repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+          cwd: this.repoRoot,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
     } catch {}
@@ -65,7 +70,10 @@ export class MergePipeline {
 
   private step2Rebase(mergingAgent: string, agentDir: string, steps: MergeStepReport[]): boolean {
     try {
-      execSync(`git -C "${agentDir}" rebase "${this.baseBranch}"`, { stdio: 'pipe' });
+      execFileSync('git', ['-C', agentDir, 'rebase', this.baseBranch], {
+        stdio: 'pipe',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
       steps.push({
         step: 2,
         name: 'Rebase against base branch',
@@ -74,7 +82,12 @@ export class MergePipeline {
       });
       return true;
     } catch {
-      try { execSync(`git -C "${agentDir}" rebase --abort`, { stdio: 'pipe' }); } catch {}
+      try {
+        execFileSync('git', ['-C', agentDir, 'rebase', '--abort'], {
+          stdio: 'pipe',
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        });
+      } catch {}
       steps.push({
         step: 2,
         name: 'Rebase against base branch',
@@ -87,7 +100,11 @@ export class MergePipeline {
 
   private step3Merge(mergingAgent: string, steps: MergeStepReport[]): boolean {
     try {
-      execSync(`git merge --ff-only "aegis/${mergingAgent}"`, { cwd: this.repoRoot, stdio: 'pipe' });
+      execFileSync('git', ['merge', '--ff-only', `aegis/${mergingAgent}`], {
+        cwd: this.repoRoot,
+        stdio: 'pipe',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
       steps.push({
         step: 3,
         name: 'Main branch merge',
@@ -111,7 +128,10 @@ export class MergePipeline {
       if (sibling === mergingAgent) continue;
       const siblingDir = path.resolve(this.repoRoot, this.worktreePrefix, sibling);
       try {
-        execSync(`git -C "${siblingDir}" reset --hard "${this.baseBranch}"`, { stdio: 'pipe' });
+        execFileSync('git', ['-C', siblingDir, 'reset', '--hard', this.baseBranch], {
+          stdio: 'pipe',
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        });
         steps.push({
           step: 4,
           name: `Sibling sync: ${sibling}`,

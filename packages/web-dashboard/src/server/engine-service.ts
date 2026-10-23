@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { MCPSecurityManager } from '@aegis/mcp-security';
@@ -103,7 +103,11 @@ export class AegisEngineService {
     let diff = diffText;
     if (diff === 'git' || diff === 'head') {
       try {
-        diff = execSync('git diff -U3 HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+        diff = execFileSync('git', ['diff', '-U3', 'HEAD'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        });
       } catch {}
     }
     const sample = diff && diff.trim() ? diff : `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
@@ -123,7 +127,11 @@ export class AegisEngineService {
     if (targetFiles.length === 0) {
       try {
         if (fs.existsSync('.git')) {
-          const out = execSync('git status --porcelain', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+          const out = execFileSync('git', ['status', '--porcelain'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          });
           targetFiles = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
         }
       } catch {}

@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 export interface GitHubAuthContext {
   token?: string;
@@ -11,7 +11,11 @@ export interface GitHubAuthContext {
 export class GitHubTokenResolver {
   private static resolveFromCli(): string | undefined {
     try {
-      const ghToken = execSync('gh auth token', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const ghToken = execFileSync('gh', ['auth', 'token'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      }).trim();
       return ghToken || undefined;
     } catch {
       return undefined;
@@ -20,12 +24,13 @@ export class GitHubTokenResolver {
 
   private static resolveFromGitCredentials(): string | undefined {
     try {
-      const credOutput = execSync('git credential fill', {
-        input: 'protocol=https\\nhost=github.com\\n\\n',
+      const credOutput = execFileSync('git', ['credential', 'fill'], {
+        input: 'protocol=https\nhost=github.com\n\n',
         encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'ignore']
+        stdio: ['pipe', 'pipe', 'ignore'],
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
       });
-      const match = credOutput.match(/password=([^\\r\\n]+)/);
+      const match = credOutput.match(/password=([^\r\n]+)/);
       return match ? match[1].trim() : undefined;
     } catch {
       return undefined;
@@ -53,14 +58,14 @@ export class GitHubTokenResolver {
 
   public static detectRepo(): { owner?: string; repo?: string } {
     try {
-      const remoteUrl = execSync('git config --get remote.origin.url', {
+      const remoteUrl = execFileSync('git', ['config', '--get', 'remote.origin.url'], {
         encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore']
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
       }).trim();
 
       if (!remoteUrl) return {};
 
-      // Match git@github.com:owner/repo.git or https://github.com/owner/repo.git
       const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/i);
       if (match) {
         return {

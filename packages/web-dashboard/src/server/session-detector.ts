@@ -22,7 +22,7 @@ export class SessionDetector {
     this.wtManager = wtManager ?? new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
   }
 
-  private detectIdeType(wtPath: string): AgentSession['ideType'] {
+  public detectIdeType(wtPath: string): AgentSession['ideType'] {
     if (fs.existsSync(path.join(wtPath, '.cursor')) || fs.existsSync(path.join(wtPath, '.cursorrules'))) {
       return 'Cursor AI';
     }

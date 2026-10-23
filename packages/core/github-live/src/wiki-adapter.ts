@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { GitHubTokenResolver } from './token-resolver.js';
 import type { WikiPage, WikiSyncStatus } from './types.js';
 import { DEFAULT_WIKI_SUITE } from './wiki-suite.js';
@@ -40,7 +40,7 @@ export class GitHubWikiLiveAdapter {
   public checkRemoteAvailability(): WikiSyncStatus {
     const url = this.getWikiRemoteUrl();
     try {
-      execSync(`git ls-remote "${url}"`, {
+      execFileSync('git', ['ls-remote', url], {
         stdio: 'pipe',
         timeout: 8000,
         env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
@@ -74,17 +74,39 @@ export class GitHubWikiLiveAdapter {
       return this.cloneWikiRemote(url);
     }
     try {
-      execSync(`git -C "${this.cloneDir}" pull origin master --allow-unrelated-histories`, { stdio: 'pipe', timeout: 15000 });
+      execFileSync('git', ['-C', this.cloneDir, 'pull', 'origin', 'master', '--allow-unrelated-histories'], {
+        stdio: 'pipe',
+        timeout: 15000,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
       return true;
     } catch {
       return this.cloneWikiRemote(url);
     }
   }
 
+  private backupConflictingWiki(): void {
+    if (!fs.existsSync(this.cloneDir)) return;
+    try {
+      const backupDir = path.resolve(process.cwd(), '.aegis', `wiki-backup-${Date.now()}`);
+      fs.mkdirSync(path.dirname(backupDir), { recursive: true });
+      fs.cpSync(this.cloneDir, backupDir, { recursive: true });
+    } catch {
+      // Graceful degradation on backup failure
+    }
+  }
+
   private cloneWikiRemote(url: string): boolean {
     try {
-      if (fs.existsSync(this.cloneDir)) fs.rmSync(this.cloneDir, { recursive: true, force: true });
-      execSync(`git clone "${url}" "${this.cloneDir}"`, { stdio: 'pipe', timeout: 20000 });
+      if (fs.existsSync(this.cloneDir)) {
+        this.backupConflictingWiki();
+        fs.rmSync(this.cloneDir, { recursive: true, force: true });
+      }
+      execFileSync('git', ['clone', url, this.cloneDir], {
+        stdio: 'pipe',
+        timeout: 20000,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
       return true;
     } catch {
       return false;
@@ -135,9 +157,10 @@ export class GitHubWikiLiveAdapter {
     const status = this.checkRemoteAvailability();
     if (status.available && fs.existsSync(path.join(this.cloneDir, '.git'))) {
       try {
-        execSync(`git -C "${this.cloneDir}" add "${slug}.md"`, { stdio: 'pipe' });
-        execSync(`git -C "${this.cloneDir}" commit -m "docs(wiki): update ${slug} living memory"`, { stdio: 'pipe' });
-        execSync(`git -C "${this.cloneDir}" push origin master`, { stdio: 'pipe', timeout: 15000 });
+        const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+        execFileSync('git', ['-C', this.cloneDir, 'add', `${slug}.md`], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${slug} living memory`], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
         return true;
       } catch {
         return false;
@@ -187,8 +210,9 @@ export class GitHubWikiLiveAdapter {
     }
 
     try {
-      execSync(`git -C "${this.cloneDir}" add .`, { stdio: 'pipe' });
-      execSync(`git -C "${this.cloneDir}" commit -m "docs(wiki): seed 8-page living architecture suite"`, { stdio: 'pipe' });
+      const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+      execFileSync('git', ['-C', this.cloneDir, 'add', '.'], { stdio: 'pipe', env });
+      execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 8-page living architecture suite'], { stdio: 'pipe', env });
     } catch {
       // workspace already committed or clean
     }
@@ -199,12 +223,12 @@ export class GitHubWikiLiveAdapter {
     this.ensureGitInitialized();
     const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
     try {
-      execSync(`git -C "${this.cloneDir}" push -u origin master`, { stdio: 'pipe', timeout: 15000, env });
+      execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
       return { success: true, message: 'Successfully pushed all wiki pages to GitHub remote.' };
     } catch {
       try {
-        execSync(`git -C "${this.cloneDir}" pull origin master --allow-unrelated-histories`, { stdio: 'pipe', timeout: 10000, env });
-        execSync(`git -C "${this.cloneDir}" push -u origin master`, { stdio: 'pipe', timeout: 15000, env });
+        execFileSync('git', ['-C', this.cloneDir, 'pull', 'origin', 'master', '--allow-unrelated-histories'], { stdio: 'pipe', timeout: 10000, env });
+        execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
         return { success: true, message: 'Successfully merged and pushed all pages to GitHub remote.' };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -215,18 +239,19 @@ export class GitHubWikiLiveAdapter {
 
   private ensureGitInitialized(): void {
     const gitDir = path.join(this.cloneDir, '.git');
+    const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
     if (!fs.existsSync(gitDir)) {
-      execSync(`git -C "${this.cloneDir}" init -b master`, { stdio: 'pipe' });
-      execSync(`git -C "${this.cloneDir}" config user.name "Aegis Fleet"`, { stdio: 'pipe' });
-      execSync(`git -C "${this.cloneDir}" config user.email "aegis@local"`, { stdio: 'pipe' });
+      execFileSync('git', ['-C', this.cloneDir, 'init', '-b', 'master'], { stdio: 'pipe', env });
+      execFileSync('git', ['-C', this.cloneDir, 'config', 'user.name', 'Aegis Fleet'], { stdio: 'pipe', env });
+      execFileSync('git', ['-C', this.cloneDir, 'config', 'user.email', 'aegis@local'], { stdio: 'pipe', env });
     }
     const remoteUrl = this.getWikiRemoteUrl();
     try {
-      execSync(`git -C "${this.cloneDir}" remote get-url origin`, { stdio: 'pipe' });
-      execSync(`git -C "${this.cloneDir}" remote set-url origin "${remoteUrl}"`, { stdio: 'pipe' });
+      execFileSync('git', ['-C', this.cloneDir, 'remote', 'get-url', 'origin'], { stdio: 'pipe', env });
+      execFileSync('git', ['-C', this.cloneDir, 'remote', 'set-url', 'origin', remoteUrl], { stdio: 'pipe', env });
     } catch {
       try {
-        execSync(`git -C "${this.cloneDir}" remote add origin "${remoteUrl}"`, { stdio: 'pipe' });
+        execFileSync('git', ['-C', this.cloneDir, 'remote', 'add', 'origin', remoteUrl], { stdio: 'pipe', env });
       } catch {
         // remote already configured
       }

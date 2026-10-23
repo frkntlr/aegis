@@ -66,3 +66,32 @@ test('GitHubWikiLiveAdapter seeds 8-page living architecture suite into git cach
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('GitHubWikiLiveAdapter backs up conflicting local wiki before re-cloning', () => {
+  const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-backup-test-'));
+  const cloneDir = path.join(tmpBase, 'wiki-clone');
+  fs.mkdirSync(cloneDir, { recursive: true });
+  fs.writeFileSync(path.join(cloneDir, 'ConflictingDraft.md'), '# Unsaved Research Notes\n• Point A\n', 'utf8');
+
+  try {
+    const adapter = new GitHubWikiLiveAdapter({ localCloneDir: cloneDir });
+    (adapter as any).cloneWikiRemote('https://invalid.example/repo.wiki.git');
+
+    const aegisDir = path.resolve(process.cwd(), '.aegis');
+    const backups = fs.existsSync(aegisDir)
+      ? fs.readdirSync(aegisDir).filter(f => f.startsWith('wiki-backup-'))
+      : [];
+    assert.ok(backups.length > 0, 'Should have created a wiki-backup directory');
+
+    const latestBackup = path.join(aegisDir, backups[backups.length - 1]);
+    const backedUpFile = path.join(latestBackup, 'ConflictingDraft.md');
+    assert.ok(fs.existsSync(backedUpFile), 'Backed up file should exist');
+    assert.ok(fs.readFileSync(backedUpFile, 'utf8').includes('Unsaved Research Notes'));
+
+    for (const b of backups) {
+      fs.rmSync(path.join(aegisDir, b), { recursive: true, force: true });
+    }
+  } finally {
+    fs.rmSync(tmpBase, { recursive: true, force: true });
+  }
+});
