@@ -147,6 +147,36 @@ export class ZedAdapter implements IdeAdapter {
   }
 }
 
+export class GodotAdapter implements IdeAdapter {
+  public readonly ideId = 'godot';
+  public readonly name = 'Godot Engine 4.x / 3.x Editor';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: true,
+    supportsSubagents: false,
+    mcpConfigFile: '.godot/aegis_mcp.json'
+  };
+
+  public setupExclusions(repoRoot: string): IdeExclusionResult {
+    const configuredFiles: string[] = [];
+    const ignoreDirs = [
+      path.resolve(repoRoot, 'experimental'),
+      path.resolve(repoRoot, '.aegis'),
+      path.resolve(repoRoot, 'node_modules')
+    ];
+    for (const dir of ignoreDirs) {
+      if (fs.existsSync(dir)) {
+        const gdignore = path.join(dir, '.gdignore');
+        if (!fs.existsSync(gdignore)) {
+          fs.writeFileSync(gdignore, '', 'utf8');
+          configuredFiles.push(gdignore);
+        }
+      }
+    }
+    return { ideId: this.ideId, success: true, configuredFiles };
+  }
+}
+
 export class IdeAdapterRegistry {
   private adapters: Map<string, IdeAdapter> = new Map();
 
@@ -156,6 +186,7 @@ export class IdeAdapterRegistry {
     this.register(new CursorAdapter());
     this.register(new WindsurfAdapter());
     this.register(new ZedAdapter());
+    this.register(new GodotAdapter());
   }
 
   public register(adapter: IdeAdapter): void {

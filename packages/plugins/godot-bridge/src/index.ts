@@ -3,3 +3,8 @@ export * from './rpc/rpc-server.js';
 export * from './godot-locator.js';
 export * from './godot-init.js';
 export * from './ui/godot-ui-verifier.js';
+export * from './classdboracle/classdb-types.js';
+export * from './classdboracle/oracle-cache.js';
+export * from './classdboracle/doctool-runner.js';
+export * from './classdboracle/classdboracle.js';
+export * from './godot-adapter.js';

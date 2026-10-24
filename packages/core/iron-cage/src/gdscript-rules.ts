@@ -87,7 +87,11 @@ export class GDScriptRulesValidator {
   private checkResourceLeaks(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
     const text = fn.lines.join('\n');
     const hasInstantiate = text.includes('.instantiate()') || text.includes('.new()');
-    const hasCleanupOrReturn = text.includes('add_child(') || text.includes('queue_free(') || text.includes('return ');
+    const hasCleanupOrReturn =
+      text.includes('add_child(') ||
+      text.includes('queue_free(') ||
+      text.includes('return ') ||
+      text.includes('parse_input_event(');
     if (hasInstantiate && !hasCleanupOrReturn) {
       violations.push({
         rule: 'GD_005_RESOURCE_LEAK',

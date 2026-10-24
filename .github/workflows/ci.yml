@@ -51,5 +51,10 @@ jobs:
       - name: Zero-Token UI Layout Inspection
         run: node packages/cli/dist/bin/aegis.js inspect
 
+      - name: Godot Bridge Status & Zero-Token UI Verification
+        run: |
+          node packages/cli/dist/bin/aegis.js godot status
+          node packages/cli/dist/bin/aegis.js godot inspect
+
       - name: Mutation Testing Gate
         run: node packages/cli/dist/bin/aegis.js mutate

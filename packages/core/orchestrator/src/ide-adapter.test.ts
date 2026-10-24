@@ -22,6 +22,7 @@ test('IdeAdapterRegistry lists default adapters and registers community adapters
   assert.ok(ids.includes('cursor'));
   assert.ok(ids.includes('windsurf'));
   assert.ok(ids.includes('zed'));
+  assert.ok(ids.includes('godot'));
 
   const mockCustom: IdeAdapter = {
     ideId: 'custom-ide',
@@ -76,7 +77,9 @@ test('McpSkillsSyncEngine syncs MCP server definitions across capable IDEs', () 
     const registry = new IdeAdapterRegistry();
     const results = engine.syncAll(registry.listAdapters(), tmpDir);
 
-    assert.strictEqual(results.length, 5);
+    assert.strictEqual(results.length, 6);
+    const godotResult = results.find(r => r.ideId === 'godot');
+    assert.ok(godotResult?.supported);
     const agResult = results.find(r => r.ideId === 'antigravity');
     assert.ok(agResult?.supported);
     assert.strictEqual(agResult.syncedServersCount, 2);

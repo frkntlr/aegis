@@ -78,7 +78,7 @@ const HELP_LINES: readonly string[] = [
   '  aegis gh:sync [token]                  Sync live issues & dispatch to agents',
   '  aegis gh:comment <num> <msg> [token]   Post comment to GitHub issue',
   '  aegis gh:pr <head> <base> <title> <body> Create GitHub pull request',
-  '  aegis godot [init|status|inspect]      Godot Engine bridge, setup & visual telemetry',
+  '  aegis godot [subcmd]                   Godot Bridge: init, status, inspect, query, doctool, validate',
   '  aegis inspect                          Run zero-token BoundingBox UI inspection',
   '  aegis mutate [filepath]                Run Mutation Testing gate evaluation',
   '  aegis estimate <files> <tests>         Compute adaptive timeout for build/test',
