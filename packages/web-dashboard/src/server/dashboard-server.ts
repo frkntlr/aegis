@@ -26,7 +26,7 @@ export class DashboardServer {
 
   constructor(options: DashboardServerOptions = {}) {
     this.port = options.port ?? 3000;
-    this.hub = new ProjectHub(options.repoRoot, options.offline);
+    this.hub = new ProjectHub(options.repoRoot, options.offline, options.persistLocks ?? false);
     if (options.metricsService) this.hub.getActiveContext().metrics = options.metricsService;
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);
     this.hub.discoverProjects().catch(() => { /* no-op */ });

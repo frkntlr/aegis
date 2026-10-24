@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  agent-alice:
+  agent-solver:
     build:
       context: ..
       dockerfile: docker/agent-runtime.Dockerfile
-    container_name: aegis-agent-alice
+    container_name: aegis-agent-solver
     cap_drop:
       - ALL
     read_only: true
@@ -16,18 +16,18 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ../experimental/alice:/workspace:rw
+      - ../experimental/solver:/workspace:rw
     environment:
-      - AEGIS_AGENT_NAME=alice
+      - AEGIS_AGENT_NAME=solver
       - PORT=3000
-      - DATABASE_URL=postgresql://localhost:5432/aegis_test_alice
+      - DATABASE_URL=postgresql://localhost:5432/aegis_test_solver
     restart: unless-stopped
 
-  agent-bob:
+  agent-qa:
     build:
       context: ..
       dockerfile: docker/agent-runtime.Dockerfile
-    container_name: aegis-agent-bob
+    container_name: aegis-agent-qa
     cap_drop:
       - ALL
     read_only: true
@@ -38,9 +38,31 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      - ../experimental/bob:/workspace:rw
+      - ../experimental/qa:/workspace:rw
     environment:
-      - AEGIS_AGENT_NAME=bob
+      - AEGIS_AGENT_NAME=qa
       - PORT=3100
-      - DATABASE_URL=postgresql://localhost:5432/aegis_test_bob
+      - DATABASE_URL=postgresql://localhost:5432/aegis_test_qa
+    restart: unless-stopped
+
+  agent-docs:
+    build:
+      context: ..
+      dockerfile: docker/agent-runtime.Dockerfile
+    container_name: aegis-agent-docs
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=500M
+    mem_limit: 2g
+    cpus: "1.0"
+    ports:
+      - "3200:3200"
+    volumes:
+      - ../experimental/docs:/workspace:rw
+    environment:
+      - AEGIS_AGENT_NAME=docs
+      - PORT=3200
+      - DATABASE_URL=postgresql://localhost:5432/aegis_test_docs
     restart: unless-stopped

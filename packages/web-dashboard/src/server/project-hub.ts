@@ -13,10 +13,12 @@ export class ProjectHub {
   private defaultRepoRoot: string;
   private owner: string;
   private offline: boolean;
+  private persistLocks: boolean;
 
-  constructor(defaultRepoRoot?: string, offline?: boolean) {
+  constructor(defaultRepoRoot?: string, offline?: boolean, persistLocks?: boolean) {
     this.defaultRepoRoot = defaultRepoRoot ?? process.cwd();
     this.offline = offline ?? false;
+    this.persistLocks = persistLocks ?? true;
     const auth = GitHubTokenResolver.resolve();
     this.owner = auth.owner || 'frkntlr';
     const repoName = auth.repo || path.basename(this.defaultRepoRoot);
@@ -28,7 +30,7 @@ export class ProjectHub {
   }
 
   private createContext(id: string, name: string, projectNumber: number, localPath: string, isBound: boolean): ProjectContext {
-    const wtManager = new WorktreeManager({ repoRoot: localPath, persistLocks: true });
+    const wtManager = new WorktreeManager({ repoRoot: localPath, persistLocks: this.persistLocks });
     const detector = new SessionDetector(localPath, wtManager);
     const kanban = new GitHubKanbanService({ repoRoot: localPath, projectNumber, offline: this.offline });
     const metrics = new RealtimeMetricsService({ repoRoot: localPath, githubService: kanban });

@@ -166,3 +166,55 @@ public:
   assert.ok(!res.skeletonContent.includes('int x = 1;'));
   assert.ok(res.skeletonContent.includes('template<typename T> class SafeContainer {'));
 });
+
+test('CppSkeletonExtractor correctly masks multi-line block comments containing braces', () => {
+  const code = `
+#include <iostream>
+/*
+ * Multi-line comment block
+ * void fakeFunc() {
+ *    int insideComment = 1;
+ * }
+ */
+void realFunction(int a) {
+    /* another block
+       with { mismatched braces */
+    int b = a + 1;
+}
+`.trim();
+
+  const extractor = new CppSkeletonExtractor();
+  const res = extractor.extract('sample.cpp', code);
+  assert.ok(!res.skeletonContent.includes('fakeFunc'));
+  assert.ok(res.skeletonContent.includes('void realFunction(int a) { /* body omitted */ }'));
+});
+
+test('GoSkeletonExtractor masks multi-line raw strings and block comments containing braces', () => {
+  const code = `
+package main
+type User struct {
+    Name string \`json:"name"\`
+}
+/*
+func CommentedOut() {
+    return
+}
+*/
+func Execute() {
+    rawSQL := \`
+        SELECT * FROM table
+        WHERE data = '{\`
+    fmt.Println(rawSQL)
+}
+func Next() string {
+    return "ok"
+}
+`.trim();
+
+  const extractor = new GoSkeletonExtractor();
+  const res = extractor.extract('main.go', code);
+  assert.ok(res.skeletonContent.includes('Name string `json:"name"`'));
+  assert.ok(!res.skeletonContent.includes('CommentedOut'));
+  assert.ok(res.skeletonContent.includes('func Execute() { /* body omitted */ }'));
+  assert.ok(res.skeletonContent.includes('func Next() string { /* body omitted */ }'));
+});

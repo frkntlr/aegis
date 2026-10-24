@@ -6,7 +6,8 @@ export class GoSkeletonExtractor implements LanguageExtractor {
   public readonly supportedExtensions = ['.go'];
 
   public extract(_filePath: string, sourceCode: string): SkeletonResult {
-    const lines = sourceCode.split(/\r?\n/);
+    const sanitized = this.maskMultiLineTokens(sourceCode);
+    const lines = sanitized.split(/\r?\n/);
     const skeletonLines = this.processLines(lines);
     const skeletonContent = skeletonLines.join('\n');
     const originalLength = sourceCode.length;
@@ -19,6 +20,12 @@ export class GoSkeletonExtractor implements LanguageExtractor {
       tokenSavingsPercent: Math.max(0, Math.round(savings)),
       skeletonContent
     };
+  }
+
+  private maskMultiLineTokens(sourceCode: string): string {
+    return sourceCode
+      .replace(/\/\*[\s\S]*?\*\//g, match => match.replace(/[^\r\n]/g, ' '))
+      .replace(/`[\s\S]*?`/g, match => (match.includes('\n') ? match.replace(/[^\r\n]/g, ' ') : match));
   }
 
   private processLines(lines: string[]): string[] {

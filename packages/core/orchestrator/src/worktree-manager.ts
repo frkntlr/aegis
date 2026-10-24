@@ -149,6 +149,13 @@ export class WorktreeManager {
     const baseBranch = baseBranchArg || this.detectCurrentBranch();
 
     if (!fs.existsSync(targetDir)) {
+      try {
+        execFileSync('git', ['worktree', 'prune'], {
+          cwd: this.repoRoot,
+          stdio: 'pipe',
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        });
+      } catch { /* ignore */ }
       fs.mkdirSync(path.dirname(targetDir), { recursive: true });
       try {
         execFileSync('git', ['worktree', 'add', targetDir, '-B', branchName, baseBranch], {
@@ -158,7 +165,7 @@ export class WorktreeManager {
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        if (!message.includes('already exists') && !message.includes('already checked out')) {
+        if (!message.includes('already exists') && !message.includes('already checked out') && !message.includes('already registered')) {
           throw err;
         }
       }

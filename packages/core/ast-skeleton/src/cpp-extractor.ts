@@ -6,7 +6,8 @@ export class CppSkeletonExtractor implements LanguageExtractor {
   public readonly supportedExtensions = ['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx'];
 
   public extract(_filePath: string, sourceCode: string): SkeletonResult {
-    const lines = sourceCode.split(/\r?\n/);
+    const sanitized = this.maskMultiLineComments(sourceCode);
+    const lines = sanitized.split(/\r?\n/);
     const skeletonLines = this.processLines(lines);
     const skeletonContent = skeletonLines.join('\n');
     const originalLength = sourceCode.length;
@@ -19,6 +20,12 @@ export class CppSkeletonExtractor implements LanguageExtractor {
       tokenSavingsPercent: Math.max(0, Math.round(savings)),
       skeletonContent
     };
+  }
+
+  private maskMultiLineComments(sourceCode: string): string {
+    return sourceCode.replace(/\/\*[\s\S]*?\*\//g, match =>
+      match.replace(/[^\r\n]/g, ' ')
+    );
   }
 
   private processLines(lines: string[]): string[] {
