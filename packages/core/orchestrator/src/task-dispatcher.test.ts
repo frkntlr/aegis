@@ -100,3 +100,23 @@ test('TaskDispatcher releases locks on non-terminal task failure', async () => {
   // Lock must be released cleanly
   assert.strictEqual(wt.getLockedFiles().has('src/Failing.ts'), false);
 });
+
+test('TaskDispatcher skips closed or done issues even if present in queue', () => {
+  const wt = new WorktreeManager();
+  const dispatcher = new TaskDispatcher(wt);
+
+  const doneIssue: GitHubIssue = {
+    ...makeIssue(50, ['src/Done.ts']),
+    status: 'done',
+    labels: ['status:done']
+  };
+
+  const readyWithDoneLabel: GitHubIssue = {
+    ...makeIssue(51, ['src/Stale.ts']),
+    status: 'ready',
+    labels: ['status:ready', 'status:done']
+  };
+
+  const res = dispatcher.dispatchNextTask(['solver'], [doneIssue, readyWithDoneLabel]);
+  assert.strictEqual(res.dispatched, false);
+});

@@ -210,15 +210,18 @@ export class GitHubLiveAdapter {
     const targetFiles = labels.filter((l: string) => l.startsWith('lock:')).map((l: string) => l.replace('lock:', '').trim());
     const criteria = this.extractBodyDetails(body, targetFiles);
     const status = this.resolveStatus(labels, raw.state);
+    const cleanLabels = status === 'done'
+      ? [...labels.filter((l: string) => !l.startsWith('status:')), 'status:done']
+      : labels;
 
     return {
       id: raw.id,
       number: raw.number,
       title: raw.title,
       body,
-      labels,
+      labels: cleanLabels,
       status,
-      assignee: raw.assignee ? raw.assignee.login : undefined,
+      assignee: status === 'done' ? undefined : (raw.assignee ? raw.assignee.login : undefined),
       targetFiles,
       acceptanceCriteria: criteria.length > 0 ? criteria : ['Pass unit tests', 'No dead code'],
       url: raw.html_url || (raw.number && this.owner && this.repo ? `https://github.com/${this.owner}/${this.repo}/issues/${raw.number}` : undefined)

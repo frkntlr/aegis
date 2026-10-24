@@ -57,7 +57,7 @@ export function handleStatus(): void {
 }
 
 async function reclaimStaleTasks(ghClient: GitHubClient, wtManager: WorktreeManager): Promise<void> {
-  const all = ghClient.listAllIssues();
+  const all = ghClient.listAllIssues().filter(i => i.status === 'in_progress');
   const locks = wtManager.getLockedFiles();
   const reclaimer = new OrphanTaskReclaimer();
   const { reclaimed } = reclaimer.scanAndReclaim(all, locks);
@@ -78,7 +78,7 @@ export async function handleAuto(): Promise<void> {
   const dispatcher = new TaskDispatcher(wtManager, loopBreaker);
 
   if (ghClient.isLive()) {
-    await ghClient.syncFromLive();
+    await ghClient.syncFromLive('all');
     await reclaimStaleTasks(ghClient, wtManager);
   } else {
     const localIssuesFile = path.resolve(process.cwd(), '.aegis', 'issues.json');

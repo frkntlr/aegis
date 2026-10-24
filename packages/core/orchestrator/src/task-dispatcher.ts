@@ -38,7 +38,7 @@ export class TaskDispatcher {
       return { dispatched: false, reason: 'No idle agents available in pool.' };
     }
     const filteredIssues = readyIssues.filter(
-      i => i.status !== 'blocked' && !this.loopBreaker?.isBlocked(i.number)
+      i => i.status === 'ready' && !i.labels.includes('status:done') && !this.loopBreaker?.isBlocked(i.number)
     );
     if (filteredIssues.length === 0) {
       return { dispatched: false, reason: 'No ready issues found in GitHub queue.' };

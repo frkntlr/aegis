@@ -70,9 +70,9 @@ export class GitHubKanbanService {
         id: 2,
         number: 2,
         title: 'feat(ast): Multi-Language AST Skeleton Extraction for C/C++ and Go',
-        status: 'ready',
+        status: 'done',
         targetFiles: ['packages/core/ast-skeleton/src/index.ts'],
-        labels: ['status:ready', 'aegis:task']
+        labels: ['status:done', 'aegis:task']
       }
     ];
   }
@@ -124,13 +124,16 @@ export class GitHubKanbanService {
         const isDone = iss.status === 'done';
         const assignedAgent = isDone ? undefined : (iss.assignee || existing?.assignedAgent);
         const assignedIde = isDone ? undefined : (assignedAgent ? (existing?.assignedIde || 'Google Antigravity') : undefined);
+        const cleanLabels = isDone
+          ? [...iss.labels.filter(l => !l.startsWith('status:')), 'status:done']
+          : iss.labels;
         return {
           id: iss.id,
           number: iss.number,
           title: iss.title,
           status: iss.status,
           targetFiles: iss.targetFiles,
-          labels: iss.labels,
+          labels: cleanLabels,
           assignedAgent,
           assignedIde,
           body: iss.body,

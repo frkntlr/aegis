@@ -42,11 +42,14 @@ test('GitHubLiveAdapter parses markdown acceptance criteria and lock labels', ()
     number: 43,
     title: 'Closed Task with Stale in_progress Label',
     body: '',
-    labels: [{ name: 'status:in_progress' }, { name: 'status:done' }],
+    labels: [{ name: 'status:in_progress' }, { name: 'status:ready' }],
     state: 'closed'
   };
   const transformedClosed = adapter.transformRawIssue(closedRaw);
   assert.strictEqual(transformedClosed.status, 'done');
+  assert.strictEqual(transformedClosed.labels.includes('status:ready'), false);
+  assert.strictEqual(transformedClosed.labels.includes('status:in_progress'), false);
+  assert.strictEqual(transformedClosed.labels.includes('status:done'), true);
 });
 
 function createMockFetch(): typeof fetch {

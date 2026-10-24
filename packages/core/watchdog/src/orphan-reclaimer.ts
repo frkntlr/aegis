@@ -63,7 +63,7 @@ export class OrphanTaskReclaimer {
     lockedFiles: Map<string, string>,
     sessions: AgentSessionSummary[]
   ): string | null {
-    if (issue.status !== 'in_progress') return null;
+    if (issue.status !== 'in_progress' || issue.labels?.includes('status:done')) return null;
     if (!issue.assignedAgent) {
       return 'Task marked in_progress with no assigned agent (Ghost task).';
     }

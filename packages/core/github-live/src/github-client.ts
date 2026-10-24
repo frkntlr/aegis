@@ -43,9 +43,9 @@ export class GitHubClient {
     return this.liveAdapter;
   }
 
-  public async syncFromLive(): Promise<number> {
+  public async syncFromLive(state = 'all'): Promise<number> {
     if (!this.liveAdapter) return 0;
-    const { issues } = await this.liveAdapter.listIssues();
+    const { issues } = await this.liveAdapter.listIssues(undefined, undefined, state);
     let count = 0;
     for (const issue of issues) {
       this.registerIssue(issue);
@@ -59,7 +59,9 @@ export class GitHubClient {
   }
 
   public listReadyIssues(): GitHubIssue[] {
-    return Array.from(this.issues.values()).filter(i => i.status === 'ready');
+    return Array.from(this.issues.values()).filter(
+      i => i.status === 'ready' && !i.labels.includes('status:done')
+    );
   }
 
   public listAllIssues(): GitHubIssue[] {
@@ -124,6 +126,34 @@ export class GitHubClient {
     if (!issue) return false;
     issue.status = status;
     return true;
+  }
+
+  public async completeIssue(
+    issueNumber: number,
+    agentName?: string
+  ): Promise<{ success: boolean; issue?: GitHubIssue; error?: string }> {
+    const issue = this.issues.get(issueNumber);
+    if (!issue) return { success: false, error: `Issue #${issueNumber} not found.` };
+
+    issue.status = 'done';
+    issue.assignee = undefined;
+    issue.labels = [...issue.labels.filter(l => !l.startsWith('status:')), 'status:done'];
+
+    if (this.liveAdapter) {
+      try {
+        await this.liveAdapter.updateIssue(issueNumber, {
+          state: 'closed',
+          labels: issue.labels
+        });
+        await this.liveAdapter.addComment(
+          issueNumber,
+          `✅ **Aegis Fleet**: Task #${issueNumber} completed and verified by @${agentName || 'agent'}. Closed.`
+        );
+      } catch {
+        // Soft-fail
+      }
+    }
+    return { success: true, issue };
   }
 
   public async blockIssue(

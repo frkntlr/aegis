@@ -80,3 +80,27 @@ test('WikiMemoryManager extracts selective tagged memory summaries', () => {
   const irrelevant = wiki.getContextForLabels(['status:ready', 'wiki:unrelated']);
   assert.ok(!irrelevant.includes('Navigation Header'));
 });
+
+test('GitHubClient completes issue and filters out done issues from ready list', async () => {
+  const client = new GitHubClient();
+  client.registerIssue({
+    id: 99,
+    number: 99,
+    title: 'Completed Task',
+    body: 'Some description',
+    labels: ['status:in_progress'],
+    status: 'in_progress',
+    targetFiles: ['src/Completed.ts'],
+    acceptanceCriteria: ['All tests pass']
+  });
+
+  const res = await client.completeIssue(99, 'solver');
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.issue?.status, 'done');
+  assert.strictEqual(res.issue?.assignee, undefined);
+  assert.strictEqual(res.issue?.labels.includes('status:done'), true);
+  assert.strictEqual(res.issue?.labels.includes('status:in_progress'), false);
+
+  const ready = client.listReadyIssues();
+  assert.strictEqual(ready.length, 0);
+});

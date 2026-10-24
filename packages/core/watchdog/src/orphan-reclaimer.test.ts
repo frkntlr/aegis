@@ -108,3 +108,29 @@ test('OrphanTaskReclaimer preserves tasks assigned to human developers without h
   assert.strictEqual(result.updatedIssues[0].status, 'in_progress');
   assert.strictEqual(result.updatedIssues[0].assignedAgent, 'frkntlr');
 });
+
+test('OrphanTaskReclaimer ignores closed and done issues', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 6,
+      number: 6,
+      title: 'Done task with stale assignee',
+      status: 'done',
+      assignedAgent: 'solver',
+      labels: ['status:done']
+    },
+    {
+      id: 7,
+      number: 7,
+      title: 'In progress task with status:done label',
+      status: 'in_progress',
+      assignedAgent: 'solver',
+      labels: ['status:done']
+    }
+  ];
+  const result = reclaimer.scanAndReclaim(issues, new Map(), []);
+  assert.strictEqual(result.reclaimed.length, 0);
+  assert.strictEqual(result.updatedIssues[0].status, 'done');
+  assert.strictEqual(result.updatedIssues[1].status, 'in_progress');
+});

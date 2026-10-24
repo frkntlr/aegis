@@ -45,7 +45,7 @@ export async function handleGhSync(tokenArg?: string): Promise<void> {
   const wtManager = new WorktreeManager({ persistLocks: true });
   const dispatcher = new TaskDispatcher(wtManager);
 
-  const syncedCount = await client.syncFromLive();
+  const syncedCount = await client.syncFromLive('all');
   console.log(`📥 Downloaded ${syncedCount} issues from ${auth.owner}/${auth.repo}.`);
 
   const ready = client.listReadyIssues();
