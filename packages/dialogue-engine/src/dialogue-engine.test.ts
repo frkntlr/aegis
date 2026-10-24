@@ -13,6 +13,7 @@ test('SymptomClassifier correctly tags categories based on keywords', () => {
   assert.equal(SymptomClassifier.classify('CPU high latency and timeout'), DiagnosticCategory.PERFORMANCE);
   assert.equal(SymptomClassifier.classify('Git worktree lock conflict detected'), DiagnosticCategory.GIT_COLLISION);
   assert.equal(SymptomClassifier.classify('Function exceeded line limit in cage check'), DiagnosticCategory.CAGE_VIOLATION);
+  assert.equal(SymptomClassifier.classify('Godot UI buttons overlap on mobile aspect ratios'), DiagnosticCategory.GODOT_ENGINE);
   assert.equal(SymptomClassifier.classify('Random unknown crash'), DiagnosticCategory.UNKNOWN);
 });
 
@@ -73,4 +74,21 @@ test('runSimulatedTriage executes end-to-end simulated 3-turn triage', () => {
   assert.ok(result.includes('3-Turn Dialogue Session'));
   assert.ok(result.includes('RESOLVED: true'));
   assert.ok(result.includes('Acceptance Criteria'));
+});
+
+test('DialogueEngine handles Godot Engine diagnostic category and generates inspect task', () => {
+  const engine = new DialogueEngine();
+  const session1 = engine.startSession('Godot UI buttons overlap on mobile aspect ratios');
+  assert.equal(session1.category, DiagnosticCategory.GODOT_ENGINE);
+  assert.equal(session1.availableOptions.length, 2);
+
+  const session2 = engine.chooseClarification(session1.sessionId, 'godot-1');
+  assert.ok(session2.prescription);
+  assert.equal(session2.prescription.targetWorktree, 'experimental/qa');
+  assert.ok(session2.prescription.steps.some(s => s.includes('aegis godot inspect')));
+
+  const session3 = engine.confirmAndResolve(session2.sessionId, true);
+  assert.equal(session3.isResolved, true);
+  const task = engine.exportTask(session3.sessionId);
+  assert.ok(task.includes('aegis godot inspect'));
 });

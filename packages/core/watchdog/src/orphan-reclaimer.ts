@@ -39,7 +39,7 @@ export class OrphanTaskReclaimer {
   constructor(options: OrphanReclaimerOptions = {}) {
     this.staleTimeoutMs = options.staleTimeoutMs ?? 10 * 60 * 1000;
     this.managedAgents = new Set(
-      (options.managedAgents ?? ['solver', 'qa', 'docs', 'contributor', 'alice', 'bob']).map(a => a.toLowerCase())
+      (options.managedAgents ?? ['solver', 'qa', 'docs', 'ui', 'contributor', 'alice', 'bob']).map(a => a.toLowerCase())
     );
   }
 

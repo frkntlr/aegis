@@ -24,6 +24,38 @@ const DEFAULT_PLANS: Record<string, PrescriptionPlan> = {
     acceptanceCriteria: ['All modified functions have <= 40 lines.', 'Existing unit tests pass with zero regression.'],
     targetWorktree: 'experimental/solver',
     lockLabels: ['packages/core/iron-cage/src/cage-validator.ts']
+  },
+  GODOT_UI_CLIPPING: {
+    title: 'Resolve Godot UI Collision or Viewport Boundary Clipping',
+    rootCause: 'Control elements overlap or overflow screen dimensions across mobile aspect ratios.',
+    steps: [
+      'Run aegis godot inspect to identify colliding node IDs and target aspect ratios.',
+      'Adjust Control anchor presets, minimum size, or wrap within MarginContainer / VBoxContainer.',
+      'Re-run zero-token UI inspection across 16:9, 21:9, 16:10, and 9:16 portrait ratios.'
+    ],
+    acceptanceCriteria: [
+      'Zero overlapping interactive controls on the same plane.',
+      'All interactive elements fit inside viewport bounds without clipping.',
+      'aegis godot inspect reports 100% PASS across configured ratios.'
+    ],
+    targetWorktree: 'experimental/qa',
+    lockLabels: ['scenes/Main.tscn', 'addons/aegis_bridge/ui_verifier.gd']
+  },
+  GODOT_CLASSSDB_MISMATCH: {
+    title: 'Fix GDScript ClassDB Method or Signal Safety Mismatch',
+    rootCause: 'GDScript invokes undeclared methods or emits unmapped signals on engine base class.',
+    steps: [
+      'Run aegis godot validate to pinpoint line numbers and invalid symbols.',
+      'Consult ClassDB Oracle (aegis godot query <Class>) for canonical signatures.',
+      'Ensure signals are explicitly declared or defined in Godot base class.'
+    ],
+    acceptanceCriteria: [
+      'All method invocations exist in ClassDB inheritance tree.',
+      'All emitted signals are valid in GDScriptRulesValidator.',
+      'aegis godot validate returns 100% clean.'
+    ],
+    targetWorktree: 'experimental/solver',
+    lockLabels: ['scripts/word_game.gd']
   }
 };
 

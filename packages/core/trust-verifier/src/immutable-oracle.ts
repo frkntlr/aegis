@@ -33,9 +33,15 @@ export class ImmutableOracle {
     }
 
     const tamperedTestFiles: string[] = [];
-    for (const file of modifiedFiles) {
-      if (createdSet.has(file)) continue;
-      if (file.match(/\.(test|spec)\.(ts|js|jsx|tsx|py)$/) || file.includes('__tests__')) {
+    for (const rawFile of modifiedFiles) {
+      const file = rawFile.replace(/\\/g, '/');
+      if (createdSet.has(file) || createdSet.has(rawFile)) continue;
+      const isTestFile =
+        Boolean(file.match(/\.(test|spec)\.(ts|js|jsx|tsx|py|gd)$/)) ||
+        Boolean(file.match(/(^|\/)test_[a-zA-Z0-9_]+\.(gd|py)$/)) ||
+        Boolean(file.match(/(^|\/)[a-zA-Z0-9_]+_test\.(gd|py)$/)) ||
+        file.includes('__tests__');
+      if (isTestFile) {
         tamperedTestFiles.push(file);
         details.push(`Suspicious: Existing test file was modified by agent: ${file}`);
       }
@@ -55,7 +61,10 @@ export class ImmutableOracle {
         const line = lines[i].trim();
         const isVacuous = line.match(/expect\(\s*([^()]+?)\s*\)\.(toBe|toEqual)\(\s*\1\s*\)/) ||
           line.match(/assert\.(strictEqual|equal)\(\s*([^,()]+?)\s*,\s*\2\s*\)/) ||
-          line.includes('expect(true).toBe(true)');
+          line.match(/assert_eq\(\s*([^,()]+?)\s*,\s*\1\s*\)/) ||
+          line.includes('expect(true).toBe(true)') ||
+          line.includes('assert_true(true)') ||
+          line.includes('assert_false(false)');
         if (isVacuous) {
           count++;
           details.push(`Vacuous assertion detected in ${filePath} at line ${i + 1}: "${line}"`);

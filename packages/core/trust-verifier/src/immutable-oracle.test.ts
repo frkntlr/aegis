@@ -127,3 +127,23 @@ test('ImmutableOracle does not falsely trigger vacuous assertion on distinct arg
   assert.strictEqual(report.verdict, 'APPROVED');
   assert.strictEqual(report.vacuousAssertionsFound, 0);
 });
+
+test('ImmutableOracle detects GDScript test tampering and vacuous assert_eq/assert_true', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['scripts/player.gd', 'test/test_player.gd'],
+    testContents: [
+      {
+        filePath: 'test/test_player.gd',
+        content: `func test_fake():\n    assert_eq(score, score)\n    assert_true(true)\n`
+      }
+    ],
+    reportedPassedCount: 2,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, true);
+  assert.strictEqual(report.verdict, 'REJECTED');
+  assert.deepStrictEqual(report.tamperedTestFiles, ['test/test_player.gd']);
+  assert.strictEqual(report.vacuousAssertionsFound, 2);
+});

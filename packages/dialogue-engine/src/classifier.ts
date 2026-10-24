@@ -12,6 +12,9 @@ export class SymptomClassifier {
     if (text.includes('cage') || text.includes('line') || text.includes('function') || text.includes('file')) {
       return DiagnosticCategory.CAGE_VIOLATION;
     }
+    if (text.includes('godot') || text.includes('gdscript') || text.includes('tscn') || text.includes('tres') || text.includes('aspect') || text.includes('classdb')) {
+      return DiagnosticCategory.GODOT_ENGINE;
+    }
     return DiagnosticCategory.UNKNOWN;
   }
 
@@ -31,6 +34,11 @@ export class SymptomClassifier {
         return [
           { id: 'cage-1', label: 'Single function exceeding 40 lines limit', hypothesisKey: 'FUNCTION_OVERFLOW' },
           { id: 'cage-2', label: 'Full file rewrite attempted instead of diff', hypothesisKey: 'REWRITE_VIOLATION' }
+        ];
+      case DiagnosticCategory.GODOT_ENGINE:
+        return [
+          { id: 'godot-1', label: 'UI bounding box collision or viewport boundary clipping', hypothesisKey: 'GODOT_UI_CLIPPING' },
+          { id: 'godot-2', label: 'GDScript ClassDB symbol mismatch or undeclared signal', hypothesisKey: 'GODOT_CLASSSDB_MISMATCH' }
         ];
       default:
         return [
