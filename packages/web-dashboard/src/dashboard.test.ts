@@ -86,6 +86,27 @@ test('AegisEngineService executes all underlying Aegis core tools successfully',
   assert.strictEqual(oracle.suspicious, false);
 });
 
+test('AegisEngineService loads Godot telemetry with nodes array accurately', () => {
+  const engine = new AegisEngineService();
+  const tmpFile = path.join(os.tmpdir(), `aegis-telemetry-test-${Date.now()}.json`);
+  const godotPayload = {
+    viewport: { width: 1080, height: 1920, aspectRatio: '9:16' },
+    nodes: [
+      { id: '/root/Main', name: 'Main', rect: { x: 0, y: 0, width: 720, height: 1280 } },
+      { id: '/root/Main/Btn', name: 'Btn', rect: { x: 50, y: 100, width: 200, height: 60 } }
+    ]
+  };
+  fs.writeFileSync(tmpFile, JSON.stringify(godotPayload), 'utf8');
+  try {
+    const res = engine.runUiInspector(tmpFile);
+    assert.strictEqual(res.tool, 'ui_inspector');
+    assert.strictEqual(res.elementsChecked, 2);
+    assert.strictEqual(res.passed, true);
+  } finally {
+    if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+  }
+});
+
 test('DashboardServer handles move_task and status via API', async () => {
   const server = new DashboardServer({ port: 0, offline: true });
   const port = await server.start();

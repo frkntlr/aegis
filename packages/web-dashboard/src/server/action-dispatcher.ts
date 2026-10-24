@@ -129,7 +129,7 @@ export class ActionDispatcher {
   private async handleRunEngineTool(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const t = payload.tool;
     let res: Record<string, unknown>;
-    if (t === 'ui_inspector') res = this.ctx.engineSvc.runUiInspector();
+    if (t === 'ui_inspector') res = this.ctx.engineSvc.runUiInspector(payload.layoutPath as string | undefined);
     else if (t === 'mutation_gate') res = this.ctx.engineSvc.runMutationGate();
     else if (t === 'adaptive_timeout') res = { ...this.ctx.engineSvc.runAdaptiveTimeout(Number(payload.files ?? 2), Number(payload.tests ?? 4)) };
     else if (t === 'mcp_security') res = this.ctx.engineSvc.runMcpSecurity(payload.agent as string, payload.mcpTool as string);

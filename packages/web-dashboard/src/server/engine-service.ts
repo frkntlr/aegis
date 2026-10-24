@@ -29,6 +29,11 @@ export interface AdaptiveTimeoutReport {
   summary: string;
 }
 
+interface LoadedLayout {
+  elements: Array<{ id: string; x: number; y: number; width: number; height: number }>;
+  viewport?: { width: number; height: number; name?: string };
+}
+
 export class AegisEngineService {
   private inspector = new BoundingBoxInspector();
   private estimator = new PreExecutionEstimator();
@@ -36,17 +41,39 @@ export class AegisEngineService {
   private diffEngine = new DiffEngine();
   private oracle = new ImmutableOracle();
 
-  public runUiInspector(layoutPath?: string): Record<string, unknown> {
-    let elements: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
+  private loadElements(layoutPath?: string): LoadedLayout {
+    const candidatePaths = [
+      layoutPath,
+      path.resolve(process.cwd(), '.aegis', 'ui_telemetry.json'),
+      path.resolve(process.cwd(), '.aegis', 'telemetry.json')
+    ].filter(Boolean) as string[];
 
-    if (layoutPath && fs.existsSync(layoutPath)) {
-      try {
-        const raw = fs.readFileSync(layoutPath, 'utf8');
-        elements = JSON.parse(raw);
-      } catch {
-        elements = [];
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        try {
+          const raw = fs.readFileSync(p, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return { elements: parsed };
+          if (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+            const elements = parsed.nodes.map((n: { id?: string; name?: string; rect?: { x?: number; y?: number; width?: number; height?: number } }) => ({
+              id: n.id || n.name || 'node',
+              x: n.rect?.x ?? 0,
+              y: n.rect?.y ?? 0,
+              width: n.rect?.width ?? 0,
+              height: n.rect?.height ?? 0
+            }));
+            const vp = parsed.viewport ? { width: parsed.viewport.width, height: parsed.viewport.height, name: parsed.viewport.aspectRatio } : undefined;
+            return { elements, viewport: vp };
+          }
+        } catch { /* try next candidate */ }
       }
     }
+    return { elements: [] };
+  }
+
+  public runUiInspector(layoutPath?: string): Record<string, unknown> {
+    const loaded = this.loadElements(layoutPath);
+    let elements = loaded.elements;
 
     if (elements.length === 0) {
       const html = getDashboardHtml();
@@ -59,7 +86,12 @@ export class AegisEngineService {
       });
     }
 
-    const report = this.inspector.inspectLayout(elements, { width: 390, height: 844, name: 'Mobile 390x844' });
+    const vp = loaded.viewport || { width: 390, height: 844, name: 'Mobile 390x844' };
+    const report = this.inspector.inspectLayout(elements, {
+      width: vp.width,
+      height: vp.height,
+      name: vp.name || `${vp.width}x${vp.height}`
+    });
     return {
       tool: 'ui_inspector',
       elementsChecked: report.elementsScanned,
