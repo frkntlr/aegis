@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { SkeletonGenerator } from '@aegis/ast-skeleton';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { GitHubKanbanService, GitHubKanbanStatus } from './github-kanban.js';
+import { collectSourceFiles, collectTestFiles, compilePromptFile } from './metrics-helpers.js';
 
 export interface SystemIssue {
   id: number;
@@ -65,24 +66,6 @@ export class RealtimeMetricsService {
     this.githubService.fetchLiveIssues().catch(() => { /* no-op */ });
   }
 
-  private collectSourceFiles(dir: string): string[] {
-    const results: string[] = [];
-    if (!fs.existsSync(dir)) return results;
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (['node_modules', 'dist', '.git', 'experimental', 'worktrees'].includes(entry.name)) continue;
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          results.push(...this.collectSourceFiles(full));
-        } else if (/\.(ts|tsx|py|gd|rs)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
-          results.push(full);
-        }
-      }
-    } catch { /* ignore */ }
-    return results;
-  }
-
   private resolveSourceDir(): string {
     const packagesPath = path.resolve(this.repoRoot, 'packages');
     if (fs.existsSync(packagesPath)) return packagesPath;
@@ -96,7 +79,7 @@ export class RealtimeMetricsService {
   public computeAstMetrics(forceRefresh = false): SystemMetrics['tokenMetrics'] {
     if (this.cachedAst && !forceRefresh) return this.cachedAst;
     const targetDir = this.resolveSourceDir();
-    const files = this.collectSourceFiles(targetDir);
+    const files = collectSourceFiles(targetDir);
     if (files.length === 0) {
       return { usedTokens: 0, cachedTokens: 0, savingsPercent: 0, filesScanned: 0 };
     }
@@ -118,7 +101,7 @@ export class RealtimeMetricsService {
   public computeCageMetrics(forceRefresh = false): { status: 'PASS' | 'FAIL'; label: string } {
     if (this.cachedCage && !forceRefresh) return this.cachedCage;
     const targetDir = this.resolveSourceDir();
-    const files = this.collectSourceFiles(targetDir);
+    const files = collectSourceFiles(targetDir);
     if (files.length === 0) {
       return { status: 'PASS', label: '0/0 Uyumlu (%100)' };
     }
@@ -163,25 +146,7 @@ export class RealtimeMetricsService {
   }
 
   public compilePromptFile(issue: SystemIssue, agentName: string): string {
-    const promptDir = path.resolve(this.repoRoot, '.aegis', 'prompts');
-    fs.mkdirSync(promptDir, { recursive: true });
-    const promptPath = path.resolve(promptDir, `${agentName}-issue-${issue.number}.md`);
-    const content = [
-      `# 🎯 Task Assignment: #${issue.number} ${issue.title}`,
-      `**Assigned Agent:** @${agentName.toUpperCase()} | **Status:** ${issue.status.toUpperCase()}`,
-      `**Target Files:**\n${issue.targetFiles.map(f => `- \`${f}\``).join('\n')}`,
-      '',
-      '## Acceptance Criteria',
-      ...(issue.acceptanceCriteria && issue.acceptanceCriteria.length > 0
-        ? issue.acceptanceCriteria.map(c => `- [ ] ${c}`)
-        : [
-            '- [ ] Strict compliance with Demir Kafes (max 40 lines/function, max 300 lines/file).',
-            '- [ ] All unit tests pass locally before requesting atomic merge.',
-            '- [ ] Zero token bloat: only surgical unified diffs are accepted.'
-          ])
-    ].join('\n');
-    fs.writeFileSync(promptPath, content, 'utf8');
-    return promptPath;
+    return compilePromptFile(issue, agentName, this.repoRoot);
   }
 
   public assignIssue(num: number, agentName: string, ideType = 'Universal IDE'): SystemIssue | null {
@@ -224,29 +189,11 @@ export class RealtimeMetricsService {
     return this.githubService.getStatus();
   }
 
-  private collectTestFiles(dir: string): string[] {
-    const results: string[] = [];
-    if (!fs.existsSync(dir)) return results;
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (['node_modules', 'dist', '.git', 'experimental', 'worktrees'].includes(entry.name)) continue;
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          results.push(...this.collectTestFiles(full));
-        } else if (/\.(test|spec)\.(ts|js)$/.test(entry.name)) {
-          results.push(full);
-        }
-      }
-    } catch { /* ignore */ }
-    return results;
-  }
-
   public getSnapshot(): SystemMetrics {
     const cage = this.computeCageMetrics();
     const targetDir = this.resolveSourceDir();
-    const testFiles = this.collectTestFiles(targetDir);
-    const sourceFiles = this.collectSourceFiles(targetDir);
+    const testFiles = collectTestFiles(targetDir);
+    const sourceFiles = collectSourceFiles(targetDir);
     const testCount = testFiles.length;
 
     return {
