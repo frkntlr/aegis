@@ -107,6 +107,27 @@ test('GDScriptSkeletonExtractor preserves Godot annotations, signals, enums, and
   assert.ok(res.tokenSavingsPercent >= 25);
 });
 
+test('GDScriptSkeletonExtractor preserves standalone @tool, multiline annotations and trailing @export vars', () => {
+  const extractor = new GDScriptSkeletonExtractor();
+  const trailingFixture = [
+    "@tool",
+    "@icon(\"res://icon.svg\")",
+    "extends Control",
+    "@export_group(\"Settings\")",
+    "@export var min_size: Vector2 = Vector2(100, 100)",
+    "@export var max_size: Vector2 = Vector2(500, 500)",
+    "@onready var header = $Header"
+  ].join('\n');
+  const res = extractor.extract('custom_control.gd', trailingFixture);
+  assert.ok(res.skeletonContent.includes('@tool'));
+  assert.ok(res.skeletonContent.includes('@icon("res://icon.svg")'));
+  assert.ok(res.skeletonContent.includes('extends Control'));
+  assert.ok(res.skeletonContent.includes('@export_group("Settings")'));
+  assert.ok(res.skeletonContent.includes('@export var min_size: Vector2 = Vector2(100, 100)'));
+  assert.ok(res.skeletonContent.includes('@export var max_size: Vector2 = Vector2(500, 500)'));
+  assert.ok(res.skeletonContent.includes('@onready var header = $Header'));
+});
+
 const rustFixture = [
   "use std::collections::HashMap;",
   "pub struct EngineConfig { pub threads: usize }",

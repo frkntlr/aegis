@@ -16,18 +16,32 @@ test('RoleClassifier identifies solver role from bug labels and code files', () 
   assert.ok(res.reason.includes('Kod Çözümü'));
 });
 
-test('RoleClassifier identifies qa role from test files and ui labels', () => {
+test('RoleClassifier identifies qa role from test files and qa labels', () => {
   const classifier = new RoleClassifier();
   const res = classifier.classify({
     title: 'Inspect layout overflow on mobile viewport',
-    labels: ['qa', 'ui'],
+    labels: ['qa'],
     targetFiles: ['src/Header.test.ts', 'scenes/Main.tscn']
   });
 
   assert.strictEqual(res.role, 'qa');
   assert.ok(res.confidence >= 60);
   assert.strictEqual(res.isAmbiguous, false);
-  assert.ok(res.reason.includes('Test & Arayüz'));
+  assert.ok(res.reason.includes('Test & Denetim'));
+});
+
+test('RoleClassifier identifies ui role from theme labels, tres files and styling semantics', () => {
+  const classifier = new RoleClassifier();
+  const res = classifier.classify({
+    title: 'Arayüz buton teması ve font boyutu güncellemesi',
+    labels: ['role:ui', 'theme'],
+    targetFiles: ['assets/main_theme.tres', 'scenes/styles/button.theme']
+  });
+
+  assert.strictEqual(res.role, 'ui');
+  assert.ok(res.confidence >= 60);
+  assert.strictEqual(res.isAmbiguous, false);
+  assert.ok(res.reason.includes('UI & Tema'));
 });
 
 test('RoleClassifier identifies docs role from markdown files and doc keywords', () => {

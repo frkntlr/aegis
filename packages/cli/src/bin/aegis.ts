@@ -75,7 +75,7 @@ const HELP_LINES: readonly string[] = [
   '  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache',
   '  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo',
   '  aegis wiki:status                      Inspect GitHub Wiki remote git availability',
-  '  aegis merge <solver|qa|docs> [branch]  4-step atomic merge & sibling synchronization',
+  '  aegis merge <solver|qa|docs|ui> [branch] 4-step atomic merge & sibling synchronization',
   '  aegis dashboard [port]                 Launch Aegis Command Center web dashboard',
   '  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix',
   '  aegis ide:sync                         Synchronize MCP servers & Skills across all IDEs',

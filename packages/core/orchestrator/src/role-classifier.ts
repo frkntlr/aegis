@@ -1,4 +1,4 @@
-export type RoleType = 'solver' | 'qa' | 'docs';
+export type RoleType = 'solver' | 'qa' | 'docs' | 'ui';
 
 export interface RoleInferenceInput {
   title?: string;
@@ -18,7 +18,7 @@ export class RoleClassifier {
   public static readonly CONFIDENCE_THRESHOLD = 60;
 
   public classify(input: RoleInferenceInput): RoleInferenceResult {
-    const scores: Record<RoleType, number> = { solver: 0, qa: 0, docs: 0 };
+    const scores: Record<RoleType, number> = { solver: 0, qa: 0, docs: 0, ui: 0 };
     const reasons: string[] = [];
 
     this.evaluateLabels(input.labels || [], scores, reasons);
@@ -45,9 +45,13 @@ export class RoleClassifier {
       scores.docs += 50;
       reasons.push("Etiket analizi: Dokümantasyon ('docs' / 'wiki' / 'rfc')");
     }
-    if (lower.some(l => l === 'role:qa' || l === 'qa' || l === 'test' || l === 'ui' || l === 'layout' || l === 'inspect')) {
+    if (lower.some(l => l === 'role:ui' || l === 'theme' || l === 'styles' || l === 'design')) {
+      scores.ui += 50;
+      reasons.push("Etiket analizi: UI & Tema ('role:ui' / 'theme' / 'styles')");
+    }
+    if (lower.some(l => l === 'role:qa' || l === 'qa' || l === 'test' || l === 'inspect')) {
       scores.qa += 50;
-      reasons.push("Etiket analizi: Test & Arayüz ('qa' / 'test' / 'ui')");
+      reasons.push("Etiket analizi: Test & Denetim ('qa' / 'test')");
     }
     if (lower.some(l => l === 'role:solver' || l === 'bug' || l === 'fix' || l === 'enhancement' || l === 'refactor')) {
       scores.solver += 50;
@@ -58,19 +62,24 @@ export class RoleClassifier {
   private evaluateTargetFiles(files: string[], scores: Record<RoleType, number>, reasons: string[]): void {
     if (files.length === 0) return;
     let docsHits = 0;
+    let uiHits = 0;
     let qaHits = 0;
     let solverHits = 0;
 
     for (const f of files) {
       const lower = f.toLowerCase().replace(/\\/g, '/');
       if (lower.endsWith('.md') || lower.includes('/wiki/') || lower.includes('docs/')) docsHits++;
+      else if (lower.endsWith('.tres') || lower.endsWith('.theme') || lower.includes('/theme/')) uiHits++;
       else if (lower.includes('.test.') || lower.includes('.spec.') || lower.endsWith('.tscn')) qaHits++;
       else if (lower.endsWith('.ts') || lower.endsWith('.py') || lower.endsWith('.gd') || lower.endsWith('.rs')) solverHits++;
     }
 
-    if (docsHits > qaHits && docsHits > solverHits) {
+    if (docsHits > qaHits && docsHits > solverHits && docsHits > uiHits) {
       scores.docs += 35;
       reasons.push(`Dosya analizi: Markdown/Wiki dosyaları (${docsHits} adet)`);
+    } else if (uiHits > 0 && uiHits >= qaHits && uiHits >= solverHits) {
+      scores.ui += 35;
+      reasons.push(`Dosya analizi: Tema/Arayüz dosyaları (${uiHits} adet)`);
     } else if (qaHits > solverHits) {
       scores.qa += 35;
       reasons.push(`Dosya analizi: Test/Sahne dosyaları (${qaHits} adet)`);
@@ -85,12 +94,17 @@ export class RoleClassifier {
     if (!lower.trim()) return;
 
     const docsKeywords = ['doküman', 'document', 'wiki', 'rehber', 'guide', 'rfc', 'mimari'];
-    const qaKeywords = ['test et', 'denetle', 'inspect', 'boundingbox', 'visual', 'görsel', 'layout', 'ui'];
+    const uiKeywords = ['tema', 'theme', 'stylebox', 'font', 'renk', 'color', 'stil', 'tasarım'];
+    const qaKeywords = ['test et', 'denetle', 'inspect', 'boundingbox', 'visual', 'görsel', 'layout'];
     const solverKeywords = ['çöz', 'onarım', 'fix', 'bug', 'hata', 'implement', 'algorithm', 'refactor'];
 
     if (docsKeywords.some(k => lower.includes(k))) {
       scores.docs += 15;
       reasons.push('Metin analizi: Dokümantasyon anahtar kelimeleri');
+    }
+    if (uiKeywords.some(k => lower.includes(k))) {
+      scores.ui += 15;
+      reasons.push('Metin analizi: UI & Tema anahtar kelimeleri');
     }
     if (qaKeywords.some(k => lower.includes(k))) {
       scores.qa += 15;
@@ -110,11 +124,14 @@ export class RoleClassifier {
       bestRole = 'qa';
       maxScore = scores.qa;
     }
+    if (scores.ui > maxScore) {
+      bestRole = 'ui';
+      maxScore = scores.ui;
+    }
     if (scores.docs > maxScore) {
       bestRole = 'docs';
       maxScore = scores.docs;
     }
-    // If tie or all zero, solver is default
     if (maxScore === 0) {
       return { role: 'solver', score: 30 };
     }

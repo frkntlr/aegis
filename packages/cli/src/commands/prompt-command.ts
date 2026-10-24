@@ -126,13 +126,13 @@ async function resolveRoleAndIssue(
   client = new GitHubClient({ autoConnectLive: true })
 ): Promise<{ role: string; issueNumber: number; issue: GitHubIssue }> {
   const issue = await resolveIssue(issueNumber, client);
-  if (rawRole === 'auto' || !['solver', 'qa', 'docs', 'contributor', 'alice', 'bob'].includes(rawRole)) {
+  if (rawRole === 'auto' || !['solver', 'qa', 'docs', 'ui', 'contributor', 'alice', 'bob'].includes(rawRole)) {
     const classification = new RoleClassifier().classify(issue);
     if (!isJson) {
       if (classification.isAmbiguous) {
         console.log(`⚠️  Görev rolü belirsiz (Güven: %${classification.confidence} < %60)`);
         console.log(` • Gerekçe: ${classification.reason}`);
-        console.log(` • Öneri: [${classification.role}]. Belirtmek için: aegis prompt <solver|qa|docs> ${issueNumber}`);
+        console.log(` • Öneri: [${classification.role}]. Belirtmek için: aegis prompt <solver|qa|docs|ui> ${issueNumber}`);
       } else {
         console.log(`🎯 Otomatik Rol Atandı: [${classification.role.toUpperCase()}] (Güven: %${classification.confidence})`);
         console.log(` • Gerekçe: ${classification.reason}`);
@@ -149,7 +149,7 @@ export async function handlePrompt(agentArg?: string, issueArg?: string, flag?: 
   if (!isJson) showBanner();
 
   if (!agentArg || agentArg === '--help' || agentArg === '-h') {
-    console.error('❌ Usage: aegis prompt [solver|qa|docs] <issueId> [--save|--json]');
+    console.error('❌ Usage: aegis prompt [solver|qa|docs|ui] <issueId> [--save|--json]');
     process.exit(1);
   }
 

@@ -36,12 +36,20 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
       }
 
       if (trimmed.startsWith('@')) {
+        if (trimmed.includes(' var ') || trimmed.includes('\tvar ')) {
+          i = this.handleDeclaration(lines, i, line, trimmed, pendingAnnotations, output);
+          continue;
+        }
         pendingAnnotations.push(line);
         i++;
         continue;
       }
 
       i = this.handleDeclaration(lines, i, line, trimmed, pendingAnnotations, output);
+    }
+
+    if (pendingAnnotations.length > 0) {
+      output.push(...pendingAnnotations);
     }
 
     return output;
@@ -89,7 +97,9 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
       trimmed.startsWith('const ') ||
       trimmed.startsWith('var ') ||
       trimmed.startsWith('@export') ||
-      trimmed.startsWith('@onready')
+      trimmed.startsWith('@onready') ||
+      trimmed.startsWith('@tool') ||
+      trimmed.startsWith('@icon')
     );
   }
 

@@ -3,17 +3,17 @@ import { DiagnosticCategory, ClarificationOption } from './types.js';
 export class SymptomClassifier {
   public static classify(input: string): DiagnosticCategory {
     const text = input.toLowerCase();
+    if (text.includes('godot') || text.includes('gdscript') || text.includes('tscn') || text.includes('tres') || text.includes('aspect') || text.includes('classdb')) {
+      return DiagnosticCategory.GODOT_ENGINE;
+    }
     if (text.includes('slow') || text.includes('latency') || text.includes('timeout') || text.includes('cpu')) {
       return DiagnosticCategory.PERFORMANCE;
     }
     if (text.includes('git') || text.includes('lock') || text.includes('conflict') || text.includes('worktree')) {
       return DiagnosticCategory.GIT_COLLISION;
     }
-    if (text.includes('cage') || text.includes('line') || text.includes('function') || text.includes('file')) {
+    if (text.includes('cage') || text.includes('demir kafes') || text.includes('complexity') || text.includes('line limit') || text.includes('function') || text.includes('file length')) {
       return DiagnosticCategory.CAGE_VIOLATION;
-    }
-    if (text.includes('godot') || text.includes('gdscript') || text.includes('tscn') || text.includes('tres') || text.includes('aspect') || text.includes('classdb')) {
-      return DiagnosticCategory.GODOT_ENGINE;
     }
     return DiagnosticCategory.UNKNOWN;
   }

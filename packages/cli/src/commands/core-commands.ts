@@ -32,9 +32,11 @@ export function handleInit(): void {
   const solver = wtManager.ensureWorktree('solver');
   const qa = wtManager.ensureWorktree('qa');
   const docs = wtManager.ensureWorktree('docs');
+  const ui = wtManager.ensureWorktree('ui');
   console.log(`✅ Worktree ready: ${solver.agentName} -> ${solver.path}`);
   console.log(`✅ Worktree ready: ${qa.agentName} -> ${qa.path}`);
   console.log(`✅ Worktree ready: ${docs.agentName} -> ${docs.path}`);
+  console.log(`✅ Worktree ready: ${ui.agentName} -> ${ui.path}`);
 
   setupIdeExclusions(process.cwd());
   console.log('✅ Constitution & Toolchain loaded.');
@@ -93,7 +95,7 @@ export async function handleAuto(): Promise<void> {
   }
 
   const ready = ghClient.listReadyIssues();
-  const result = dispatcher.dispatchNextTask(['solver', 'qa', 'docs'], ready);
+  const result = dispatcher.dispatchNextTask(['solver', 'qa', 'docs', 'ui'], ready);
 
   if (result.dispatched && result.agentName && result.issue) {
     if (ghClient.isLive()) {
@@ -125,7 +127,7 @@ function getPrimaryBranch(): string {
 export async function handleMerge(agentName?: string, baseBranchArg?: string): Promise<void> {
   showBanner();
   if (!agentName || agentName === '--help' || agentName === '-h') {
-    console.error('❌ Usage: aegis merge <solver|qa|docs> [baseBranch]');
+    console.error('❌ Usage: aegis merge <solver|qa|docs|ui> [baseBranch]');
     process.exit(1);
   }
 
@@ -133,7 +135,7 @@ export async function handleMerge(agentName?: string, baseBranchArg?: string): P
   const pipeline = new MergePipeline({ baseBranch });
   const wtManager = new WorktreeManager({ persistLocks: true });
   console.log(`🔀 Running 4-Step Atomic Merge Pipeline for Agent [${agentName}] into [${baseBranch}]...`);
-  const siblings = ['solver', 'qa', 'docs'].filter(a => a !== agentName);
+  const siblings = ['solver', 'qa', 'docs', 'ui'].filter(a => a !== agentName);
   const res = await pipeline.executePipeline(agentName, siblings, true);
 
   for (const s of res.steps) {

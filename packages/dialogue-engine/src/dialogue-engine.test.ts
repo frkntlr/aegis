@@ -14,6 +14,7 @@ test('SymptomClassifier correctly tags categories based on keywords', () => {
   assert.equal(SymptomClassifier.classify('Git worktree lock conflict detected'), DiagnosticCategory.GIT_COLLISION);
   assert.equal(SymptomClassifier.classify('Function exceeded line limit in cage check'), DiagnosticCategory.CAGE_VIOLATION);
   assert.equal(SymptomClassifier.classify('Godot UI buttons overlap on mobile aspect ratios'), DiagnosticCategory.GODOT_ENGINE);
+  assert.equal(SymptomClassifier.classify('Godot gdscript file has layout clipping'), DiagnosticCategory.GODOT_ENGINE);
   assert.equal(SymptomClassifier.classify('Random unknown crash'), DiagnosticCategory.UNKNOWN);
 });
 
