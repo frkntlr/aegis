@@ -22,7 +22,7 @@ static func collect_ui_nodes(root: Node) -> Array:
 static func _traverse_control_tree(node: Node, acc: Array) -> void:
 	if node is Control and node.visible:
 		var rect = node.get_global_rect()
-		acc.append({
+		var node_info = {
 			"id": str(node.get_path()),
 			"name": node.name,
 			"type": node.get_class(),
@@ -33,7 +33,12 @@ static func _traverse_control_tree(node: Node, acc: Array) -> void:
 				"width": rect.size.x,
 				"height": rect.size.y
 			}
-		})
+		}
+		if "text" in node and node.get("text") != null:
+			node_info["text"] = str(node.get("text"))
+		if "disabled" in node:
+			node_info["disabled"] = bool(node.get("disabled"))
+		acc.append(node_info)
 	for child in node.get_children():
 		_traverse_control_tree(child, acc)
 

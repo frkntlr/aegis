@@ -49,3 +49,14 @@ test('MCPSecurityManager counts unauthorized calls toward rate limit', () => {
   assert.strictEqual(res3.allowed, false);
   assert.ok(res3.reason?.includes('Rate limit reached'));
 });
+
+test('MCPSecurityManager authorizes UI specialist and Godot toolchain', () => {
+  const manager = new MCPSecurityManager();
+  assert.strictEqual(manager.authorizeToolCall('ui', 'read_file').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('ui', 'inspect_ui').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('ui', 'godot_inspect').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('ui', 'godot_playtest').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('solver', 'godot_validate').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('qa', 'godot_status').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('docs', 'godot_inspect').allowed, false);
+});

@@ -32,13 +32,24 @@ func execute_scenario(actions: Array) -> Dictionary:
 
 func _dispatch_action(action: Dictionary) -> void:
 	var action_type: String = action.get("type", "")
+	if action_type in ["key_press", "mouse_click", "click_node", "action", "action_press", "action_release"]:
+		_dispatch_basic_input(action_type, action)
+	elif action_type in ["touch_tap", "touch_drag", "type_text"]:
+		_dispatch_touch_and_text(action_type, action)
+	elif action_type in ["wait", "wait_frames"]:
+		await _dispatch_wait(action_type, action)
+	elif action_type in ["assert_node", "assert_text"]:
+		_dispatch_assertion(action_type, action)
+	else:
+		error_list.append("Unknown action type: " + action_type)
+
+func _dispatch_basic_input(action_type: String, action: Dictionary) -> void:
 	match action_type:
 		"key_press":
 			_simulate_key(action.get("key", 0), true)
 			_simulate_key(action.get("key", 0), false)
 		"mouse_click":
-			var pos: Vector2 = action.get("position", Vector2.ZERO)
-			_simulate_click(pos)
+			_simulate_click(action.get("position", Vector2.ZERO))
 		"click_node":
 			_click_node_at_path(action.get("path", ""))
 		"action_press":
@@ -49,6 +60,9 @@ func _dispatch_action(action: Dictionary) -> void:
 			var act_name = action.get("action", "")
 			_simulate_action(act_name, true)
 			_simulate_action(act_name, false)
+
+func _dispatch_touch_and_text(action_type: String, action: Dictionary) -> void:
+	match action_type:
 		"touch_tap":
 			var pos: Vector2 = action.get("position", Vector2.ZERO)
 			_simulate_touch(pos, true)
@@ -57,16 +71,42 @@ func _dispatch_action(action: Dictionary) -> void:
 			var from_pos: Vector2 = action.get("from", Vector2.ZERO)
 			var to_pos: Vector2 = action.get("to", Vector2.ZERO)
 			_simulate_drag(from_pos, to_pos)
-		"wait":
-			var duration = float(action.get("duration", 0.1))
-			if duration > 0.0:
-				await get_tree().create_timer(duration).timeout
-		"wait_frames":
-			var f_count = int(action.get("frames", 1))
-			for _f in range(f_count):
-				await get_tree().process_frame
-		_:
-			error_list.append("Unknown action type: " + action_type)
+		"type_text":
+			_simulate_type_text(str(action.get("text", "")))
+
+func _dispatch_wait(action_type: String, action: Dictionary) -> void:
+	if action_type == "wait":
+		var duration = float(action.get("duration", 0.1))
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	elif action_type == "wait_frames":
+		var f_count = int(action.get("frames", 1))
+		for _f in range(f_count):
+			await get_tree().process_frame
+
+func _dispatch_assertion(action_type: String, action: Dictionary) -> void:
+	var path_str = str(action.get("path", ""))
+	var target = get_tree().root.get_node_or_null(path_str)
+	if action_type == "assert_node":
+		if not target:
+			error_list.append("Assertion failed: node not found: " + path_str)
+	elif action_type == "assert_text":
+		var expected = str(action.get("expected", ""))
+		if not target:
+			error_list.append("Assertion failed: node not found for text check: " + path_str)
+		elif not ("text" in target) or str(target.get("text")) != expected:
+			error_list.append("Assertion failed: expected text '" + expected + "', got: " + (str(target.get("text")) if target and "text" in target else "null"))
+
+func _simulate_type_text(text: String) -> void:
+	for i in range(text.length()):
+		var ev = InputEventKey.new()
+		ev.unicode = text.unicode_at(i)
+		ev.pressed = true
+		Input.parse_input_event(ev)
+		var ev_rel = InputEventKey.new()
+		ev_rel.unicode = text.unicode_at(i)
+		ev_rel.pressed = false
+		Input.parse_input_event(ev_rel)
 
 func _simulate_action(action_name: String, is_pressed: bool) -> void:
 	if action_name.is_empty():

@@ -22,6 +22,8 @@ export interface GodotUiNode {
     width: number;
     height: number;
   };
+  text?: string;
+  disabled?: boolean;
   children?: GodotUiNode[];
 }
 

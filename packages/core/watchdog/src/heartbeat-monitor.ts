@@ -1,4 +1,4 @@
-import type { ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import type { ProcessRunMetrics } from '@aegis/shared';
 
 export interface HeartbeatOptions {
@@ -22,6 +22,21 @@ export class HeartbeatMonitor {
     this.extensionStepMs = options.extensionStepMs ?? 30_000;
   }
 
+  private terminateProcess(child: ChildProcess, signal: NodeJS.Signals): void {
+    if (process.platform === 'win32' && child.pid) {
+      try {
+        spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      } catch {
+        // Ignore taskkill errors if already terminated
+      }
+    }
+    try {
+      child.kill(signal);
+    } catch {
+      // Ignore if process already closed
+    }
+  }
+
   private checkWatchdogTimer(
     child: ChildProcess,
     state: MonitorState,
@@ -37,14 +52,14 @@ export class HeartbeatMonitor {
       flags.stagnated = true;
       clearInterval(interval);
       if (onProgress) onProgress(`[Aegis Watchdog] Stagnation detected (${timeSinceActivity / 1000}s silence). Terminating.`);
-      child.kill('SIGTERM');
+      this.terminateProcess(child, 'SIGTERM');
     }
 
     if (now > state.currentDeadlineMs && child.exitCode === null) {
       flags.timedOut = true;
       clearInterval(interval);
       if (onProgress) onProgress(`[Aegis Watchdog] Dynamic timeout limit reached (${timeoutSeconds}s). Hard killing process.`);
-      child.kill('SIGKILL');
+      this.terminateProcess(child, 'SIGKILL');
     }
   }
 

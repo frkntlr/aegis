@@ -30,6 +30,13 @@ func _ready() -> void:
 	add_child(poll_timer)
 
 	print("[AegisBridge] Client ready on port: ", port)
+	_capture_initial_telemetry()
+
+func _capture_initial_telemetry() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var p = AegisUiVerifier.build_payload(get_tree().root, "16:9")
+	_save_telemetry_snapshot(JSON.stringify(p))
 
 func send_telemetry(payload: Dictionary) -> void:
 	var url = "http://127.0.0.1:" + str(port) + "/telemetry"
