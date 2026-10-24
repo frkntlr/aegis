@@ -60,7 +60,7 @@ export class ImmutableOracle {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         const isVacuous = line.match(/expect\(\s*([^()]+?)\s*\)\.(toBe|toEqual)\(\s*\1\s*\)/) ||
-          line.match(/assert\.(strictEqual|equal)\(\s*([^,()]+?)\s*,\s*\2\s*\)/) ||
+          line.match(/assert\.(strictEqual|equal|deepStrictEqual|deepEqual)\(\s*([^,()]+?)\s*,\s*\2\s*\)/) ||
           line.match(/assert_eq\(\s*([^,()]+?)\s*,\s*\1\s*\)/) ||
           line.match(/\bassert(\.ok)?\(\s*true\s*\)/) ||
           line.match(/\bassert\s+True\b/) ||

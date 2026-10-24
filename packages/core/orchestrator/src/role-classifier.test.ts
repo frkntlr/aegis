@@ -81,3 +81,15 @@ test('RoleClassifier normalizes Windows path separators in target files', () => 
   assert.strictEqual(res.role, 'docs');
   assert.ok(res.confidence >= 60);
 });
+
+test('RoleClassifier identifies qa role from telemetry and playtest semantics', () => {
+  const classifier = new RoleClassifier();
+  const res = classifier.classify({
+    title: 'Run zero-token telemetry verification and playtest on mobile aspect ratio',
+    labels: ['qa'],
+    targetFiles: []
+  });
+
+  assert.strictEqual(res.role, 'qa');
+  assert.ok(res.confidence >= 60);
+});

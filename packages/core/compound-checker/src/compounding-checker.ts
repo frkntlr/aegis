@@ -8,7 +8,7 @@ export interface StepMetric {
 }
 
 export interface CompoundingAlert {
-  alert: 'COMPOUNDING_ERROR' | 'RUNAWAY_DIFF' | 'TEST_REGRESSION';
+  alert: 'COMPOUNDING_ERROR' | 'RUNAWAY_DIFF' | 'TEST_REGRESSION' | 'RUNAWAY_FILE_CHURN';
   currentStep: number;
   recommendedRollbackStep?: number;
   reason: string;
@@ -48,6 +48,11 @@ export class CompoundingErrorChecker {
       prev1.failingTestsCount >= prev2.failingTestsCount &&
       current.failingTestsCount > 0;
 
+    const isFileChurnGrowing = prev2.changedFilesCount > 0 &&
+      current.changedFilesCount >= (prev1.changedFilesCount * 2) &&
+      prev1.changedFilesCount > prev2.changedFilesCount &&
+      current.changedFilesCount >= 8;
+
     if (isDiffGrowing && isTestRegression) {
       return this.createAlert('COMPOUNDING_ERROR', current.step, prev2.step, 'Compounding error: runaway diff and cascading test failures.');
     }
@@ -58,6 +63,10 @@ export class CompoundingErrorChecker {
     if (isTestRegression) {
       const msg = `Failing tests escalated continuously (${prev2.failingTestsCount} -> ${prev1.failingTestsCount} -> ${current.failingTestsCount}). Rolling back to clean state is advised.`;
       return this.createAlert('TEST_REGRESSION', current.step, prev2.step, msg);
+    }
+    if (isFileChurnGrowing) {
+      const msg = `Changed files escalated exponentially (${prev2.changedFilesCount} -> ${prev1.changedFilesCount} -> ${current.changedFilesCount}). Multi-file churn detected.`;
+      return this.createAlert('RUNAWAY_FILE_CHURN', current.step, prev2.step, msg);
     }
 
     return null;

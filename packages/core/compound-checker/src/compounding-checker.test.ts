@@ -85,3 +85,15 @@ test('CompoundingErrorChecker alerts on sudden test regression starting from cle
   assert.strictEqual(alert.alert, 'TEST_REGRESSION');
   assert.strictEqual(alert.recommendedRollbackStep, 1);
 });
+
+test('CompoundingErrorChecker alerts on runaway file churn when changed files escalate', () => {
+  const checker = new CompoundingErrorChecker();
+  checker.recordStep({ step: 1, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 0, timestamp: '' });
+  checker.recordStep({ step: 2, changedFilesCount: 3, diffLinesCount: 20, failingTestsCount: 0, timestamp: '' });
+
+  // Step 3 file churn escalates to 8 files
+  const alert = checker.recordStep({ step: 3, changedFilesCount: 8, diffLinesCount: 30, failingTestsCount: 0, timestamp: '' });
+  assert.ok(alert);
+  assert.strictEqual(alert.alert, 'RUNAWAY_FILE_CHURN');
+  assert.strictEqual(alert.recommendedRollbackStep, 1);
+});

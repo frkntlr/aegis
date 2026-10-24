@@ -166,3 +166,22 @@ test('ImmutableOracle detects vacuous assert.ok(true), assert(true) and Python a
   assert.strictEqual(report.verdict, 'REJECTED');
   assert.strictEqual(report.vacuousAssertionsFound, 3);
 });
+
+test('ImmutableOracle detects vacuous assert.deepStrictEqual and assert.deepEqual', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['test/dummy.test.ts'],
+    newTestContents: [
+      {
+        filePath: 'test/dummy.test.ts',
+        content: `test('tautology', () => {\n  assert.deepStrictEqual(payload, payload);\n  assert.deepEqual(config, config);\n});`
+      }
+    ],
+    reportedPassedCount: 1,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, true);
+  assert.strictEqual(report.verdict, 'REJECTED');
+  assert.strictEqual(report.vacuousAssertionsFound, 2);
+});

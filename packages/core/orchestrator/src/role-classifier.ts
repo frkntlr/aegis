@@ -94,9 +94,9 @@ export class RoleClassifier {
     if (!lower.trim()) return;
 
     const docsKeywords = ['doküman', 'document', 'wiki', 'rehber', 'guide', 'rfc', 'mimari'];
-    const uiKeywords = ['tema', 'theme', 'stylebox', 'font', 'renk', 'color', 'stil', 'tasarım'];
-    const qaKeywords = ['test et', 'denetle', 'inspect', 'boundingbox', 'visual', 'görsel', 'layout'];
-    const solverKeywords = ['çöz', 'onarım', 'fix', 'bug', 'hata', 'implement', 'algorithm', 'refactor'];
+    const uiKeywords = ['tema', 'theme', 'stylebox', 'font', 'renk', 'color', 'stil', 'tasarım', 'container', 'margin', 'responsive'];
+    const qaKeywords = ['test et', 'denetle', 'inspect', 'boundingbox', 'visual', 'görsel', 'layout', 'telemetry', 'playtest', 'aspect ratio'];
+    const solverKeywords = ['çöz', 'onarım', 'fix', 'bug', 'hata', 'implement', 'algorithm', 'refactor', 'mutation', 'demir kafes'];
 
     if (docsKeywords.some(k => lower.includes(k))) {
       scores.docs += 15;

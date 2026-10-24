@@ -15,6 +15,8 @@ test('SymptomClassifier correctly tags categories based on keywords', () => {
   assert.equal(SymptomClassifier.classify('Function exceeded line limit in cage check'), DiagnosticCategory.CAGE_VIOLATION);
   assert.equal(SymptomClassifier.classify('Godot UI buttons overlap on mobile aspect ratios'), DiagnosticCategory.GODOT_ENGINE);
   assert.equal(SymptomClassifier.classify('Godot gdscript file has layout clipping'), DiagnosticCategory.GODOT_ENGINE);
+  assert.equal(SymptomClassifier.classify('Mutation gate reports survived mutants below threshold'), DiagnosticCategory.MUTATION_GAP);
+  assert.equal(SymptomClassifier.classify('Autonomous agent invoked unauthorized destructive tool via mcp'), DiagnosticCategory.MCP_SECURITY);
   assert.equal(SymptomClassifier.classify('Random unknown crash'), DiagnosticCategory.UNKNOWN);
 });
 
@@ -92,4 +94,21 @@ test('DialogueEngine handles Godot Engine diagnostic category and generates insp
   assert.equal(session3.isResolved, true);
   const task = engine.exportTask(session3.sessionId);
   assert.ok(task.includes('aegis godot inspect'));
+});
+
+test('DialogueEngine handles Mutation Gap and MCP Security sessions', () => {
+  const engine = new DialogueEngine();
+  const mutSession = engine.startSession('Mutation testing failed with surviving mutants');
+  assert.equal(mutSession.category, DiagnosticCategory.MUTATION_GAP);
+  const mut2 = engine.chooseClarification(mutSession.sessionId, 'mut-1');
+  assert.ok(mut2.prescription?.steps.some(s => s.includes('aegis mutate')));
+  const mut3 = engine.confirmAndResolve(mut2.sessionId, true);
+  assert.equal(mut3.isResolved, true);
+
+  const mcpSession = engine.startSession('Unauthorized agent mcp tool call blocked');
+  assert.equal(mcpSession.category, DiagnosticCategory.MCP_SECURITY);
+  const mcp2 = engine.chooseClarification(mcpSession.sessionId, 'mcp-1');
+  assert.ok(mcp2.prescription?.title.includes('MCP Tool Authorization'));
+  const mcp3 = engine.confirmAndResolve(mcp2.sessionId, true);
+  assert.equal(mcp3.isResolved, true);
 });

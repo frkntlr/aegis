@@ -56,6 +56,38 @@ const DEFAULT_PLANS: Record<string, PrescriptionPlan> = {
     ],
     targetWorktree: 'experimental/solver',
     lockLabels: ['scripts/word_game.gd']
+  },
+  MUTATION_SURVIVOR: {
+    title: 'Eliminate Surviving Mutants with Target Boundary Tests',
+    rootCause: 'Changed code survived mutation operator without test failure.',
+    steps: [
+      'Run aegis mutate on changed files to locate exact surviving line numbers.',
+      'Add dedicated unit test asserting exact boundary value and inverted branch condition.',
+      'Re-run mutation gate to confirm mutation score >= 70%.'
+    ],
+    acceptanceCriteria: [
+      'All generated mutants in changed lines are killed.',
+      'Mutation gate reports >= 70% kill rate.',
+      'All unit tests pass cleanly.'
+    ],
+    targetWorktree: 'experimental/solver',
+    lockLabels: ['packages/plugins/telemetry-tester/src/mutation-gate.ts']
+  },
+  TOOL_UNAUTHORIZED: {
+    title: 'Remediate MCP Tool Authorization and Rate Limits',
+    rootCause: 'Agent attempted invocation of destructive or un-whitelisted MCP tool.',
+    steps: [
+      'Inspect agent role permissions against MCPSecurityManager allowlist.',
+      'Ensure destructive tools require explicit human approval.',
+      'Re-execute task within scoped agent boundary.'
+    ],
+    acceptanceCriteria: [
+      'Only whitelisted tools are dispatched for role.',
+      'Security audit passes with zero unauthorized rejections.',
+      'MCPSecurityManager rate limits remain within threshold.'
+    ],
+    targetWorktree: 'experimental/solver',
+    lockLabels: ['packages/core/mcp-security/src/mcp-security-manager.ts']
   }
 };
 
