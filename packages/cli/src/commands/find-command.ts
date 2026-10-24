@@ -1,7 +1,25 @@
 import * as path from 'node:path';
-import { SymbolIndexer, SymbolSliceExtractor, type SymbolEntry } from '@aegis/ast-skeleton';
+import {
+  SymbolIndexer,
+  SymbolSliceExtractor,
+  RelationalGraph,
+  GraphQueryEngine,
+  type SymbolEntry
+} from '@aegis/ast-skeleton';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
+
+function resolveMatches(indexer: SymbolIndexer, queryArg: string): SymbolEntry[] {
+  const cachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'symbols.json');
+  indexer.loadCache(cachePath);
+  let matches = indexer.findSymbols(queryArg);
+  if (matches.length === 0) {
+    const srcFiles = collectSourceFiles(path.resolve(process.cwd(), 'packages'));
+    indexer.indexFiles(srcFiles, process.cwd(), cachePath);
+    matches = indexer.findSymbols(queryArg);
+  }
+  return matches;
+}
 
 export function handleFind(queryArg?: string): void {
   showBanner();
@@ -11,19 +29,10 @@ export function handleFind(queryArg?: string): void {
   }
 
   const startT = performance.now();
-  const cachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'symbols.json');
   const indexer = new SymbolIndexer();
-  indexer.loadCache(cachePath);
-
-  let matches = indexer.findSymbols(queryArg);
-  if (matches.length === 0) {
-    // If not found in cache, scan packages and update
-    const srcFiles = collectSourceFiles(path.resolve(process.cwd(), 'packages'));
-    indexer.indexFiles(srcFiles, process.cwd(), cachePath);
-    matches = indexer.findSymbols(queryArg);
-  }
-
+  const matches = resolveMatches(indexer, queryArg);
   const durationMs = (performance.now() - startT).toFixed(2);
+
   if (matches.length === 0) {
     console.log(`⚠️  No symbols matching '${queryArg}' found in workspace index (${durationMs}ms).`);
     return;
@@ -36,10 +45,24 @@ export function handleFind(queryArg?: string): void {
     console.log(` • Other matches (${matches.length - 1}): ${matches.slice(1, 4).map((m: SymbolEntry) => m.name).join(', ')}`);
   }
 
+  printRelationalLinks(target.name);
+
   const extractor = new SymbolSliceExtractor(indexer);
   const slice = extractor.extractSliceFromEntry(target, process.cwd(), 3);
   if (slice) {
     console.log(` • Sliced:   ${slice.lineCount} lines / ${slice.originalFileLineCount} total (~${slice.tokenSavingsPercent}% token savings)`);
     console.log('\n' + slice.codeSlice);
+  }
+}
+
+function printRelationalLinks(symbolName: string): void {
+  const graphCachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
+  const graph = new RelationalGraph();
+  if (graph.loadCache(graphCachePath)) {
+    const qEngine = new GraphQueryEngine(graph);
+    const trace = qEngine.trace(symbolName, 2);
+    if (trace.connectedScenes.length > 0 || trace.connectedSignals.length > 0 || trace.upstreamEdges.length > 0) {
+      console.log(` • Relational Links: ${trace.connectedScenes.length} scenes, ${trace.connectedSignals.length} signals, ${trace.upstreamEdges.length} callers`);
+    }
   }
 }

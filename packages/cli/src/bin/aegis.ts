@@ -55,6 +55,8 @@ import {
 import { notifyDashboardFocus } from '../commands/focus-notifier.js';
 import { handleFind } from '../commands/find-command.js';
 import { handleTriage } from '../commands/triage-command.js';
+import { handleTrace } from '../commands/trace-command.js';
+import { handleGraphScan } from '../commands/graph-command.js';
 
 const HELP_LINES: readonly string[] = [
   'Commands:',
@@ -96,7 +98,9 @@ const HELP_LINES: readonly string[] = [
   '  aegis diff <diff>                      Validate surgical unified diff compliance',
   '  aegis audit <files>                    Run Immutable Oracle trust verification',
   '  aegis find <symbol>                    Fast AST symbol lookup and precision surgical slice',
-  '  aegis triage [dir]                     Run Evidence-Based Bug Triage (zero false-alarm bugs)'
+  '  aegis triage [dir]                     Run Evidence-Based Bug Triage (zero false-alarm bugs)',
+  '  aegis trace <target>                   Trace relational callers, signal listeners & scenes',
+  '  aegis graph:scan [dir]                 Build cross-reference relational knowledge graph'
 ];
 
 function handleHelp(): void {
@@ -153,7 +157,9 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   diff: (a) => handleDiff(a.length > 2 ? a.slice(1).join(' ') : a[1]),
   audit: (a) => handleAudit(a[1]),
   find: (a) => handleFind(a[1]),
-  triage: (a) => handleTriage(a[1])
+  triage: (a) => handleTriage(a[1]),
+  trace: (a) => handleTrace(a[1]),
+  'graph:scan': (a) => handleGraphScan(a[1])
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {

@@ -12,3 +12,7 @@ export * from './diff-engine.js';
 export * from './symbol-parser.js';
 export * from './symbol-indexer.js';
 export * from './symbol-slice-extractor.js';
+export * from './relational-graph.js';
+export * from './tscn-relation-parser.js';
+export * from './cross-reference-linker.js';
+export * from './graph-query-engine.js';
