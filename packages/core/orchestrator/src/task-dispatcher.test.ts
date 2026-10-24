@@ -151,3 +151,18 @@ test('TaskDispatcher completeTask clears loop breaker failure history', () => {
   dispatcher.completeTask('solver', 42);
   assert.strictEqual(successRecorded, 42);
 });
+
+test('TaskDispatcher dispatches QA/UI issues to idle ui agent', () => {
+  const wt = new WorktreeManager();
+  const dispatcher = new TaskDispatcher(wt);
+
+  const uiIssue: GitHubIssue = {
+    ...makeIssue(70, ['scenes/Menu.tscn']),
+    title: 'Inspect mobile UI layout',
+    labels: ['ui', 'status:ready']
+  };
+
+  const res = dispatcher.dispatchNextTask(['ui'], [uiIssue]);
+  assert.strictEqual(res.dispatched, true);
+  assert.strictEqual(res.agentName, 'ui');
+});

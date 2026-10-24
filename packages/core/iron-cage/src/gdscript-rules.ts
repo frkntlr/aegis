@@ -86,9 +86,10 @@ export class GDScriptRulesValidator {
 
   private static readonly REF_COUNTED_TYPES = new Set([
     'RegEx', 'ConfigFile', 'InputEventKey', 'InputEventMouseButton',
-    'InputEventScreenTouch', 'InputEventScreenDrag', 'RandomNumberGenerator',
-    'Image', 'Resource', 'AegisUiVerifier', 'RefCounted', 'JSON',
-    'WordData', 'AegisCompatBridge', 'TCP_Server', 'StreamPeerTCP'
+    'InputEventScreenTouch', 'InputEventScreenDrag', 'InputEventAction',
+    'RandomNumberGenerator', 'Image', 'Resource', 'AegisUiVerifier',
+    'RefCounted', 'JSON', 'WordData', 'AegisCompatBridge', 'TCP_Server',
+    'StreamPeerTCP', 'FileAccess', 'DirAccess', 'ImageTexture', 'AudioStream'
   ]);
 
   private static readonly ENGINE_SIGNALS = new Set([
@@ -203,7 +204,7 @@ export class GDScriptRulesValidator {
       if (!trimmed || trimmed.startsWith('#')) continue;
 
       const isDef = trimmed.startsWith('func ') || trimmed.startsWith('static func ');
-      const indent = (line.match(/^(\t|\s)*/)?.[0] ?? '').length;
+      const indent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
 
       if (current && indent <= baseIndent && !isDef) {
         blocks.push(current);

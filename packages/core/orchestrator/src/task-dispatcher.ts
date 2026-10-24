@@ -32,7 +32,7 @@ export class TaskDispatcher {
   }
 
   public dispatchNextTask(
-    availableAgents: string[] = ['solver', 'qa', 'docs'],
+    availableAgents: string[] = ['solver', 'qa', 'docs', 'ui'],
     readyIssues: GitHubIssue[]
   ): DispatchResult {
     if (availableAgents.length === 0) {
@@ -47,7 +47,9 @@ export class TaskDispatcher {
 
     const isRoleCompatible = (agent: string, role: string): boolean => {
       if (agent === role) return true;
-      const specialized = ['solver', 'qa', 'docs'];
+      if (agent === 'ui' && role === 'qa') return true;
+      if (agent === 'qa' && role === 'ui') return true;
+      const specialized = ['solver', 'qa', 'docs', 'ui'];
       return !specialized.includes(agent);
     };
 

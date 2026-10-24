@@ -59,7 +59,7 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
       this.flushAnnotations(pendingAnnotations, output);
       const { header, nextIndex } = this.consumeHeader(lines, i);
       const indent = line.match(/^(\t|\s)*/)?.[0] ?? '';
-      const baseIndent = line.match(/^(\t|\s)*/)?.[0].length ?? 0;
+      const baseIndent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
       const step = indent.includes(' ') && !indent.includes('\t') ? '    ' : '\t';
       output.push(header);
       output.push(`${indent}${step}pass`);
@@ -138,7 +138,7 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
         i++;
         continue;
       }
-      const indent = line.match(/^(\t|\s)*/)?.[0].length ?? 0;
+      const indent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
       if (indent <= baseIndent) {
         break;
       }

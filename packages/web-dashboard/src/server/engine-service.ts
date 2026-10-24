@@ -11,6 +11,16 @@ import { getDashboardHtml } from '../ui/dashboard-html.js';
 
 const execFileAsync = promisify(execFile);
 
+function cleanGitEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  delete env.GIT_DIR;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_PREFIX;
+  delete env.GIT_COMMON_DIR;
+  return env;
+}
+
 export interface AdaptiveTimeoutReport {
   tool: string;
   timeoutSeconds: number;
@@ -116,7 +126,7 @@ export class AegisEngineService {
       try {
         const { stdout } = await execFileAsync('git', ['diff', '-U3', 'HEAD'], {
           encoding: 'utf8',
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          env: cleanGitEnv()
         });
         diff = stdout;
       } catch { /* ignore */ }
@@ -140,7 +150,7 @@ export class AegisEngineService {
         if (fs.existsSync('.git')) {
           const { stdout } = await execFileAsync('git', ['status', '--porcelain'], {
             encoding: 'utf8',
-            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+            env: cleanGitEnv()
           });
           targetFiles = stdout.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
         }

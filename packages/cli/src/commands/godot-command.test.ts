@@ -82,3 +82,25 @@ test('handleGodotInspect respects mobile aspect ratios in aegis.config.json', as
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('handleGodotInspect loads cached telemetry and flags overlapping UI controls', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-overlap-inspect-'));
+  try {
+    const aegisDir = path.join(tmp, '.aegis');
+    fs.mkdirSync(aegisDir, { recursive: true });
+    const telemetryPath = path.join(aegisDir, 'ui_telemetry.json');
+    fs.writeFileSync(telemetryPath, JSON.stringify({
+      nodes: [
+        { id: '/root/Main/ButtonA', name: 'ButtonA', type: 'Button', visible: true, rect: { x: 50, y: 50, width: 200, height: 60 } },
+        { id: '/root/Main/ButtonB', name: 'ButtonB', type: 'Button', visible: true, rect: { x: 100, y: 70, width: 200, height: 60 } }
+      ]
+    }), 'utf8');
+
+    const out = await captureOutput(() => handleGodotInspect(tmp));
+    assert.ok(out.includes('Loaded 2 UI nodes from telemetry cache'));
+    assert.ok(out.includes('FAIL (overlaps/clippings)'));
+    assert.ok(out.includes('Overlap: "/root/Main/ButtonA" and "/root/Main/ButtonB"'));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -20,7 +20,7 @@ func execute_scenario(actions: Array) -> Dictionary:
 		if executed_actions >= MAX_FRAMES_LIMIT:
 			error_list.append("Maximum action limit reached.")
 			break
-		_dispatch_action(action)
+		await _dispatch_action(action)
 		executed_actions += 1
 
 	is_running = false
@@ -57,6 +57,14 @@ func _dispatch_action(action: Dictionary) -> void:
 			var from_pos: Vector2 = action.get("from", Vector2.ZERO)
 			var to_pos: Vector2 = action.get("to", Vector2.ZERO)
 			_simulate_drag(from_pos, to_pos)
+		"wait":
+			var duration = float(action.get("duration", 0.1))
+			if duration > 0.0:
+				await get_tree().create_timer(duration).timeout
+		"wait_frames":
+			var f_count = int(action.get("frames", 1))
+			for _f in range(f_count):
+				await get_tree().process_frame
 		_:
 			error_list.append("Unknown action type: " + action_type)
 

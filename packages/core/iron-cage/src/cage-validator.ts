@@ -152,7 +152,7 @@ export class IronCageValidator {
 
       const isDef = trimmed.startsWith('def ') || trimmed.startsWith('async def ') ||
         trimmed.startsWith('func ') || trimmed.startsWith('static func ');
-      const indent = (line.match(/^(\t|\s)*/)?.[0] ?? '').length;
+      const indent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
 
       if (inFunction && indent <= baseIndent) {
         this.checkFunctionLimit(funcStart + 1, i - funcStart, filePath, violations);
