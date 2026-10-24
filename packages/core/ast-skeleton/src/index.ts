@@ -9,3 +9,6 @@ export * from './cpp-extractor.js';
 export * from './skeleton-generator.js';
 export * from './cache-manager.js';
 export * from './diff-engine.js';
+export * from './symbol-parser.js';
+export * from './symbol-indexer.js';
+export * from './symbol-slice-extractor.js';

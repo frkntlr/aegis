@@ -53,6 +53,8 @@ import {
   handleGodotPlaytest
 } from '../commands/godot-command.js';
 import { notifyDashboardFocus } from '../commands/focus-notifier.js';
+import { handleFind } from '../commands/find-command.js';
+import { handleTriage } from '../commands/triage-command.js';
 
 const HELP_LINES: readonly string[] = [
   'Commands:',
@@ -92,7 +94,9 @@ const HELP_LINES: readonly string[] = [
   '  aegis skeleton:scan [dir]              Scan project and compute total token savings',
   '  aegis cage:check [dir]                 Run Demir Kafes audit across all project code',
   '  aegis diff <diff>                      Validate surgical unified diff compliance',
-  '  aegis audit <files>                    Run Immutable Oracle trust verification'
+  '  aegis audit <files>                    Run Immutable Oracle trust verification',
+  '  aegis find <symbol>                    Fast AST symbol lookup and precision surgical slice',
+  '  aegis triage [dir]                     Run Evidence-Based Bug Triage (zero false-alarm bugs)'
 ];
 
 function handleHelp(): void {
@@ -147,7 +151,9 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   skeleton: (a) => handleSkeleton(a[1]),
   'skeleton:scan': (a) => handleSkeletonScan(a[1]),
   diff: (a) => handleDiff(a.length > 2 ? a.slice(1).join(' ') : a[1]),
-  audit: (a) => handleAudit(a[1])
+  audit: (a) => handleAudit(a[1]),
+  find: (a) => handleFind(a[1]),
+  triage: (a) => handleTriage(a[1])
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {
