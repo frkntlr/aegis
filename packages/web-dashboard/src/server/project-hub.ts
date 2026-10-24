@@ -61,7 +61,12 @@ export class ProjectHub {
       for (const ent of entries) {
         if (!ent.isDirectory()) continue;
         const cleanName = ent.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (cleanName === cleanHint || cleanName.includes(cleanHint) || cleanHint.includes(cleanName)) {
+        if (cleanName === cleanHint) return path.join(parent, ent.name);
+      }
+      for (const ent of entries) {
+        if (!ent.isDirectory()) continue;
+        const cleanName = ent.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanName.includes(cleanHint) || cleanHint.includes(cleanName)) {
           return path.join(parent, ent.name);
         }
       }
@@ -96,7 +101,8 @@ export class ProjectHub {
   }
 
   public handleFocus(workspacePath: string): FocusResult {
-    const norm = path.resolve(workspacePath).replace(/\\/g, '/');
+    const resolved = path.resolve(workspacePath);
+    const norm = resolved.replace(/\\/g, '/');
     let matchedCtx: ProjectContext | undefined;
 
     for (const ctx of this.contexts.values()) {
@@ -108,6 +114,9 @@ export class ProjectHub {
     }
 
     if (!matchedCtx) {
+      if (!fs.existsSync(resolved) || !fs.existsSync(path.join(resolved, '.git'))) {
+        throw new Error(`Geçersiz proje kökü: '${workspacePath}' geçerli bir git deposu değil (.git bulunamadı).`);
+      }
       const baseName = path.basename(workspacePath);
       const newId = `${this.owner}/${baseName.toLowerCase()}`;
       matchedCtx = this.createContext(newId, baseName, 4, workspacePath, true);

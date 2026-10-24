@@ -21,6 +21,8 @@ test('ProjectHub initializes with default context and lists projects', () => {
 test('ProjectHub handles focus auto-switching when workspace path changes', () => {
   const tmpDirA = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-proj-a-'));
   const tmpDirB = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-proj-b-'));
+  fs.mkdirSync(path.join(tmpDirA, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(tmpDirB, '.git'), { recursive: true });
 
   try {
     const hub = new ProjectHub(tmpDirA);
@@ -49,6 +51,8 @@ test('ProjectHub handles focus auto-switching when workspace path changes', () =
 test('ProjectHub maintains strictly isolated namespaced contexts', () => {
   const tmpDirA = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-iso-a-'));
   const tmpDirB = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-iso-b-'));
+  fs.mkdirSync(path.join(tmpDirA, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(tmpDirB, '.git'), { recursive: true });
 
   try {
     const hub = new ProjectHub(tmpDirA);
@@ -86,6 +90,7 @@ test('DashboardServer handles /api/projects and /api/projects/focus endpoints', 
 
     // 2. POST /api/projects/focus (Auto-Follow simulation from Antigravity)
     const newWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-other-proj-'));
+    fs.mkdirSync(path.join(newWorkspace, '.git'), { recursive: true });
 
     const focusRes = await fetch(`http://localhost:${port}/api/projects/focus`, {
       method: 'POST',
@@ -101,5 +106,35 @@ test('DashboardServer handles /api/projects and /api/projects/focus endpoints', 
   } finally {
     await server.stop();
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('ProjectHub handleFocus rejects directory without .git', () => {
+  const invalidDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-no-git-'));
+  try {
+    const hub = new ProjectHub();
+    assert.throws(() => {
+      hub.handleFocus(invalidDir);
+    }, /geçerli bir git deposu değil/);
+  } finally {
+    fs.rmSync(invalidDir, { recursive: true, force: true });
+  }
+});
+
+test('ProjectHub findMatchingLocalPath prioritizes exact match over prefix or substring', () => {
+  const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-parent-test-'));
+  const aegisSandbox = path.join(parentDir, 'aegis-sandbox');
+  const aegisExact = path.join(parentDir, 'aegis');
+  const otherDir = path.join(parentDir, 'other');
+  fs.mkdirSync(aegisSandbox, { recursive: true });
+  fs.mkdirSync(aegisExact, { recursive: true });
+  fs.mkdirSync(otherDir, { recursive: true });
+
+  try {
+    const hub = new ProjectHub(otherDir);
+    const matched = hub.findMatchingLocalPath('aegis');
+    assert.strictEqual(matched, aegisExact);
+  } finally {
+    fs.rmSync(parentDir, { recursive: true, force: true });
   }
 });
