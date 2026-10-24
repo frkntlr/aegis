@@ -60,3 +60,21 @@ test('handleSkeleton and handleVerify inspect target files accurately', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('dev-helpers collectSourceFiles and verifyFile validate correctly', async () => {
+  const { collectSourceFiles, verifyFile } = await import('./dev-helpers.js');
+  const { IronCageValidator } = await import('@aegis/iron-cage');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-dev-helpers-test-'));
+  try {
+    const fileA = path.join(tmpDir, 'a.ts');
+    fs.writeFileSync(fileA, 'export const A = 1;\n', 'utf8');
+
+    const files = collectSourceFiles(tmpDir);
+    assert.strictEqual(files.length, 1);
+
+    const validator = new IronCageValidator();
+    assert.strictEqual(verifyFile(fileA, validator), true);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

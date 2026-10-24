@@ -114,3 +114,19 @@ test('GitHubWikiLiveAdapter prevents path traversal when retrieving or publishin
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('wiki-helpers formats and parses wiki markdown accurately', async () => {
+  const { formatWikiMarkdown, parseWikiMarkdown, cleanGitEnv } = await import('./wiki-helpers.js');
+  const env = cleanGitEnv();
+  assert.strictEqual(env.GIT_TERMINAL_PROMPT, '0');
+
+  const md = formatWikiMarkdown('Test Title', ['Point 1', 'Point 2', 'Point 3'], 'Detailed body text');
+  assert.ok(md.includes('# Test Title'));
+  assert.ok(md.includes('• Point 1'));
+
+  const parsed = parseWikiMarkdown('test-slug', md);
+  assert.strictEqual(parsed.title, 'Test Title');
+  assert.strictEqual(parsed.threeBulletSummary[0], 'Point 1');
+  assert.strictEqual(parsed.threeBulletSummary[1], 'Point 2');
+  assert.strictEqual(parsed.threeBulletSummary[2], 'Point 3');
+});

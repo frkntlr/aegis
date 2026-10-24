@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { GitHubLiveAdapter, GitHubProjectsAdapter, GitHubTokenResolver, RateLimitInfo } from '@aegis/github-live';
 import type { SystemIssue } from './realtime-metrics.js';
+import { INITIAL_DEFAULT_ISSUES, buildIssueBody, buildQualityGateComment } from './kanban-templates.js';
 
 export interface GitHubKanbanOptions {
   repoRoot?: string;
@@ -57,24 +58,7 @@ export class GitHubKanbanService {
         }
       } catch { /* ignore */ }
     }
-    this.issues = [
-      {
-        id: 1,
-        number: 1,
-        title: 'feat(kanban): Real-time GitHub Projects & Kanban Live Synchronization',
-        status: 'done',
-        targetFiles: ['packages/web-dashboard/src/server/github-kanban.ts'],
-        labels: ['status:done', 'aegis:task']
-      },
-      {
-        id: 2,
-        number: 2,
-        title: 'feat(ast): Multi-Language AST Skeleton Extraction for C/C++ and Go',
-        status: 'done',
-        targetFiles: ['packages/core/ast-skeleton/src/index.ts'],
-        labels: ['status:done', 'aegis:task']
-      }
-    ];
+    this.issues = [...INITIAL_DEFAULT_ISSUES];
   }
 
   private persistIssues(): void {
@@ -170,7 +154,7 @@ export class GitHubKanbanService {
   }
 
   public async createIssue(title: string, targetFiles: string[] = []): Promise<SystemIssue> {
-    const defaultBody = this.buildIssueBody(title, targetFiles);
+    const defaultBody = buildIssueBody(title, targetFiles);
     const labels = ['status:ready', 'aegis:task', ...targetFiles.map(f => `lock:${f}`)];
 
     if (this.adapter && this.connected) {
@@ -191,21 +175,6 @@ export class GitHubKanbanService {
       } catch { /* ignore */ }
     }
     return this.createLocalIssue(title, targetFiles, labels, defaultBody);
-  }
-
-  private buildIssueBody(title: string, targetFiles: string[]): string {
-    return [
-      `### Objective`,
-      title,
-      '',
-      `### Target Files`,
-      targetFiles.map(f => `- \`${f}\``).join('\n') || '- None specified',
-      '',
-      `### Acceptance Criteria`,
-      `- [ ] Strict compliance with Demir Kafes (max 40 lines/function, max 300 lines/file).`,
-      `- [ ] All unit tests pass locally before requesting atomic merge.`,
-      `- [ ] Zero token bloat: only surgical unified diffs are accepted.`
-    ].join('\n');
   }
 
   public updateIssueStatus(num: number, targetStatus: SystemIssue['status'], agent?: string, ide?: string): SystemIssue | null {
@@ -243,15 +212,7 @@ export class GitHubKanbanService {
         const tool = ide || 'Google Antigravity';
         this.adapter?.addComment(num, `🤖 **Aegis Fleet**: Agent \`@${ag}\` (${tool}) claimed this task.\nLocks: ${issue.targetFiles.map(f => `\`${f}\``).join(', ')}`);
       } else if (targetStatus === 'done') {
-        const report = [
-          '### 🛡️ Aegis Autonomous Quality Gate Report',
-          `- **Status:** COMPLETED & VERIFIED ✅`,
-          `- **Resolver Agent:** \`@${agent || 'solver'}\` (${ide || 'Google Antigravity'})`,
-          `- **Demir Kafes Compliance:** PASS (Max 40 lines/fn, max 300 lines/file)`,
-          `- **Pre-Commit Tests:** PASS (100% tests green)`,
-          `- **Checklist Verified:** All acceptance criteria satisfied.`,
-          `- **Timestamp:** ${new Date().toISOString()}`
-        ].join('\n');
+        const report = buildQualityGateComment(agent, ide);
         this.adapter?.addComment(num, report);
       } else if (targetStatus === 'blocked') {
         this.adapter?.addComment(num, `🛑 **Aegis Loop Breaker**: Task marked as blocked. Locks released.`);

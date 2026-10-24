@@ -4,16 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { GitHubTokenResolver } from './token-resolver.js';
 import type { WikiPage, WikiSyncStatus } from './types.js';
 import { DEFAULT_WIKI_SUITE } from './wiki-suite.js';
-
-function cleanGitEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-  delete env.GIT_DIR;
-  delete env.GIT_INDEX_FILE;
-  delete env.GIT_WORK_TREE;
-  delete env.GIT_PREFIX;
-  delete env.GIT_COMMON_DIR;
-  return env;
-}
+import { cleanGitEnv, formatWikiMarkdown, parseWikiMarkdown } from './wiki-helpers.js';
 
 export interface WikiAdapterOptions {
   token?: string;
@@ -133,7 +124,7 @@ export class GitHubWikiLiveAdapter {
     return files.map(f => {
       const slug = path.basename(f, '.md');
       const raw = fs.readFileSync(path.join(this.cloneDir, f), 'utf8');
-      return this.parsePage(slug, raw);
+      return parseWikiMarkdown(slug, raw);
     });
   }
 
@@ -143,7 +134,7 @@ export class GitHubWikiLiveAdapter {
     if (!filePath.startsWith(path.resolve(this.cloneDir))) return undefined;
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf8');
-      return this.parsePage(cleanSlug, raw);
+      return parseWikiMarkdown(cleanSlug, raw);
     }
     return this.getFallbackPages().find(p => p.slug === cleanSlug);
   }
@@ -153,19 +144,7 @@ export class GitHubWikiLiveAdapter {
     fs.mkdirSync(this.cloneDir, { recursive: true });
     const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
     if (!filePath.startsWith(path.resolve(this.cloneDir))) return false;
-    const md = [
-      `# ${title}`,
-      '',
-      '## Living Memory (Three Bullets)',
-      `• ${bullets[0]}`,
-      `• ${bullets[1]}`,
-      `• ${bullets[2]}`,
-      '',
-      '## Detailed Context',
-      content || '_Direct GitHub Wiki Living Memory._',
-      '',
-      `_Published to GitHub Wiki on: ${new Date().toISOString()}_`
-    ].join('\n');
+    const md = formatWikiMarkdown(title, bullets, content);
     fs.writeFileSync(filePath, md, 'utf8');
 
     const status = this.checkRemoteAvailability();
@@ -182,23 +161,6 @@ export class GitHubWikiLiveAdapter {
       }
     }
     return false;
-  }
-
-  private parsePage(slug: string, raw: string): WikiPage {
-    const lines = raw.split('\n');
-    const title = lines[0]?.replace(/^#\s*/, '').trim() || slug;
-    const bullets = lines.filter(l => l.trim().startsWith('• ')).map(l => l.replace(/^•\s*/, '').trim());
-    return {
-      slug,
-      title,
-      threeBulletSummary: [
-        bullets[0] || 'Living architecture documentation updated.',
-        bullets[1] || 'Living architecture documentation updated.',
-        bullets[2] || 'Demir Kafes compliance verified.'
-      ],
-      content: raw,
-      lastUpdated: new Date().toISOString()
-    };
   }
 
   public seedComprehensiveWikiSuite(): { created: number; pages: string[] } {

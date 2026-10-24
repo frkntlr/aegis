@@ -250,3 +250,18 @@ test('GitHubKanbanService persists local issues to disk and reloads them', async
     fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
+
+test('kanban-templates formats issue body and quality gate comment accurately', async () => {
+  const { buildIssueBody, buildQualityGateComment, INITIAL_DEFAULT_ISSUES } = await import('./server/kanban-templates.js');
+  assert.ok(INITIAL_DEFAULT_ISSUES.length >= 2);
+
+  const body = buildIssueBody('Sample Objective', ['file1.ts', 'file2.ts']);
+  assert.ok(body.includes('### Objective'));
+  assert.ok(body.includes('Sample Objective'));
+  assert.ok(body.includes('- `file1.ts`'));
+
+  const comment = buildQualityGateComment('solver', 'Google Antigravity', '2026-10-24T00:00:00Z');
+  assert.ok(comment.includes('Aegis Autonomous Quality Gate Report'));
+  assert.ok(comment.includes('@solver'));
+  assert.ok(comment.includes('Google Antigravity'));
+});
