@@ -52,3 +52,24 @@ test('CompoundingErrorChecker alerts on cascading test regressions', () => {
   assert.strictEqual(alert.alert, 'TEST_REGRESSION');
   assert.strictEqual(alert.recommendedRollbackStep, 1);
 });
+
+
+test('CompoundingErrorChecker does not trigger runaway diff when baseline step has 0 diff lines', () => {
+  const checker = new CompoundingErrorChecker();
+  checker.recordStep({ step: 1, changedFilesCount: 0, diffLinesCount: 0, failingTestsCount: 0, timestamp: '' });
+  checker.recordStep({ step: 2, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 0, timestamp: '' });
+
+  const alert = checker.recordStep({ step: 3, changedFilesCount: 2, diffLinesCount: 70, failingTestsCount: 0, timestamp: '' });
+  assert.strictEqual(alert, null);
+});
+
+test('CompoundingErrorChecker alerts with COMPOUNDING_ERROR when runaway diff and test regressions coincide', () => {
+  const checker = new CompoundingErrorChecker();
+  checker.recordStep({ step: 1, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 1, timestamp: '' });
+  checker.recordStep({ step: 2, changedFilesCount: 2, diffLinesCount: 25, failingTestsCount: 3, timestamp: '' });
+
+  const alert = checker.recordStep({ step: 3, changedFilesCount: 5, diffLinesCount: 100, failingTestsCount: 6, timestamp: '' });
+  assert.ok(alert);
+  assert.strictEqual(alert.alert, 'COMPOUNDING_ERROR');
+  assert.strictEqual(alert.recommendedRollbackStep, 1);
+});

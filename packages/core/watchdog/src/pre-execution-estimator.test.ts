@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { PreExecutionEstimator } from './pre-execution-estimator.js';
+import type { EstimationFactors } from '@aegis/shared';
 
 test('PreExecutionEstimator calculates base timeout for 0 changes', () => {
   const estimator = new PreExecutionEstimator({ baseTimeoutSeconds: 30 });
@@ -61,4 +62,14 @@ test('PreExecutionEstimator respects max ceiling', () => {
   });
 
   assert.strictEqual(result.calculatedTimeoutSeconds, 300);
+});
+
+
+test('PreExecutionEstimator safely handles undefined factors without producing NaN', () => {
+  const estimator = new PreExecutionEstimator();
+  const result = estimator.estimate({} as unknown as EstimationFactors);
+
+  assert.strictEqual(isNaN(result.calculatedTimeoutSeconds), false);
+  assert.strictEqual(result.calculatedTimeoutSeconds, 30);
+  assert.strictEqual(result.confidence, 'medium');
 });

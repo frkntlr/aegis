@@ -120,3 +120,20 @@ test('TaskDispatcher skips closed or done issues even if present in queue', () =
   const res = dispatcher.dispatchNextTask(['solver'], [doneIssue, readyWithDoneLabel]);
   assert.strictEqual(res.dispatched, false);
 });
+
+
+test('TaskDispatcher prevents assigning tasks to incompatible specialized agents', () => {
+  const wt = new WorktreeManager();
+  const dispatcher = new TaskDispatcher(wt);
+
+  const bugIssue: GitHubIssue = {
+    ...makeIssue(60, ['packages/core/engine.ts']),
+    title: 'Fix critical engine panic bug',
+    labels: ['bug', 'status:ready']
+  };
+
+  // Only docs agent is idle in pool
+  const res = dispatcher.dispatchNextTask(['docs'], [bugIssue]);
+  assert.strictEqual(res.dispatched, false);
+  assert.ok(res.reason?.includes('No compatible idle agents'));
+});

@@ -16,7 +16,8 @@ export class NotebookLmBridge {
 
   public exportRfcResearchNote(rfc: ParsedRfc): ResearchNoteResult {
     fs.mkdirSync(this.researchDir, { recursive: true });
-    const slug = rfc.targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const rawSlug = rfc.targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const slug = rawSlug || 'unnamed-rfc';
     const filePath = path.resolve(this.researchDir, `rfc-${slug}-research.md`);
 
     const lines = [
@@ -25,7 +26,7 @@ export class NotebookLmBridge {
       `## 1. RFC Overview`,
       `* **Title:** ${rfc.title}`,
       `* **Category:** ${rfc.category}`,
-      `* **Target Files:** ${rfc.proposedFiles.join(', ')}`,
+      `* **Target Files:** ${(rfc.proposedFiles ?? []).join(', ')}`,
       '',
       `## 2. Architectural Rationale`,
       rfc.rationale,

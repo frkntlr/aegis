@@ -134,3 +134,47 @@ test('OrphanTaskReclaimer ignores closed and done issues', () => {
   assert.strictEqual(result.updatedIssues[0].status, 'done');
   assert.strictEqual(result.updatedIssues[1].status, 'in_progress');
 });
+
+
+test('OrphanTaskReclaimer reclaims tasks when agent registered session lacks heartbeat', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 8,
+      number: 8,
+      title: 'Crash before heartbeat',
+      status: 'in_progress',
+      assignedAgent: 'solver',
+      targetFiles: ['src/init.ts']
+    }
+  ];
+  const locks = new Map<string, string>([['src/init.ts', 'solver']]);
+  // Session registered without lastHeartbeat
+  const sessions: AgentSessionSummary[] = [{ agentName: 'solver' }];
+
+  const result = reclaimer.scanAndReclaim(issues, locks, sessions);
+  assert.strictEqual(result.reclaimed.length, 1);
+  assert.strictEqual(result.reclaimed[0].issueNumber, 8);
+  assert.ok(result.reclaimed[0].reason.includes('missing_heartbeat'));
+  assert.strictEqual(result.updatedIssues[0].status, 'ready');
+});
+
+test('OrphanTaskReclaimer matches agent names case-insensitively in locks and sessions', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 9,
+      number: 9,
+      title: 'Case mismatch task',
+      status: 'in_progress',
+      assignedAgent: 'Solver',
+      targetFiles: ['src/case.ts']
+    }
+  ];
+  const locks = new Map<string, string>([['src/case.ts', 'solver']]);
+  const sessions: AgentSessionSummary[] = [{ agentName: 'SOLVER', lastHeartbeat: new Date().toISOString() }];
+
+  const result = reclaimer.scanAndReclaim(issues, locks, sessions);
+  assert.strictEqual(result.reclaimed.length, 0);
+  assert.strictEqual(result.updatedIssues[0].status, 'in_progress');
+});

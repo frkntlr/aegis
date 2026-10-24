@@ -25,13 +25,13 @@ export class PreExecutionEstimator {
 
   public estimate(factors: EstimationFactors): TimeoutEstimation {
     const rawCalculated = this.baseTimeout
-      + (this.alpha * Math.max(0, factors.blastRadiusFiles))
-      + (this.beta * Math.max(0, factors.affectedTestCount))
-      + (this.gamma * Math.max(0, factors.dependencyDepth));
+      + (this.alpha * Math.max(0, factors.blastRadiusFiles ?? 0))
+      + (this.beta * Math.max(0, factors.affectedTestCount ?? 0))
+      + (this.gamma * Math.max(0, factors.dependencyDepth ?? 0));
 
     let finalTimeout = rawCalculated;
     let confidence: 'high' | 'medium' | 'low' = 'medium';
-    let reasoning = `Base ${this.baseTimeout}s + (${factors.blastRadiusFiles} files × ${this.alpha}s) + (${factors.affectedTestCount} tests × ${this.beta}s) + (depth ${factors.dependencyDepth} × ${this.gamma}s)`;
+    let reasoning = `Base ${this.baseTimeout}s + (${factors.blastRadiusFiles ?? 0} files × ${this.alpha}s) + (${factors.affectedTestCount ?? 0} tests × ${this.beta}s) + (depth ${factors.dependencyDepth ?? 0} × ${this.gamma}s)`;
 
     if (factors.historicalAverageSeconds && factors.historicalAverageSeconds > 0) {
       // Historical safety factor of 1.5x
@@ -40,7 +40,7 @@ export class PreExecutionEstimator {
       confidence = 'high';
       reasoning += ` | Calibrated with historical average ${factors.historicalAverageSeconds.toFixed(1)}s (1.5x buffer)`;
     } else {
-      confidence = factors.blastRadiusFiles <= 2 ? 'medium' : 'low';
+      confidence = (factors.blastRadiusFiles ?? 0) <= 2 ? 'medium' : 'low';
     }
 
     finalTimeout = Math.min(finalTimeout, this.maxCeiling);

@@ -22,7 +22,8 @@ export class RfcTriager {
   }
 
   private deriveTargetFiles(category: 'language' | 'ide' | 'tool', targetName: string): string[] {
-    const slug = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const rawSlug = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const slug = rawSlug || 'extension';
     if (category === 'language') {
       return [
         `packages/core/ast-skeleton/src/${slug}-extractor.ts`,
@@ -46,11 +47,12 @@ export class RfcTriager {
     return stripped || m[1].trim();
   }
 
-  public parseRfc(title: string, body: string, discussionNumber?: number): ParsedRfc {
-    const category = this.detectCategory(`${title}\n${body}`);
+  public parseRfc(title: string, body?: string, discussionNumber?: number): ParsedRfc {
+    const safeBody = body ?? '';
+    const category = this.detectCategory(`${title}\n${safeBody}`);
     const targetName = this.extractTargetName(title);
 
-    const fileMatches = body.match(/packages\/[a-zA-Z0-9_\-\/.]+\.ts/g);
+    const fileMatches = safeBody.match(/packages\/[a-zA-Z0-9_\-\/.]+\.ts/g);
     const proposedFiles = fileMatches && fileMatches.length > 0
       ? Array.from(new Set(fileMatches))
       : this.deriveTargetFiles(category, targetName);
@@ -60,7 +62,7 @@ export class RfcTriager {
       title,
       category,
       targetName,
-      rationale: body.slice(0, 500).trim(),
+      rationale: safeBody.slice(0, 500).trim(),
       proposedFiles
     };
   }

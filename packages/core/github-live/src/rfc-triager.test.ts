@@ -38,3 +38,12 @@ test('RfcTriager parses support and compound language names', () => {
   assert.strictEqual(parsed.targetName, 'Godot C#');
   assert.ok(parsed.proposedFiles[0].includes('godotc'));
 });
+
+
+test('RfcTriager handles undefined or empty body and special character names safely', () => {
+  const triager = new RfcTriager();
+  const parsed = triager.parseRfc('RFC: ###!!!', undefined, 12);
+  assert.strictEqual(parsed.category, 'language');
+  assert.ok(parsed.proposedFiles.length > 0);
+  assert.ok(!parsed.proposedFiles[0].includes('//'));
+});

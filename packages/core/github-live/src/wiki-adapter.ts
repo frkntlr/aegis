@@ -128,17 +128,21 @@ export class GitHubWikiLiveAdapter {
   }
 
   public getPage(slug: string): WikiPage | undefined {
-    const filePath = path.join(this.cloneDir, `${slug}.md`);
+    const cleanSlug = path.basename(slug).replace(/\.md$/, '');
+    const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
+    if (!filePath.startsWith(path.resolve(this.cloneDir))) return undefined;
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf8');
-      return this.parsePage(slug, raw);
+      return this.parsePage(cleanSlug, raw);
     }
-    return this.getFallbackPages().find(p => p.slug === slug);
+    return this.getFallbackPages().find(p => p.slug === cleanSlug);
   }
 
   public publishPage(slug: string, title: string, bullets: [string, string, string], content = ''): boolean {
+    const cleanSlug = path.basename(slug).replace(/\.md$/, '') || 'wiki-page';
     fs.mkdirSync(this.cloneDir, { recursive: true });
-    const filePath = path.join(this.cloneDir, `${slug}.md`);
+    const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
+    if (!filePath.startsWith(path.resolve(this.cloneDir))) return false;
     const md = [
       `# ${title}`,
       '',
@@ -158,8 +162,8 @@ export class GitHubWikiLiveAdapter {
     if (status.available && fs.existsSync(path.join(this.cloneDir, '.git'))) {
       try {
         const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-        execFileSync('git', ['-C', this.cloneDir, 'add', `${slug}.md`], { stdio: 'pipe', env });
-        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${slug} living memory`], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
         execFileSync('git', ['-C', this.cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
         return true;
       } catch {

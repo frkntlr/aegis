@@ -22,6 +22,15 @@ export class CompoundingErrorChecker {
     this.maxGrowthMultiplier = options.maxGrowthMultiplier ?? 2.5;
   }
 
+  private createAlert(
+    alert: CompoundingAlert['alert'],
+    step: number,
+    rollbackStep: number,
+    reason: string
+  ): CompoundingAlert {
+    return { alert, currentStep: step, recommendedRollbackStep: rollbackStep, reason };
+  }
+
   public recordStep(metric: StepMetric): CompoundingAlert | null {
     this.history.push(metric);
     const len = this.history.length;
@@ -31,28 +40,23 @@ export class CompoundingErrorChecker {
     const prev1 = this.history[len - 2];
     const prev2 = this.history[len - 3];
 
-    // Check 1: Exponential Diff Growth over 3 consecutive steps
-    const isDiffGrowing = current.diffLinesCount > (prev1.diffLinesCount * this.maxGrowthMultiplier) &&
-                          prev1.diffLinesCount > (prev2.diffLinesCount * 1.5);
+    const isDiffGrowing = prev2.diffLinesCount > 0 &&
+      current.diffLinesCount > (prev1.diffLinesCount * this.maxGrowthMultiplier) &&
+      prev1.diffLinesCount > (prev2.diffLinesCount * 1.5);
 
-    if (isDiffGrowing && current.diffLinesCount > 60) {
-      return {
-        alert: 'RUNAWAY_DIFF',
-        currentStep: current.step,
-        recommendedRollbackStep: prev2.step,
-        reason: `Diff lines increased exponentially (${prev2.diffLinesCount} -> ${prev1.diffLinesCount} -> ${current.diffLinesCount} lines). Cascade error detected.`
-      };
+    const isTestRegression = current.failingTestsCount > prev1.failingTestsCount &&
+      prev1.failingTestsCount > prev2.failingTestsCount;
+
+    if (isDiffGrowing && isTestRegression) {
+      return this.createAlert('COMPOUNDING_ERROR', current.step, prev2.step, 'Compounding error: runaway diff and cascading test failures.');
     }
-
-    // Check 2: Cascading test failures (increasing fail count across 3 turns)
-    if (current.failingTestsCount > prev1.failingTestsCount &&
-        prev1.failingTestsCount > prev2.failingTestsCount) {
-      return {
-        alert: 'TEST_REGRESSION',
-        currentStep: current.step,
-        recommendedRollbackStep: prev2.step,
-        reason: `Failing tests escalated continuously (${prev2.failingTestsCount} -> ${prev1.failingTestsCount} -> ${current.failingTestsCount}). Rolling back to clean state is advised.`
-      };
+    if (isDiffGrowing && current.diffLinesCount > 60) {
+      const msg = `Diff lines increased exponentially (${prev2.diffLinesCount} -> ${prev1.diffLinesCount} -> ${current.diffLinesCount} lines). Cascade error detected.`;
+      return this.createAlert('RUNAWAY_DIFF', current.step, prev2.step, msg);
+    }
+    if (isTestRegression) {
+      const msg = `Failing tests escalated continuously (${prev2.failingTestsCount} -> ${prev1.failingTestsCount} -> ${current.failingTestsCount}). Rolling back to clean state is advised.`;
+      return this.createAlert('TEST_REGRESSION', current.step, prev2.step, msg);
     }
 
     return null;

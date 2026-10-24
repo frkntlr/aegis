@@ -100,6 +100,11 @@ export class MergePipeline {
 
   private step3Merge(mergingAgent: string, steps: MergeStepReport[]): boolean {
     try {
+      execFileSync('git', ['checkout', this.baseBranch], {
+        cwd: this.repoRoot,
+        stdio: 'pipe',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
       execFileSync('git', ['merge', '--ff-only', `aegis/${mergingAgent}`], {
         cwd: this.repoRoot,
         stdio: 'pipe',

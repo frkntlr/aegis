@@ -44,29 +44,27 @@ export class TaskDispatcher {
       return { dispatched: false, reason: 'No ready issues found in GitHub queue.' };
     }
 
+    const isRoleCompatible = (agent: string, role: string): boolean => {
+      if (agent === role) return true;
+      const specialized = ['solver', 'qa', 'docs'];
+      return !specialized.includes(agent);
+    };
+
     for (const issue of filteredIssues) {
       const inference = this.roleClassifier.classify(issue);
-      const optimalAgent = availableAgents.find(a => a === inference.role);
-      if (optimalAgent) {
-        const lockAttempt = this.worktreeManager.acquireFileLocks(optimalAgent, issue.targetFiles);
+      const eligibleAgent = availableAgents.find(a => a === inference.role)
+        ?? availableAgents.find(a => isRoleCompatible(a, inference.role));
+      if (eligibleAgent) {
+        const lockAttempt = this.worktreeManager.acquireFileLocks(eligibleAgent, issue.targetFiles);
         if (lockAttempt.success) {
-          return { dispatched: true, agentName: optimalAgent, issue };
-        }
-      }
-    }
-
-    for (const agent of availableAgents) {
-      for (const issue of filteredIssues) {
-        const lockAttempt = this.worktreeManager.acquireFileLocks(agent, issue.targetFiles);
-        if (lockAttempt.success) {
-          return { dispatched: true, agentName: agent, issue };
+          return { dispatched: true, agentName: eligibleAgent, issue };
         }
       }
     }
 
     return {
       dispatched: false,
-      reason: 'All available ready issues have file conflicts with currently running tasks.'
+      reason: 'No compatible idle agents or available ready issues without file conflicts.'
     };
   }
 

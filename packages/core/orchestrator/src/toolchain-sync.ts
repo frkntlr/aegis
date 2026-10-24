@@ -100,9 +100,17 @@ export class UniversalToolchainSync {
 
       const rulesFile = path.resolve(this.repoRoot, '.cursorrules');
       const skillLines = skills.map(s => `- **${s.name}**: ${s.description}`).join('\n');
-      const header = `# Aegis Synchronized Skills Index\n${skillLines}\n\n`;
-      if (!fs.existsSync(rulesFile) || !fs.readFileSync(rulesFile, 'utf8').includes('Aegis Synchronized Skills')) {
-        fs.writeFileSync(rulesFile, header + (fs.existsSync(rulesFile) ? fs.readFileSync(rulesFile, 'utf8') : ''), 'utf8');
+      const header = `# Aegis Synchronized Skills Index\n${skillLines}\n<!-- aegis:skills:end -->\n\n`;
+      if (fs.existsSync(rulesFile)) {
+        const existing = fs.readFileSync(rulesFile, 'utf8');
+        const pattern = /# Aegis Synchronized Skills Index[\s\S]*?(?:<!-- aegis:skills:end -->\r?\n\r?\n?|(?=\r?\n#)|\n$|$)/;
+        if (pattern.test(existing)) {
+          fs.writeFileSync(rulesFile, existing.replace(pattern, header), 'utf8');
+        } else {
+          fs.writeFileSync(rulesFile, header + existing, 'utf8');
+        }
+      } else {
+        fs.writeFileSync(rulesFile, header, 'utf8');
       }
       return true;
     } catch (e: unknown) {
@@ -137,7 +145,12 @@ export class UniversalToolchainSync {
 
     if (this.syncCursor(skills, mcps, warnings)) syncedIdes.push('Cursor AI');
     if (this.syncVSCode(mcps, warnings)) syncedIdes.push('VS Code');
-    syncedIdes.push('Google Antigravity');
+
+    const agySkills = path.resolve(this.repoRoot, '.agents', 'skills');
+    const isAgyPresent = fs.existsSync(agySkills) || fs.existsSync(path.resolve(this.repoRoot, '.gemini')) || Boolean(process.env.ANTIGRAVITY_ENV);
+    if (isAgyPresent) {
+      syncedIdes.push('Google Antigravity');
+    }
 
     return {
       timestamp: new Date().toISOString(),

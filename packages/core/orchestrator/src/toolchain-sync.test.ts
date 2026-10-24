@@ -49,3 +49,36 @@ test('UniversalToolchainSync falls back to mcp.example.json when mcp.json is mis
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+
+test('UniversalToolchainSync updates .cursorrules dynamically when skills change', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cursor-update-'));
+  try {
+    const rulesFile = path.join(tmpDir, '.cursorrules');
+    fs.writeFileSync(rulesFile, '# Existing Rules\nSome custom rule.\n', 'utf8');
+
+    const skillsDir = path.join(tmpDir, '.agents', 'skills', 'new-skill');
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'SKILL.md'), '---\nname: new-skill\ndescription: Dynamic new skill\n---\n# Doc', 'utf8');
+
+    const sync = new UniversalToolchainSync(tmpDir);
+    sync.syncAll();
+
+    const content1 = fs.readFileSync(rulesFile, 'utf8');
+    assert.ok(content1.includes('new-skill'));
+    assert.ok(content1.includes('Some custom rule.'));
+
+    // Add a second skill
+    const skill2Dir = path.join(tmpDir, '.agents', 'skills', 'second-skill');
+    fs.mkdirSync(skill2Dir, { recursive: true });
+    fs.writeFileSync(path.join(skill2Dir, 'SKILL.md'), '---\nname: second-skill\ndescription: Second dynamic skill\n---\n# Doc', 'utf8');
+
+    sync.syncAll();
+    const content2 = fs.readFileSync(rulesFile, 'utf8');
+    assert.ok(content2.includes('new-skill'));
+    assert.ok(content2.includes('second-skill'));
+    assert.ok(content2.includes('Some custom rule.'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

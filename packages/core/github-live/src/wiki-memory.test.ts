@@ -95,3 +95,22 @@ test('GitHubWikiLiveAdapter backs up conflicting local wiki before re-cloning', 
     fs.rmSync(tmpBase, { recursive: true, force: true });
   }
 });
+
+
+test('GitHubWikiLiveAdapter prevents path traversal when retrieving or publishing pages', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-traversal-test-'));
+  try {
+    const adapter = new GitHubWikiLiveAdapter({ localCloneDir: tmpDir });
+    // Attempting traversal slug
+    adapter.publishPage('../../traversal', 'Traversal Test', ['A', 'B', 'C'], 'content');
+
+    // Page must be contained inside tmpDir, not escape into parent
+    const safePage = adapter.getPage('../../traversal');
+    assert.ok(safePage);
+    assert.strictEqual(safePage.slug, 'traversal');
+    assert.ok(fs.existsSync(path.join(tmpDir, 'traversal.md')));
+    assert.strictEqual(fs.existsSync(path.resolve(tmpDir, '..', 'traversal.md')), false);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

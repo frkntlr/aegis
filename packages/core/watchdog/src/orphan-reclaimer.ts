@@ -43,17 +43,18 @@ export class OrphanTaskReclaimer {
     agentName: string,
     sessions: AgentSessionSummary[]
   ): { active: boolean; reason?: string } {
-    const session = sessions.find(s => s.agentName === agentName);
+    const session = sessions.find(s => s.agentName.toLowerCase() === agentName.toLowerCase());
     if (!session) {
       return { active: false, reason: `Agent [${agentName}] has no active registered session.` };
     }
-    if (session.lastHeartbeat) {
-      const hbTime = new Date(session.lastHeartbeat).getTime();
-      const elapsed = Date.now() - hbTime;
-      if (!isNaN(hbTime) && elapsed > this.staleTimeoutMs) {
-        const mins = Math.round(elapsed / 60000);
-        return { active: false, reason: `Agent [${agentName}] heartbeat expired (${mins}m silence).` };
-      }
+    if (!session.lastHeartbeat) {
+      return { active: false, reason: `Agent [${agentName}] registered without heartbeat (missing_heartbeat).` };
+    }
+    const hbTime = new Date(session.lastHeartbeat).getTime();
+    const elapsed = Date.now() - hbTime;
+    if (isNaN(hbTime) || elapsed > this.staleTimeoutMs) {
+      const mins = Math.round(elapsed / 60000);
+      return { active: false, reason: `Agent [${agentName}] heartbeat expired (${mins}m silence).` };
     }
     return { active: true };
   }
@@ -78,7 +79,7 @@ export class OrphanTaskReclaimer {
     }
 
     if (issue.targetFiles && issue.targetFiles.length > 0) {
-      const hasAnyLock = issue.targetFiles.some(f => lockedFiles.get(f) === issue.assignedAgent);
+      const hasAnyLock = issue.targetFiles.some(f => lockedFiles.get(f)?.toLowerCase() === issue.assignedAgent?.toLowerCase());
       if (!hasAnyLock) {
         return `Assigned agent [${issue.assignedAgent}] holds zero active file locks for target files.`;
       }
