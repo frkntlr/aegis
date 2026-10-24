@@ -41,6 +41,10 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis godot <subcmd>` | Godot Bridge: status, inspect, validate, query, run | `npm run aegis -- godot <subcmd>` |
 | `/aegis diff <diff>` | Validate surgical unified diff compliance | `npm run aegis -- diff <diff>` |
 | `/aegis audit <files>` | Run Immutable Oracle trust verification | `npm run aegis -- audit <files>` |
+| `/aegis ast:search <pat> [dir]` | Structural AST search via ast-grep | `npm run aegis -- ast:search <pat> [dir]` |
+| `/aegis ast:replace <p> <r> <f>` | Structural AST replacement via ast-grep | `npm run aegis -- ast:replace <p> <r> <f>` |
+| `/aegis rtk:compress [file]` | Compress terminal/test output via RTK | `npm run aegis -- rtk:compress [file]` |
+| `/aegis context7:query <l> <t>` | Query official library documentation | `npm run aegis -- context7:query <l> <t>` |
 
 ## Core Principles
 1. **Iron Cage Enforcement**: Maximum 300 lines per file, maximum 40 lines per function.

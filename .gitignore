@@ -43,6 +43,7 @@ tmp/
 .windsurf/
 .gemini/
 .zed/
+.godot/
 .cursor/*
 !.cursor/mcp.example.json
 !.cursor/settings.json

@@ -25,6 +25,10 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis diff <diff>`: Validate surgical unified diff compliance.
 - `/aegis audit <files>`: Run Immutable Oracle trust verification.
 - `/aegis estimate <files> <tests>`: Pre-execution adaptive timeout estimation.
+- `/aegis ast:search <pat> [dir]`: Structural AST search via ast-grep.
+- `/aegis ast:replace <p> <r> <f>`: Structural AST replacement via ast-grep.
+- `/aegis rtk:compress [file]`: Compress terminal/test output via RTK Token Killer.
+- `/aegis context7:query <lib> <top>`: Query official ground-truth library documentation.
 
 ## Headless Git & Remote Execution Safeguards
 To prevent indefinite command hangs during git remote operations:
