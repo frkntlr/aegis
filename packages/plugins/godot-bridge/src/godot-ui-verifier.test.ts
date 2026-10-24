@@ -99,3 +99,35 @@ test('GodotUiVerifier does not report overlap for parent-child hierarchies', () 
   const res = verifier.verifyPayload(payload);
   assert.strictEqual(res.overlaps.length, 0);
 });
+
+test('GodotUiVerifier identifies undersized touch targets on interactive controls', () => {
+  const verifier = new GodotUiVerifier();
+  const payload: GodotUiTreePayload = {
+    viewport: { width: 1080, height: 1920, aspectRatio: '9:16' },
+    nodes: [
+      {
+        id: 'tiny_btn',
+        name: 'TinyButton',
+        type: 'Button',
+        visible: true,
+        rect: { x: 50, y: 50, width: 24, height: 24 }
+      },
+      {
+        id: 'normal_btn',
+        name: 'NormalButton',
+        type: 'Button',
+        visible: true,
+        rect: { x: 50, y: 150, width: 80, height: 80 }
+      }
+    ]
+  };
+
+  const res = verifier.verifyPayload(payload, { minTouchTarget: 44 });
+  assert.strictEqual(res.undersizedTargets.length, 1);
+  assert.strictEqual(res.undersizedTargets[0].nodeId, 'tiny_btn');
+  assert.strictEqual(res.undersizedTargets[0].width, 24);
+  assert.strictEqual(res.passed, true);
+
+  const strictRes = verifier.verifyPayload(payload, { minTouchTarget: 44, enforceMinTouchTarget: true });
+  assert.strictEqual(strictRes.passed, false);
+});

@@ -11,11 +11,19 @@ export interface UiClipping {
   reason: 'out_of_bounds_left' | 'out_of_bounds_right' | 'out_of_bounds_top' | 'out_of_bounds_bottom';
 }
 
+export interface UiUndersizedTarget {
+  nodeId: string;
+  width: number;
+  height: number;
+  minRecommended: number;
+}
+
 export interface AspectVerificationResult {
   aspectRatio: string;
   passed: boolean;
   overlaps: UiOverlap[];
   clippings: UiClipping[];
+  undersizedTargets: UiUndersizedTarget[];
   scannedCount: number;
 }
 
@@ -34,17 +42,43 @@ export class GodotUiVerifier {
     '3:4': { width: 1080, height: 1440 }
   };
 
-  public verifyPayload(payload: GodotUiTreePayload): AspectVerificationResult {
+  public verifyPayload(
+    payload: GodotUiTreePayload,
+    options: { minTouchTarget?: number; enforceMinTouchTarget?: boolean } = {}
+  ): AspectVerificationResult {
+    const minTarget = options.minTouchTarget ?? 44;
     const overlaps = this.findOverlaps(payload.nodes);
     const clippings = this.findClippings(payload.nodes, payload.viewport);
+    const undersizedTargets = this.findUndersizedTargets(payload.nodes, minTarget);
+
+    const passed = overlaps.length === 0 &&
+      clippings.length === 0 &&
+      (!options.enforceMinTouchTarget || undersizedTargets.length === 0);
 
     return {
       aspectRatio: payload.viewport.aspectRatio,
-      passed: overlaps.length === 0 && clippings.length === 0,
+      passed,
       overlaps,
       clippings,
+      undersizedTargets,
       scannedCount: payload.nodes.length
     };
+  }
+
+  private findUndersizedTargets(nodes: GodotUiNode[], minRecommended: number): UiUndersizedTarget[] {
+    const list: UiUndersizedTarget[] = [];
+    for (const node of nodes) {
+      if (!node.visible || !this.isInteractive(node)) continue;
+      if (node.rect.width < minRecommended || node.rect.height < minRecommended) {
+        list.push({
+          nodeId: node.id,
+          width: node.rect.width,
+          height: node.rect.height,
+          minRecommended
+        });
+      }
+    }
+    return list;
   }
 
   private findClippings(nodes: GodotUiNode[], viewport: { width: number; height: number }): UiClipping[] {

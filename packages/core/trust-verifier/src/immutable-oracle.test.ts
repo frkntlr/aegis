@@ -147,3 +147,22 @@ test('ImmutableOracle detects GDScript test tampering and vacuous assert_eq/asse
   assert.deepStrictEqual(report.tamperedTestFiles, ['test/test_player.gd']);
   assert.strictEqual(report.vacuousAssertionsFound, 2);
 });
+
+test('ImmutableOracle detects vacuous assert.ok(true), assert(true) and Python assert True', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['test/test_fake.py'],
+    newTestContents: [
+      {
+        filePath: 'test/test_fake.py',
+        content: `def test_tautology():\n    assert.ok(true)\n    assert True\n    assert(true)\n`
+      }
+    ],
+    reportedPassedCount: 1,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, true);
+  assert.strictEqual(report.verdict, 'REJECTED');
+  assert.strictEqual(report.vacuousAssertionsFound, 3);
+});

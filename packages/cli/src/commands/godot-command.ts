@@ -126,6 +126,10 @@ export function handleGodotInspect(projectDirArg?: string): void {
       for (const cl of res.clippings.slice(0, 2)) console.log(`   - Clipping: "${cl.nodeId}" (${cl.reason})`);
     } else {
       console.log(` • Aspect [${ratio}] (${dims.width}x${dims.height}): ✅ PASS`);
+      if (res.undersizedTargets.length > 0) {
+        const ut = res.undersizedTargets[0];
+        console.log(`   ℹ️ Küçük Dokunma Hedefi: "${ut.nodeId}" (${ut.width}x${ut.height}px < ${ut.minRecommended}px)`);
+      }
     }
   }
 
