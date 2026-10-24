@@ -36,9 +36,11 @@ export class GDScriptRulesValidator {
       this.checkComplexity(filePath, fn, violations);
       this.checkResourceLeaks(filePath, fn, violations);
       this.checkSignalUsage(filePath, fn, declaredSignals, violations);
+      this.checkTypedGDScript(filePath, fn, violations);
     }
 
     this.checkOnreadySafety(filePath, lines, violations);
+    this.checkParentCoupling(filePath, lines, violations);
     return violations;
   }
 
@@ -194,6 +196,60 @@ export class GDScriptRulesValidator {
           message: 'Empty @onready node path reference detected.',
           severity: 'error'
         });
+      }
+    }
+  }
+
+  private checkParentCoupling(filePath: string, lines: string[], violations: CageViolation[]): void {
+    const parentRegex = /(?:\$["']\.\.|\bget_node\s*\(\s*["']\.\.)/;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].replace(/#.*$/, '');
+      if (parentRegex.test(line)) {
+        violations.push({
+          rule: 'GD_007_COUPLING_PARENT_NODE',
+          filePath,
+          line: i + 1,
+          message: "Direct parent coupling via '../' detected. Decouple nodes using signals for upward communication.",
+          severity: 'error'
+        });
+      }
+    }
+  }
+
+  private checkTypedGDScript(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
+    let header = '';
+    for (const line of fn.lines) {
+      const stripped = line.replace(/#.*$/, '').trim();
+      header += (header ? ' ' : '') + stripped;
+      if (stripped.endsWith(':')) break;
+    }
+    const name = fn.name;
+    const parenOpen = header.indexOf('(');
+    const parenClose = header.lastIndexOf(')');
+    if (parenOpen === -1 || parenClose <= parenOpen) return;
+
+    if (name !== '_init' && !header.slice(parenClose).includes('->')) {
+      violations.push({
+        rule: 'GD_008_TYPED_GDSCRIPT',
+        filePath,
+        line: fn.startLine,
+        message: `Function '${name}' is missing an explicit return type hint (e.g. '-> void').`,
+        severity: 'warning'
+      });
+    }
+
+    const paramsStr = header.slice(parenOpen + 1, parenClose).trim();
+    if (paramsStr) {
+      for (const p of paramsStr.split(',').map(s => s.trim())) {
+        if (p && !p.includes(':')) {
+          violations.push({
+            rule: 'GD_008_TYPED_GDSCRIPT',
+            filePath,
+            line: fn.startLine,
+            message: `Parameter '${p}' in function '${name}' is missing a static type hint.`,
+            severity: 'warning'
+          });
+        }
       }
     }
   }

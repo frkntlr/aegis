@@ -74,6 +74,41 @@ function formatTaskDescription(agentName: string, issue: GitHubIssue): string {
   return lines.join('\n');
 }
 
+export function generateLanguageConstitution(targetFiles: string[]): string {
+  const baseLines = [
+    'Demir Kafes Constitution:',
+    '1. Max 300 lines per source file.',
+    '2. Max 40 lines per function.',
+    '3. Surgical unified diffs only.',
+    '4. Pre-commit test pass mandatory.'
+  ];
+
+  const hasGdScript = targetFiles.some(f => /\.(gd|tscn)$/i.test(f));
+  const hasTypeScript = targetFiles.some(f => /\.[jt]sx?$/i.test(f));
+
+  if (hasGdScript) {
+    baseLines.push(
+      '',
+      'Godot 4 Clean Component Architecture:',
+      '- Decouple nodes; use Signals for upward parent communication (no Direct $\'../\' coupling).',
+      '- Strictly typed GDScript: explicit parameter types and explicit return types required.',
+      '- Prevent resource/node leaks: all instantiated nodes must be added to tree or freed.'
+    );
+  }
+
+  if (hasTypeScript) {
+    baseLines.push(
+      '',
+      'TypeScript Clean Domain Architecture:',
+      "- Zero 'any' types: use strict domain types or unknown with type narrowing (TS_001).",
+      '- Zero empty catches: swallowing exceptions without comments or handling is prohibited (TS_002).',
+      '- Max nesting depth <= 4: refactor deeply nested conditionals with guard clauses (TS_003).'
+    );
+  }
+
+  return baseLines.join('\n');
+}
+
 export async function compilePrompt(
   agentName: string,
   issueNumber: number,
@@ -86,9 +121,8 @@ export async function compilePrompt(
   const generator = new SkeletonGenerator();
   const skeletonResult = generator.generateForFiles(issue.targetFiles, process.cwd());
 
-  const cacheManager = new PromptCacheManager(
-    'Demir Kafes Constitution:\n1. Max 300 lines per source file.\n2. Max 40 lines per function.\n3. Surgical unified diffs only.\n4. Pre-commit test pass mandatory.'
-  );
+  const constitution = generateLanguageConstitution(issue.targetFiles);
+  const cacheManager = new PromptCacheManager(constitution);
 
   const taskDesc = formatTaskDescription(agentName, issue);
   const context = cacheManager.assembleContext(skeletonResult.combinedMap, taskDesc);

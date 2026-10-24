@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import type { CageValidationResult, CageViolation } from '@aegis/shared';
 import { GDScriptRulesValidator } from './gdscript-rules.js';
+import { CleanArchitectureValidator } from './clean-architecture-rules.js';
 
 export interface CageValidatorOptions {
   maxFunctionLines?: number;
@@ -184,6 +185,30 @@ export class IronCageValidator {
     }
   }
 
+  private validateNonGdScript(filePath: string, content: string, lines: string[], violations: CageViolation[]): void {
+    if (lines.length > this.maxFileLines) {
+      violations.push({
+        rule: 'MAX_FILE_LINES',
+        filePath,
+        message: `File exceeds maximum length of ${this.maxFileLines} lines (actual: ${lines.length} lines).`,
+        severity: 'error'
+      });
+    }
+
+    if (/\.[jt]sx?$/i.test(filePath)) {
+      try {
+        this.validateTypeScriptAst(filePath, content, violations);
+        violations.push(...new CleanArchitectureValidator().validate(filePath, content));
+      } catch {
+        this.validateLineBased(filePath, lines, violations);
+      }
+    } else if (/\.py$/i.test(filePath)) {
+      this.validateIndentationBased(filePath, lines, violations);
+    } else {
+      this.validateLineBased(filePath, lines, violations);
+    }
+  }
+
   public validateFileContent(filePath: string, content: string): CageValidationResult {
     const violations: CageViolation[] = [];
     const lines = content.split('\n');
@@ -195,26 +220,7 @@ export class IronCageValidator {
       }).validate(filePath, content);
       violations.push(...gdViolations);
     } else {
-      if (lines.length > this.maxFileLines) {
-        violations.push({
-          rule: 'MAX_FILE_LINES',
-          filePath,
-          message: `File exceeds maximum length of ${this.maxFileLines} lines (actual: ${lines.length} lines).`,
-          severity: 'error'
-        });
-      }
-
-      if (/\.[jt]sx?$/i.test(filePath)) {
-        try {
-          this.validateTypeScriptAst(filePath, content, violations);
-        } catch {
-          this.validateLineBased(filePath, lines, violations);
-        }
-      } else if (/\.py$/i.test(filePath)) {
-        this.validateIndentationBased(filePath, lines, violations);
-      } else {
-        this.validateLineBased(filePath, lines, violations);
-      }
+      this.validateNonGdScript(filePath, content, lines, violations);
     }
 
     return {

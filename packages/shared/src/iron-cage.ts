@@ -10,7 +10,12 @@ export type CageRuleType =
   | 'GD_003_ONREADY_SAFETY'
   | 'GD_004_SIGNAL_SAFETY'
   | 'GD_005_RESOURCE_LEAK'
-  | 'GD_006_CYCLOMATIC_COMPLEXITY';
+  | 'GD_006_CYCLOMATIC_COMPLEXITY'
+  | 'GD_007_COUPLING_PARENT_NODE'
+  | 'GD_008_TYPED_GDSCRIPT'
+  | 'TS_001_NO_ANY'
+  | 'TS_002_EMPTY_CATCH'
+  | 'TS_003_NESTING_DEPTH';
 
 export interface CageViolation {
   rule: CageRuleType;

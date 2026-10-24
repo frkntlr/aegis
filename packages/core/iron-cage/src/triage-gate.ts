@@ -143,7 +143,12 @@ export class EvidenceBasedTriageGate {
       'GD_001_FUNC_LENGTH',
       'GD_002_FILE_LENGTH',
       'GD_006_CYCLOMATIC_COMPLEXITY',
-      'GD_005_RESOURCE_LEAK'
+      'GD_005_RESOURCE_LEAK',
+      'GD_007_COUPLING_PARENT_NODE',
+      'GD_008_TYPED_GDSCRIPT',
+      'TS_001_NO_ANY',
+      'TS_002_EMPTY_CATCH',
+      'TS_003_NESTING_DEPTH'
     ].includes(rule);
   }
 

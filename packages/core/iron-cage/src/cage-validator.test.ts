@@ -107,7 +107,7 @@ def long_func():
   assert.strictEqual(pyRes.violations[0].rule, 'MAX_FUNCTION_LINES');
 
   const gdValid = `
-func short_player_logic():
+func short_player_logic() -> void:
 \tvelocity.x = 100
 \tmove_and_slide()
 `.trim();
@@ -143,7 +143,7 @@ test('GDScriptRulesValidator does not flag RefCounted objects or engine signals 
   const validator = new GDScriptRulesValidator();
 
   const script = `
-func setup_utils():
+func setup_utils() -> void:
 \tvar regex = RegEx.new()
 \tvar cfg = ConfigFile.new()
 \temit_signal("pressed")
@@ -187,4 +187,59 @@ func test_typo():
 `.trim();
   const typoViolations = validator.validate('scripts/typo.gd', typoScript);
   assert.ok(typoViolations.some(v => v.message.includes("Did you mean 'health_changed'?")));
+});
+test('GDScriptRulesValidator flags GD_007_COUPLING_PARENT_NODE for upward node paths', () => {
+  const validator = new GDScriptRulesValidator();
+  const badScript = `
+func test_coupling():
+	var enemy = $\"../Enemy\"
+	var boss = get_node(\"../Boss\")
+	var child = $\"Child\"
+`.trim();
+
+  const violations = validator.validate('scripts/bad_coupling.gd', badScript);
+  const couplingViolations = violations.filter(v => v.rule === 'GD_007_COUPLING_PARENT_NODE');
+  assert.strictEqual(couplingViolations.length, 2);
+  assert.ok(couplingViolations[0].message.includes('Direct parent coupling via'));
+});
+
+test('GDScriptRulesValidator flags GD_008_TYPED_GDSCRIPT on untyped signatures while allowing _init', () => {
+  const validator = new GDScriptRulesValidator();
+  const script = `
+func _init(speed: float):
+	pass
+
+func valid_typed(a: int, b: String) -> void:
+	pass
+
+func untyped_param(missing_type, fine: int) -> void:
+	pass
+
+func missing_return(x: int):
+	pass
+`.trim();
+
+  const violations = validator.validate('scripts/types.gd', script);
+  const typedViolations = violations.filter(v => v.rule === 'GD_008_TYPED_GDSCRIPT');
+  assert.strictEqual(typedViolations.length, 2);
+  assert.ok(typedViolations.some(v => v.message.includes("Parameter 'missing_type'")));
+  assert.ok(typedViolations.some(v => v.message.includes("Function 'missing_return' is missing")));
+});
+
+test('IronCageValidator end-to-end integration verifies TypeScript clean architecture rules', () => {
+  const validator = new IronCageValidator();
+  const content = `
+function processItem(raw: any): boolean {
+  try {
+    JSON.parse(raw);
+  } catch {}
+  return true;
+}
+`.trim();
+
+  const result = validator.validateFileContent('src/service.ts', content);
+  assert.strictEqual(result.passed, false);
+  const rules = result.violations.map(v => v.rule);
+  assert.ok(rules.includes('TS_001_NO_ANY'));
+  assert.ok(rules.includes('TS_002_EMPTY_CATCH'));
 });
