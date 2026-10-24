@@ -34,6 +34,13 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis inspect` | Zero-token bounding box layout inspection | `npm run aegis -- inspect` |
 | `/aegis mutate <file>` | Run mutation testing gate | `npm run aegis -- mutate <file>` |
 | `/aegis estimate <files> <tests>` | Pre-execution adaptive timeout estimation | `npm run aegis -- estimate <files> <tests>` |
+| `/aegis find <symbol>` | Fast AST symbol lookup & surgical slice | `npm run aegis -- find <symbol>` |
+| `/aegis triage [dir]` | Evidence-Based Bug Triage (zero false alarms) | `npm run aegis -- triage [dir]` |
+| `/aegis trace <target>` | Trace relational callers, signal listeners & scenes | `npm run aegis -- trace <target>` |
+| `/aegis graph:scan [dir]` | Build cross-reference relational knowledge graph | `npm run aegis -- graph:scan [dir]` |
+| `/aegis godot <subcmd>` | Godot Bridge: status, inspect, validate, query, run | `npm run aegis -- godot <subcmd>` |
+| `/aegis diff <diff>` | Validate surgical unified diff compliance | `npm run aegis -- diff <diff>` |
+| `/aegis audit <files>` | Run Immutable Oracle trust verification | `npm run aegis -- audit <files>` |
 
 ## Core Principles
 1. **Iron Cage Enforcement**: Maximum 300 lines per file, maximum 40 lines per function.

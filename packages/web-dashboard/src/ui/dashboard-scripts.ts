@@ -122,7 +122,17 @@ export const DASHBOARD_JS = `
     }
 
     async function runEngineTool(toolName) {
-      const d = await sendAction('run_engine_tool', { tool: toolName });
+      const payload = { tool: toolName };
+      if (toolName === 'symbol_find') {
+        const q = prompt('Aranacak sembol adı:', 'IronCageValidator');
+        if (!q) return;
+        payload.query = q;
+      } else if (toolName === 'relational_trace') {
+        const t = prompt('İzlenecek hedef sembol veya sahne:', 'IronCageValidator');
+        if (!t) return;
+        payload.target = t;
+      }
+      const d = await sendAction('run_engine_tool', payload);
       if (d && d.result) document.getElementById('engine-output').innerText = JSON.stringify(d.result, null, 2);
     }
 

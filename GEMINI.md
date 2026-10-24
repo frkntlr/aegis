@@ -16,6 +16,15 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis wiki:sync`: Automatically synchronize and push living memory to `<repo>.wiki.git`.
 - `/aegis nlm:query "<q>"`: Query project knowledge base via Google NotebookLM.
 - `/aegis nlm:research "<topic>"`: Conduct deep architectural research via NotebookLM and stage Wiki.
+- `/aegis find <symbol>`: Fast AST symbol lookup and precision surgical slice.
+- `/aegis triage [dir]`: Evidence-Based Bug Triage (zero false alarms).
+- `/aegis trace <target>`: Trace relational callers, signal listeners & scenes.
+- `/aegis graph:scan [dir]`: Build cross-reference relational knowledge graph.
+- `/aegis godot <subcmd>`: Godot Bridge: status, inspect, validate, query, run.
+- `/aegis mutate <file>`: Run mutation testing gate on target file.
+- `/aegis diff <diff>`: Validate surgical unified diff compliance.
+- `/aegis audit <files>`: Run Immutable Oracle trust verification.
+- `/aegis estimate <files> <tests>`: Pre-execution adaptive timeout estimation.
 
 ## Headless Git & Remote Execution Safeguards
 To prevent indefinite command hangs during git remote operations:

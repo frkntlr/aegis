@@ -88,6 +88,25 @@ function renderTerminalSection(): string {
   </div>`;
 }
 
+function renderEngineModal(): string {
+  return `  <div class="modal" id="modal-engines">
+    <div class="modal-content">
+      <div class="modal-header"><h3>Aegis Çekirdek Araç & Kalite Motorları</h3><button class="btn btn-secondary btn-sm" onclick="closeModal('modal-engines')">✕</button></div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+        <button class="btn btn-secondary" onclick="runEngineTool('ui_inspector')">UI Inspector</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('mutation_gate')">Mutation Gate</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('diff_validator')">Diff Validator</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('oracle_audit')">Immutable Oracle</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('cage_check')">Demir Kafes Denetimi</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('bug_triage')">Kanıt Bazlı Triage</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('symbol_find')">AST Sembol Arama</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('relational_trace')">İlişkisel Trace</button>
+      </div>
+      <pre id="engine-output" style="background:#0d1117; padding:0.5rem; border-radius:6px; font-size:0.75rem; max-height:200px; overflow:auto; margin-top:0.75rem;"></pre>
+    </div>
+  </div>`;
+}
+
 function renderModalsSection(): string {
   return `  <div class="modal" id="modal-new-task">
     <div class="modal-content">
@@ -111,19 +130,7 @@ function renderModalsSection(): string {
       </div>
     </div>
   </div>
-
-  <div class="modal" id="modal-engines">
-    <div class="modal-content">
-      <div class="modal-header"><h3>Aegis Çekirdek Araç & Kalite Motorları</h3><button class="btn btn-secondary btn-sm" onclick="closeModal('modal-engines')">✕</button></div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-        <button class="btn btn-secondary" onclick="runEngineTool('ui_inspector')">UI Inspector</button>
-        <button class="btn btn-secondary" onclick="runEngineTool('mutation_gate')">Mutation Gate</button>
-        <button class="btn btn-secondary" onclick="runEngineTool('diff_validator')">Diff Validator</button>
-        <button class="btn btn-secondary" onclick="runEngineTool('oracle_audit')">Immutable Oracle</button>
-      </div>
-      <pre id="engine-output" style="background:#0d1117; padding:0.5rem; border-radius:6px; font-size:0.75rem; max-height:200px; overflow:auto; margin-top:0.75rem;"></pre>
-    </div>
-  </div>`;
+${renderEngineModal()}`;
 }
 
 export function getDashboardHtml(): string {

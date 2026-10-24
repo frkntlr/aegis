@@ -134,7 +134,11 @@ export class ActionDispatcher {
     else if (t === 'adaptive_timeout') res = { ...this.ctx.engineSvc.runAdaptiveTimeout(Number(payload.files ?? 2), Number(payload.tests ?? 4)) };
     else if (t === 'mcp_security') res = this.ctx.engineSvc.runMcpSecurity(payload.agent as string, payload.mcpTool as string);
     else if (t === 'diff_validator') res = await this.ctx.engineSvc.runDiffValidator(payload.diffText as string);
-    else if (t === 'immutable_oracle') res = await this.ctx.engineSvc.runOracleAudit(payload.files as string[]);
+    else if (t === 'immutable_oracle' || t === 'oracle_audit') res = await this.ctx.engineSvc.runOracleAudit(payload.files as string[]);
+    else if (t === 'cage_check') res = this.ctx.engineSvc.runCageCheck(payload.dir as string | undefined);
+    else if (t === 'bug_triage') res = this.ctx.engineSvc.runBugTriage(payload.dir as string | undefined);
+    else if (t === 'symbol_find') res = this.ctx.engineSvc.runSymbolFind(payload.query as string | undefined);
+    else if (t === 'relational_trace') res = this.ctx.engineSvc.runRelationalTrace(payload.target as string | undefined);
     else return { success: false, error: 'Bilinmeyen araç: ' + t, message: 'Bilinmeyen araç: ' + t };
     return { success: true, result: res, message: (res.summary as string) || 'Motor aracı çalıştırıldı.' };
   }

@@ -8,6 +8,7 @@ import { MCPSecurityManager } from '@aegis/mcp-security';
 import { DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
+import { EngineAnalysisTools } from './engine-analysis-tools.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -203,5 +204,23 @@ export class AegisEngineService {
       details: rep.details,
       summary: `Oracle Güven Denetimi: ${rep.verdict} (Şüpheli Test: ${rep.suspicious ? 'EVET ⚠️' : 'HAYIR ✅'})`
     };
+  }
+
+  private analysisTools = new EngineAnalysisTools();
+
+  public runCageCheck(dir?: string): Record<string, unknown> {
+    return this.analysisTools.runCageCheck(dir);
+  }
+
+  public runBugTriage(dir?: string): Record<string, unknown> {
+    return this.analysisTools.runBugTriage(dir);
+  }
+
+  public runSymbolFind(query?: string): Record<string, unknown> {
+    return this.analysisTools.runSymbolFind(query);
+  }
+
+  public runRelationalTrace(target?: string): Record<string, unknown> {
+    return this.analysisTools.runRelationalTrace(target);
   }
 }
