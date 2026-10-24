@@ -136,7 +136,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'godot:inspect': (a) => handleGodotInspect(a[1]),
   'godot:validate': (a) => handleGodotValidate(a[1]),
   'godot:query': (a) => handleGodotQuery(a[1]),
-  'godot:run': (a) => handleGodotRun(a[1], a[2]),
+  'godot:run': (a) => handleGodotRun(a[1], ...a.slice(2)),
   'godot:doctool': () => handleGodotDoctool(),
   'godot:playtest': (a) => handleGodotPlaytest(a[1]),
   inspect: (a) => handleInspect(a[1]),

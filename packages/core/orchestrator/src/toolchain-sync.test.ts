@@ -116,3 +116,16 @@ test('UniversalToolchainSync preserves existing custom MCP servers in Cursor and
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('UniversalToolchainSync includes Godot Engine when project.godot is present', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-sync-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'project.godot'), 'config_version=5\n', 'utf8');
+    const sync = new UniversalToolchainSync(tmpDir);
+    const report = sync.syncAll();
+    assert.strictEqual(report.success, true);
+    assert.ok(report.syncedIdes.includes('Godot Engine (Aegis Bridge)'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

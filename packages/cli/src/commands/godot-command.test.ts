@@ -141,3 +141,8 @@ test('godot-helpers parses telemetry nodes and validates scripts safely', async 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('handleGodot dispatches run subcommand with variadic arguments', async () => {
+  const out = await captureOutput(() => handleGodot(['run', 'nonexistent_project_path', '--headless', '--quit-after', '5']));
+  assert.ok(out.includes('Executing Godot project at: nonexistent_project_path'));
+});

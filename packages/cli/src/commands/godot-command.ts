@@ -110,7 +110,7 @@ export function handleGodotInspect(projectDirArg?: string): void {
   }
 }
 
-export function handleGodotRun(projectDirArg?: string, sceneArg?: string): void {
+export function handleGodotRun(projectDirArg?: string, ...extraArgs: string[]): void {
   showBanner();
   const projectDir = projectDirArg || process.cwd();
   console.log(`🚀 Executing Godot project at: ${projectDir}...`);
@@ -119,8 +119,7 @@ export function handleGodotRun(projectDirArg?: string, sceneArg?: string): void 
     console.error('❌ Cannot run project: No Godot binary detected.');
     return;
   }
-  const args = ['--path', projectDir];
-  if (sceneArg) args.push(sceneArg);
+  const args = ['--path', projectDir, ...extraArgs];
   console.log(` • Godot: ${inst.binaryPath} (${inst.versionString})`);
   try {
     const cp = child_process.spawn(inst.binaryPath, args, { stdio: 'inherit' });
@@ -226,7 +225,7 @@ export async function handleGodot(args: string[]): Promise<void> {
   } else if (subcommand === 'validate') {
     handleGodotValidate(args[1]);
   } else if (subcommand === 'run') {
-    handleGodotRun(args[1], args[2]);
+    handleGodotRun(args[1], ...args.slice(2));
   } else if (subcommand === 'playtest') {
     handleGodotPlaytest(args[1]);
   } else {
