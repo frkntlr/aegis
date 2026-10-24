@@ -124,3 +124,35 @@ test('GitHubClient spawnSubIssue avoids ID collisions with non-sequential issue 
   assert.strictEqual(client.getIssue(100)?.title, 'High ID Task');
   assert.strictEqual(client.getIssue(101)?.title, '[Subtask of #100] Subtask');
 });
+
+test('GitHubClient updateIssueStatus synchronizes status labels and resets assignee on ready or done', () => {
+  const client = new GitHubClient();
+  client.registerIssue({
+    id: 50,
+    number: 50,
+    title: 'In Progress Task',
+    body: 'desc',
+    labels: ['status:in_progress', 'lock:src/Task.ts'],
+    status: 'in_progress',
+    assignee: 'solver',
+    targetFiles: ['src/Task.ts'],
+    acceptanceCriteria: []
+  });
+
+  const updatedReady = client.updateIssueStatus(50, 'ready');
+  assert.strictEqual(updatedReady, true);
+  const issue = client.getIssue(50);
+  assert.strictEqual(issue?.status, 'ready');
+  assert.strictEqual(issue?.assignee, undefined);
+  assert.strictEqual(issue?.labels.includes('status:ready'), true);
+  assert.strictEqual(issue?.labels.includes('status:in_progress'), false);
+
+  client.claimIssue(50, 'bob');
+  assert.strictEqual(client.getIssue(50)?.assignee, 'bob');
+
+  const updatedDone = client.updateIssueStatus(50, 'done');
+  assert.strictEqual(updatedDone, true);
+  assert.strictEqual(client.getIssue(50)?.status, 'done');
+  assert.strictEqual(client.getIssue(50)?.assignee, undefined);
+  assert.strictEqual(client.getIssue(50)?.labels.includes('status:done'), true);
+});

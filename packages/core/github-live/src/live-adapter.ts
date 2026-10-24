@@ -30,6 +30,8 @@ export interface LiveAdapterOptions {
   repo?: string;
   baseUrl?: string;
   fetchFn?: typeof fetch;
+  maxRetries?: number;
+  retryDelayMs?: number;
 }
 
 export class GitHubLiveAdapter {
@@ -38,6 +40,8 @@ export class GitHubLiveAdapter {
   private repo?: string;
   private baseUrl: string;
   private fetch: typeof fetch;
+  private maxRetries: number;
+  private retryDelayMs: number;
 
   constructor(options: LiveAdapterOptions) {
     this.token = options.token;
@@ -45,6 +49,20 @@ export class GitHubLiveAdapter {
     this.repo = options.repo;
     this.baseUrl = options.baseUrl ?? 'https://api.github.com';
     this.fetch = options.fetchFn ?? globalThis.fetch;
+    this.maxRetries = options.maxRetries ?? 0;
+    this.retryDelayMs = options.retryDelayMs ?? 100;
+  }
+
+  private parseRateLimit(response: Response): RateLimitInfo {
+    const limit = parseInt(response.headers.get('x-ratelimit-limit') || '5000', 10);
+    const remaining = parseInt(response.headers.get('x-ratelimit-remaining') || '4999', 10);
+    const resetTime = parseInt(response.headers.get('x-ratelimit-reset') || '0', 10);
+    const resetDate = resetTime ? new Date(resetTime * 1000).toISOString() : new Date().toISOString();
+    return { limit, remaining, resetDate };
+  }
+
+  private shouldRetry(status: number, attempt: number): boolean {
+    return attempt < this.maxRetries && (status === 429 || status === 503);
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<{ data: T; rateLimit: RateLimitInfo }> {
@@ -54,22 +72,27 @@ export class GitHubLiveAdapter {
     headers.set('Accept', 'application/vnd.github.v3+json');
     headers.set('User-Agent', 'Aegis-Autonomous-Engine');
 
-    const response = await this.fetch(url, { ...init, headers });
+    let attempt = 0;
+    while (true) {
+      const response = await this.fetch(url, { ...init, headers });
+      const rateLimit = this.parseRateLimit(response);
 
-    const limit = parseInt(response.headers.get('x-ratelimit-limit') || '5000', 10);
-    const remaining = parseInt(response.headers.get('x-ratelimit-remaining') || '4999', 10);
-    const resetTime = parseInt(response.headers.get('x-ratelimit-reset') || '0', 10);
-    const resetDate = resetTime ? new Date(resetTime * 1000).toISOString() : new Date().toISOString();
+      if (this.shouldRetry(response.status, attempt)) {
+        attempt++;
+        const retryAfter = parseInt(response.headers.get('retry-after') || '0', 10);
+        const delay = retryAfter > 0 ? retryAfter * 1000 : this.retryDelayMs * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
 
-    const rateLimit: RateLimitInfo = { limit, remaining, resetDate };
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`GitHub API Error [${response.status}]: ${errText}`);
+      }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`GitHub API Error [${response.status}]: ${errText}`);
+      const data = (await response.json()) as T;
+      return { data, rateLimit };
     }
-
-    const data = (await response.json()) as T;
-    return { data, rateLimit };
   }
 
   public async getAuthenticatedUser(): Promise<{ user: GitHubUser; rateLimit: RateLimitInfo }> {

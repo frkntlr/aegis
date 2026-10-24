@@ -125,6 +125,10 @@ export class GitHubClient {
     const issue = this.issues.get(issueNumber);
     if (!issue) return false;
     issue.status = status;
+    issue.labels = [...issue.labels.filter(l => !l.startsWith('status:')), `status:${status}`];
+    if (status === 'ready' || status === 'done') {
+      issue.assignee = undefined;
+    }
     return true;
   }
 
