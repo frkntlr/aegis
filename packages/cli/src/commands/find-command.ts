@@ -42,7 +42,11 @@ export function handleFind(queryArg?: string): void {
   }
 
   const target = matches[0];
-  console.log(`🔍 Symbol found: '${target.name}' [${target.filePath}:${target.startLine}-${target.endLine}]`);
+  const isFuzzy = target.name.toLowerCase() !== queryArg.toLowerCase() && !target.name.toLowerCase().includes(queryArg.toLowerCase());
+  const header = isFuzzy
+    ? `🔍 Fuzzy Match: '${queryArg}' -> '${target.name}' [${target.filePath}:${target.startLine}-${target.endLine}]`
+    : `🔍 Symbol found: '${target.name}' [${target.filePath}:${target.startLine}-${target.endLine}]`;
+  console.log(header);
   console.log(` • Kind:     ${target.kind.toUpperCase()} | Index Lookup: ${durationMs}ms (<10ms target ✅)`);
   if (matches.length > 1) {
     console.log(` • Other matches (${matches.length - 1}): ${matches.slice(1, 4).map((m: SymbolEntry) => m.name).join(', ')}`);

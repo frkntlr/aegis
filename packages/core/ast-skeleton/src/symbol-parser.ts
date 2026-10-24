@@ -106,20 +106,21 @@ export class SymbolParser {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmed = line.trim();
+      const codeOnly = trimmed.replace(/#.*$/, '').trim();
       const lineNum = i + 1;
 
-      const clsMatch = trimmed.match(/^class_name\s+([a-zA-Z_]\w*)/);
+      const clsMatch = codeOnly.match(/^class_name\s+([a-zA-Z_]\w*)/);
       if (clsMatch) {
         curClass = clsMatch[1];
         symbols.push({ name: curClass, kind: 'class', filePath: normPath, startLine: lineNum, endLine: lines.length, signature: `class_name ${curClass}` });
       }
 
-      const sigMatch = trimmed.match(/^signal\s+([a-zA-Z_]\w*)(.*)/);
+      const sigMatch = codeOnly.match(/^signal\s+([a-zA-Z_]\w*)(.*)/);
       if (sigMatch) {
-        symbols.push({ name: sigMatch[1], kind: 'signal', filePath: normPath, startLine: lineNum, endLine: lineNum, signature: `signal ${sigMatch[1]}${sigMatch[2]}` });
+        symbols.push({ name: sigMatch[1], kind: 'signal', filePath: normPath, startLine: lineNum, endLine: lineNum, signature: `signal ${sigMatch[1]}${sigMatch[2]}`.trim() });
       }
 
-      const funcMatch = trimmed.match(/^(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
+      const funcMatch = codeOnly.match(/^(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
       if (funcMatch) {
         const fnName = curClass ? `${curClass}.${funcMatch[1]}` : funcMatch[1];
         const endLine = SymbolParser.findGdFuncEnd(lines, i);
@@ -129,7 +130,7 @@ export class SymbolParser {
           filePath: normPath,
           startLine: lineNum,
           endLine,
-          signature: trimmed.replace(/:$/, '')
+          signature: codeOnly.replace(/:$/, '')
         });
       }
     }

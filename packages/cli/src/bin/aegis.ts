@@ -57,6 +57,7 @@ import { handleFind } from '../commands/find-command.js';
 import { handleTriage } from '../commands/triage-command.js';
 import { handleTrace } from '../commands/trace-command.js';
 import { handleGraphScan } from '../commands/graph-command.js';
+import { FuzzyMatcher } from '@aegis/ast-skeleton';
 
 const HELP_LINES: readonly string[] = [
   'Commands:',
@@ -204,7 +205,14 @@ async function main(): Promise<void> {
       console.log(`🚀 Routing directly to Aegis RFC & Ideation Pipeline...\n`);
       await handleRfcCreate(idea.title, idea.desc);
     } else {
-      handleHelp();
+      const suggestion = FuzzyMatcher.suggest(command, Object.keys(commandMap), 2);
+      if (suggestion) {
+        showBanner();
+        console.log(`⚠️  Unknown command '${command}'. Did you mean 'aegis ${suggestion}'?\n`);
+        console.log(`Run 'aegis help' to see all available commands.`);
+      } else {
+        handleHelp();
+      }
     }
   }
 }

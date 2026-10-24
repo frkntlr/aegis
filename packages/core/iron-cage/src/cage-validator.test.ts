@@ -179,4 +179,12 @@ func invalid_signal():
   assert.strictEqual(signalViolations.length, 1);
   assert.ok(signalViolations[0].message.includes('undeclared_boom'));
   assert.strictEqual(leakViolations.length, 0, 'No resource leak false positives for member assignments or .free()');
+
+  const typoScript = `
+signal health_changed
+func test_typo():
+\thealth_chnaged.emit()
+`.trim();
+  const typoViolations = validator.validate('scripts/typo.gd', typoScript);
+  assert.ok(typoViolations.some(v => v.message.includes("Did you mean 'health_changed'?")));
 });

@@ -1,3 +1,4 @@
+import { FuzzyMatcher } from '@aegis/shared';
 import { BUILTIN_GODOT_CLASSES } from './builtin-classes.js';
 import { DoctoolRunner } from './doctool-runner.js';
 import type { ClassInfo, MethodInfo, PropertyInfo, SignalInfo, ValidationResult } from './classdb-types.js';
@@ -125,14 +126,22 @@ export class ClassDbOracle {
     if (methodMatch) {
       const methodName = methodMatch[1];
       if (!localMethods.has(methodName) && !this.queryMethod(baseClass, methodName)) {
-        out.push({
-          file,
-          line: lineNo,
-          severity: 'error',
-          symbol: methodName,
-          message: `Unknown method '${methodName}' called on base class '${baseClass}'.`
-        });
+        const suggestion = this.suggestSimilarMethod(baseClass, methodName);
+        const message = suggestion
+          ? `Unknown method '${methodName}' called on base class '${baseClass}'. Did you mean '${suggestion}'?`
+          : `Unknown method '${methodName}' called on base class '${baseClass}'.`;
+        out.push({ file, line: lineNo, severity: 'error', symbol: methodName, message });
       }
     }
+  }
+
+  private suggestSimilarMethod(baseClass: string, methodName: string): string | null {
+    const candidates: string[] = [];
+    let current: ClassInfo | undefined = this.classes.get(baseClass);
+    while (current) {
+      for (const m of current.methods) candidates.push(m.name);
+      current = current.inherits ? this.classes.get(current.inherits) : undefined;
+    }
+    return FuzzyMatcher.suggest(methodName, candidates, 2);
   }
 }

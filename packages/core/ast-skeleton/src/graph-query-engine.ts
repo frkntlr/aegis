@@ -1,4 +1,5 @@
 import { type RelationalEdge, type RelationalNode, RelationalGraph } from './relational-graph.js';
+import { FuzzyMatcher } from './fuzzy-matcher.js';
 
 export interface TraceResult {
   target: string;
@@ -61,7 +62,13 @@ export class GraphQueryEngine {
         return node;
       }
     }
-    return undefined;
+    return this.findFuzzyNode(lower);
+  }
+
+  private findFuzzyNode(lower: string): RelationalNode | undefined {
+    const nodes = this.graph.getAllNodes();
+    const matches = FuzzyMatcher.findMatches(lower, nodes, n => n.name.toLowerCase(), 2);
+    return matches.length > 0 ? matches[0].item : undefined;
   }
 
   private traverseIncoming(startId: string, maxDepth: number): RelationalEdge[] {
@@ -163,6 +170,9 @@ export class GraphQueryEngine {
       ` • Blast Radius (${res.blastRadiusFiles.length} files): ${res.blastRadiusFiles.slice(0, 5).join(', ')}`,
       '──────────────────────────────────────────────────'
     ];
+    if (res.foundNode && res.foundNode.name.toLowerCase() !== res.target.toLowerCase()) {
+      lines.splice(2, 0, ` • Fuzzy Match:        Resolved to '${res.foundNode.name}'`);
+    }
     const keyEdges = [...res.upstreamEdges.slice(0, 3), ...res.downstreamEdges.slice(0, 3)];
     if (keyEdges.length > 0) {
       lines.push('🔗 Key Connections:');

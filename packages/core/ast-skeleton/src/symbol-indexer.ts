@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { type SymbolEntry, SymbolParser } from './symbol-parser.js';
+import { FuzzyMatcher } from './fuzzy-matcher.js';
 
 export { type SymbolEntry } from './symbol-parser.js';
 
@@ -115,6 +116,18 @@ export class SymbolIndexer {
         }
       }
     }
-    return [...exact, ...suffix, ...substr];
+    const directMatches = [...exact, ...suffix, ...substr];
+    if (directMatches.length > 0) return directMatches;
+
+    return this.findFuzzySymbols(lowerQuery, targetDb);
+  }
+
+  private findFuzzySymbols(lowerQuery: string, targetDb: SymbolDatabase): SymbolEntry[] {
+    const allSymbols: SymbolEntry[] = [];
+    for (const fileData of Object.values(targetDb.files)) {
+      allSymbols.push(...fileData.symbols);
+    }
+    const fuzzy = FuzzyMatcher.findMatches(lowerQuery, allSymbols, s => s.name.toLowerCase(), 2);
+    return fuzzy.map(f => f.item);
   }
 }

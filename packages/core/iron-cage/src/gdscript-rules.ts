@@ -1,4 +1,4 @@
-import type { CageViolation } from '@aegis/shared';
+import { FuzzyMatcher, type CageViolation } from '@aegis/shared';
 
 export interface GDScriptRulesOptions {
   maxFunctionLines?: number;
@@ -167,11 +167,16 @@ export class GDScriptRulesValidator {
         }
       }
       if (sig && !signals.has(sig) && !GDScriptRulesValidator.ENGINE_SIGNALS.has(sig)) {
+        const allKnown = [...Array.from(signals), ...Array.from(GDScriptRulesValidator.ENGINE_SIGNALS)];
+        const suggestion = FuzzyMatcher.suggest(sig, allKnown, 2);
+        const msg = suggestion
+          ? `Emitted signal '${sig}' is not declared in this script or known base classes. Did you mean '${suggestion}'?`
+          : `Emitted signal '${sig}' is not declared in this script or known base classes.`;
         violations.push({
           rule: 'GD_004_SIGNAL_SAFETY',
           filePath,
           line: fn.startLine + i,
-          message: `Emitted signal '${sig}' is not declared in this script or known base classes.`,
+          message: msg,
           severity: 'warning'
         });
       }
@@ -203,7 +208,7 @@ export class GDScriptRulesValidator {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
 
-      const isDef = trimmed.startsWith('func ') || trimmed.startsWith('static func ');
+      const isDef = /^(?:@\w+(?:\([^)]*\))?\s+)?(?:static\s+)?func\s+/.test(trimmed);
       const indent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
 
       if (current && indent <= baseIndent && !isDef) {

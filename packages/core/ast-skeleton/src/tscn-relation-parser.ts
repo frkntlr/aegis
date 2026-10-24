@@ -51,23 +51,23 @@ export class TscnRelationParser {
     isFirstChild: boolean
   ): void {
     if (!ctx.curNode) return;
-    if (line.startsWith('script =')) {
+    if (/^script\s*=/.test(line)) {
       ctx.curNode.scriptId = TscnRelationParser.extractExtResourceId(line);
       const res = extResources.get(ctx.curNode.scriptId || '');
       if (res) {
         ctx.nodeScripts.set(ctx.curNode.name, res.path);
         if (ctx.curNode.name === '.' || isFirstChild) ctx.rootScriptPath = res.path;
       }
-    } else if (line.startsWith('instance =')) {
+    } else if (/^instance\s*=/.test(line)) {
       ctx.curNode.instanceId = TscnRelationParser.extractExtResourceId(line);
     }
   }
 
   private static parseExtResource(line: string, extResources: Map<string, ExtResourceItem>): void {
     if (!line.startsWith('[ext_resource ')) return;
-    const typeM = line.match(/type=["']([^"']+)["']/);
-    const pathM = line.match(/path=["']([^"']+)["']/);
-    const idM = line.match(/id=["']?([^"'\s\]]+)["']?/);
+    const typeM = line.match(/type\s*=\s*["']([^"']+)["']/);
+    const pathM = line.match(/path\s*=\s*["']([^"']+)["']/);
+    const idM = line.match(/id\s*=\s*["']?([^"'\s\]]+)["']?/);
     if (typeM && pathM && idM) {
       const cleanPath = pathM[1].replace(/^res:\/\//, '').replace(/\\/g, '/');
       extResources.set(idM[1], { id: idM[1], type: typeM[1], path: cleanPath });
@@ -75,12 +75,12 @@ export class TscnRelationParser {
   }
 
   private static extractNodeInfo(line: string): { name: string } {
-    const nameM = line.match(/name=["']([^"']+)["']/);
+    const nameM = line.match(/name\s*=\s*["']([^"']+)["']/);
     return { name: nameM ? nameM[1] : 'UnknownNode' };
   }
 
   private static extractExtResourceId(line: string): string | undefined {
-    const m = line.match(/ExtResource\(["']?([^"')]+)["']?\)/);
+    const m = line.match(/ExtResource\(\s*["']?([^"')\s]+)["']?\s*\)/);
     return m ? m[1] : undefined;
   }
 
@@ -111,10 +111,10 @@ export class TscnRelationParser {
     ctx: NodeContext,
     edges: RelationalEdge[]
   ): void {
-    const sigM = line.match(/signal=["']([^"']+)["']/);
-    const fromM = line.match(/from=["']([^"']+)["']/);
-    const toM = line.match(/to=["']([^"']+)["']/);
-    const methodM = line.match(/method=["']([^"']+)["']/);
+    const sigM = line.match(/signal\s*=\s*["']([^"']+)["']/);
+    const fromM = line.match(/from\s*=\s*["']([^"']+)["']/);
+    const toM = line.match(/to\s*=\s*["']([^"']+)["']/);
+    const methodM = line.match(/method\s*=\s*["']([^"']+)["']/);
 
     if (sigM && fromM && methodM) {
       const fromNodeId = `${scenePath}::${fromM[1]}`;

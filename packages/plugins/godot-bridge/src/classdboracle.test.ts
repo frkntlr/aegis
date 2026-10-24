@@ -54,6 +54,15 @@ test('ClassDbOracle searches classes and validates GDScript base usage', () => {
   assert.strictEqual(invalidViolations.length, 1);
   assert.strictEqual(invalidViolations[0].symbol, 'non_existent_method_xyz');
   assert.strictEqual(invalidViolations[0].severity, 'error');
+
+  const typoScript = [
+    'extends CharacterBody2D',
+    'func _physics_process(delta):',
+    '    self.move_and_slid()'
+  ].join('\n');
+  const typoViolations = oracle.validateUsage(typoScript, 'typo.gd');
+  assert.strictEqual(typoViolations.length, 1);
+  assert.ok(typoViolations[0].message.includes("Did you mean 'move_and_slide'?"));
 });
 
 test('ClassDbOracle resolves expanded builtin classes offline', () => {
