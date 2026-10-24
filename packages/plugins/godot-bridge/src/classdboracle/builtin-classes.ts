@@ -230,5 +230,60 @@ export const BUILTIN_GODOT_CLASSES: Record<string, ClassInfo> = {
     ],
     properties: [{ name: 'current_animation', type: 'String' }],
     signals: [{ name: 'animation_finished', arguments: [{ name: 'anim_name', type: 'String' }] }]
+  },
+  Tween: {
+    name: 'Tween',
+    inherits: 'RefCounted',
+    methods: [
+      { name: 'tween_property', returnType: 'Variant', arguments: [{ name: 'object', type: 'Object' }, { name: 'property', type: 'NodePath' }, { name: 'final_val', type: 'Variant' }, { name: 'duration', type: 'float' }] },
+      { name: 'tween_interval', returnType: 'Variant', arguments: [{ name: 'time', type: 'float' }] },
+      { name: 'tween_callback', returnType: 'Variant', arguments: [{ name: 'callable', type: 'Callable' }] },
+      { name: 'play', returnType: 'void', arguments: [] },
+      { name: 'stop', returnType: 'void', arguments: [] },
+      { name: 'kill', returnType: 'void', arguments: [] }
+    ],
+    properties: [],
+    signals: [{ name: 'finished', arguments: [] }]
+  },
+  SceneTree: {
+    name: 'SceneTree',
+    inherits: 'Object',
+    methods: [
+      { name: 'change_scene_to_file', returnType: 'int', arguments: [{ name: 'path', type: 'String' }] },
+      { name: 'reload_current_scene', returnType: 'int', arguments: [] },
+      { name: 'create_timer', returnType: 'Variant', arguments: [{ name: 'time_sec', type: 'float' }] },
+      { name: 'create_tween', returnType: 'Tween', arguments: [] },
+      { name: 'quit', returnType: 'void', arguments: [] }
+    ],
+    properties: [{ name: 'paused', type: 'bool' }],
+    signals: []
+  },
+  TextureRect: {
+    name: 'TextureRect',
+    inherits: 'Control',
+    methods: [],
+    properties: [{ name: 'texture', type: 'Texture2D' }, { name: 'expand_mode', type: 'int' }],
+    signals: []
+  },
+  ColorRect: {
+    name: 'ColorRect',
+    inherits: 'Control',
+    methods: [],
+    properties: [{ name: 'color', type: 'Color' }],
+    signals: []
+  },
+  MarginContainer: {
+    name: 'MarginContainer',
+    inherits: 'Container',
+    methods: [],
+    properties: [],
+    signals: []
+  },
+  LineEdit: {
+    name: 'LineEdit',
+    inherits: 'Control',
+    methods: [{ name: 'clear', returnType: 'void', arguments: [] }],
+    properties: [{ name: 'text', type: 'String' }, { name: 'placeholder_text', type: 'String' }],
+    signals: [{ name: 'text_changed', arguments: [] }, { name: 'text_submitted', arguments: [] }]
   }
 };

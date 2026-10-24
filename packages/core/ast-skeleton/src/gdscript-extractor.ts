@@ -60,22 +60,13 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
       const { header, nextIndex } = this.consumeHeader(lines, i);
       const indent = line.match(/^(\t|\s)*/)?.[0] ?? '';
       const baseIndent = line.match(/^(\t|\s)*/)?.[0].length ?? 0;
+      const step = indent.includes(' ') && !indent.includes('\t') ? '    ' : '\t';
       output.push(header);
-      output.push(`${indent}\tpass`);
+      output.push(`${indent}${step}pass`);
       return this.skipBlock(lines, nextIndex, baseIndent);
     }
 
-    if (
-      trimmed.startsWith('extends ') ||
-      trimmed.startsWith('class_name ') ||
-      trimmed.startsWith('class ') ||
-      trimmed.startsWith('signal ') ||
-      trimmed.startsWith('enum ') ||
-      trimmed.startsWith('const ') ||
-      trimmed.startsWith('var ') ||
-      trimmed.startsWith('@export') ||
-      trimmed.startsWith('@onready')
-    ) {
+    if (this.isDeclarationLine(trimmed)) {
       this.flushAnnotations(pendingAnnotations, output);
       if (trimmed.startsWith('enum ') && !trimmed.endsWith('}')) {
         return this.consumeEnumBlock(lines, i, output);
@@ -86,6 +77,20 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
 
     pendingAnnotations.length = 0;
     return i + 1;
+  }
+
+  private isDeclarationLine(trimmed: string): boolean {
+    return (
+      trimmed.startsWith('extends ') ||
+      trimmed.startsWith('class_name ') ||
+      trimmed.startsWith('class ') ||
+      trimmed.startsWith('signal ') ||
+      trimmed.startsWith('enum ') ||
+      trimmed.startsWith('const ') ||
+      trimmed.startsWith('var ') ||
+      trimmed.startsWith('@export') ||
+      trimmed.startsWith('@onready')
+    );
   }
 
   private flushAnnotations(pending: string[], output: string[]): void {

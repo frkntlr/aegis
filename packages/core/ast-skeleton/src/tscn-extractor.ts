@@ -63,7 +63,10 @@ export class TscnSkeletonExtractor implements LanguageExtractor {
       trimmed.startsWith('layout_mode =') ||
       trimmed.startsWith('anchors_preset =') ||
       trimmed.startsWith('process_mode =') ||
-      trimmed.startsWith('custom_minimum_size =')
+      trimmed.startsWith('custom_minimum_size =') ||
+      trimmed.startsWith('visible =') ||
+      trimmed.startsWith('mouse_filter =') ||
+      trimmed.startsWith('texture =')
     );
   }
 }

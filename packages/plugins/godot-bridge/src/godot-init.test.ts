@@ -38,3 +38,25 @@ test('GodotInitWorkflow merges into existing editor_plugins without creating dup
   assert.strictEqual((merged.match(/enabled=/g) || []).length, 1);
   assert.strictEqual((merged.match(/\[editor_plugins\]/g) || []).length, 1);
 });
+
+test('GodotInitWorkflow preserves custom aspect ratios configured in existing aegis.config.json', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-ratios-'));
+  try {
+    const customConfig = {
+      engine: 'godot',
+      godot: {
+        bridgePort: 7000,
+        aspectRatios: ['9:16', '9:19.5', '3:4']
+      }
+    };
+    fs.writeFileSync(path.join(tmpDir, 'aegis.config.json'), JSON.stringify(customConfig), 'utf8');
+
+    GodotInitWorkflow.initProject({ projectDir: tmpDir, bridgePort: 7001 });
+
+    const updated = JSON.parse(fs.readFileSync(path.join(tmpDir, 'aegis.config.json'), 'utf8'));
+    assert.strictEqual(updated.godot.bridgePort, 7001);
+    assert.deepStrictEqual(updated.godot.aspectRatios, ['9:16', '9:19.5', '3:4']);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

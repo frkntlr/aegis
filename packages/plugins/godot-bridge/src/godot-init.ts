@@ -138,12 +138,13 @@ export class GodotInitWorkflow {
       }
     }
 
+    const existingGodot = config.godot as Record<string, unknown> | undefined;
     config.engine = 'godot';
     config.godot = {
       bridgePort: port,
-      binaryPath: binary || undefined,
-      aspectRatios: ['16:9', '21:9', '16:10', '9:16'],
-      cacheDir: '.aegis/cache/godot'
+      binaryPath: binary || existingGodot?.binaryPath || undefined,
+      aspectRatios: existingGodot?.aspectRatios || ['16:9', '21:9', '16:10', '9:16'],
+      cacheDir: existingGodot?.cacheDir || '.aegis/cache/godot'
     };
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');

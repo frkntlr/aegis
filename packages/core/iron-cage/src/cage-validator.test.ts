@@ -152,3 +152,31 @@ func setup_utils():
   const violations = validator.validate('scripts/utils.gd', script);
   assert.strictEqual(violations.length, 0);
 });
+
+test('GDScriptRulesValidator supports modern Godot 4 signal.emit() and recognizes member assignment', () => {
+  const validator = new GDScriptRulesValidator();
+
+  const script = `
+signal custom_event
+
+func valid_handlers():
+\tcustom_event.emit()
+\tpressed.emit()
+\tself.active_node = Node.new()
+\t_cached_child = Node.new()
+\titems["key"] = Node.new()
+\tvar n = Node.new()
+\tn.free()
+
+func invalid_signal():
+\tundeclared_boom.emit()
+`.trim();
+
+  const violations = validator.validate('scripts/modern.gd', script);
+  const signalViolations = violations.filter(v => v.rule === 'GD_004_SIGNAL_SAFETY');
+  const leakViolations = violations.filter(v => v.rule === 'GD_005_RESOURCE_LEAK');
+
+  assert.strictEqual(signalViolations.length, 1);
+  assert.ok(signalViolations[0].message.includes('undeclared_boom'));
+  assert.strictEqual(leakViolations.length, 0, 'No resource leak false positives for member assignments or .free()');
+});

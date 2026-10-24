@@ -175,6 +175,14 @@ export function handleGodotValidate(targetDir?: string): void {
 
 function scanAndValidateGd(dir: string, oracle: ClassDbOracle): ValidationResult[] {
   if (!fs.existsSync(dir)) return [];
+  if (fs.statSync(dir).isFile()) {
+    if (!dir.endsWith('.gd')) return [];
+    try {
+      return oracle.validateUsage(fs.readFileSync(dir, 'utf8'), path.basename(dir));
+    } catch {
+      return [];
+    }
+  }
   const results: ValidationResult[] = [];
   const entries = fs.readdirSync(dir, { recursive: true });
   for (const entry of entries) {

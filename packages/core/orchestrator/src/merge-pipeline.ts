@@ -23,6 +23,16 @@ export interface MergeResult {
   error?: string;
 }
 
+function cleanGitEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  delete env.GIT_DIR;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_PREFIX;
+  delete env.GIT_COMMON_DIR;
+  return env;
+}
+
 export class MergePipeline {
   private repoRoot: string;
   private worktreePrefix: string;
@@ -35,7 +45,7 @@ export class MergePipeline {
           cwd: this.repoRoot,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          env: cleanGitEnv()
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
@@ -72,7 +82,7 @@ export class MergePipeline {
     try {
       execFileSync('git', ['-C', agentDir, 'rebase', this.baseBranch], {
         stdio: 'pipe',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       steps.push({
         step: 2,
@@ -85,7 +95,7 @@ export class MergePipeline {
       try {
         execFileSync('git', ['-C', agentDir, 'rebase', '--abort'], {
           stdio: 'pipe',
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          env: cleanGitEnv()
         });
       } catch { /* ignore */ }
       steps.push({
@@ -103,12 +113,12 @@ export class MergePipeline {
       execFileSync('git', ['checkout', this.baseBranch], {
         cwd: this.repoRoot,
         stdio: 'pipe',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       execFileSync('git', ['merge', '--ff-only', `aegis/${mergingAgent}`], {
         cwd: this.repoRoot,
         stdio: 'pipe',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       steps.push({
         step: 3,
@@ -133,7 +143,7 @@ export class MergePipeline {
       const aheadCountRaw = execFileSync('git', ['-C', siblingDir, 'rev-list', '--count', `${this.baseBranch}..HEAD`], {
         stdio: 'pipe',
         encoding: 'utf8',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       }).trim();
       return parseInt(aheadCountRaw, 10) || 0;
     } catch {
@@ -146,15 +156,15 @@ export class MergePipeline {
     if (aheadCount > 0) {
       execFileSync('git', ['-C', siblingDir, 'rebase', this.baseBranch], {
         stdio: 'pipe',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       return `Rebased ${sibling} workspace (${aheadCount} local commit(s)) onto latest ${this.baseBranch}.`;
     }
     execFileSync('git', ['-C', siblingDir, 'reset', '--hard', this.baseBranch], {
       stdio: 'pipe',
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      env: cleanGitEnv()
     });
-    return `Synchronized ${sibling} workspace with latest ${this.baseBranch}.`;
+      return `Synchronized ${sibling} workspace with latest ${this.baseBranch}.`;
   }
 
   private syncSingleSibling(sibling: string, siblingDir: string, steps: MergeStepReport[]): void {
@@ -162,7 +172,7 @@ export class MergePipeline {
       const dirty = execFileSync('git', ['-C', siblingDir, 'status', '--porcelain'], {
         stdio: 'pipe',
         encoding: 'utf8',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       }).trim();
 
       if (dirty.length > 0) {

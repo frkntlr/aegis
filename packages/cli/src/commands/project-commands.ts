@@ -107,7 +107,7 @@ export function handleWikiSeed(): void {
   console.log('🌱 Seeding living architecture suite into GitHub Wiki cache...');
   const manager = new WikiMemoryManager();
   const res = manager.seedSuite();
-  console.log(`✅ Seeded ${res.created} living architecture page(s) into .git/aegis-wiki:`);
+  console.log(`✅ Seeded ${res.created} living architecture page(s) into .aegis/wiki-cache:`);
   for (const slug of res.pages) {
     console.log(` • ${slug}`);
   }

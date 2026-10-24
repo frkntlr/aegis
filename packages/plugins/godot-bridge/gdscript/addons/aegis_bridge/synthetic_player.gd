@@ -1,5 +1,6 @@
 # synthetic_player.gd
 # Autonomous playtest runner and input simulator (Aegis RFC-002)
+class_name AegisSyntheticPlayer
 extends Node
 
 const MAX_FRAMES_LIMIT: int = 1200

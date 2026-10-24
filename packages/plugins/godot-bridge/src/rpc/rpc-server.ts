@@ -38,11 +38,16 @@ export class GodotBridgeServer {
     return this.commandResults.get(id);
   }
 
-  public async start(): Promise<void> {
+  public async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => this.handleHttpRequest(req, res));
       this.server.on('error', reject);
-      this.server.listen(this.port, this.host, () => resolve());
+      this.server.listen(this.port, this.host, () => {
+        const addr = this.server?.address();
+        const p = typeof addr === 'object' && addr ? addr.port : this.port;
+        this.port = p;
+        resolve(p);
+      });
     });
   }
 
@@ -57,7 +62,11 @@ export class GodotBridgeServer {
   }
 
   private handleHttpRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    res.setHeader('Access-Control-Allow-Origin', `http://${this.host}:${this.port}`);
+    const origin = req.headers.origin;
+    const allowOrigin = origin && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))
+      ? origin
+      : `http://${this.host}:${this.port}`;
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

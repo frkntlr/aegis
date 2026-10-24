@@ -113,11 +113,15 @@ export class GDScriptRulesValidator {
     return (
       text.includes('add_child(') ||
       text.includes('queue_free(') ||
+      text.includes('.free()') ||
       text.includes('return ') ||
       text.includes('parse_input_event(') ||
       text.includes('.append(') ||
       text.includes('.push_back(') ||
-      text.includes('connect(')
+      text.includes('connect(') ||
+      text.includes('self.') ||
+      /_\w+\s*=/.test(text) ||
+      /\w+\[.*\]\s*=/.test(text)
     );
   }
 
@@ -151,18 +155,24 @@ export class GDScriptRulesValidator {
   ): void {
     for (let i = 0; i < fn.lines.length; i++) {
       const line = fn.lines[i];
-      const emitMatch = line.match(/emit_signal\(\s*["']([^"']+)["']/);
-      if (emitMatch) {
-        const sig = emitMatch[1];
-        if (!signals.has(sig) && !GDScriptRulesValidator.ENGINE_SIGNALS.has(sig)) {
-          violations.push({
-            rule: 'GD_004_SIGNAL_SAFETY',
-            filePath,
-            line: fn.startLine + i,
-            message: `Emitted signal '${sig}' is not declared in this script or known base classes.`,
-            severity: 'warning'
-          });
+      let sig: string | null = null;
+      const legacyMatch = line.match(/emit_signal\(\s*["']([^"']+)["']/);
+      if (legacyMatch) {
+        sig = legacyMatch[1];
+      } else {
+        const modernMatch = line.match(/\b([a-zA-Z_]\w*)\.emit\s*\(/);
+        if (modernMatch && modernMatch[1] !== 'self') {
+          sig = modernMatch[1];
         }
+      }
+      if (sig && !signals.has(sig) && !GDScriptRulesValidator.ENGINE_SIGNALS.has(sig)) {
+        violations.push({
+          rule: 'GD_004_SIGNAL_SAFETY',
+          filePath,
+          line: fn.startLine + i,
+          message: `Emitted signal '${sig}' is not declared in this script or known base classes.`,
+          severity: 'warning'
+        });
       }
     }
   }

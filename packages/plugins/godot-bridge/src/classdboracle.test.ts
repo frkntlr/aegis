@@ -84,3 +84,20 @@ test('ClassDbOracle accepts local script methods called via self without false e
   const violations = oracle.validateUsage(scriptWithLocal, 'test.gd');
   assert.strictEqual(violations.length, 0);
 });
+
+test('ClassDbOracle resolves Tween, SceneTree, TextureRect, and LineEdit offline', () => {
+  const oracle = new ClassDbOracle();
+  assert.ok(oracle.queryClass('Tween'));
+  assert.ok(oracle.queryClass('SceneTree'));
+  assert.ok(oracle.queryClass('TextureRect'));
+  assert.ok(oracle.queryClass('LineEdit'));
+
+  const tweenProp = oracle.queryMethod('Tween', 'tween_property');
+  assert.ok(tweenProp);
+
+  const sceneCreateTween = oracle.queryMethod('SceneTree', 'create_tween');
+  assert.ok(sceneCreateTween);
+
+  const lineEditText = oracle.queryProperty('LineEdit', 'text');
+  assert.ok(lineEditText);
+});

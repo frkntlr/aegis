@@ -11,6 +11,16 @@ export interface WorktreeManagerOptions {
 
 const normPath = (p: string): string => p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
 
+function cleanGitEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  delete env.GIT_DIR;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_PREFIX;
+  delete env.GIT_COMMON_DIR;
+  return env;
+}
+
 export class WorktreeManager {
   private repoRoot: string;
   private worktreePrefix: string;
@@ -137,7 +147,7 @@ export class WorktreeManager {
           cwd: this.repoRoot,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          env: cleanGitEnv()
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
@@ -155,7 +165,7 @@ export class WorktreeManager {
         execFileSync('git', ['worktree', 'prune'], {
           cwd: this.repoRoot,
           stdio: 'pipe',
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          env: cleanGitEnv()
         });
       } catch { /* ignore */ }
       fs.mkdirSync(path.dirname(targetDir), { recursive: true });
@@ -163,7 +173,7 @@ export class WorktreeManager {
         execFileSync('git', ['worktree', 'add', targetDir, '-B', branchName, baseBranch], {
           cwd: this.repoRoot,
           stdio: 'pipe',
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+          env: cleanGitEnv()
         });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -190,7 +200,7 @@ export class WorktreeManager {
       execFileSync('git', ['worktree', 'remove', targetDir, '--force'], {
         cwd: this.repoRoot,
         stdio: 'pipe',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       return true;
     } catch {
@@ -200,7 +210,7 @@ export class WorktreeManager {
           execFileSync('git', ['worktree', 'prune'], {
             cwd: this.repoRoot,
             stdio: 'pipe',
-            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+            env: cleanGitEnv()
           });
         } catch { /* ignore */ }
         return true;
@@ -240,7 +250,7 @@ export class WorktreeManager {
         cwd: this.repoRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       const worktrees = output
         .split('\n\n')

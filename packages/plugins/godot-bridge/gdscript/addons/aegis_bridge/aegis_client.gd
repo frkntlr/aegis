@@ -50,12 +50,22 @@ func _on_poll_completed(_result: int, response_code: int, _headers: PackedString
 func _execute_command(cmd: Dictionary) -> void:
 	var cmd_id = str(cmd.get("id", "0"))
 	var action = str(cmd.get("action", ""))
+	var payload = cmd.get("payload", {})
 	var resp_data = { "acknowledged": true, "action": action }
 
 	if action == "get_ui_tree":
 		var p = AegisUiVerifier.build_payload(get_tree().root, "16:9")
 		send_telemetry(p)
 		resp_data["nodes_count"] = p.get("nodes", []).size()
+	elif action == "simulate_input":
+		var actions = payload.get("actions", [])
+		var player = AegisSyntheticPlayer.new()
+		add_child(player)
+		var res = player.execute_scenario(actions)
+		player.queue_free()
+		resp_data["result"] = res
+	elif action == "ping":
+		resp_data["pong"] = true
 
 	_post_command_result(cmd_id, true, resp_data)
 

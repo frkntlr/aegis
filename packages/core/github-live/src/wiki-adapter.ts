@@ -5,6 +5,16 @@ import { GitHubTokenResolver } from './token-resolver.js';
 import type { WikiPage, WikiSyncStatus } from './types.js';
 import { DEFAULT_WIKI_SUITE } from './wiki-suite.js';
 
+function cleanGitEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+  delete env.GIT_DIR;
+  delete env.GIT_INDEX_FILE;
+  delete env.GIT_WORK_TREE;
+  delete env.GIT_PREFIX;
+  delete env.GIT_COMMON_DIR;
+  return env;
+}
+
 export interface WikiAdapterOptions {
   token?: string;
   owner?: string;
@@ -23,12 +33,7 @@ export class GitHubWikiLiveAdapter {
     this.token = auth.token || '';
     this.owner = options.owner || auth.owner || 'frkntlr';
     this.repo = options.repo || auth.repo || 'aegis';
-    const rootGit = path.resolve(process.cwd(), '.git');
-    const isWorktree = fs.existsSync(rootGit) && !fs.statSync(rootGit).isDirectory();
-    const defaultCloneDir = isWorktree
-      ? path.resolve(process.cwd(), '.aegis', 'wiki-cache')
-      : path.resolve(process.cwd(), '.git', 'aegis-wiki');
-    this.cloneDir = options.localCloneDir || defaultCloneDir;
+    this.cloneDir = options.localCloneDir || path.resolve(process.cwd(), '.aegis', 'wiki-cache');
   }
 
   public getWikiRemoteUrl(): string {
@@ -48,7 +53,7 @@ export class GitHubWikiLiveAdapter {
       execFileSync('git', ['ls-remote', url], {
         stdio: 'pipe',
         timeout: 8000,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       return {
         available: true,
@@ -82,7 +87,7 @@ export class GitHubWikiLiveAdapter {
       execFileSync('git', ['-C', this.cloneDir, 'pull', 'origin', 'master', '--allow-unrelated-histories'], {
         stdio: 'pipe',
         timeout: 15000,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       return true;
     } catch {
@@ -110,7 +115,7 @@ export class GitHubWikiLiveAdapter {
       execFileSync('git', ['clone', url, this.cloneDir], {
         stdio: 'pipe',
         timeout: 20000,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        env: cleanGitEnv()
       });
       return true;
     } catch {
@@ -167,7 +172,7 @@ export class GitHubWikiLiveAdapter {
     const hasGit = fs.existsSync(path.join(this.cloneDir, '.git'));
     if (status.available && hasGit) {
       try {
-        const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+        const env = cleanGitEnv();
         execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
         execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
         execFileSync('git', ['-C', this.cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
@@ -221,7 +226,7 @@ export class GitHubWikiLiveAdapter {
 
     if (fs.existsSync(path.join(this.cloneDir, '.git'))) {
       try {
-        const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+        const env = cleanGitEnv();
         execFileSync('git', ['-C', this.cloneDir, 'add', '.'], { stdio: 'pipe', env });
         execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 8-page living architecture suite'], { stdio: 'pipe', env });
       } catch {
@@ -233,7 +238,7 @@ export class GitHubWikiLiveAdapter {
 
   public pushAllToRemote(): { success: boolean; message: string } {
     this.ensureGitInitialized();
-    const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+    const env = cleanGitEnv();
     try {
       execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
       return { success: true, message: 'Successfully pushed all wiki pages to GitHub remote.' };
@@ -252,7 +257,7 @@ export class GitHubWikiLiveAdapter {
   private ensureGitInitialized(): void {
     fs.mkdirSync(this.cloneDir, { recursive: true });
     const gitDir = path.join(this.cloneDir, '.git');
-    const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+    const env = cleanGitEnv();
     if (!fs.existsSync(gitDir)) {
       execFileSync('git', ['init', '-b', 'master', this.cloneDir], { stdio: 'pipe', env });
       execFileSync('git', ['-C', this.cloneDir, 'config', 'user.name', 'Aegis Fleet'], { stdio: 'pipe', env });

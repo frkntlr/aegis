@@ -46,10 +46,10 @@ function httpGet<T = Record<string, unknown>>(url: string): Promise<{ status: nu
 }
 
 test('GodotBridgeServer handles status check', async () => {
-  const server = new GodotBridgeServer({ port: 6861 });
-  await server.start();
+  const server = new GodotBridgeServer({ port: 0 });
+  const port = await server.start();
   try {
-    const res = await httpGet<{ status: string }>('http://127.0.0.1:6861/status');
+    const res = await httpGet<{ status: string }>(`http://127.0.0.1:${port}/status`);
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.status, 'running');
   } finally {
@@ -60,20 +60,20 @@ test('GodotBridgeServer handles status check', async () => {
 test('GodotBridgeServer handles telemetry dispatch and retrieval', async () => {
   let received: GodotUiTreePayload | null = null;
   const server = new GodotBridgeServer({
-    port: 6862,
+    port: 0,
     onTelemetryReceived: (p) => { received = p; }
   });
-  await server.start();
+  const port = await server.start();
   try {
     const payload: GodotUiTreePayload = {
       viewport: { width: 1920, height: 1080, aspectRatio: '16:9' },
       nodes: [{ id: 'b1', name: 'StartBtn', type: 'Button', visible: true, rect: { x: 0, y: 0, width: 100, height: 40 } }]
     };
-    const postRes = await httpPost('http://127.0.0.1:6862/telemetry', payload);
+    const postRes = await httpPost(`http://127.0.0.1:${port}/telemetry`, payload);
     assert.strictEqual(postRes.status, 200);
     assert.ok(received !== null);
 
-    const getRes = await httpGet<{ telemetry: GodotUiTreePayload }>('http://127.0.0.1:6862/telemetry/latest');
+    const getRes = await httpGet<{ telemetry: GodotUiTreePayload }>(`http://127.0.0.1:${port}/telemetry/latest`);
     assert.strictEqual(getRes.status, 200);
     assert.strictEqual(getRes.body.telemetry.nodes.length, 1);
   } finally {
@@ -82,29 +82,29 @@ test('GodotBridgeServer handles telemetry dispatch and retrieval', async () => {
 });
 
 test('GodotBridgeServer handles command queueing, polling and result retrieval', async () => {
-  const server = new GodotBridgeServer({ port: 6863 });
-  await server.start();
+  const server = new GodotBridgeServer({ port: 0 });
+  const port = await server.start();
   try {
-    const queueRes = await httpPost('http://127.0.0.1:6863/command/queue', {
+    const queueRes = await httpPost(`http://127.0.0.1:${port}/command/queue`, {
       id: 'cmd-42',
       action: 'get_ui_tree'
     });
     assert.strictEqual(queueRes.status, 200);
 
-    const pollRes = await httpGet<{ command: { id: string; action: string } | null }>('http://127.0.0.1:6863/command/poll');
+    const pollRes = await httpGet<{ command: { id: string; action: string } | null }>(`http://127.0.0.1:${port}/command/poll`);
     assert.strictEqual(pollRes.status, 200);
     assert.ok(pollRes.body.command !== null);
     assert.strictEqual(pollRes.body.command.id, 'cmd-42');
     assert.strictEqual(pollRes.body.command.action, 'get_ui_tree');
 
-    const resultPost = await httpPost('http://127.0.0.1:6863/command/result', {
+    const resultPost = await httpPost(`http://127.0.0.1:${port}/command/result`, {
       id: 'cmd-42',
       success: true,
       data: { acknowledged: true }
     });
     assert.strictEqual(resultPost.status, 200);
 
-    const resultGet = await httpGet<{ result: { id: string; success: boolean } | null }>('http://127.0.0.1:6863/command/result?id=cmd-42');
+    const resultGet = await httpGet<{ result: { id: string; success: boolean } | null }>(`http://127.0.0.1:${port}/command/result?id=cmd-42`);
     assert.strictEqual(resultGet.status, 200);
     assert.ok(resultGet.body.result !== null);
     assert.strictEqual(resultGet.body.result.success, true);
