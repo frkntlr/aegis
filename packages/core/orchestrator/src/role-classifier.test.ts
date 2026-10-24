@@ -55,3 +55,15 @@ test('RoleClassifier flags low confidence when signals are empty or ambiguous', 
   assert.strictEqual(res.isAmbiguous, true);
   assert.ok(res.confidence < 60);
 });
+
+test('RoleClassifier normalizes Windows path separators in target files', () => {
+  const classifier = new RoleClassifier();
+  const res = classifier.classify({
+    title: 'Update Living Architecture Guide',
+    labels: ['docs'],
+    targetFiles: ['wiki\\Architecture.md', 'docs\\README.md']
+  });
+
+  assert.strictEqual(res.role, 'docs');
+  assert.ok(res.confidence >= 60);
+});

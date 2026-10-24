@@ -37,3 +37,19 @@ test('LoopBreaker clears failure count on success', () => {
   assert.strictEqual(r.attempts, 1);
   assert.strictEqual(r.blocked, false);
 });
+
+test('LoopBreaker enumerates blocked issues accurately', () => {
+  const breaker = new LoopBreaker({ maxFailures: 2 });
+  breaker.recordFailure(301, 'Err 1');
+  breaker.recordFailure(301, 'Err 2'); // blocked
+
+  breaker.recordFailure(302, 'Err A'); // not blocked
+
+  const blocked = breaker.getBlockedIssues();
+  assert.deepStrictEqual(blocked, [301]);
+
+  const allRecords = breaker.getAllRecords();
+  assert.strictEqual(allRecords.size, 2);
+  assert.strictEqual(allRecords.get(301)?.blocked, true);
+  assert.strictEqual(allRecords.get(302)?.blocked, false);
+});

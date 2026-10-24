@@ -62,7 +62,7 @@ export class RoleClassifier {
     let solverHits = 0;
 
     for (const f of files) {
-      const lower = f.toLowerCase();
+      const lower = f.toLowerCase().replace(/\\/g, '/');
       if (lower.endsWith('.md') || lower.includes('/wiki/') || lower.includes('docs/')) docsHits++;
       else if (lower.includes('.test.') || lower.includes('.spec.') || lower.endsWith('.tscn')) qaHits++;
       else if (lower.endsWith('.ts') || lower.endsWith('.py') || lower.endsWith('.gd') || lower.endsWith('.rs')) solverHits++;

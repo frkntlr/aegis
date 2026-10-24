@@ -193,7 +193,8 @@ export class GitHubClient {
       };
     }
 
-    const nextNumber = this.issues.size + 1;
+    const existingKeys = Array.from(this.issues.keys());
+    const nextNumber = existingKeys.length > 0 ? Math.max(...existingKeys) + 1 : 1;
     const subIssue: GitHubIssue = {
       id: nextNumber,
       number: nextNumber,

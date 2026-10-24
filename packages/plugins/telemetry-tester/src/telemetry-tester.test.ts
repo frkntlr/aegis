@@ -90,3 +90,17 @@ test('MutationGate handles consecutive lines matching same pattern without lastI
   assert.strictEqual(trueMutants[1].line, 2);
   assert.strictEqual(trueMutants[2].line, 3);
 });
+
+test('BoundingBoxInspector ignores parent-child hierarchies and zero-dimension boxes', () => {
+  const inspector = new BoundingBoxInspector();
+  const parentBox: BoundingBox = { id: 'modal', x: 100, y: 100, width: 400, height: 300 };
+  const childBox: BoundingBox = { id: 'modal/close_btn', x: 450, y: 110, width: 30, height: 30 };
+
+  assert.strictEqual(inspector.checkOverlap(parentBox, childBox), false);
+
+  const zeroBox: BoundingBox = { id: 'invisible', x: 200, y: 200, width: 0, height: 0 };
+  assert.strictEqual(inspector.checkOverlap(parentBox, zeroBox), false);
+
+  const parentIdChild: BoundingBox = { id: 'btn', parentId: 'modal', x: 150, y: 150, width: 100, height: 40 };
+  assert.strictEqual(inspector.checkOverlap(parentBox, parentIdChild), false);
+});

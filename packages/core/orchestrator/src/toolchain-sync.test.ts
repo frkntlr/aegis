@@ -82,3 +82,37 @@ test('UniversalToolchainSync updates .cursorrules dynamically when skills change
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('UniversalToolchainSync preserves existing custom MCP servers in Cursor and VS Code configs', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mcp-merge-'));
+  try {
+    const cursorDir = path.join(tmpDir, '.cursor');
+    fs.mkdirSync(cursorDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(cursorDir, 'mcp.json'),
+      JSON.stringify({ mcpServers: { 'custom-db': { command: 'db-tool', args: ['run'] } } }),
+      'utf8'
+    );
+
+    const vscodeDir = path.join(tmpDir, '.vscode');
+    fs.mkdirSync(vscodeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(vscodeDir, 'mcp.json'),
+      JSON.stringify({ servers: { 'custom-api': { url: 'http://localhost:9000/sse' } } }),
+      'utf8'
+    );
+
+    const sync = new UniversalToolchainSync(tmpDir);
+    sync.syncAll();
+
+    const cursorMcp = JSON.parse(fs.readFileSync(path.join(cursorDir, 'mcp.json'), 'utf8'));
+    assert.ok(cursorMcp.mcpServers['custom-db']);
+    assert.ok(cursorMcp.mcpServers['aegis-engine']);
+
+    const vscodeMcp = JSON.parse(fs.readFileSync(path.join(vscodeDir, 'mcp.json'), 'utf8'));
+    assert.ok(vscodeMcp.servers['custom-api']);
+    assert.ok(vscodeMcp.servers['aegis-engine']);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

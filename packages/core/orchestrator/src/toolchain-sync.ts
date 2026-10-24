@@ -88,30 +88,49 @@ export class UniversalToolchainSync {
     return servers;
   }
 
+  private readExistingServers(jsonPath: string, key: 'mcpServers' | 'servers'): Record<string, unknown> {
+    if (!fs.existsSync(jsonPath)) return {};
+    try {
+      const parsed = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      if (parsed?.[key] && typeof parsed[key] === 'object') {
+        return parsed[key] as Record<string, unknown>;
+      }
+    } catch { /* ignore corrupt json */ }
+    return {};
+  }
+
+  private updateCursorRules(skills: DiscoveredSkill[]): void {
+    const rulesFile = path.resolve(this.repoRoot, '.cursorrules');
+    const skillLines = skills.map(s => `- **${s.name}**: ${s.description}`).join('\n');
+    const header = `# Aegis Synchronized Skills Index\n${skillLines}\n<!-- aegis:skills:end -->\n\n`;
+    if (fs.existsSync(rulesFile)) {
+      const existing = fs.readFileSync(rulesFile, 'utf8');
+      const pattern = /# Aegis Synchronized Skills Index[\s\S]*?(?:<!-- aegis:skills:end -->\r?\n\r?\n?|(?=\r?\n#)|\n$|$)/;
+      if (pattern.test(existing)) {
+        fs.writeFileSync(rulesFile, existing.replace(pattern, header), 'utf8');
+      } else {
+        fs.writeFileSync(rulesFile, header + existing, 'utf8');
+      }
+    } else {
+      fs.writeFileSync(rulesFile, header, 'utf8');
+    }
+  }
+
   private syncCursor(skills: DiscoveredSkill[], mcps: McpServerDefinition[], warnings: string[]): boolean {
     try {
       const cursorDir = path.resolve(this.repoRoot, '.cursor');
       fs.mkdirSync(cursorDir, { recursive: true });
-      const mcpConfig: { mcpServers: Record<string, unknown> } = { mcpServers: {} };
+      const mcpJsonPath = path.join(cursorDir, 'mcp.json');
+      const existingServers = this.readExistingServers(mcpJsonPath, 'mcpServers');
+      const mcpConfig = { mcpServers: { ...existingServers } as Record<string, unknown> };
       for (const m of mcps) {
         mcpConfig.mcpServers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
       }
-      fs.writeFileSync(path.join(cursorDir, 'mcp.json'), JSON.stringify(mcpConfig, null, 2), 'utf8');
-
-      const rulesFile = path.resolve(this.repoRoot, '.cursorrules');
-      const skillLines = skills.map(s => `- **${s.name}**: ${s.description}`).join('\n');
-      const header = `# Aegis Synchronized Skills Index\n${skillLines}\n<!-- aegis:skills:end -->\n\n`;
-      if (fs.existsSync(rulesFile)) {
-        const existing = fs.readFileSync(rulesFile, 'utf8');
-        const pattern = /# Aegis Synchronized Skills Index[\s\S]*?(?:<!-- aegis:skills:end -->\r?\n\r?\n?|(?=\r?\n#)|\n$|$)/;
-        if (pattern.test(existing)) {
-          fs.writeFileSync(rulesFile, existing.replace(pattern, header), 'utf8');
-        } else {
-          fs.writeFileSync(rulesFile, header + existing, 'utf8');
-        }
-      } else {
-        fs.writeFileSync(rulesFile, header, 'utf8');
+      if (!mcpConfig.mcpServers['aegis-engine']) {
+        mcpConfig.mcpServers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js'] };
       }
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
+      this.updateCursorRules(skills);
       return true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -124,11 +143,16 @@ export class UniversalToolchainSync {
     try {
       const vscodeDir = path.resolve(this.repoRoot, '.vscode');
       fs.mkdirSync(vscodeDir, { recursive: true });
-      const mcpConfig: { servers: Record<string, unknown> } = { servers: {} };
+      const mcpJsonPath = path.join(vscodeDir, 'mcp.json');
+      const existingServers = this.readExistingServers(mcpJsonPath, 'servers');
+      const mcpConfig = { servers: { ...existingServers } as Record<string, unknown> };
       for (const m of mcps) {
         mcpConfig.servers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
       }
-      fs.writeFileSync(path.join(vscodeDir, 'mcp.json'), JSON.stringify(mcpConfig, null, 2), 'utf8');
+      if (!mcpConfig.servers['aegis-engine']) {
+        mcpConfig.servers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js'] };
+      }
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
       return true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

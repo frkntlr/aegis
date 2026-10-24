@@ -104,3 +104,23 @@ test('GitHubClient completes issue and filters out done issues from ready list',
   const ready = client.listReadyIssues();
   assert.strictEqual(ready.length, 0);
 });
+
+test('GitHubClient spawnSubIssue avoids ID collisions with non-sequential issue numbers', () => {
+  const client = new GitHubClient();
+  client.registerIssue({
+    id: 100,
+    number: 100,
+    title: 'High ID Task',
+    body: 'desc',
+    labels: ['status:ready'],
+    status: 'ready',
+    targetFiles: ['src/index.ts'],
+    acceptanceCriteria: []
+  });
+
+  const spawned = client.spawnSubIssue(100, 'Subtask', 'body', ['src/sub.ts']);
+  assert.strictEqual(spawned.success, true);
+  assert.strictEqual(spawned.createdIssue?.number, 101);
+  assert.strictEqual(client.getIssue(100)?.title, 'High ID Task');
+  assert.strictEqual(client.getIssue(101)?.title, '[Subtask of #100] Subtask');
+});

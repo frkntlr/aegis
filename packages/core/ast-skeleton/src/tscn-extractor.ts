@@ -49,7 +49,8 @@ export class TscnSkeletonExtractor implements LanguageExtractor {
       trimmed.startsWith('[gd_resource') ||
       trimmed.startsWith('[ext_resource') ||
       trimmed.startsWith('[sub_resource') ||
-      trimmed.startsWith('[node ')
+      trimmed.startsWith('[node ') ||
+      trimmed.startsWith('[resource]')
     );
   }
 
@@ -57,9 +58,12 @@ export class TscnSkeletonExtractor implements LanguageExtractor {
     return (
       trimmed.startsWith('script =') ||
       trimmed.startsWith('theme =') ||
+      trimmed.startsWith('text =') ||
+      trimmed.startsWith('unique_name_in_owner =') ||
       trimmed.startsWith('layout_mode =') ||
       trimmed.startsWith('anchors_preset =') ||
-      trimmed.startsWith('process_mode =')
+      trimmed.startsWith('process_mode =') ||
+      trimmed.startsWith('custom_minimum_size =')
     );
   }
 }

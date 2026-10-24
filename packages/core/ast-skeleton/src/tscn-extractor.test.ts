@@ -49,3 +49,30 @@ test('SkeletonGenerator handles .tscn via registry automatically', () => {
   const res = gen.extractFile('player.tscn', sampleTscn);
   assert.ok(res.skeletonContent.includes('[node name="Player"'));
 });
+
+test('TscnSkeletonExtractor preserves [resource] header in .tres and unique_name_in_owner properties', () => {
+  const extractor = new TscnSkeletonExtractor();
+  const tresContent = [
+    '[gd_resource type="Theme" format=3 uid="uid://tres123"]',
+    '',
+    '[resource]',
+    'default_font_size = 24'
+  ].join('\n');
+
+  const tresRes = extractor.extract('theme.tres', tresContent);
+  assert.ok(tresRes.skeletonContent.includes('[gd_resource'));
+  assert.ok(tresRes.skeletonContent.includes('[resource]'));
+
+  const uiTscn = [
+    '[gd_scene format=3]',
+    '[node name="StartBtn" type="Button"]',
+    'unique_name_in_owner = true',
+    'text = "BAŞLA"',
+    'offset_left = 100.0'
+  ].join('\n');
+
+  const uiRes = extractor.extract('ui.tscn', uiTscn);
+  assert.ok(uiRes.skeletonContent.includes('unique_name_in_owner = true'));
+  assert.ok(uiRes.skeletonContent.includes('text = "BAŞLA"'));
+  assert.ok(!uiRes.skeletonContent.includes('offset_left = 100.0'));
+});

@@ -65,6 +65,18 @@ export class LoopBreaker {
     return this.failures.get(issueNumber)?.blocked ?? false;
   }
 
+  public getBlockedIssues(): number[] {
+    const blocked: number[] = [];
+    for (const [num, record] of this.failures.entries()) {
+      if (record.blocked) blocked.push(num);
+    }
+    return blocked;
+  }
+
+  public getAllRecords(): Map<number, FailureRecord> {
+    return new Map(this.failures);
+  }
+
   public getRecord(issueNumber: number): FailureRecord | undefined {
     return this.failures.get(issueNumber);
   }

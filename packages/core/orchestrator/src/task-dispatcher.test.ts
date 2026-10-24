@@ -137,3 +137,17 @@ test('TaskDispatcher prevents assigning tasks to incompatible specialized agents
   assert.strictEqual(res.dispatched, false);
   assert.ok(res.reason?.includes('No compatible idle agents'));
 });
+
+test('TaskDispatcher completeTask clears loop breaker failure history', () => {
+  let successRecorded: number | null = null;
+  const breaker: ILoopBreaker = {
+    isBlocked: () => false,
+    recordFailure: () => ({ blocked: false, attempts: 1, maxFailures: 3 }),
+    recordSuccess: (num: number) => { successRecorded = num; }
+  };
+  const wt = new WorktreeManager();
+  const dispatcher = new TaskDispatcher(wt, breaker);
+
+  dispatcher.completeTask('solver', 42);
+  assert.strictEqual(successRecorded, 42);
+});

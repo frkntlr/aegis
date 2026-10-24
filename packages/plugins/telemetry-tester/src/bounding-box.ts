@@ -5,6 +5,7 @@ export interface BoundingBox {
   width: number;
   height: number;
   zIndex?: number;
+  parentId?: string;
 }
 
 export interface ViewportConfig {
@@ -29,6 +30,18 @@ export interface InspectionResult {
 
 export class BoundingBoxInspector {
   public checkOverlap(boxA: BoundingBox, boxB: BoundingBox): boolean {
+    if (boxA.width <= 0 || boxA.height <= 0 || boxB.width <= 0 || boxB.height <= 0) {
+      return false;
+    }
+
+    if (boxA.parentId === boxB.id || boxB.parentId === boxA.id) {
+      return false;
+    }
+
+    if (boxA.id.startsWith(`${boxB.id}/`) || boxB.id.startsWith(`${boxA.id}/`)) {
+      return false;
+    }
+
     // If z-indices differ, they are intentionally layered
     if (boxA.zIndex !== undefined && boxB.zIndex !== undefined && boxA.zIndex !== boxB.zIndex) {
       return false;

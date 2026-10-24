@@ -135,7 +135,7 @@ export class ActionDispatcher {
     else if (t === 'mcp_security') res = this.ctx.engineSvc.runMcpSecurity(payload.agent as string, payload.mcpTool as string);
     else if (t === 'diff_validator') res = await this.ctx.engineSvc.runDiffValidator(payload.diffText as string);
     else if (t === 'immutable_oracle') res = await this.ctx.engineSvc.runOracleAudit(payload.files as string[]);
-    else res = { error: 'Bilinmeyen araç: ' + t };
+    else return { success: false, error: 'Bilinmeyen araç: ' + t, message: 'Bilinmeyen araç: ' + t };
     return { success: true, result: res, message: (res.summary as string) || 'Motor aracı çalıştırıldı.' };
   }
 

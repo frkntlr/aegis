@@ -4,6 +4,7 @@ import type { GitHubIssue, GitHubClient } from '@aegis/github-live';
 
 export interface ILoopBreaker {
   isBlocked(issueNumber: number): boolean;
+  recordSuccess?(issueNumber: number): void;
   recordFailure(issueNumber: number, errorMessage: string): {
     blocked: boolean;
     attempts: number;
@@ -97,7 +98,10 @@ export class TaskDispatcher {
     return { blocked: false };
   }
 
-  public completeTask(agentName: string): void {
+  public completeTask(agentName: string, issueNumber?: number): void {
     this.worktreeManager.releaseFileLocks(agentName);
+    if (issueNumber && this.loopBreaker?.recordSuccess) {
+      this.loopBreaker.recordSuccess(issueNumber);
+    }
   }
 }

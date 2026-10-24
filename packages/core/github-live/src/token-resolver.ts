@@ -37,44 +37,50 @@ export class GitHubTokenResolver {
     }
   }
 
-  public static resolve(customToken?: string): GitHubAuthContext {
+  public static resolve(customToken?: string, repoRoot?: string): GitHubAuthContext {
     const raw = customToken?.trim() || process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim();
     if (raw) {
-      return { token: raw, ...this.detectRepo(), source: 'env', hasCredentials: true };
+      return { token: raw, ...this.detectRepo(repoRoot), source: 'env', hasCredentials: true };
     }
 
     const cliToken = this.resolveFromCli();
     if (cliToken) {
-      return { token: cliToken, ...this.detectRepo(), source: 'gh-cli', hasCredentials: true };
+      return { token: cliToken, ...this.detectRepo(repoRoot), source: 'gh-cli', hasCredentials: true };
     }
 
     const gitToken = this.resolveFromGitCredentials();
     if (gitToken) {
-      return { token: gitToken, ...this.detectRepo(), source: 'git-credential', hasCredentials: true };
+      return { token: gitToken, ...this.detectRepo(repoRoot), source: 'git-credential', hasCredentials: true };
     }
 
-    return { ...this.detectRepo(), source: 'none', hasCredentials: false };
+    return { ...this.detectRepo(repoRoot), source: 'none', hasCredentials: false };
   }
 
-  public static detectRepo(): { owner?: string; repo?: string } {
-    try {
-      const remoteUrl = execFileSync('git', ['config', '--get', 'remote.origin.url'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
-      }).trim();
+  public static detectRepo(repoRoot?: string): { owner?: string; repo?: string } {
+    const cwd = repoRoot || process.cwd();
+    const candidateRemotes = ['remote.origin.url', 'remote.upstream.url'];
 
-      if (!remoteUrl) return {};
+    for (const rem of candidateRemotes) {
+      try {
+        const remoteUrl = execFileSync('git', ['config', '--get', rem], {
+          cwd,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+        }).trim();
 
-      const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/i);
-      if (match) {
-        return {
-          owner: match[1],
-          repo: match[2]
-        };
+        if (!remoteUrl) continue;
+
+        const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/i);
+        if (match) {
+          return {
+            owner: match[1],
+            repo: match[2]
+          };
+        }
+      } catch {
+        // try next candidate
       }
-    } catch {
-      // git remote not configured
     }
 
     return {};
