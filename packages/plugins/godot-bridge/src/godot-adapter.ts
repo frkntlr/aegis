@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { GodotInitWorkflow } from './godot-init.js';
 
 export interface IdeCapabilities {
   supportsMcp: boolean;
@@ -71,10 +72,10 @@ export class GodotIdeAdapter implements IdeAdapter {
     if (!fs.existsSync(projectGodot)) return;
 
     try {
-      let content = fs.readFileSync(projectGodot, 'utf8');
-      if (!content.includes('aegis_bridge')) {
-        content += '\n[editor_plugins]\n\nenabled=PackedStringArray("res://addons/aegis_bridge/plugin.cfg")\n';
-        fs.writeFileSync(projectGodot, content, 'utf8');
+      const content = fs.readFileSync(projectGodot, 'utf8');
+      const updated = GodotInitWorkflow.mergePluginIntoConfig(content);
+      if (updated !== content) {
+        fs.writeFileSync(projectGodot, updated, 'utf8');
         configuredFiles.push(projectGodot);
       }
     } catch {

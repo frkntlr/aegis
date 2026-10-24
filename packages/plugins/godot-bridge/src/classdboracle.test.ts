@@ -55,3 +55,32 @@ test('ClassDbOracle searches classes and validates GDScript base usage', () => {
   assert.strictEqual(invalidViolations[0].symbol, 'non_existent_method_xyz');
   assert.strictEqual(invalidViolations[0].severity, 'error');
 });
+
+test('ClassDbOracle resolves expanded builtin classes offline', () => {
+  const oracle = new ClassDbOracle();
+  assert.ok(oracle.queryClass('RefCounted'));
+  assert.ok(oracle.queryClass('Resource'));
+  assert.ok(oracle.queryClass('Label'));
+  assert.ok(oracle.queryClass('Timer'));
+  assert.ok(oracle.queryClass('AudioStreamPlayer'));
+
+  const timerTimeout = oracle.querySignal('Timer', 'timeout');
+  assert.ok(timerTimeout);
+
+  const audioPlay = oracle.queryMethod('AudioStreamPlayer', 'play');
+  assert.ok(audioPlay);
+});
+
+test('ClassDbOracle accepts local script methods called via self without false errors', () => {
+  const oracle = new ClassDbOracle();
+  const scriptWithLocal = [
+    'extends Control',
+    'func _ready():',
+    '    self._init_custom_ui()',
+    'func _init_custom_ui():',
+    '    pass'
+  ].join('\n');
+
+  const violations = oracle.validateUsage(scriptWithLocal, 'test.gd');
+  assert.strictEqual(violations.length, 0);
+});

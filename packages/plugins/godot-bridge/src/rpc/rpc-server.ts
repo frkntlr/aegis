@@ -13,6 +13,8 @@ export class GodotBridgeServer {
   private host: string;
   private latestTelemetry: GodotUiTreePayload | null = null;
   private onTelemetryCallback?: (payload: GodotUiTreePayload) => void;
+  private commandQueue: GodotRpcRequest[] = [];
+  private commandResults: Map<string, GodotRpcResponse> = new Map();
 
   constructor(options: GodotBridgeServerOptions = {}) {
     this.port = options.port ?? 6850;
@@ -26,6 +28,14 @@ export class GodotBridgeServer {
 
   public getLatestTelemetry(): GodotUiTreePayload | null {
     return this.latestTelemetry;
+  }
+
+  public queueCommand(cmd: GodotRpcRequest): void {
+    this.commandQueue.push(cmd);
+  }
+
+  public getCommandResult(id: string): GodotRpcResponse | undefined {
+    return this.commandResults.get(id);
   }
 
   public async start(): Promise<void> {
@@ -57,13 +67,8 @@ export class GodotBridgeServer {
       return;
     }
 
-    if (req.method === 'GET' && req.url === '/status') {
-      this.sendJsonResponse(res, 200, { status: 'running', port: this.port, hasTelemetry: !!this.latestTelemetry });
-      return;
-    }
-
-    if (req.method === 'GET' && req.url === '/telemetry/latest') {
-      this.sendJsonResponse(res, 200, { telemetry: this.latestTelemetry });
+    if (req.method === 'GET') {
+      this.handleGet(req, res);
       return;
     }
 
@@ -75,6 +80,29 @@ export class GodotBridgeServer {
     this.sendJsonResponse(res, 404, { error: 'Not found' });
   }
 
+  private handleGet(req: http.IncomingMessage, res: http.ServerResponse): void {
+    if (req.url === '/status') {
+      this.sendJsonResponse(res, 200, { status: 'running', port: this.port, hasTelemetry: !!this.latestTelemetry });
+      return;
+    }
+    if (req.url === '/telemetry/latest') {
+      this.sendJsonResponse(res, 200, { telemetry: this.latestTelemetry });
+      return;
+    }
+    if (req.url === '/command/poll') {
+      const command = this.commandQueue.shift() || null;
+      this.sendJsonResponse(res, 200, { command });
+      return;
+    }
+    if (req.url?.startsWith('/command/result')) {
+      const id = new URL(req.url, 'http://localhost').searchParams.get('id');
+      const result = id ? (this.commandResults.get(id) || null) : null;
+      this.sendJsonResponse(res, 200, { result });
+      return;
+    }
+    this.sendJsonResponse(res, 404, { error: 'Not found' });
+  }
+
   private handlePost(req: http.IncomingMessage, res: http.ServerResponse): void {
     this.readJsonBody(req, res, (data) => {
       if (req.url === '/telemetry') {
@@ -83,18 +111,22 @@ export class GodotBridgeServer {
         this.sendJsonResponse(res, 200, { success: true });
         return;
       }
-
-      if (req.url === '/rpc') {
-        const rpcReq = data as GodotRpcRequest;
-        const response: GodotRpcResponse = {
-          id: rpcReq.id || '0',
-          success: true,
-          data: { acknowledged: true, action: rpcReq.action }
-        };
-        this.sendJsonResponse(res, 200, response);
+      if (req.url === '/command/queue') {
+        this.queueCommand(data as GodotRpcRequest);
+        this.sendJsonResponse(res, 200, { queued: true });
         return;
       }
-
+      if (req.url === '/command/result') {
+        const resp = data as GodotRpcResponse;
+        if (resp.id) this.commandResults.set(resp.id, resp);
+        this.sendJsonResponse(res, 200, { success: true });
+        return;
+      }
+      if (req.url === '/rpc') {
+        const rpcReq = data as GodotRpcRequest;
+        this.sendJsonResponse(res, 200, { id: rpcReq.id || '0', success: true, data: { acknowledged: true, action: rpcReq.action } });
+        return;
+      }
       this.sendJsonResponse(res, 404, { error: 'Unknown endpoint' });
     });
   }

@@ -29,3 +29,12 @@ test('GodotInitWorkflow initializes addon files and aegis.config.json in target 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('GodotInitWorkflow merges into existing editor_plugins without creating duplicate keys', () => {
+  const existing = '[editor_plugins]\n\nenabled=PackedStringArray("res://addons/custom_tool/plugin.cfg")\n';
+  const merged = GodotInitWorkflow.mergePluginIntoConfig(existing);
+  assert.ok(merged.includes('res://addons/custom_tool/plugin.cfg'));
+  assert.ok(merged.includes('res://addons/aegis_bridge/plugin.cfg'));
+  assert.strictEqual((merged.match(/enabled=/g) || []).length, 1);
+  assert.strictEqual((merged.match(/\[editor_plugins\]/g) || []).length, 1);
+});

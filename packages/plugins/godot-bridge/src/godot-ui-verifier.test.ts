@@ -47,22 +47,23 @@ test('GodotUiVerifier passes cleanly formatted layout across required aspect rat
   const verifier = new GodotUiVerifier();
 
   for (const aspect of GodotUiVerifier.REQUIRED_ASPECT_RATIOS) {
+    const dims = GodotUiVerifier.ASPECT_DIMENSIONS[aspect] ?? { width: 1920, height: 1080 };
     const payload: GodotUiTreePayload = {
-      viewport: { width: 1920, height: 1080, aspectRatio: aspect },
+      viewport: { width: dims.width, height: dims.height, aspectRatio: aspect },
       nodes: [
         {
           id: 'top_nav',
           name: 'TopNav',
           type: 'Panel',
           visible: true,
-          rect: { x: 0, y: 0, width: 1920, height: 80 }
+          rect: { x: 0, y: 0, width: dims.width, height: 80 }
         },
         {
           id: 'btn_ok',
           name: 'OkButton',
           type: 'Button',
           visible: true,
-          rect: { x: 500, y: 300, width: 120, height: 40 }
+          rect: { x: 100, y: 150, width: 120, height: 40 }
         }
       ]
     };
@@ -72,4 +73,29 @@ test('GodotUiVerifier passes cleanly formatted layout across required aspect rat
     assert.strictEqual(res.overlaps.length, 0);
     assert.strictEqual(res.clippings.length, 0);
   }
+});
+
+test('GodotUiVerifier does not report overlap for parent-child hierarchies', () => {
+  const verifier = new GodotUiVerifier();
+  const payload: GodotUiTreePayload = {
+    viewport: { width: 1920, height: 1080, aspectRatio: '16:9' },
+    nodes: [
+      {
+        id: 'main_menu/play_btn',
+        name: 'PlayButton',
+        type: 'Button',
+        visible: true,
+        rect: { x: 100, y: 100, width: 200, height: 60 }
+      },
+      {
+        id: 'main_menu/play_btn/sub_icon_btn',
+        name: 'SubIconBtn',
+        type: 'Button',
+        visible: true,
+        rect: { x: 110, y: 110, width: 40, height: 40 }
+      }
+    ]
+  };
+  const res = verifier.verifyPayload(payload);
+  assert.strictEqual(res.overlaps.length, 0);
 });

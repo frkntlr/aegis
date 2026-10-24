@@ -6,7 +6,12 @@ const ASPECT_RATIOS = {
 	"16:9": Vector2(1920, 1080),
 	"21:9": Vector2(2560, 1080),
 	"16:10": Vector2(1920, 1200),
-	"9:16": Vector2(1080, 1920)
+	"4:3": Vector2(1440, 1080),
+	"9:16": Vector2(1080, 1920),
+	"9:18": Vector2(1080, 2160),
+	"9:19.5": Vector2(1080, 2340),
+	"9:20": Vector2(1080, 2400),
+	"3:4": Vector2(1080, 1440)
 }
 
 static func collect_ui_nodes(root: Node) -> Array:

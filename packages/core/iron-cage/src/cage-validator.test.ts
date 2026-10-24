@@ -138,3 +138,17 @@ func complex_func():
   assert.ok(rules.includes('GD_005_RESOURCE_LEAK'), 'Detects instantiate without add_child/queue_free');
   assert.ok(rules.includes('GD_006_CYCLOMATIC_COMPLEXITY'), 'Detects high complexity');
 });
+
+test('GDScriptRulesValidator does not flag RefCounted objects or engine signals as violations', () => {
+  const validator = new GDScriptRulesValidator();
+
+  const script = `
+func setup_utils():
+\tvar regex = RegEx.new()
+\tvar cfg = ConfigFile.new()
+\temit_signal("pressed")
+`.trim();
+
+  const violations = validator.validate('scripts/utils.gd', script);
+  assert.strictEqual(violations.length, 0);
+});

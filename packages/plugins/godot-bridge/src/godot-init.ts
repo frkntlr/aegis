@@ -78,6 +78,7 @@ export class GodotInitWorkflow {
     const candidates = [
       path.resolve(dir, '..', 'gdscript', 'addons', 'aegis_bridge'),
       path.resolve(dir, '..', '..', 'gdscript', 'addons', 'aegis_bridge'),
+      path.resolve(dir, '..', '..', '..', 'plugins', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge'),
       path.resolve(process.cwd(), 'packages', 'plugins', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge'),
       path.resolve(process.cwd(), 'node_modules', '@aegis', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge')
     ];
@@ -87,23 +88,42 @@ export class GodotInitWorkflow {
     return candidates[0];
   }
 
+  public static mergePluginIntoConfig(content: string, majorVersion = 4): string {
+    const pluginPath = 'res://addons/aegis_bridge/plugin.cfg';
+    if (content.includes(pluginPath)) return content;
+
+    const packedMatch = content.match(/enabled=PackedStringArray\(([^)]*)\)/);
+    if (packedMatch) {
+      const inner = packedMatch[1].trim();
+      const updated = inner.length > 0 ? `${inner}, "${pluginPath}"` : `"${pluginPath}"`;
+      return content.replace(packedMatch[0], `enabled=PackedStringArray(${updated})`);
+    }
+
+    const arrayMatch = content.match(/enabled=\[([^\]]*)\]/);
+    if (arrayMatch) {
+      const inner = arrayMatch[1].trim();
+      const updated = inner.length > 0 ? `${inner}, "${pluginPath}"` : `"${pluginPath}"`;
+      return content.replace(arrayMatch[0], `enabled=[${updated}]`);
+    }
+
+    const pluginLine = majorVersion === 3
+      ? `enabled=["${pluginPath}"]`
+      : `enabled=PackedStringArray("${pluginPath}")`;
+
+    if (content.includes('[editor_plugins]')) {
+      return content.replace('[editor_plugins]', `[editor_plugins]\n\n${pluginLine}`);
+    }
+    return `${content.trimEnd()}\n\n[editor_plugins]\n\n${pluginLine}\n`;
+  }
+
   private static enablePluginInProjectGodot(projectDir: string, majorVersion: number): void {
     const pPath = path.join(projectDir, 'project.godot');
     if (!fs.existsSync(pPath)) return;
-    let content = fs.readFileSync(pPath, 'utf8');
-
-    if (content.includes('res://addons/aegis_bridge/plugin.cfg')) return;
-
-    const pluginLine = majorVersion === 3
-      ? 'enabled=["res://addons/aegis_bridge/plugin.cfg"]'
-      : 'enabled=PackedStringArray("res://addons/aegis_bridge/plugin.cfg")';
-
-    if (content.includes('[editor_plugins]')) {
-      content = content.replace('[editor_plugins]', `[editor_plugins]\n\n${pluginLine}`);
-    } else {
-      content += `\n[editor_plugins]\n\n${pluginLine}\n`;
+    const content = fs.readFileSync(pPath, 'utf8');
+    const updated = this.mergePluginIntoConfig(content, majorVersion);
+    if (updated !== content) {
+      fs.writeFileSync(pPath, updated, 'utf8');
     }
-    fs.writeFileSync(pPath, content, 'utf8');
   }
 
   private static ensureAegisConfigFile(projectDir: string, port: number, binary?: string): void {

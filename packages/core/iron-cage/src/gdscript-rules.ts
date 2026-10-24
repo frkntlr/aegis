@@ -84,20 +84,51 @@ export class GDScriptRulesValidator {
     }
   }
 
-  private checkResourceLeaks(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
-    const text = fn.lines.join('\n');
-    const hasInstantiate = text.includes('.instantiate()') || text.includes('.new()');
-    const hasCleanupOrReturn =
+  private static readonly REF_COUNTED_TYPES = new Set([
+    'RegEx', 'ConfigFile', 'InputEventKey', 'InputEventMouseButton',
+    'InputEventScreenTouch', 'InputEventScreenDrag', 'RandomNumberGenerator',
+    'Image', 'Resource', 'AegisUiVerifier', 'RefCounted', 'JSON',
+    'WordData', 'AegisCompatBridge', 'TCP_Server', 'StreamPeerTCP'
+  ]);
+
+  private static readonly ENGINE_SIGNALS = new Set([
+    'pressed', 'released', 'button_up', 'button_down', 'toggled', 'timeout',
+    'ready', 'tree_entered', 'tree_exited', 'visibility_changed', 'draw',
+    'resized', 'focus_entered', 'focus_exited', 'mouse_entered', 'mouse_exited',
+    'item_selected', 'text_changed', 'text_submitted', 'request_completed', 'finished'
+  ]);
+
+  private hasNodeInstantiation(text: string): boolean {
+    if (text.includes('.instantiate()')) return true;
+    const newMatches = text.matchAll(/([A-Z]\w+)\.new\(\)/g);
+    for (const match of newMatches) {
+      if (!GDScriptRulesValidator.REF_COUNTED_TYPES.has(match[1])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private hasRetentionOrCleanup(text: string): boolean {
+    return (
       text.includes('add_child(') ||
       text.includes('queue_free(') ||
       text.includes('return ') ||
-      text.includes('parse_input_event(');
-    if (hasInstantiate && !hasCleanupOrReturn) {
+      text.includes('parse_input_event(') ||
+      text.includes('.append(') ||
+      text.includes('.push_back(') ||
+      text.includes('connect(')
+    );
+  }
+
+  private checkResourceLeaks(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
+    const text = fn.lines.join('\n');
+    if (this.hasNodeInstantiation(text) && !this.hasRetentionOrCleanup(text)) {
       violations.push({
         rule: 'GD_005_RESOURCE_LEAK',
         filePath,
         line: fn.startLine,
-        message: `Function '${fn.name}' instantiates a node without add_child(), queue_free(), or returning it.`,
+        message: `Function '${fn.name}' instantiates a node without add_child(), queue_free(), or retaining it.`,
         severity: 'warning'
       });
     }
@@ -121,14 +152,17 @@ export class GDScriptRulesValidator {
     for (let i = 0; i < fn.lines.length; i++) {
       const line = fn.lines[i];
       const emitMatch = line.match(/emit_signal\(\s*["']([^"']+)["']/);
-      if (emitMatch && !signals.has(emitMatch[1])) {
-        violations.push({
-          rule: 'GD_004_SIGNAL_SAFETY',
-          filePath,
-          line: fn.startLine + i,
-          message: `Emitted signal '${emitMatch[1]}' is not declared in this script.`,
-          severity: 'warning'
-        });
+      if (emitMatch) {
+        const sig = emitMatch[1];
+        if (!signals.has(sig) && !GDScriptRulesValidator.ENGINE_SIGNALS.has(sig)) {
+          violations.push({
+            rule: 'GD_004_SIGNAL_SAFETY',
+            filePath,
+            line: fn.startLine + i,
+            message: `Emitted signal '${sig}' is not declared in this script or known base classes.`,
+            severity: 'warning'
+          });
+        }
       }
     }
   }

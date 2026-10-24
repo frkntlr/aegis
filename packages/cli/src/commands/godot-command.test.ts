@@ -61,3 +61,24 @@ test('handleGodot dispatches subcommands properly', async () => {
   const out = await captureOutput(() => handleGodot(['unknown_subcmd']));
   assert.ok(out.includes('Unknown godot subcommand'));
 });
+
+test('handleGodotInspect respects mobile aspect ratios in aegis.config.json', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-mobile-inspect-'));
+  try {
+    const configPath = path.join(tmp, 'aegis.config.json');
+    fs.writeFileSync(configPath, JSON.stringify({
+      engine: 'godot',
+      godot: {
+        aspectRatios: ['9:16', '9:18', '9:20']
+      }
+    }), 'utf8');
+
+    const out = await captureOutput(() => handleGodotInspect(tmp));
+    assert.ok(out.includes('Checking 3 target aspect ratios'));
+    assert.ok(out.includes('Aspect [9:16] (1080x1920)'));
+    assert.ok(out.includes('Aspect [9:18] (1080x2160)'));
+    assert.ok(out.includes('Aspect [9:20] (1080x2400)'));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

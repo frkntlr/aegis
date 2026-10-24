@@ -82,11 +82,21 @@ export class ClassDbOracle {
     const baseClass = this.extractBaseClass(sourceCode);
     if (!baseClass || !this.classes.has(baseClass)) return results;
 
+    const localMethods = this.extractLocalFunctions(sourceCode);
     const lines = sourceCode.split('\n');
     for (let i = 0; i < lines.length; i++) {
-      this.validateLine(lines[i], i + 1, baseClass, filePath, results);
+      this.validateLine(lines[i], i + 1, baseClass, localMethods, filePath, results);
     }
     return results;
+  }
+
+  private extractLocalFunctions(sourceCode: string): Set<string> {
+    const fns = new Set<string>();
+    const matches = sourceCode.matchAll(/^\s*(?:static\s+)?func\s+([a-zA-Z_]\w*)/gm);
+    for (const m of matches) {
+      fns.add(m[1]);
+    }
+    return fns;
   }
 
   private seedBuiltins(): void {
@@ -104,6 +114,7 @@ export class ClassDbOracle {
     line: string,
     lineNo: number,
     baseClass: string,
+    localMethods: Set<string>,
     file: string | undefined,
     out: ValidationResult[]
   ): void {
@@ -113,7 +124,7 @@ export class ClassDbOracle {
     const methodMatch = trimmed.match(/self\.([a-zA-Z0-9_]+)\s*\(/);
     if (methodMatch) {
       const methodName = methodMatch[1];
-      if (!this.queryMethod(baseClass, methodName)) {
+      if (!localMethods.has(methodName) && !this.queryMethod(baseClass, methodName)) {
         out.push({
           file,
           line: lineNo,

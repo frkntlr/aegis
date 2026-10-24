@@ -100,5 +100,135 @@ export const BUILTIN_GODOT_CLASSES: Record<string, ClassInfo> = {
       { name: 'motion_mode', type: 'int' }
     ],
     signals: []
+  },
+  RefCounted: {
+    name: 'RefCounted',
+    inherits: 'Object',
+    methods: [
+      { name: 'get_reference_count', returnType: 'int', arguments: [] },
+      { name: 'reference', returnType: 'bool', arguments: [] },
+      { name: 'unreference', returnType: 'bool', arguments: [] }
+    ],
+    properties: [],
+    signals: []
+  },
+  Resource: {
+    name: 'Resource',
+    inherits: 'RefCounted',
+    methods: [
+      { name: 'duplicate', returnType: 'Resource', arguments: [{ name: 'subresources', type: 'bool' }] }
+    ],
+    properties: [
+      { name: 'resource_name', type: 'String' },
+      { name: 'resource_path', type: 'String' }
+    ],
+    signals: [{ name: 'changed', arguments: [] }]
+  },
+  Label: {
+    name: 'Label',
+    inherits: 'Control',
+    methods: [
+      { name: 'set_text', returnType: 'void', arguments: [{ name: 'text', type: 'String' }] },
+      { name: 'get_text', returnType: 'String', arguments: [] }
+    ],
+    properties: [
+      { name: 'text', type: 'String' },
+      { name: 'horizontal_alignment', type: 'int' },
+      { name: 'vertical_alignment', type: 'int' }
+    ],
+    signals: []
+  },
+  Container: {
+    name: 'Container',
+    inherits: 'Control',
+    methods: [
+      { name: 'fit_child_in_rect', returnType: 'void', arguments: [{ name: 'child', type: 'Control' }, { name: 'rect', type: 'Rect2' }] },
+      { name: 'queue_sort', returnType: 'void', arguments: [] }
+    ],
+    properties: [],
+    signals: [{ name: 'sort_children', arguments: [] }]
+  },
+  BoxContainer: {
+    name: 'BoxContainer',
+    inherits: 'Container',
+    methods: [
+      { name: 'add_spacer', returnType: 'Control', arguments: [{ name: 'begin', type: 'bool' }] }
+    ],
+    properties: [{ name: 'alignment', type: 'int' }, { name: 'vertical', type: 'bool' }],
+    signals: []
+  },
+  VBoxContainer: {
+    name: 'VBoxContainer',
+    inherits: 'BoxContainer',
+    methods: [],
+    properties: [],
+    signals: []
+  },
+  HBoxContainer: {
+    name: 'HBoxContainer',
+    inherits: 'BoxContainer',
+    methods: [],
+    properties: [],
+    signals: []
+  },
+  GridContainer: {
+    name: 'GridContainer',
+    inherits: 'Container',
+    methods: [],
+    properties: [{ name: 'columns', type: 'int' }],
+    signals: []
+  },
+  Timer: {
+    name: 'Timer',
+    inherits: 'Node',
+    methods: [
+      { name: 'start', returnType: 'void', arguments: [{ name: 'time_sec', type: 'float' }] },
+      { name: 'stop', returnType: 'void', arguments: [] }
+    ],
+    properties: [
+      { name: 'wait_time', type: 'float' },
+      { name: 'one_shot', type: 'bool' },
+      { name: 'autostart', type: 'bool' }
+    ],
+    signals: [{ name: 'timeout', arguments: [] }]
+  },
+  AudioStreamPlayer: {
+    name: 'AudioStreamPlayer',
+    inherits: 'Node',
+    methods: [
+      { name: 'play', returnType: 'void', arguments: [{ name: 'from_position', type: 'float' }] },
+      { name: 'stop', returnType: 'void', arguments: [] },
+      { name: 'seek', returnType: 'void', arguments: [{ name: 'to_position', type: 'float' }] }
+    ],
+    properties: [
+      { name: 'stream', type: 'AudioStream' },
+      { name: 'volume_db', type: 'float' },
+      { name: 'pitch_scale', type: 'float' },
+      { name: 'playing', type: 'bool' }
+    ],
+    signals: [{ name: 'finished', arguments: [] }]
+  },
+  Sprite2D: {
+    name: 'Sprite2D',
+    inherits: 'Node2D',
+    methods: [],
+    properties: [
+      { name: 'texture', type: 'Texture2D' },
+      { name: 'hframes', type: 'int' },
+      { name: 'vframes', type: 'int' },
+      { name: 'frame', type: 'int' }
+    ],
+    signals: [{ name: 'frame_changed', arguments: [] }, { name: 'texture_changed', arguments: [] }]
+  },
+  AnimationPlayer: {
+    name: 'AnimationPlayer',
+    inherits: 'Node',
+    methods: [
+      { name: 'play', returnType: 'void', arguments: [{ name: 'name', type: 'String' }] },
+      { name: 'pause', returnType: 'void', arguments: [] },
+      { name: 'stop', returnType: 'void', arguments: [] }
+    ],
+    properties: [{ name: 'current_animation', type: 'String' }],
+    signals: [{ name: 'animation_finished', arguments: [{ name: 'anim_name', type: 'String' }] }]
   }
 };

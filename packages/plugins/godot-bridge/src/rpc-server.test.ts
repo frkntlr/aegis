@@ -80,3 +80,35 @@ test('GodotBridgeServer handles telemetry dispatch and retrieval', async () => {
     await server.stop();
   }
 });
+
+test('GodotBridgeServer handles command queueing, polling and result retrieval', async () => {
+  const server = new GodotBridgeServer({ port: 6863 });
+  await server.start();
+  try {
+    const queueRes = await httpPost('http://127.0.0.1:6863/command/queue', {
+      id: 'cmd-42',
+      action: 'get_ui_tree'
+    });
+    assert.strictEqual(queueRes.status, 200);
+
+    const pollRes = await httpGet<{ command: { id: string; action: string } | null }>('http://127.0.0.1:6863/command/poll');
+    assert.strictEqual(pollRes.status, 200);
+    assert.ok(pollRes.body.command !== null);
+    assert.strictEqual(pollRes.body.command.id, 'cmd-42');
+    assert.strictEqual(pollRes.body.command.action, 'get_ui_tree');
+
+    const resultPost = await httpPost('http://127.0.0.1:6863/command/result', {
+      id: 'cmd-42',
+      success: true,
+      data: { acknowledged: true }
+    });
+    assert.strictEqual(resultPost.status, 200);
+
+    const resultGet = await httpGet<{ result: { id: string; success: boolean } | null }>('http://127.0.0.1:6863/command/result?id=cmd-42');
+    assert.strictEqual(resultGet.status, 200);
+    assert.ok(resultGet.body.result !== null);
+    assert.strictEqual(resultGet.body.result.success, true);
+  } finally {
+    await server.stop();
+  }
+});

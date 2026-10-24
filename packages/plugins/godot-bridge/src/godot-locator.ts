@@ -30,26 +30,62 @@ export class GodotLocator {
     if (fromPath) candidates.push(fromPath);
 
     if (process.platform === 'win32') {
-      candidates.push(
-        'C:\\Program Files\\Godot\\Godot Console.exe',
-        'C:\\Program Files\\Godot\\Godot.exe'
-      );
-      const localAppData = process.env.LOCALAPPDATA;
-      if (localAppData) {
-        candidates.push(
-          path.join(localAppData, 'Godot', 'Godot Console.exe'),
-          path.join(localAppData, 'Godot', 'Godot.exe')
-        );
-      }
+      candidates.push(...this.collectWindowsCandidates());
     } else {
-      candidates.push('/usr/local/bin/godot', '/usr/bin/godot');
+      candidates.push('/usr/local/bin/godot', '/usr/bin/godot', '/opt/godot/godot');
     }
     return candidates;
   }
 
+  private static collectWindowsCandidates(): string[] {
+    const list: string[] = [
+      'C:\\Program Files\\Godot\\Godot Console.exe',
+      'C:\\Program Files\\Godot\\Godot.exe'
+    ];
+    const localAppData = process.env.LOCALAPPDATA;
+    if (localAppData) {
+      list.push(
+        path.join(localAppData, 'Godot', 'Godot Console.exe'),
+        path.join(localAppData, 'Godot', 'Godot.exe'),
+        ...this.scanWingetGodot(localAppData)
+      );
+    }
+    const userProfile = process.env.USERPROFILE;
+    if (userProfile) {
+      list.push(path.join(userProfile, 'scoop', 'apps', 'godot', 'current', 'godot.exe'));
+    }
+    return list;
+  }
+
+  private static scanWingetGodot(localAppData: string): string[] {
+    const wingetDir = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages');
+    if (!fs.existsSync(wingetDir)) return [];
+    try {
+      const pkg = fs.readdirSync(wingetDir).find(d => d.startsWith('GodotEngine.GodotEngine'));
+      if (!pkg) return [];
+      const fullPkg = path.join(wingetDir, pkg);
+      const exes = fs.readdirSync(fullPkg).filter(f => f.toLowerCase().endsWith('.exe'));
+      const consoleExe = exes.find(f => f.toLowerCase().includes('console'));
+      const found: string[] = [];
+      if (consoleExe) found.push(path.join(fullPkg, consoleExe));
+      for (const e of exes) found.push(path.join(fullPkg, e));
+      return found;
+    } catch {
+      return [];
+    }
+  }
+
   private static resolveFromSystemPath(): string | null {
     try {
-      const cmd = process.platform === 'win32' ? 'where.exe godot' : 'which godot';
+      if (process.platform === 'win32') {
+        const out = execSync('where.exe "Godot*"', { stdio: ['ignore', 'pipe', 'ignore'], timeout: 2000 })
+          .toString()
+          .trim();
+        const lines = out.split(/\r?\n/).map(l => l.trim()).filter(l => l.toLowerCase().endsWith('.exe') && fs.existsSync(l));
+        const consoleExe = lines.find(l => l.toLowerCase().includes('console'));
+        return consoleExe || lines[0] || null;
+      }
+      const cmd = 'which godot';
       const out = execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'], timeout: 2000 })
         .toString()
         .trim();

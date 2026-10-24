@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import * as child_process from 'node:child_process';
 import {
   GodotInitWorkflow,
   GodotLocator,
@@ -65,27 +66,64 @@ export function handleGodotStatus(): void {
   }
 }
 
+function resolveInspectAspectRatios(projectDir: string): string[] {
+  const configPath = path.join(projectDir, 'aegis.config.json');
+  if (fs.existsSync(configPath)) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (Array.isArray(cfg.godot?.aspectRatios) && cfg.godot.aspectRatios.length > 0) {
+        return cfg.godot.aspectRatios;
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return GodotUiVerifier.REQUIRED_ASPECT_RATIOS;
+}
+
 export function handleGodotInspect(projectDirArg?: string): void {
   showBanner();
   const projectDir = projectDirArg || process.cwd();
   console.log(`📐 Running Zero-Token UI Telemetry Verification for: ${projectDir}...`);
 
   const verifier = new GodotUiVerifier();
-  console.log(`Checking ${GodotUiVerifier.REQUIRED_ASPECT_RATIOS.length} required aspect ratios: ${GodotUiVerifier.REQUIRED_ASPECT_RATIOS.join(', ')}`);
+  const ratios = resolveInspectAspectRatios(projectDir);
+  console.log(`Checking ${ratios.length} target aspect ratios: ${ratios.join(', ')}`);
 
   let allPassed = true;
-  for (const ratio of GodotUiVerifier.REQUIRED_ASPECT_RATIOS) {
+  for (const ratio of ratios) {
+    const dims = GodotUiVerifier.ASPECT_DIMENSIONS[ratio] ?? { width: 1920, height: 1080 };
     const mockPayload: GodotUiTreePayload = {
-      viewport: { width: 1920, height: 1080, aspectRatio: ratio },
+      viewport: { width: dims.width, height: dims.height, aspectRatio: ratio },
       nodes: []
     };
     const res = verifier.verifyPayload(mockPayload);
     if (!res.passed) allPassed = false;
-    console.log(` • Aspect [${ratio}]: ${res.passed ? '✅ PASS' : '❌ FAIL (overlaps/clippings)'}`);
+    console.log(` • Aspect [${ratio}] (${dims.width}x${dims.height}): ${res.passed ? '✅ PASS' : '❌ FAIL (overlaps/clippings)'}`);
   }
 
   if (allPassed) {
     console.log('🎯 UI Telemetry Verification complete: All aspect ratios valid.');
+  }
+}
+
+export function handleGodotRun(projectDirArg?: string, sceneArg?: string): void {
+  showBanner();
+  const projectDir = projectDirArg || process.cwd();
+  console.log(`🚀 Executing Godot project at: ${projectDir}...`);
+  const inst = GodotLocator.findGodot();
+  if (!inst) {
+    console.error('❌ Cannot run project: No Godot binary detected.');
+    return;
+  }
+  const args = ['--path', projectDir];
+  if (sceneArg) args.push(sceneArg);
+  console.log(` • Godot: ${inst.binaryPath} (${inst.versionString})`);
+  try {
+    const cp = child_process.spawn(inst.binaryPath, args, { stdio: 'inherit' });
+    console.log(`✅ Godot process spawned with PID ${cp.pid}.`);
+  } catch (err) {
+    console.error(`❌ Failed to spawn Godot: ${(err as Error).message}`);
   }
 }
 
@@ -168,7 +206,9 @@ export async function handleGodot(args: string[]): Promise<void> {
     handleGodotDoctool();
   } else if (subcommand === 'validate') {
     handleGodotValidate(args[1]);
+  } else if (subcommand === 'run') {
+    handleGodotRun(args[1], args[2]);
   } else {
-    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|status|inspect|query|doctool|validate]`);
+    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|status|inspect|query|doctool|validate|run]`);
   }
 }

@@ -20,7 +20,19 @@ export interface AspectVerificationResult {
 }
 
 export class GodotUiVerifier {
-  public static readonly REQUIRED_ASPECT_RATIOS = ['16:9', '21:9', '16:10', '9:16'];
+  public static readonly REQUIRED_ASPECT_RATIOS = ['16:9', '21:9', '16:10', '9:16', '9:18', '9:20'];
+
+  public static readonly ASPECT_DIMENSIONS: Record<string, { width: number; height: number }> = {
+    '16:9': { width: 1920, height: 1080 },
+    '21:9': { width: 2560, height: 1080 },
+    '16:10': { width: 1920, height: 1200 },
+    '4:3': { width: 1440, height: 1080 },
+    '9:16': { width: 1080, height: 1920 },
+    '9:18': { width: 1080, height: 2160 },
+    '9:19.5': { width: 1080, height: 2340 },
+    '9:20': { width: 1080, height: 2400 },
+    '3:4': { width: 1080, height: 1440 }
+  };
 
   public verifyPayload(payload: GodotUiTreePayload): AspectVerificationResult {
     const overlaps = this.findOverlaps(payload.nodes);
@@ -48,17 +60,30 @@ export class GodotUiVerifier {
     return clippings;
   }
 
+  private isAncestorDescendant(idA: string, idB: string): boolean {
+    return idA.startsWith(`${idB}/`) || idB.startsWith(`${idA}/`);
+  }
+
+  private isInteractive(node: GodotUiNode): boolean {
+    const t = node.type.toLowerCase();
+    return t.includes('button') || t.includes('slider') || t.includes('lineedit');
+  }
+
   private findOverlaps(nodes: GodotUiNode[]): UiOverlap[] {
     const overlaps: UiOverlap[] = [];
-    const interactive = nodes.filter(n => n.visible && n.type.toLowerCase().includes('button'));
+    const interactive = nodes.filter(n => n.visible && this.isInteractive(n));
 
     for (let i = 0; i < interactive.length; i++) {
       for (let j = i + 1; j < interactive.length; j++) {
-        const overlap = this.computeIntersection(interactive[i], interactive[j]);
+        const a = interactive[i];
+        const b = interactive[j];
+        if (this.isAncestorDescendant(a.id, b.id)) continue;
+
+        const overlap = this.computeIntersection(a, b);
         if (overlap) {
           overlaps.push({
-            nodeA: interactive[i].id,
-            nodeB: interactive[j].id,
+            nodeA: a.id,
+            nodeB: b.id,
             intersectionRect: overlap
           });
         }

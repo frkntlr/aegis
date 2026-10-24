@@ -40,8 +40,48 @@ func _dispatch_action(action: Dictionary) -> void:
 			_simulate_click(pos)
 		"click_node":
 			_click_node_at_path(action.get("path", ""))
+		"action_press":
+			_simulate_action(action.get("action", ""), true)
+		"action_release":
+			_simulate_action(action.get("action", ""), false)
+		"action":
+			var act_name = action.get("action", "")
+			_simulate_action(act_name, true)
+			_simulate_action(act_name, false)
+		"touch_tap":
+			var pos: Vector2 = action.get("position", Vector2.ZERO)
+			_simulate_touch(pos, true)
+			_simulate_touch(pos, false)
+		"touch_drag":
+			var from_pos: Vector2 = action.get("from", Vector2.ZERO)
+			var to_pos: Vector2 = action.get("to", Vector2.ZERO)
+			_simulate_drag(from_pos, to_pos)
 		_:
 			error_list.append("Unknown action type: " + action_type)
+
+func _simulate_action(action_name: String, is_pressed: bool) -> void:
+	if action_name.is_empty():
+		return
+	if is_pressed:
+		Input.action_press(action_name)
+	else:
+		Input.action_release(action_name)
+
+func _simulate_touch(pos: Vector2, is_pressed: bool, index: int = 0) -> void:
+	var touch = InputEventScreenTouch.new()
+	touch.position = pos
+	touch.pressed = is_pressed
+	touch.index = index
+	Input.parse_input_event(touch)
+
+func _simulate_drag(from_pos: Vector2, to_pos: Vector2, index: int = 0) -> void:
+	_simulate_touch(from_pos, true, index)
+	var drag = InputEventScreenDrag.new()
+	drag.position = to_pos
+	drag.relative = to_pos - from_pos
+	drag.index = index
+	Input.parse_input_event(drag)
+	_simulate_touch(to_pos, false, index)
 
 func _simulate_key(keycode: int, is_pressed: bool) -> void:
 	var ev = InputEventKey.new()
