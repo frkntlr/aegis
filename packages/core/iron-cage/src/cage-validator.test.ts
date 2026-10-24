@@ -194,13 +194,29 @@ test('GDScriptRulesValidator flags GD_007_COUPLING_PARENT_NODE for upward node p
 func test_coupling():
 	var enemy = $\"../Enemy\"
 	var boss = get_node(\"../Boss\")
+	var p = get_parent()
 	var child = $\"Child\"
 `.trim();
 
   const violations = validator.validate('scripts/bad_coupling.gd', badScript);
   const couplingViolations = violations.filter(v => v.rule === 'GD_007_COUPLING_PARENT_NODE');
-  assert.strictEqual(couplingViolations.length, 2);
+  assert.strictEqual(couplingViolations.length, 3);
   assert.ok(couplingViolations[0].message.includes('Direct parent coupling via'));
+});
+
+test('GDScriptRulesValidator flags GD_009_BAND_AID_PREVENTION on is_instance_valid calls', () => {
+  const validator = new GDScriptRulesValidator();
+  const script = `
+func update_target(target: Node) -> void:
+\tif is_instance_valid(target):
+\t\ttarget.queue_free()
+`.trim();
+
+  const violations = validator.validate('scripts/band_aid.gd', script);
+  const bandAidViolations = violations.filter(v => v.rule === 'GD_009_BAND_AID_PREVENTION');
+  assert.strictEqual(bandAidViolations.length, 1);
+  assert.strictEqual(bandAidViolations[0].severity, 'warning');
+  assert.ok(bandAidViolations[0].message.includes('band-aid detected'));
 });
 
 test('GDScriptRulesValidator flags GD_008_TYPED_GDSCRIPT on untyped signatures while allowing _init', () => {

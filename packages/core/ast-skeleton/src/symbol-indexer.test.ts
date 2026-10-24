@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { SymbolParser, type SymbolEntry } from './symbol-parser.js';
 import { SymbolSliceExtractor } from './symbol-slice-extractor.js';
+import { CrossReferenceLinker } from './cross-reference-linker.js';
 
 const sampleTs = [
   'export interface Config { timeout: number; }',
@@ -137,4 +138,50 @@ test('SymbolParser extracts TS variable functions, type aliases, and GDScript br
   const gdSymbols = SymbolParser.parseGDScript('scripts/inventory.gd', gdCode);
   assert.ok(gdSymbols.find((s: SymbolEntry) => s.name === 'Inventory.get_items'));
   assert.ok(gdSymbols.find((s: SymbolEntry) => s.name === 'Inventory.get_dict'));
+});
+
+test('SymbolParser parses @rpc decorated GDScript functions and includes decorators in slice line range', () => {
+  const gdDecorated = [
+    'class_name NetworkController',
+    '@rpc("any_peer", "call_local")',
+    'func sync_player(state: Dictionary) -> void:',
+    '    print("syncing")',
+    '',
+    '@rpc func ping() -> void:',
+    '    pass'
+  ].join('\n');
+
+  const symbols = SymbolParser.parseGDScript('scripts/net.gd', gdDecorated);
+  const syncFunc = symbols.find((s: SymbolEntry) => s.name === 'NetworkController.sync_player');
+  assert.ok(syncFunc);
+  assert.strictEqual(syncFunc.startLine, 2); // Includes @rpc annotation line
+  assert.strictEqual(syncFunc.endLine, 5);
+
+  const pingFunc = symbols.find((s: SymbolEntry) => s.name === 'NetworkController.ping');
+  assert.ok(pingFunc);
+  assert.strictEqual(pingFunc.startLine, 6);
+});
+
+test('SymbolParser and CrossReferenceLinker parse Python/polyglot files with multi-line blocks', () => {
+  const pyCode = [
+    'class DataProcessor:',
+    '    def compute(self, val):',
+    '        result = val * 10',
+    '        return result',
+    '',
+    'def standalone():',
+    '    pass'
+  ].join('\n');
+
+  const symbols = SymbolParser.parseGeneric('scripts/processor.py', pyCode);
+  const computeFn = symbols.find((s: SymbolEntry) => s.name === 'compute');
+  assert.ok(computeFn);
+  assert.strictEqual(computeFn.startLine, 2);
+  assert.strictEqual(computeFn.endLine, 5);
+
+  const linker = new CrossReferenceLinker();
+  linker.linkSingleFile('scripts/processor.py', pyCode);
+  const nodes = linker.getGraph().getAllNodes();
+  assert.ok(nodes.some(n => n.name === 'compute'));
+  assert.ok(nodes.some(n => n.name === 'DataProcessor'));
 });

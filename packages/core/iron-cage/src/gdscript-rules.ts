@@ -41,6 +41,7 @@ export class GDScriptRulesValidator {
 
     this.checkOnreadySafety(filePath, lines, violations);
     this.checkParentCoupling(filePath, lines, violations);
+    this.checkBandAidPrevention(filePath, lines, violations);
     return violations;
   }
 
@@ -113,19 +114,8 @@ export class GDScriptRulesValidator {
   }
 
   private hasRetentionOrCleanup(text: string): boolean {
-    return (
-      text.includes('add_child(') ||
-      text.includes('queue_free(') ||
-      text.includes('.free()') ||
-      text.includes('return ') ||
-      text.includes('parse_input_event(') ||
-      text.includes('.append(') ||
-      text.includes('.push_back(') ||
-      text.includes('connect(') ||
-      text.includes('self.') ||
-      /_\w+\s*=/.test(text) ||
-      /\w+\[.*\]\s*=/.test(text)
-    );
+    const patterns = ['add_child(', 'queue_free(', '.free()', 'return ', 'parse_input_event(', '.append(', '.push_back(', 'connect(', 'self.'];
+    return patterns.some(p => text.includes(p)) || /_\w+\s*=/.test(text) || /\w+\[.*\]\s*=/.test(text);
   }
 
   private checkResourceLeaks(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
@@ -201,7 +191,7 @@ export class GDScriptRulesValidator {
   }
 
   private checkParentCoupling(filePath: string, lines: string[], violations: CageViolation[]): void {
-    const parentRegex = /(?:\$["']\.\.|\bget_node\s*\(\s*["']\.\.)/;
+    const parentRegex = /(?:\$["']\.\.|\bget_node\s*\(\s*["']\.\.|\bget_parent\s*\(\s*\))/;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].replace(/#.*$/, '');
       if (parentRegex.test(line)) {
@@ -209,8 +199,24 @@ export class GDScriptRulesValidator {
           rule: 'GD_007_COUPLING_PARENT_NODE',
           filePath,
           line: i + 1,
-          message: "Direct parent coupling via '../' detected. Decouple nodes using signals for upward communication.",
+          message: "Direct parent coupling via '../' or 'get_parent()' detected. Decouple nodes using signals for upward communication.",
           severity: 'error'
+        });
+      }
+    }
+  }
+
+  private checkBandAidPrevention(filePath: string, lines: string[], violations: CageViolation[]): void {
+    const bandAidRegex = /\bis_instance_valid\s*\(/;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].replace(/#.*$/, '');
+      if (bandAidRegex.test(line)) {
+        violations.push({
+          rule: 'GD_009_BAND_AID_PREVENTION',
+          filePath,
+          line: i + 1,
+          message: "'is_instance_valid()' band-aid detected. Manage node lifecycle explicitly via signals or tree exit hooks.",
+          severity: 'warning'
         });
       }
     }

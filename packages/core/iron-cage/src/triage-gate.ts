@@ -146,6 +146,7 @@ export class EvidenceBasedTriageGate {
       'GD_005_RESOURCE_LEAK',
       'GD_007_COUPLING_PARENT_NODE',
       'GD_008_TYPED_GDSCRIPT',
+      'GD_009_BAND_AID_PREVENTION',
       'TS_001_NO_ANY',
       'TS_002_EMPTY_CATCH',
       'TS_003_NESTING_DEPTH'

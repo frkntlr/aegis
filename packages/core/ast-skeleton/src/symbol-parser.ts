@@ -120,15 +120,16 @@ export class SymbolParser {
         symbols.push({ name: sigMatch[1], kind: 'signal', filePath: normPath, startLine: lineNum, endLine: lineNum, signature: `signal ${sigMatch[1]}${sigMatch[2]}`.trim() });
       }
 
-      const funcMatch = codeOnly.match(/^(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
+      const funcMatch = codeOnly.match(/^(?:@\w+(?:\([^)]*\))?\s+)*(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
       if (funcMatch) {
         const fnName = curClass ? `${curClass}.${funcMatch[1]}` : funcMatch[1];
+        const startLine = SymbolParser.findDecoratorStart(lines, lineNum);
         const endLine = SymbolParser.findGdFuncEnd(lines, i);
         symbols.push({
           name: fnName,
           kind: curClass ? 'method' : 'function',
           filePath: normPath,
-          startLine: lineNum,
+          startLine,
           endLine,
           signature: codeOnly.replace(/:$/, '')
         });
@@ -137,11 +138,17 @@ export class SymbolParser {
     return symbols;
   }
 
+  private static findDecoratorStart(lines: string[], lineNum: number): number {
+    let start = lineNum;
+    while (start > 1 && lines[start - 2].trim().startsWith('@')) start--;
+    return start;
+  }
+
   private static findGdFuncEnd(lines: string[], startIdx: number): number {
     const baseIndent = (lines[startIdx].match(/^[\t\s]*/)?.[0] || '').length;
     for (let j = startIdx + 1; j < lines.length; j++) {
       const l = lines[j];
-      if (!l.trim() || l.trim().startsWith('#')) continue;
+      if (!l.trim() || l.trim().startsWith('#') || l.trim().startsWith('//')) continue;
       const indent = (l.match(/^[\t\s]*/)?.[0] || '').length;
       if (indent <= baseIndent) return j;
     }
@@ -159,13 +166,30 @@ export class SymbolParser {
       const trimmed = lines[i].trim();
       const fn = trimmed.match(fnPattern);
       if (fn) {
-        symbols.push({ name: fn[1], kind: 'function', filePath: normPath, startLine: i + 1, endLine: i + 1, signature: trimmed });
+        const endLine = SymbolParser.findBlockEnd(lines, i);
+        symbols.push({ name: fn[1], kind: 'function', filePath: normPath, startLine: i + 1, endLine, signature: trimmed });
       }
       const cls = trimmed.match(clsPattern);
       if (cls) {
-        symbols.push({ name: cls[1], kind: 'class', filePath: normPath, startLine: i + 1, endLine: i + 1, signature: trimmed });
+        const endLine = SymbolParser.findBlockEnd(lines, i);
+        symbols.push({ name: cls[1], kind: 'class', filePath: normPath, startLine: i + 1, endLine, signature: trimmed });
       }
     }
     return symbols;
+  }
+
+  private static findBlockEnd(lines: string[], startIdx: number): number {
+    let braceCount = 0;
+    let hasBraces = false;
+    for (let j = startIdx; j < lines.length; j++) {
+      const l = lines[j].replace(/\/\/.*$/, '').replace(/#.*$/, '');
+      const open = (l.match(/\{/g) || []).length;
+      const close = (l.match(/\}/g) || []).length;
+      if (open > 0) hasBraces = true;
+      braceCount += open - close;
+      if (hasBraces && braceCount <= 0) return j + 1;
+    }
+    if (hasBraces) return lines.length;
+    return SymbolParser.findGdFuncEnd(lines, startIdx);
   }
 }

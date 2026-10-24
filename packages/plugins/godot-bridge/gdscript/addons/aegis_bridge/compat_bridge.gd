@@ -17,5 +17,5 @@ static func get_viewport_rect(node: CanvasItem) -> Rect2:
 	return node.get_viewport_rect()
 
 static func safe_queue_free(node: Node) -> void:
-	if is_instance_valid(node):
+	if node != null and not node.is_queued_for_deletion():
 		node.queue_free()

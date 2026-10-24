@@ -45,7 +45,14 @@ export class CrossReferenceLinker {
       this.linkGDScript(normPath, content);
     } else if (['.ts', '.tsx', '.js'].includes(ext)) {
       this.linkTypeScript(normPath, content);
+    } else if (['.py', '.rs', '.go'].includes(ext)) {
+      this.linkGeneric(normPath, content);
     }
+  }
+
+  private linkGeneric(filePath: string, content: string): void {
+    const symbols = SymbolParser.parseGeneric(filePath, content);
+    this.registerSymbols(filePath, symbols);
   }
 
   private linkGDScript(filePath: string, content: string): void {
