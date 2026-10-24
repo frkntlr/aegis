@@ -76,3 +76,16 @@ test('WorktreeManager cleans up stale lock when owner PID is dead', () => {
     fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
+
+test('WorktreeManager normalizes path separators preventing cross-platform lock bypass', () => {
+  const manager = new WorktreeManager();
+  const res1 = manager.acquireFileLocks('alice', ['packages/core/foo.ts']);
+  assert.strictEqual(res1.success, true);
+
+  const res2 = manager.acquireFileLocks('bob', ['packages\\core\\foo.ts']);
+  assert.strictEqual(res2.success, false);
+  assert.deepStrictEqual(res2.conflictingFiles, ['packages/core/foo.ts']);
+
+  const allLocks = manager.getLockedFiles();
+  assert.strictEqual(allLocks.get('packages/core/foo.ts'), 'alice');
+});

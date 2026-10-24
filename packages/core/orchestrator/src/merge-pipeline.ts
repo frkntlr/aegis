@@ -128,6 +128,35 @@ export class MergePipeline {
     }
   }
 
+  private checkSiblingAhead(siblingDir: string): number {
+    try {
+      const aheadCountRaw = execFileSync('git', ['-C', siblingDir, 'rev-list', '--count', `${this.baseBranch}..HEAD`], {
+        stdio: 'pipe',
+        encoding: 'utf8',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      }).trim();
+      return parseInt(aheadCountRaw, 10) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private applySiblingSync(sibling: string, siblingDir: string): string {
+    const aheadCount = this.checkSiblingAhead(siblingDir);
+    if (aheadCount > 0) {
+      execFileSync('git', ['-C', siblingDir, 'rebase', this.baseBranch], {
+        stdio: 'pipe',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
+      return `Rebased ${sibling} workspace (${aheadCount} local commit(s)) onto latest ${this.baseBranch}.`;
+    }
+    execFileSync('git', ['-C', siblingDir, 'reset', '--hard', this.baseBranch], {
+      stdio: 'pipe',
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+    });
+    return `Synchronized ${sibling} workspace with latest ${this.baseBranch}.`;
+  }
+
   private syncSingleSibling(sibling: string, siblingDir: string, steps: MergeStepReport[]): void {
     try {
       const dirty = execFileSync('git', ['-C', siblingDir, 'status', '--porcelain'], {
@@ -146,22 +175,14 @@ export class MergePipeline {
         return;
       }
 
-      execFileSync('git', ['-C', siblingDir, 'reset', '--hard', this.baseBranch], {
-        stdio: 'pipe',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
-      });
-      steps.push({
-        step: 4,
-        name: `Sibling sync: ${sibling}`,
-        passed: true,
-        message: `Synchronized ${sibling} workspace with latest ${this.baseBranch}.`
-      });
+      const message = this.applySiblingSync(sibling, siblingDir);
+      steps.push({ step: 4, name: `Sibling sync: ${sibling}`, passed: true, message });
     } catch {
       steps.push({
         step: 4,
         name: `Sibling sync: ${sibling}`,
         passed: false,
-        message: `Failed to reset sibling ${sibling} to ${this.baseBranch}.`
+        message: `Failed to synchronize sibling ${sibling} with ${this.baseBranch}.`
       });
     }
   }

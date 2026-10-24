@@ -19,7 +19,7 @@ export interface ParsedDiff {
 
 export class DiffEngine {
   private parseHunkHeader(line: string): DiffChunk | null {
-    const match = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+    const match = line.trim().match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?:\s+.*)?$/);
     if (!match) return null;
     return {
       oldStart: parseInt(match[1], 10),
@@ -61,7 +61,7 @@ export class DiffEngine {
   }
 
   public parseAndValidate(diffText: string, maxAllowedChangedLines = 150): ParsedDiff {
-    const lines = diffText.split('\n');
+    const lines = diffText.trimEnd().split('\n');
     let oldFile = '';
     let newFile = '';
     const counts = { added: 0, deleted: 0, unmodified: 0 };
@@ -69,13 +69,14 @@ export class DiffEngine {
     let currentChunk: DiffChunk | null = null;
 
     for (const line of lines) {
-      if (line.startsWith('--- ')) oldFile = line.substring(4).trim().replace(/^[ab]\//, '');
-      else if (line.startsWith('+++ ')) newFile = line.substring(4).trim().replace(/^[ab]\//, '');
-      else if (line.startsWith('@@ ')) {
+      const clean = line.replace(/\r$/, '');
+      if (clean.startsWith('--- ')) oldFile = clean.substring(4).trim().replace(/^[ab]\//, '');
+      else if (clean.startsWith('+++ ')) newFile = clean.substring(4).trim().replace(/^[ab]\//, '');
+      else if (clean.trim().startsWith('@@ ')) {
         if (currentChunk) chunks.push(currentChunk);
-        currentChunk = this.parseHunkHeader(line);
+        currentChunk = this.parseHunkHeader(clean);
       } else if (currentChunk) {
-        this.processChunkLine(line, currentChunk, counts);
+        this.processChunkLine(clean, currentChunk, counts);
       }
     }
     if (currentChunk) chunks.push(currentChunk);

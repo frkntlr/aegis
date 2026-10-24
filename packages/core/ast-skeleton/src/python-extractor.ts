@@ -47,6 +47,14 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
     return output;
   }
 
+  private isTopLevelAssignment(line: string, trimmed: string): boolean {
+    const indent = (line.match(/^\s*/)?.[0] ?? '').length;
+    return indent === 0 &&
+      !trimmed.includes('==') &&
+      !trimmed.startsWith('self.') &&
+      /^[A-Za-z_]\w*(?:\s*:\s*[^=]+)?\s*=\s*(?!=)/.test(trimmed);
+  }
+
   private handleDeclaration(
     lines: string[],
     i: number,
@@ -57,17 +65,19 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
   ): number {
     if (trimmed.startsWith('def ') || trimmed.startsWith('async def ')) {
       this.flushDecorators(pendingDecorators, output);
-      const defLine = this.consumeUntilColon(lines, i);
+      const { header, nextIndex } = this.consumeHeader(lines, i);
       const indent = line.match(/^\s*/)?.[0] ?? '';
-      output.push(defLine);
+      const baseIndent = (line.match(/^\s*/)?.[0] ?? '').length;
+      output.push(header);
       output.push(`${indent}    ...`);
-      return this.skipBlock(lines, i);
+      return this.skipBlock(lines, nextIndex, baseIndent);
     }
 
     if (trimmed.startsWith('class ')) {
       this.flushDecorators(pendingDecorators, output);
-      output.push(this.consumeUntilColon(lines, i));
-      return i + 1;
+      const { header, nextIndex } = this.consumeHeader(lines, i);
+      output.push(header);
+      return nextIndex;
     }
 
     if (trimmed.startsWith('import ') || trimmed.startsWith('from ')) {
@@ -76,7 +86,7 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
       return i + 1;
     }
 
-    if (trimmed.includes('=') && !trimmed.startsWith('self.')) {
+    if (this.isTopLevelAssignment(line, trimmed)) {
       this.flushDecorators(pendingDecorators, output);
       output.push(line);
       return i + 1;
@@ -93,26 +103,27 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
     }
   }
 
-  private consumeUntilColon(lines: string[], startIndex: number): string {
+  private consumeHeader(lines: string[], startIndex: number): { header: string; nextIndex: number } {
     const parts: string[] = [];
     let i = startIndex;
+    let parenDepth = 0;
     while (i < lines.length) {
-      parts.push(lines[i]);
-      if (lines[i].includes(':')) break;
+      const line = lines[i];
+      parts.push(line);
+      for (const ch of line) {
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
+      }
+      if (parenDepth === 0 && line.includes(':')) {
+        return { header: parts.join('\n'), nextIndex: i + 1 };
+      }
       i++;
     }
-    return parts.join('\n');
+    return { header: parts.join('\n'), nextIndex: i };
   }
 
-  private skipBlock(lines: string[], startIndex: number): number {
-    const baseIndent = lines[startIndex].match(/^\s*/)?.[0].length ?? 0;
-    let i = startIndex + 1;
-
-    // consume multi-line signature
-    while (i < lines.length && !lines[i - 1].includes(':')) {
-      i++;
-    }
-
+  private skipBlock(lines: string[], startIndex: number, baseIndent: number): number {
+    let i = startIndex;
     while (i < lines.length) {
       const line = lines[i];
       const trimmed = line.trim();
@@ -126,7 +137,6 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
       }
       i++;
     }
-
     return i;
   }
 }

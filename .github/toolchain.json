@@ -16,27 +16,45 @@
   "git_provider": "github",
   "ide": "antigravity",
   "agents": {
-    "count": 2,
+    "count": 4,
     "names": [
-      "alice",
-      "bob"
+      "solver",
+      "qa",
+      "docs",
+      "contributor"
     ],
     "worktree_prefix": "experimental/",
     "isolated_environments": {
-      "alice": {
+      "solver": {
         "port_range": [3000, 3099],
-        "test_db": "aegis_test_alice",
+        "test_db": "aegis_test_solver",
         "env_overrides": {
           "PORT": "3000",
-          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_alice"
+          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_solver"
         }
       },
-      "bob": {
+      "qa": {
         "port_range": [3100, 3199],
-        "test_db": "aegis_test_bob",
+        "test_db": "aegis_test_qa",
         "env_overrides": {
           "PORT": "3100",
-          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_bob"
+          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_qa"
+        }
+      },
+      "docs": {
+        "port_range": [3200, 3299],
+        "test_db": "aegis_test_docs",
+        "env_overrides": {
+          "PORT": "3200",
+          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_docs"
+        }
+      },
+      "contributor": {
+        "port_range": [3300, 3399],
+        "test_db": "aegis_test_contributor",
+        "env_overrides": {
+          "PORT": "3300",
+          "DATABASE_URL": "postgresql://localhost:5432/aegis_test_contributor"
         }
       }
     }

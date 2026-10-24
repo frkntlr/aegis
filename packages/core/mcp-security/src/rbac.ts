@@ -37,7 +37,8 @@ export class MCPSecurityManager {
       perm.callsInLastMinute = 0;
       perm.lastWindowResetMs = now;
     }
-    if (perm.callsInLastMinute >= this.maxCallsPerMinute) {
+    perm.callsInLastMinute++;
+    if (perm.callsInLastMinute > this.maxCallsPerMinute) {
       this.recordAudit(agentName, toolName, false, 'Rate limit exceeded.');
       return { allowed: false, reason: `Rate limit reached (${this.maxCallsPerMinute} calls/min). Blocked runaway tool loop.` };
     }
@@ -58,6 +59,7 @@ export class MCPSecurityManager {
       this.recordAudit(agentName, toolName, false, 'Unregistered agent.');
       return { allowed: false, reason: `Agent "${agentName}" is not registered in MCP security policy.` };
     }
+
     const rateErr = this.checkRateLimit(perm, agentName, toolName);
     if (rateErr) return rateErr;
 
@@ -69,7 +71,6 @@ export class MCPSecurityManager {
       return { allowed: false, reason: `Agent "${agentName}" lacks scope for tool "${toolName}".` };
     }
 
-    perm.callsInLastMinute++;
     this.recordAudit(agentName, toolName, true);
     return { allowed: true };
   }

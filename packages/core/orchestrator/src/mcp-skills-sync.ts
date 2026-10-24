@@ -55,14 +55,26 @@ export class McpSkillsSyncEngine {
     }
 
     const targetFile = path.resolve(repoRoot, adapter.capabilities.mcpConfigFile);
-    const mcpPayload = { mcpServers: this.getServers() };
+    let existingConfig: Record<string, unknown> = {};
+    if (fs.existsSync(targetFile)) {
+      try {
+        existingConfig = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
+      } catch {
+        existingConfig = {};
+      }
+    }
+    const existingServers = (typeof existingConfig.mcpServers === 'object' && existingConfig.mcpServers !== null && !Array.isArray(existingConfig.mcpServers))
+      ? (existingConfig.mcpServers as Record<string, unknown>)
+      : {};
+    const mergedServers = { ...existingServers, ...this.getServers() };
+    const mcpPayload = { ...existingConfig, mcpServers: mergedServers };
     this.writeConfigFile(targetFile, mcpPayload);
 
     return {
       ideId: adapter.ideId,
       targetFile,
       supported: true,
-      syncedServersCount: this.servers.size,
+      syncedServersCount: Object.keys(mergedServers).length,
       message: `Synchronized ${this.servers.size} MCP servers into [${adapter.capabilities.mcpConfigFile}].`
     };
   }

@@ -73,3 +73,15 @@ test('CompoundingErrorChecker alerts with COMPOUNDING_ERROR when runaway diff an
   assert.strictEqual(alert.alert, 'COMPOUNDING_ERROR');
   assert.strictEqual(alert.recommendedRollbackStep, 1);
 });
+
+test('CompoundingErrorChecker alerts on sudden test regression starting from clean zero state', () => {
+  const checker = new CompoundingErrorChecker();
+  checker.recordStep({ step: 1, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 0, timestamp: '' });
+  checker.recordStep({ step: 2, changedFilesCount: 1, diffLinesCount: 12, failingTestsCount: 0, timestamp: '' });
+
+  // Sudden test break in step 3
+  const alert = checker.recordStep({ step: 3, changedFilesCount: 2, diffLinesCount: 15, failingTestsCount: 10, timestamp: '' });
+  assert.ok(alert);
+  assert.strictEqual(alert.alert, 'TEST_REGRESSION');
+  assert.strictEqual(alert.recommendedRollbackStep, 1);
+});

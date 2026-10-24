@@ -190,3 +190,81 @@ test('DiffEngine validates surgical unified diffs and rejects massive changes', 
   assert.strictEqual(rejected.isSurgical, false);
   assert.ok(rejected.rejectionReason?.includes('exceeding surgical limit'));
 });
+
+test('DiffEngine accepts hunk headers with trailing function context', () => {
+  const engine = new DiffEngine();
+  const diffWithContext = `--- a/src/main.ts\n+++ b/src/main.ts\n@@ -1,5 +1,6 @@ function testFunc() {\n const x = 1;\n+const y = 2;\n return x;`;
+  const res = engine.parseAndValidate(diffWithContext, 10);
+  assert.strictEqual(res.isSurgical, true);
+  assert.strictEqual(res.chunks.length, 1);
+  assert.strictEqual(res.chunks[0].oldStart, 1);
+  assert.strictEqual(res.chunks[0].newStart, 1);
+});
+
+test('PythonSkeletonExtractor ignores indented assignments and equality comparisons', () => {
+  const extractor = new PythonSkeletonExtractor();
+  const pyCode = [
+    'GLOBAL_VAR = "hello"',
+    'def calculate(val):',
+    '    x = val * 2',
+    '    if x == 10:',
+    '        return True',
+    '    return False'
+  ].join('\n');
+
+  const res = extractor.extract('test.py', pyCode);
+  assert.ok(res.skeletonContent.includes('GLOBAL_VAR = "hello"'));
+  assert.ok(res.skeletonContent.includes('def calculate(val):'));
+  assert.ok(!res.skeletonContent.includes('x = val * 2'));
+  assert.ok(!res.skeletonContent.includes('if x == 10:'));
+});
+
+test('DiffEngine correctly handles Windows CRLF diffs with empty context lines', () => {
+  const engine = new DiffEngine();
+  const crlfDiff = "--- a/src/index.ts\r\n+++ b/src/index.ts\r\n@@ -1,4 +1,5 @@\r\n const a = 1;\r\n\r\n+const b = 2;\r\n return a;\r\n";
+  const res = engine.parseAndValidate(crlfDiff, 10);
+  assert.strictEqual(res.isSurgical, true);
+  assert.strictEqual(res.addedLinesCount, 1);
+  assert.strictEqual(res.unmodifiedLinesCount, 3);
+  assert.strictEqual(res.chunks.length, 1);
+});
+
+test('GDScriptSkeletonExtractor preserves multiline typed function parameters', () => {
+  const extractor = new GDScriptSkeletonExtractor();
+  const code = [
+    'func calculate_reward(',
+    '    score: int,',
+    '    multiplier: float',
+    ') -> int:',
+    '    var bonus: int = 10',
+    '    return int(score * multiplier) + bonus',
+    'func next_step() -> void:',
+    '    pass'
+  ].join('\n');
+  const res = extractor.extract('game.gd', code);
+  assert.ok(res.skeletonContent.includes('score: int,'));
+  assert.ok(res.skeletonContent.includes('multiplier: float'));
+  assert.ok(res.skeletonContent.includes(') -> int:'));
+  assert.ok(!res.skeletonContent.includes('var bonus: int = 10'));
+  assert.ok(res.skeletonContent.includes('func next_step() -> void:'));
+});
+
+test('PythonSkeletonExtractor preserves multiline typed function parameters', () => {
+  const extractor = new PythonSkeletonExtractor();
+  const code = [
+    'def process_items(',
+    '    item_id: int,',
+    '    user_name: str',
+    ') -> dict:',
+    '    result = {item_id: user_name}',
+    '    return result',
+    'def finish_task():',
+    '    return True'
+  ].join('\n');
+  const res = extractor.extract('script.py', code);
+  assert.ok(res.skeletonContent.includes('item_id: int,'));
+  assert.ok(res.skeletonContent.includes('user_name: str'));
+  assert.ok(res.skeletonContent.includes(') -> dict:'));
+  assert.ok(!res.skeletonContent.includes('result = {item_id: user_name}'));
+  assert.ok(res.skeletonContent.includes('def finish_task():'));
+});

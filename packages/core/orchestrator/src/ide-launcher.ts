@@ -32,6 +32,17 @@ export class IdeLauncher {
     }
   }
 
+  private parseProcessLine(trimmed: string, isWin: boolean): { exe: string; pid: number; originalExe: string } | null {
+    if (isWin) {
+      const parts = trimmed.split(',').map(p => p.replace(/"/g, '').trim());
+      if (parts.length < 2) return null;
+      return { originalExe: parts[0], exe: parts[0].toLowerCase(), pid: parseInt(parts[1], 10) };
+    }
+    const match = trimmed.match(/^(\d+)\s+(.+)$/);
+    if (!match) return null;
+    return { originalExe: match[2], exe: match[2].toLowerCase(), pid: parseInt(match[1], 10) };
+  }
+
   public detectRunningIdes(): RunningIdeProcess[] {
     const list: RunningIdeProcess[] = [];
     try {
@@ -39,20 +50,16 @@ export class IdeLauncher {
       const output = isWin
         ? execFileSync('tasklist', ['/FO', 'CSV', '/NH'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
         : execFileSync('ps', ['-eo', 'pid,comm'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-      const lines = output.split('\n');
-      for (const line of lines) {
-        const parts = line.split(',').map(p => p.replace(/"/g, '').trim());
-        if (parts.length < 2) continue;
-        const exe = parts[0].toLowerCase();
-        const pid = parseInt(parts[1], 10);
-        if (isNaN(pid)) continue;
+      for (const line of output.split('\n')) {
+        const proc = this.parseProcessLine(line.trim(), isWin);
+        if (!proc || isNaN(proc.pid)) continue;
 
-        if (exe.includes('cursor')) {
-          list.push({ pid, name: 'Cursor AI', ideType: 'Cursor AI', executable: parts[0] });
-        } else if (exe.includes('antigravity')) {
-          list.push({ pid, name: 'Google Antigravity', ideType: 'Google Antigravity', executable: parts[0] });
-        } else if (exe === 'code.exe' || exe === 'code') {
-          list.push({ pid, name: 'VS Code', ideType: 'VS Code', executable: parts[0] });
+        if (proc.exe.includes('cursor')) {
+          list.push({ pid: proc.pid, name: 'Cursor AI', ideType: 'Cursor AI', executable: proc.originalExe });
+        } else if (proc.exe.includes('antigravity')) {
+          list.push({ pid: proc.pid, name: 'Google Antigravity', ideType: 'Google Antigravity', executable: proc.originalExe });
+        } else if (proc.exe === 'code.exe' || proc.exe === 'code') {
+          list.push({ pid: proc.pid, name: 'VS Code', ideType: 'VS Code', executable: proc.originalExe });
         }
       }
     } catch {

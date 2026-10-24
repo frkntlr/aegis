@@ -6,6 +6,13 @@ export interface HeartbeatOptions {
   extensionStepMs?: number;
 }
 
+interface MonitorState {
+  currentDeadlineMs: number;
+  lastActivityTimeMs: number;
+  stdoutLinesCount: number;
+  stderrLinesCount: number;
+}
+
 export class HeartbeatMonitor {
   private stagnationThresholdMs: number;
   private extensionStepMs: number;
@@ -17,15 +24,14 @@ export class HeartbeatMonitor {
 
   private checkWatchdogTimer(
     child: ChildProcess,
-    lastActivityTimeMs: number,
-    currentDeadlineMs: number,
+    state: MonitorState,
     timeoutSeconds: number,
     interval: NodeJS.Timeout,
     flags: { stagnated: boolean; timedOut: boolean },
     onProgress?: (msg: string) => void
   ): void {
     const now = Date.now();
-    const timeSinceActivity = now - lastActivityTimeMs;
+    const timeSinceActivity = now - state.lastActivityTimeMs;
 
     if (timeSinceActivity > this.stagnationThresholdMs && child.exitCode === null) {
       flags.stagnated = true;
@@ -34,7 +40,7 @@ export class HeartbeatMonitor {
       child.kill('SIGTERM');
     }
 
-    if (now > currentDeadlineMs && child.exitCode === null) {
+    if (now > state.currentDeadlineMs && child.exitCode === null) {
       flags.timedOut = true;
       clearInterval(interval);
       if (onProgress) onProgress(`[Aegis Watchdog] Dynamic timeout limit reached (${timeoutSeconds}s). Hard killing process.`);
@@ -44,7 +50,7 @@ export class HeartbeatMonitor {
 
   private setupDataListeners(
     child: ChildProcess,
-    state: { lastActivityTimeMs: number; stdoutLinesCount: number; stderrLinesCount: number; currentDeadlineMs: number },
+    state: MonitorState,
     onProgress?: (msg: string) => void
   ): void {
     const handleData = (isStderr: boolean, chunk: Buffer | string) => {
@@ -69,7 +75,7 @@ export class HeartbeatMonitor {
     onProgress?: (msg: string) => void
   ): Promise<ProcessRunMetrics> {
     const startTimeMs = Date.now();
-    const state = {
+    const state: MonitorState = {
       currentDeadlineMs: startTimeMs + (timeoutSeconds * 1000),
       lastActivityTimeMs: Date.now(),
       stdoutLinesCount: 0,
@@ -80,7 +86,7 @@ export class HeartbeatMonitor {
     return new Promise((resolve) => {
       this.setupDataListeners(child, state, onProgress);
       const interval = setInterval(() => {
-        this.checkWatchdogTimer(child, state.lastActivityTimeMs, state.currentDeadlineMs, timeoutSeconds, interval, flags, onProgress);
+        this.checkWatchdogTimer(child, state, timeoutSeconds, interval, flags, onProgress);
       }, 1000);
 
       child.on('close', (exitCode) => {

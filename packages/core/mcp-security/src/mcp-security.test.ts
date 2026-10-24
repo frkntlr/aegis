@@ -37,3 +37,15 @@ test('MCPSecurityManager enforces rate limiting', () => {
   assert.strictEqual(res4.allowed, false);
   assert.ok(res4.reason?.includes('Rate limit reached'));
 });
+
+test('MCPSecurityManager counts unauthorized calls toward rate limit', () => {
+  const manager = new MCPSecurityManager({ maxCallsPerMinute: 2 });
+  // Call 1: unauthorized
+  assert.strictEqual(manager.authorizeToolCall('bob', 'unknown_tool').allowed, false);
+  // Call 2: unauthorized
+  assert.strictEqual(manager.authorizeToolCall('bob', 'unknown_tool').allowed, false);
+  // Call 3: should now be blocked by rate limit
+  const res3 = manager.authorizeToolCall('bob', 'read_file');
+  assert.strictEqual(res3.allowed, false);
+  assert.ok(res3.reason?.includes('Rate limit reached'));
+});

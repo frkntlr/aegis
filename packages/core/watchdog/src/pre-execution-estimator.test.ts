@@ -64,12 +64,25 @@ test('PreExecutionEstimator respects max ceiling', () => {
   assert.strictEqual(result.calculatedTimeoutSeconds, 300);
 });
 
-
 test('PreExecutionEstimator safely handles undefined factors without producing NaN', () => {
   const estimator = new PreExecutionEstimator();
   const result = estimator.estimate({} as unknown as EstimationFactors);
 
   assert.strictEqual(isNaN(result.calculatedTimeoutSeconds), false);
+  assert.strictEqual(result.calculatedTimeoutSeconds, 30);
+  assert.strictEqual(result.confidence, 'medium');
+});
+
+test('PreExecutionEstimator safely handles NaN factors without producing NaN', () => {
+  const estimator = new PreExecutionEstimator();
+  const result = estimator.estimate({
+    blastRadiusFiles: NaN,
+    affectedTestCount: NaN,
+    dependencyDepth: NaN,
+    historicalAverageSeconds: NaN
+  });
+
+  assert.strictEqual(Number.isNaN(result.calculatedTimeoutSeconds), false);
   assert.strictEqual(result.calculatedTimeoutSeconds, 30);
   assert.strictEqual(result.confidence, 'medium');
 });

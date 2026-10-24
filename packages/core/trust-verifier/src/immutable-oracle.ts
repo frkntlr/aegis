@@ -1,8 +1,16 @@
 import type { TrustAuditReport } from '@aegis/shared';
 
+export interface TestFileContent {
+  filePath: string;
+  content: string;
+  isNew?: boolean;
+}
+
 export interface AuditInput {
   modifiedFiles: string[];
-  newTestContents?: { filePath: string; content: string }[];
+  newTestContents?: TestFileContent[];
+  testContents?: TestFileContent[];
+  createdFiles?: string[];
   reportedPassedCount: number;
   reportedFailedCount: number;
   mutationScorePercent?: number;
@@ -11,13 +19,22 @@ export interface AuditInput {
 export class ImmutableOracle {
   private findTamperedTests(
     modifiedFiles: string[],
-    newTestContents: { filePath: string; content: string }[] | undefined,
+    newTestContents: TestFileContent[] | undefined,
+    createdFiles: string[] | undefined,
     details: string[]
   ): string[] {
-    const newFiles = new Set((newTestContents ?? []).map(t => t.filePath));
+    const createdSet = new Set(createdFiles ?? []);
+    if (newTestContents) {
+      for (const t of newTestContents) {
+        if (t.isNew !== false && (createdFiles ? createdSet.has(t.filePath) : true)) {
+          createdSet.add(t.filePath);
+        }
+      }
+    }
+
     const tamperedTestFiles: string[] = [];
     for (const file of modifiedFiles) {
-      if (newFiles.has(file)) continue;
+      if (createdSet.has(file)) continue;
       if (file.match(/\.(test|spec)\.(ts|js|jsx|tsx|py)$/) || file.includes('__tests__')) {
         tamperedTestFiles.push(file);
         details.push(`Suspicious: Existing test file was modified by agent: ${file}`);
@@ -26,15 +43,18 @@ export class ImmutableOracle {
     return tamperedTestFiles;
   }
 
-  private countVacuousAssertions(newTestContents: { filePath: string; content: string }[] | undefined, details: string[]): number {
-    if (!newTestContents) return 0;
+  private countVacuousAssertions(
+    testContents: TestFileContent[] | undefined,
+    details: string[]
+  ): number {
+    if (!testContents) return 0;
     let count = 0;
-    for (const { filePath, content } of newTestContents) {
+    for (const { filePath, content } of testContents) {
       const lines = content.split('\n');
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        const isVacuous = line.match(/expect\(([^)]+)\)\.(toBe|toEqual)\(\1\)/) ||
-          line.match(/assert\.(strictEqual|equal)\(([^,]+),\s*\2\)/) ||
+        const isVacuous = line.match(/expect\(\s*([^()]+?)\s*\)\.(toBe|toEqual)\(\s*\1\s*\)/) ||
+          line.match(/assert\.(strictEqual|equal)\(\s*([^,()]+?)\s*,\s*\2\s*\)/) ||
           line.includes('expect(true).toBe(true)');
         if (isVacuous) {
           count++;
@@ -45,10 +65,34 @@ export class ImmutableOracle {
     return count;
   }
 
+  private determineVerdict(
+    vacuous: number,
+    failedCount: number,
+    mutationScore: number,
+    tamperedCount: number
+  ): { suspicious: boolean; verdict: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW_REQUIRED' } {
+    if (vacuous > 0 || failedCount > 0 || mutationScore < 70) {
+      return { suspicious: true, verdict: 'REJECTED' };
+    }
+    if (tamperedCount > 0) {
+      return { suspicious: true, verdict: 'MANUAL_REVIEW_REQUIRED' };
+    }
+    return { suspicious: false, verdict: 'APPROVED' };
+  }
+
   public audit(input: AuditInput): TrustAuditReport {
     const details: string[] = [];
-    const tamperedTestFiles = this.findTamperedTests(input.modifiedFiles, input.newTestContents, details);
-    const vacuousAssertionsFound = this.countVacuousAssertions(input.newTestContents, details);
+    const allTests = [...(input.testContents ?? []), ...(input.newTestContents ?? [])];
+    const tamperedTestFiles = this.findTamperedTests(
+      input.modifiedFiles,
+      input.newTestContents,
+      input.createdFiles,
+      details
+    );
+    const vacuousAssertionsFound = this.countVacuousAssertions(
+      allTests.length > 0 ? allTests : undefined,
+      details
+    );
 
     if (input.reportedFailedCount > 0) {
       details.push(`Agent self-reported ${input.reportedFailedCount} failing tests. Cannot approve.`);
@@ -59,16 +103,12 @@ export class ImmutableOracle {
       details.push(`Mutation score ${mutationScore}% is below required 70% threshold.`);
     }
 
-    let verdict: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW_REQUIRED' = 'APPROVED';
-    let suspicious = false;
-
-    if (vacuousAssertionsFound > 0 || input.reportedFailedCount > 0 || mutationScore < 70) {
-      suspicious = true;
-      verdict = 'REJECTED';
-    } else if (tamperedTestFiles.length > 0) {
-      suspicious = true;
-      verdict = 'MANUAL_REVIEW_REQUIRED';
-    }
+    const { suspicious, verdict } = this.determineVerdict(
+      vacuousAssertionsFound,
+      input.reportedFailedCount,
+      mutationScore,
+      tamperedTestFiles.length
+    );
 
     return {
       suspicious,

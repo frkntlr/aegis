@@ -178,3 +178,61 @@ test('OrphanTaskReclaimer matches agent names case-insensitively in locks and se
   assert.strictEqual(result.reclaimed.length, 0);
   assert.strictEqual(result.updatedIssues[0].status, 'in_progress');
 });
+
+test('OrphanTaskReclaimer normalizes Windows and POSIX path separators and dot-slash prefixes', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 10,
+      number: 10,
+      title: 'Path normalization task',
+      status: 'in_progress',
+      assignedAgent: 'solver',
+      targetFiles: ['.\\src\\case.ts']
+    }
+  ];
+  const locks = new Map<string, string>([['src/case.ts', 'solver']]);
+  const sessions: AgentSessionSummary[] = [{ agentName: 'solver', lastHeartbeat: new Date().toISOString() }];
+
+  const result = reclaimer.scanAndReclaim(issues, locks, sessions);
+  assert.strictEqual(result.reclaimed.length, 0);
+  assert.strictEqual(result.updatedIssues[0].status, 'in_progress');
+});
+
+test('OrphanTaskReclaimer manages autonomous agents alice and bob', () => {
+  const reclaimer = new OrphanTaskReclaimer({ staleTimeoutMs: 5000 });
+  const staleTime = new Date(Date.now() - 10000).toISOString();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 20,
+      number: 20,
+      title: 'Alice Task',
+      status: 'in_progress',
+      assignedAgent: 'alice',
+      targetFiles: ['src/alice.ts']
+    },
+    {
+      id: 21,
+      number: 21,
+      title: 'Bob Task',
+      status: 'in_progress',
+      assignedAgent: 'bob',
+      targetFiles: ['src/bob.ts']
+    }
+  ];
+  const locks = new Map<string, string>([
+    ['src/alice.ts', 'alice'],
+    ['src/bob.ts', 'bob']
+  ]);
+  const sessions: AgentSessionSummary[] = [
+    { agentName: 'alice', lastHeartbeat: staleTime },
+    { agentName: 'bob', lastHeartbeat: staleTime }
+  ];
+
+  const result = reclaimer.scanAndReclaim(issues, locks, sessions);
+  assert.strictEqual(result.reclaimed.length, 2);
+  assert.strictEqual(result.reclaimed[0].previousAgent, 'alice');
+  assert.strictEqual(result.reclaimed[1].previousAgent, 'bob');
+  assert.strictEqual(result.updatedIssues[0].status, 'ready');
+  assert.strictEqual(result.updatedIssues[1].status, 'ready');
+});

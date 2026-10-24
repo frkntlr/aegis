@@ -224,7 +224,7 @@ function collectSourceFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) return results;
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
-    if (['node_modules', 'dist', '.git', 'experimental'].includes(entry.name)) continue;
+    if (['node_modules', 'dist', '.git', 'experimental', '.mcp', '.aegis', '.godot'].includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...collectSourceFiles(full));

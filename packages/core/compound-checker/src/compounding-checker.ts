@@ -45,7 +45,8 @@ export class CompoundingErrorChecker {
       prev1.diffLinesCount > (prev2.diffLinesCount * 1.5);
 
     const isTestRegression = current.failingTestsCount > prev1.failingTestsCount &&
-      prev1.failingTestsCount > prev2.failingTestsCount;
+      prev1.failingTestsCount >= prev2.failingTestsCount &&
+      current.failingTestsCount > 0;
 
     if (isDiffGrowing && isTestRegression) {
       return this.createAlert('COMPOUNDING_ERROR', current.step, prev2.step, 'Compounding error: runaway diff and cascading test failures.');

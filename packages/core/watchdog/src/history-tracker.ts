@@ -37,18 +37,27 @@ export class HistoryTracker {
         avgDurationMs: durationMs,
         p95DurationMs: durationMs,
         runCount: 1,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        recentDurationsMs: [durationMs]
       });
     } else {
+      const recent = [...(existing.recentDurationsMs ?? [existing.p95DurationMs]), durationMs];
+      if (recent.length > 100) {
+        recent.shift();
+      }
+      const sorted = [...recent].sort((a, b) => a - b);
+      const p95Index = Math.max(0, Math.ceil(sorted.length * 0.95) - 1);
+      const newP95 = sorted[p95Index];
       const newCount = existing.runCount + 1;
       const newAvg = ((existing.avgDurationMs * existing.runCount) + durationMs) / newCount;
-      const newP95 = Math.max(existing.p95DurationMs, durationMs);
+
       this.records.set(modulePath, {
         modulePath,
         avgDurationMs: Math.round(newAvg),
         p95DurationMs: Math.round(newP95),
         runCount: newCount,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        recentDurationsMs: recent
       });
     }
     this.persist();

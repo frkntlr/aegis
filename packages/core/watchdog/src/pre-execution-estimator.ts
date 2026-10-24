@@ -8,6 +8,10 @@ export interface EstimatorOptions {
   gammaDepthWeight?: number;
 }
 
+function sanitizeFactor(val: number | undefined, fallback: number = 0): number {
+  return typeof val === 'number' && Number.isFinite(val) ? Math.max(0, val) : fallback;
+}
+
 export class PreExecutionEstimator {
   private baseTimeout: number;
   private maxCeiling: number;
@@ -24,23 +28,28 @@ export class PreExecutionEstimator {
   }
 
   public estimate(factors: EstimationFactors): TimeoutEstimation {
+    const files = sanitizeFactor(factors.blastRadiusFiles, 0);
+    const tests = sanitizeFactor(factors.affectedTestCount, 0);
+    const depth = sanitizeFactor(factors.dependencyDepth, 0);
+    const hist = sanitizeFactor(factors.historicalAverageSeconds, 0);
+
     const rawCalculated = this.baseTimeout
-      + (this.alpha * Math.max(0, factors.blastRadiusFiles ?? 0))
-      + (this.beta * Math.max(0, factors.affectedTestCount ?? 0))
-      + (this.gamma * Math.max(0, factors.dependencyDepth ?? 0));
+      + (this.alpha * files)
+      + (this.beta * tests)
+      + (this.gamma * depth);
 
     let finalTimeout = rawCalculated;
     let confidence: 'high' | 'medium' | 'low' = 'medium';
-    let reasoning = `Base ${this.baseTimeout}s + (${factors.blastRadiusFiles ?? 0} files × ${this.alpha}s) + (${factors.affectedTestCount ?? 0} tests × ${this.beta}s) + (depth ${factors.dependencyDepth ?? 0} × ${this.gamma}s)`;
+    let reasoning = `Base ${this.baseTimeout}s + (${files} files × ${this.alpha}s) + (${tests} tests × ${this.beta}s) + (depth ${depth} × ${this.gamma}s)`;
 
-    if (factors.historicalAverageSeconds && factors.historicalAverageSeconds > 0) {
+    if (hist > 0) {
       // Historical safety factor of 1.5x
-      const historicalTarget = factors.historicalAverageSeconds * 1.5;
+      const historicalTarget = hist * 1.5;
       finalTimeout = Math.max(rawCalculated, historicalTarget);
       confidence = 'high';
-      reasoning += ` | Calibrated with historical average ${factors.historicalAverageSeconds.toFixed(1)}s (1.5x buffer)`;
+      reasoning += ` | Calibrated with historical average ${hist.toFixed(1)}s (1.5x buffer)`;
     } else {
-      confidence = (factors.blastRadiusFiles ?? 0) <= 2 ? 'medium' : 'low';
+      confidence = files <= 2 ? 'medium' : 'low';
     }
 
     finalTimeout = Math.min(finalTimeout, this.maxCeiling);

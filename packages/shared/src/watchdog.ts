@@ -18,6 +18,7 @@ export interface ExecutionHistoryRecord {
   p95DurationMs: number;
   runCount: number;
   lastUpdated: string;
+  recentDurationsMs?: number[];
 }
 
 export interface ProcessRunMetrics {

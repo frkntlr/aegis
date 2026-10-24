@@ -57,11 +57,12 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
   ): number {
     if (trimmed.startsWith('func ') || trimmed.startsWith('static func ')) {
       this.flushAnnotations(pendingAnnotations, output);
-      const funcDef = this.consumeUntilColon(lines, i);
+      const { header, nextIndex } = this.consumeHeader(lines, i);
       const indent = line.match(/^(\t|\s)*/)?.[0] ?? '';
-      output.push(funcDef);
+      const baseIndent = line.match(/^(\t|\s)*/)?.[0].length ?? 0;
+      output.push(header);
       output.push(`${indent}\tpass`);
-      return this.skipBlock(lines, i);
+      return this.skipBlock(lines, nextIndex, baseIndent);
     }
 
     if (
@@ -94,15 +95,23 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
     }
   }
 
-  private consumeUntilColon(lines: string[], startIndex: number): string {
+  private consumeHeader(lines: string[], startIndex: number): { header: string; nextIndex: number } {
     const parts: string[] = [];
     let i = startIndex;
+    let parenDepth = 0;
     while (i < lines.length) {
-      parts.push(lines[i]);
-      if (lines[i].includes(':')) break;
+      const line = lines[i];
+      parts.push(line);
+      for (const ch of line) {
+        if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
+      }
+      if (parenDepth === 0 && line.includes(':')) {
+        return { header: parts.join('\n'), nextIndex: i + 1 };
+      }
       i++;
     }
-    return parts.join('\n');
+    return { header: parts.join('\n'), nextIndex: i };
   }
 
   private consumeEnumBlock(lines: string[], startIndex: number, output: string[]): number {
@@ -115,15 +124,8 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
     return i + 1;
   }
 
-  private skipBlock(lines: string[], startIndex: number): number {
-    const baseIndent = lines[startIndex].match(/^(\t|\s)*/)?.[0].length ?? 0;
-    let i = startIndex + 1;
-
-    // consume multi-line signature
-    while (i < lines.length && !lines[i - 1].includes(':')) {
-      i++;
-    }
-
+  private skipBlock(lines: string[], startIndex: number, baseIndent: number): number {
+    let i = startIndex;
     while (i < lines.length) {
       const line = lines[i];
       const trimmed = line.trim();
@@ -137,7 +139,6 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
       }
       i++;
     }
-
     return i;
   }
 }

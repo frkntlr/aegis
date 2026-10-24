@@ -4,7 +4,7 @@ import * as http from 'node:http';
 import { GodotBridgeServer } from './rpc/rpc-server.js';
 import type { GodotUiTreePayload } from './rpc/rpc-types.js';
 
-function httpPost(url: string, data: unknown): Promise<{ status: number; body: any }> {
+function httpPost<T = Record<string, unknown>>(url: string, data: unknown): Promise<{ status: number; body: T }> {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const postData = JSON.stringify(data);
@@ -23,7 +23,7 @@ function httpPost(url: string, data: unknown): Promise<{ status: number; body: a
         let raw = '';
         res.on('data', chunk => { raw += chunk; });
         res.on('end', () => {
-          resolve({ status: res.statusCode || 0, body: raw ? JSON.parse(raw) : {} });
+          resolve({ status: res.statusCode || 0, body: (raw ? JSON.parse(raw) : {}) as T });
         });
       }
     );
@@ -33,13 +33,13 @@ function httpPost(url: string, data: unknown): Promise<{ status: number; body: a
   });
 }
 
-function httpGet(url: string): Promise<{ status: number; body: any }> {
+function httpGet<T = Record<string, unknown>>(url: string): Promise<{ status: number; body: T }> {
   return new Promise((resolve, reject) => {
     http.get(url, (res) => {
       let raw = '';
       res.on('data', chunk => { raw += chunk; });
       res.on('end', () => {
-        resolve({ status: res.statusCode || 0, body: raw ? JSON.parse(raw) : {} });
+        resolve({ status: res.statusCode || 0, body: (raw ? JSON.parse(raw) : {}) as T });
       });
     }).on('error', reject);
   });
@@ -49,7 +49,7 @@ test('GodotBridgeServer handles status check', async () => {
   const server = new GodotBridgeServer({ port: 6861 });
   await server.start();
   try {
-    const res = await httpGet('http://127.0.0.1:6861/status');
+    const res = await httpGet<{ status: string }>('http://127.0.0.1:6861/status');
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.status, 'running');
   } finally {
@@ -73,7 +73,7 @@ test('GodotBridgeServer handles telemetry dispatch and retrieval', async () => {
     assert.strictEqual(postRes.status, 200);
     assert.ok(received !== null);
 
-    const getRes = await httpGet('http://127.0.0.1:6862/telemetry/latest');
+    const getRes = await httpGet<{ telemetry: GodotUiTreePayload }>('http://127.0.0.1:6862/telemetry/latest');
     assert.strictEqual(getRes.status, 200);
     assert.strictEqual(getRes.body.telemetry.nodes.length, 1);
   } finally {

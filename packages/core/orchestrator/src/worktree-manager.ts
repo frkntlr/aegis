@@ -9,6 +9,8 @@ export interface WorktreeManagerOptions {
   persistLocks?: boolean;
 }
 
+const normPath = (p: string): string => p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
+
 export class WorktreeManager {
   private repoRoot: string;
   private worktreePrefix: string;
@@ -101,7 +103,7 @@ export class WorktreeManager {
     if (fs.existsSync(lockFile)) {
       try {
         const data = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
-        this.activeLocks = new Map(Object.entries(data));
+        this.activeLocks = new Map(Object.entries(data).map(([k, v]) => [normPath(k), String(v)]));
       } catch {
         this.activeLocks = new Map();
       }
@@ -254,17 +256,13 @@ export class WorktreeManager {
   public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
     return this.withLock(() => {
       const conflictingFiles: string[] = [];
-      for (const file of files) {
+      const normalized = files.map(normPath);
+      for (const file of normalized) {
         const existingOwner = this.activeLocks.get(file);
-        if (existingOwner && existingOwner !== agentName) {
-          conflictingFiles.push(file);
-        }
+        if (existingOwner && existingOwner !== agentName) conflictingFiles.push(file);
       }
       if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
-
-      for (const file of files) {
-        this.activeLocks.set(file, agentName);
-      }
+      for (const file of normalized) this.activeLocks.set(file, agentName);
       return { success: true, conflictingFiles: [] };
     });
   }

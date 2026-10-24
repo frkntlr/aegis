@@ -28,6 +28,10 @@ export interface OrphanReclaimerOptions {
   managedAgents?: string[];
 }
 
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
+}
+
 export class OrphanTaskReclaimer {
   private staleTimeoutMs: number;
   private managedAgents: Set<string>;
@@ -35,7 +39,7 @@ export class OrphanTaskReclaimer {
   constructor(options: OrphanReclaimerOptions = {}) {
     this.staleTimeoutMs = options.staleTimeoutMs ?? 10 * 60 * 1000;
     this.managedAgents = new Set(
-      (options.managedAgents ?? ['solver', 'qa', 'docs', 'contributor']).map(a => a.toLowerCase())
+      (options.managedAgents ?? ['solver', 'qa', 'docs', 'contributor', 'alice', 'bob']).map(a => a.toLowerCase())
     );
   }
 
@@ -79,7 +83,10 @@ export class OrphanTaskReclaimer {
     }
 
     if (issue.targetFiles && issue.targetFiles.length > 0) {
-      const hasAnyLock = issue.targetFiles.some(f => lockedFiles.get(f)?.toLowerCase() === issue.assignedAgent?.toLowerCase());
+      const hasAnyLock = issue.targetFiles.some(f => {
+        const lockHolder = lockedFiles.get(normalizePath(f));
+        return lockHolder?.toLowerCase() === issue.assignedAgent?.toLowerCase();
+      });
       if (!hasAnyLock) {
         return `Assigned agent [${issue.assignedAgent}] holds zero active file locks for target files.`;
       }
@@ -96,8 +103,13 @@ export class OrphanTaskReclaimer {
     const reclaimed: ReclaimResult[] = [];
     const updatedIssues: ReclaimCandidate[] = [];
 
+    const normalizedLocks = new Map<string, string>();
+    for (const [k, v] of lockedFiles.entries()) {
+      normalizedLocks.set(normalizePath(k), v);
+    }
+
     for (const issue of issues) {
-      const stallReason = this.evaluateIssueStall(issue, lockedFiles, sessions);
+      const stallReason = this.evaluateIssueStall(issue, normalizedLocks, sessions);
       if (stallReason) {
         const copy: ReclaimCandidate = {
           ...issue,

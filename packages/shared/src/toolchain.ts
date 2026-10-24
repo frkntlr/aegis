@@ -16,26 +16,26 @@ export interface AegisToolchainConfig {
     count: number;
     names: string[];
     worktree_prefix: string;
-    isolated_environments: Record<string, {
-      port_range: [number, number];
-      test_db: string;
-      env_overrides: Record<string, string>;
+    isolated_environments?: Record<string, {
+      port_range?: [number, number];
+      test_db?: string;
+      env_overrides?: Record<string, string>;
     }>;
   };
-  watchdog: {
-    adaptive_timeout: boolean;
-    base_timeout_seconds: number;
-    max_ceiling_seconds: number;
-    stagnation_threshold_seconds: number;
-    max_retries: number;
-    issue_token_cap: number;
+  watchdog?: {
+    adaptive_timeout?: boolean;
+    base_timeout_seconds?: number;
+    max_ceiling_seconds?: number;
+    stagnation_threshold_seconds?: number;
+    max_retries?: number;
+    issue_token_cap?: number;
   };
-  iron_cage: {
-    max_function_lines: number;
-    max_file_lines: number;
-    max_cyclomatic_complexity: number;
-    forbid_full_file_rewrites: boolean;
-    require_tdd: boolean;
+  iron_cage?: {
+    max_function_lines?: number;
+    max_file_lines?: number;
+    max_cyclomatic_complexity?: number;
+    forbid_full_file_rewrites?: boolean;
+    require_tdd?: boolean;
   };
   godot?: AegisGodotConfig;
 }

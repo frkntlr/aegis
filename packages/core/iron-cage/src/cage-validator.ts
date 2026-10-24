@@ -111,7 +111,6 @@ export class IronCageValidator {
   private isLineFunctionStart(trimmed: string): boolean {
     const stripped = trimmed.replace(/^export\s+(default\s+)?/, '');
     const fnRegex = new RegExp('^(public\\s+|private\\s+|protected\\s+|static\\s+)*(async\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{?');
-    const arrowMarker = '=' + '> ' + '{';
     return stripped.startsWith('function ') ||
       stripped.startsWith('async function ') ||
       stripped.startsWith('func ') ||
@@ -119,7 +118,7 @@ export class IronCageValidator {
       stripped.startsWith('fn ') ||
       stripped.startsWith('pub fn ') ||
       stripped.startsWith('async fn ') ||
-      trimmed.includes(arrowMarker) ||
+      /=>\s*\{/.test(trimmed) ||
       Boolean(stripped.match(fnRegex));
   }
 
@@ -128,7 +127,7 @@ export class IronCageValidator {
       .replace(/"(\\.|[^"\\])*"/g, '""')
       .replace(/'(\\.|[^'\\])*'/g, "''")
       .replace(/`(\\.|[^`\\])*`/g, '``')
-      .replace(/\/\/.*$/, '');
+      .replace(/\/\/.*$/gm, '');
 
     for (const ch of cleanLine) {
       if (ch === '{') state.braceDepth++;

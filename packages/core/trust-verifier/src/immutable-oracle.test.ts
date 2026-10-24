@@ -75,7 +75,6 @@ test('genuine test', () => {
   assert.strictEqual(report.vacuousAssertionsFound, 0);
 });
 
-
 test('ImmutableOracle prioritizes REJECTED when tests fail or assertions are vacuous even if tests were modified', () => {
   const oracle = new ImmutableOracle();
   const report = oracle.audit({
@@ -88,4 +87,43 @@ test('ImmutableOracle prioritizes REJECTED when tests fail or assertions are vac
   assert.strictEqual(report.verdict, 'REJECTED');
   assert.deepStrictEqual(report.tamperedTestFiles, ['tests/Header.test.ts']);
   assert.ok(report.details.some(d => d.includes('failing tests')));
+});
+
+test('ImmutableOracle flags modified existing tests even when testContents are provided', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['src/api.ts', 'tests/api.test.ts'],
+    testContents: [
+      {
+        filePath: 'tests/api.test.ts',
+        content: `test('ok', () => { assert.strictEqual(1 + 1, 2); });`,
+        isNew: false
+      }
+    ],
+    reportedPassedCount: 1,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, true);
+  assert.strictEqual(report.verdict, 'MANUAL_REVIEW_REQUIRED');
+  assert.deepStrictEqual(report.tamperedTestFiles, ['tests/api.test.ts']);
+});
+
+test('ImmutableOracle does not falsely trigger vacuous assertion on distinct arguments with non-greedy regex', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['src/calc.ts'],
+    newTestContents: [
+      {
+        filePath: 'tests/calc.test.ts',
+        content: `test('different values', () => { expect(a).toBe(b); expect(x).toBe(y); });`
+      }
+    ],
+    reportedPassedCount: 2,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, false);
+  assert.strictEqual(report.verdict, 'APPROVED');
+  assert.strictEqual(report.vacuousAssertionsFound, 0);
 });

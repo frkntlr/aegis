@@ -141,7 +141,10 @@ export class ZedAdapter implements IdeAdapter {
   public setupExclusions(repoRoot: string): IdeExclusionResult {
     const settingsFile = path.resolve(repoRoot, '.zed', 'settings.json');
     updateJsonSettings(settingsFile, (s) => {
-      s['file_scan_exclusions'] = [...asArr(s['file_scan_exclusions']), 'experimental/**'];
+      const existing = asArr(s['file_scan_exclusions']);
+      if (!existing.includes('experimental/**')) {
+        s['file_scan_exclusions'] = [...existing, 'experimental/**'];
+      }
     });
     return { ideId: this.ideId, success: true, configuredFiles: [settingsFile] };
   }
