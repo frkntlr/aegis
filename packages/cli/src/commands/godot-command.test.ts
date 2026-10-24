@@ -127,3 +127,17 @@ test('handleGodotPlaytest queues scenario actions from file and default smoke sc
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('godot-helpers parses telemetry nodes and validates scripts safely', async () => {
+  const { loadProjectTelemetryNodes, resolveInspectAspectRatios } = await import('./godot-helpers.js');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-helpers-test-'));
+  try {
+    const defaultRatios = resolveInspectAspectRatios(tmp);
+    assert.ok(defaultRatios.length >= 3);
+
+    const emptyNodes = loadProjectTelemetryNodes(tmp);
+    assert.strictEqual(emptyNodes.length, 0);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

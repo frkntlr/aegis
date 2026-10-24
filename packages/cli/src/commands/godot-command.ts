@@ -7,11 +7,14 @@ import {
   GodotUiVerifier,
   ClassDbOracle,
   DoctoolRunner,
-  type GodotUiTreePayload,
-  type GodotUiNode,
-  type ValidationResult
+  type GodotUiTreePayload
 } from '@aegis/godot-bridge';
 import { showBanner } from './banner.js';
+import {
+  resolveInspectAspectRatios,
+  loadProjectTelemetryNodes,
+  scanAndValidateGd
+} from './godot-helpers.js';
 
 export function handleGodotInit(projectDirArg?: string, portArg?: string): void {
   showBanner();
@@ -65,37 +68,6 @@ export function handleGodotStatus(): void {
       // ignore
     }
   }
-}
-
-function resolveInspectAspectRatios(projectDir: string): string[] {
-  const configPath = path.join(projectDir, 'aegis.config.json');
-  if (fs.existsSync(configPath)) {
-    try {
-      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      if (Array.isArray(cfg.godot?.aspectRatios) && cfg.godot.aspectRatios.length > 0) {
-        return cfg.godot.aspectRatios;
-      }
-    } catch {
-      // fallback
-    }
-  }
-  return GodotUiVerifier.REQUIRED_ASPECT_RATIOS;
-}
-
-function loadProjectTelemetryNodes(projectDir: string): GodotUiNode[] {
-  const candidates = [
-    path.join(projectDir, '.aegis', 'ui_telemetry.json'),
-    path.join(projectDir, '.aegis', 'telemetry.json')
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(c, 'utf8'));
-        if (Array.isArray(data.nodes)) return data.nodes;
-      } catch { /* ignore */ }
-    }
-  }
-  return [];
 }
 
 export function handleGodotInspect(projectDirArg?: string): void {
@@ -202,33 +174,6 @@ export function handleGodotValidate(targetDir?: string): void {
       console.log(` • [${v.severity.toUpperCase()}] ${v.file}:${v.line} - ${v.message}`);
     }
   }
-}
-
-function scanAndValidateGd(dir: string, oracle: ClassDbOracle): ValidationResult[] {
-  if (!fs.existsSync(dir)) return [];
-  if (fs.statSync(dir).isFile()) {
-    if (!dir.endsWith('.gd')) return [];
-    try {
-      return oracle.validateUsage(fs.readFileSync(dir, 'utf8'), path.basename(dir));
-    } catch {
-      return [];
-    }
-  }
-  const results: ValidationResult[] = [];
-  const entries = fs.readdirSync(dir, { recursive: true });
-  for (const entry of entries) {
-    const s = String(entry);
-    if (s.endsWith('.gd')) {
-      const full = path.join(dir, s);
-      try {
-        const content = fs.readFileSync(full, 'utf8');
-        results.push(...oracle.validateUsage(content, s));
-      } catch {
-        // ignore unreadable files
-      }
-    }
-  }
-  return results;
 }
 
 export function handleGodotPlaytest(scenarioArg?: string): void {

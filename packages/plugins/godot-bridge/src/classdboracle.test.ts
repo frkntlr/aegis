@@ -101,3 +101,20 @@ test('ClassDbOracle resolves Tween, SceneTree, TextureRect, and LineEdit offline
   const lineEditText = oracle.queryProperty('LineEdit', 'text');
   assert.ok(lineEditText);
 });
+
+test('ClassDbOracle resolves PanelContainer, HFlowContainer, and RichTextLabel', () => {
+  const oracle = new ClassDbOracle();
+  const panel = oracle.queryClass('PanelContainer');
+  assert.ok(panel);
+  assert.strictEqual(panel.inherits, 'Container');
+
+  const hflow = oracle.queryClass('HFlowContainer');
+  assert.ok(hflow);
+  assert.ok(['Container', 'FlowContainer'].includes(hflow.inherits || ''));
+
+  const richText = oracle.queryClass('RichTextLabel');
+  assert.ok(richText);
+  assert.strictEqual(richText.inherits, 'Control');
+  const appendMethod = oracle.queryMethod('RichTextLabel', 'append_text');
+  assert.ok(appendMethod);
+});
