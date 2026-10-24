@@ -112,3 +112,32 @@ test('GodotBridgeServer handles command queueing, polling and result retrieval',
     await server.stop();
   }
 });
+
+test('GodotBridgeServer executeCommand resolves on result and handles timeouts', async () => {
+  const server = new GodotBridgeServer({ port: 0 });
+  const port = await server.start();
+  try {
+    const promise = server.executeCommand({ id: 'cmd-test-1', action: 'ping' }, 2000);
+
+    // Simulate game polling command and posting result
+    const pollRes = await httpGet<{ command: { id: string } | null }>(`http://127.0.0.1:${port}/command/poll`);
+    assert.strictEqual(pollRes.body.command?.id, 'cmd-test-1');
+
+    await httpPost(`http://127.0.0.1:${port}/command/result`, {
+      id: 'cmd-test-1',
+      success: true,
+      data: { pong: true }
+    });
+
+    const res = await promise;
+    assert.strictEqual(res.success, true);
+    assert.deepStrictEqual(res.data, { pong: true });
+
+    // Test timeout
+    const timeoutRes = await server.executeCommand({ id: 'cmd-timeout', action: 'ping' }, 100);
+    assert.strictEqual(timeoutRes.success, false);
+    assert.ok(timeoutRes.error?.includes('timed out'));
+  } finally {
+    await server.stop();
+  }
+});

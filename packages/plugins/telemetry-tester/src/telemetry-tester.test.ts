@@ -104,3 +104,17 @@ test('BoundingBoxInspector ignores parent-child hierarchies and zero-dimension b
   const parentIdChild: BoundingBox = { id: 'btn', parentId: 'modal', x: 150, y: 150, width: 100, height: 40 };
   assert.strictEqual(inspector.checkOverlap(parentBox, parentIdChild), false);
 });
+
+test('MutationGate ignores comment lines during mutant generation', () => {
+  const gate = new MutationGate();
+  const sampleCode = [
+    '// const flag = true;',
+    '# a + b is calculated here',
+    '/* return true */',
+    'const actual = true;'
+  ].join('\n');
+
+  const mutants = gate.generateMutants(sampleCode);
+  assert.strictEqual(mutants.length, 1);
+  assert.strictEqual(mutants[0].line, 4);
+});

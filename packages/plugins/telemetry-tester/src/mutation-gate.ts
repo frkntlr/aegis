@@ -34,6 +34,10 @@ export class MutationGate {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+        continue;
+      }
       for (const rule of this.mutationRules) {
         rule.pattern.lastIndex = 0;
         if (rule.pattern.test(line)) {

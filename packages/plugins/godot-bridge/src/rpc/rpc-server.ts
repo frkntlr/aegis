@@ -38,6 +38,21 @@ export class GodotBridgeServer {
     return this.commandResults.get(id);
   }
 
+  public async executeCommand(cmd: GodotRpcRequest, timeoutMs = 5000): Promise<GodotRpcResponse> {
+    this.queueCommand(cmd);
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const res = this.getCommandResult(cmd.id);
+      if (res) return res;
+      await new Promise(r => setTimeout(r, 50));
+    }
+    return {
+      id: cmd.id,
+      success: false,
+      error: `Command '${cmd.action}' (id: ${cmd.id}) timed out after ${timeoutMs}ms`
+    };
+  }
+
   public async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => this.handleHttpRequest(req, res));
