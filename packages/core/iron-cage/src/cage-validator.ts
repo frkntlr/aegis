@@ -1,5 +1,6 @@
 import ts from 'typescript';
 import type { CageValidationResult, CageViolation } from '@aegis/shared';
+import { GDScriptRulesValidator } from './gdscript-rules.js';
 
 export interface CageValidatorOptions {
   maxFunctionLines?: number;
@@ -188,28 +189,33 @@ export class IronCageValidator {
     const violations: CageViolation[] = [];
     const lines = content.split('\n');
 
-    if (lines.length > this.maxFileLines) {
-      violations.push({
-        rule: 'MAX_FILE_LINES',
-        filePath,
-        message: `File exceeds maximum length of ${this.maxFileLines} lines (actual: ${lines.length} lines).`,
-        severity: 'error'
-      });
-    }
+    if (filePath.endsWith('.gd')) {
+      const gdViolations = new GDScriptRulesValidator({
+        maxFunctionLines: this.maxFunctionLines,
+        maxFileLines: this.maxFileLines
+      }).validate(filePath, content);
+      violations.push(...gdViolations);
+    } else {
+      if (lines.length > this.maxFileLines) {
+        violations.push({
+          rule: 'MAX_FILE_LINES',
+          filePath,
+          message: `File exceeds maximum length of ${this.maxFileLines} lines (actual: ${lines.length} lines).`,
+          severity: 'error'
+        });
+      }
 
-    const isTsOrJs = /\.[jt]sx?$/i.test(filePath);
-    const isIndentBased = /\.(py|gd)$/i.test(filePath);
-
-    if (isTsOrJs) {
-      try {
-        this.validateTypeScriptAst(filePath, content, violations);
-      } catch {
+      if (/\.[jt]sx?$/i.test(filePath)) {
+        try {
+          this.validateTypeScriptAst(filePath, content, violations);
+        } catch {
+          this.validateLineBased(filePath, lines, violations);
+        }
+      } else if (/\.py$/i.test(filePath)) {
+        this.validateIndentationBased(filePath, lines, violations);
+      } else {
         this.validateLineBased(filePath, lines, violations);
       }
-    } else if (isIndentBased) {
-      this.validateIndentationBased(filePath, lines, violations);
-    } else {
-      this.validateLineBased(filePath, lines, violations);
     }
 
     return {

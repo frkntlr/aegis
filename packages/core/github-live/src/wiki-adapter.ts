@@ -23,7 +23,12 @@ export class GitHubWikiLiveAdapter {
     this.token = auth.token || '';
     this.owner = options.owner || auth.owner || 'frkntlr';
     this.repo = options.repo || auth.repo || 'aegis';
-    this.cloneDir = options.localCloneDir || path.resolve(process.cwd(), '.git', 'aegis-wiki');
+    const rootGit = path.resolve(process.cwd(), '.git');
+    const isWorktree = fs.existsSync(rootGit) && !fs.statSync(rootGit).isDirectory();
+    const defaultCloneDir = isWorktree
+      ? path.resolve(process.cwd(), '.aegis', 'wiki-cache')
+      : path.resolve(process.cwd(), '.git', 'aegis-wiki');
+    this.cloneDir = options.localCloneDir || defaultCloneDir;
   }
 
   public getWikiRemoteUrl(): string {
@@ -159,7 +164,8 @@ export class GitHubWikiLiveAdapter {
     fs.writeFileSync(filePath, md, 'utf8');
 
     const status = this.checkRemoteAvailability();
-    if (status.available && fs.existsSync(path.join(this.cloneDir, '.git'))) {
+    const hasGit = fs.existsSync(path.join(this.cloneDir, '.git'));
+    if (status.available && hasGit) {
       try {
         const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
         execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
@@ -181,7 +187,7 @@ export class GitHubWikiLiveAdapter {
       slug,
       title,
       threeBulletSummary: [
-        bullets[0] || 'Core system principle preserved in GitHub Wiki.',
+        bullets[0] || 'Living architecture documentation updated.',
         bullets[1] || 'Living architecture documentation updated.',
         bullets[2] || 'Demir Kafes compliance verified.'
       ],
@@ -213,12 +219,14 @@ export class GitHubWikiLiveAdapter {
       createdSlugs.push(page.slug);
     }
 
-    try {
-      const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-      execFileSync('git', ['-C', this.cloneDir, 'add', '.'], { stdio: 'pipe', env });
-      execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 8-page living architecture suite'], { stdio: 'pipe', env });
-    } catch {
-      // workspace already committed or clean
+    if (fs.existsSync(path.join(this.cloneDir, '.git'))) {
+      try {
+        const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+        execFileSync('git', ['-C', this.cloneDir, 'add', '.'], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 8-page living architecture suite'], { stdio: 'pipe', env });
+      } catch {
+        // workspace already committed or clean
+      }
     }
     return { created: createdSlugs.length, pages: createdSlugs };
   }
@@ -233,19 +241,20 @@ export class GitHubWikiLiveAdapter {
       try {
         execFileSync('git', ['-C', this.cloneDir, 'pull', 'origin', 'master', '--allow-unrelated-histories'], { stdio: 'pipe', timeout: 10000, env });
         execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
-        return { success: true, message: 'Successfully merged and pushed all pages to GitHub remote.' };
+        return { success: true, message: 'Successfully reconciled and pushed wiki pages to remote.' };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, message: `Git push failed: ${msg}` };
+        return { success: false, message: `Failed to push wiki to remote: ${msg}` };
       }
     }
   }
 
   private ensureGitInitialized(): void {
+    fs.mkdirSync(this.cloneDir, { recursive: true });
     const gitDir = path.join(this.cloneDir, '.git');
     const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
     if (!fs.existsSync(gitDir)) {
-      execFileSync('git', ['-C', this.cloneDir, 'init', '-b', 'master'], { stdio: 'pipe', env });
+      execFileSync('git', ['init', '-b', 'master', this.cloneDir], { stdio: 'pipe', env });
       execFileSync('git', ['-C', this.cloneDir, 'config', 'user.name', 'Aegis Fleet'], { stdio: 'pipe', env });
       execFileSync('git', ['-C', this.cloneDir, 'config', 'user.email', 'aegis@local'], { stdio: 'pipe', env });
     }

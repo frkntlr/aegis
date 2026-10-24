@@ -2,6 +2,7 @@ export * from './extractor-registry.js';
 export * from './ts-extractor.js';
 export * from './python-extractor.js';
 export * from './gdscript-extractor.js';
+export * from './tscn-extractor.js';
 export * from './rust-extractor.js';
 export * from './go-extractor.js';
 export * from './cpp-extractor.js';

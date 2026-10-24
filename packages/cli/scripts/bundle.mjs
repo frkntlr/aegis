@@ -14,7 +14,7 @@ await esbuild.build({
   format: 'esm',
   external: ['typescript'],
   banner: {
-    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);"
+    js: "import { createRequire as __createRequire } from 'node:module'; import { fileURLToPath as __fileURLToPath } from 'node:url'; import * as __nodePath from 'node:path'; const require = __createRequire(import.meta.url); const __filename = __fileURLToPath(import.meta.url); const __dirname = __nodePath.dirname(__filename);"
   },
   outfile: path.join(cliRoot, 'dist/bin/aegis.js')
 });

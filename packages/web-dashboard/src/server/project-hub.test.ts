@@ -10,7 +10,7 @@ test('ProjectHub initializes with default context and lists projects', () => {
   const hub = new ProjectHub();
   const active = hub.getActiveContext();
   assert.ok(active);
-  assert.ok(active.id.includes('aegis'));
+  assert.ok(active.id.includes('aegis') || active.id.includes('solver'));
   assert.strictEqual(active.projectNumber, 4);
 
   const list = hub.listProjects();

@@ -1,0 +1,44 @@
+@tool
+class_name AegisUiVerifier
+extends RefCounted
+
+const ASPECT_RATIOS = {
+	"16:9": Vector2(1920, 1080),
+	"21:9": Vector2(2560, 1080),
+	"16:10": Vector2(1920, 1200),
+	"9:16": Vector2(1080, 1920)
+}
+
+static func collect_ui_nodes(root: Node) -> Array:
+	var result = []
+	_traverse_control_tree(root, result)
+	return result
+
+static func _traverse_control_tree(node: Node, acc: Array) -> void:
+	if node is Control and node.visible:
+		var rect = node.get_global_rect()
+		acc.append({
+			"id": str(node.get_path()),
+			"name": node.name,
+			"type": node.get_class(),
+			"visible": node.visible,
+			"rect": {
+				"x": rect.position.x,
+				"y": rect.position.y,
+				"width": rect.size.x,
+				"height": rect.size.y
+			}
+		})
+	for child in node.get_children():
+		_traverse_control_tree(child, acc)
+
+static func build_payload(root: Node, aspect_key: String) -> Dictionary:
+	var res = ASPECT_RATIOS.get(aspect_key, Vector2(1920, 1080))
+	return {
+		"viewport": {
+			"width": res.x,
+			"height": res.y,
+			"aspectRatio": aspect_key
+		},
+		"nodes": collect_ui_nodes(root)
+	}

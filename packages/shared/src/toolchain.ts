@@ -37,4 +37,15 @@ export interface AegisToolchainConfig {
     forbid_full_file_rewrites: boolean;
     require_tdd: boolean;
   };
+  godot?: AegisGodotConfig;
+}
+
+export type GodotAspectRatio = '16:9' | '21:9' | '16:10' | '9:16';
+
+export interface AegisGodotConfig {
+  bridgePort?: number;
+  binaryPath?: string;
+  cacheDir?: string;
+  aspectRatios?: GodotAspectRatio[];
+  rpcTimeoutMs?: number;
 }

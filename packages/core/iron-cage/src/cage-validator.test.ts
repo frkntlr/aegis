@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { IronCageValidator } from './cage-validator.js';
+import { GDScriptRulesValidator } from './gdscript-rules.js';
 
 test('IronCageValidator passes clean files', () => {
   const validator = new IronCageValidator({ maxFunctionLines: 40, maxFileLines: 300 });
@@ -111,4 +112,29 @@ func short_player_logic():
 \tmove_and_slide()
 `.trim();
   assert.strictEqual(validator.validateFileContent('player.gd', gdValid).passed, true);
+});
+
+test('GDScriptRulesValidator enforces GD-001 through GD-006', () => {
+  const validator = new GDScriptRulesValidator({ maxFunctionLines: 5, maxComplexity: 3 });
+
+  const script = `
+signal health_changed(new_health)
+@onready var bad_ref = $""
+
+func complex_func():
+\tif true and true:
+\t\tif false or false:
+\t\t\tmatch 1:
+\t\t\t\t1: pass
+\tvar scene = load("res://mob.tscn").instantiate()
+\temit_signal("unknown_signal")
+`.trim();
+
+  const violations = validator.validate('scripts/enemy.gd', script);
+  const rules = violations.map(v => v.rule);
+
+  assert.ok(rules.includes('GD_003_ONREADY_SAFETY'), 'Detects empty onready path');
+  assert.ok(rules.includes('GD_004_SIGNAL_SAFETY'), 'Detects undeclared signal emission');
+  assert.ok(rules.includes('GD_005_RESOURCE_LEAK'), 'Detects instantiate without add_child/queue_free');
+  assert.ok(rules.includes('GD_006_CYCLOMATIC_COMPLEXITY'), 'Detects high complexity');
 });

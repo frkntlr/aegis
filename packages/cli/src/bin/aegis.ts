@@ -41,47 +41,58 @@ import {
   handleGhLocate
 } from '../commands/project-commands.js';
 import { handleNlmQuery, handleNlmResearch } from '../commands/nlm-command.js';
+import {
+  handleGodot,
+  handleGodotInit,
+  handleGodotInspect,
+  handleGodotStatus
+} from '../commands/godot-command.js';
 import { notifyDashboardFocus } from '../commands/focus-notifier.js';
+
+const HELP_LINES: readonly string[] = [
+  'Commands:',
+  '  aegis init                             Initialize worktrees and environment',
+  '  aegis status                           View worktrees and active file locks',
+  '  aegis auto                             Run autonomous task queue & dispatcher',
+  '  aegis prompt [role|id] [id]         Compile surgical AST prompt caching context',
+  '  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution',
+  '  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria',
+  '  aegis rfc:create "<title>" [desc]      Create architectural RFC, publish Wiki & GitHub Discussion',
+  '  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues',
+  '  aegis nlm:sync                         Export and synchronize architecture with NotebookLM',
+  '  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations',
+  '  aegis nlm:research "<topic>" [mode]    Run automated NotebookLM research and stage in Wiki',
+  '  aegis gh:locate [domain]               Resolve authoritative GitHub & Research locations',
+  '  aegis project:list [owner]             List GitHub Projects v2 boards',
+  '  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column',
+  '  aegis wiki:list                        List living memory pages directly from GitHub Wiki',
+  '  aegis wiki:show <slug>                 Display page content directly from GitHub Wiki',
+  '  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache',
+  '  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo',
+  '  aegis wiki:status                      Inspect GitHub Wiki remote git availability',
+  '  aegis merge <solver|qa|docs> [branch]  4-step atomic merge & sibling synchronization',
+  '  aegis dashboard [port]                 Launch Aegis Command Center web dashboard',
+  '  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix',
+  '  aegis ide:sync                         Synchronize MCP servers & Skills across all IDEs',
+  '  aegis gh:status [token]                Inspect live GitHub authentication & limits',
+  '  aegis gh:sync [token]                  Sync live issues & dispatch to agents',
+  '  aegis gh:comment <num> <msg> [token]   Post comment to GitHub issue',
+  '  aegis gh:pr <head> <base> <title> <body> Create GitHub pull request',
+  '  aegis godot [init|status|inspect]      Godot Engine bridge, setup & visual telemetry',
+  '  aegis inspect                          Run zero-token BoundingBox UI inspection',
+  '  aegis mutate [filepath]                Run Mutation Testing gate evaluation',
+  '  aegis estimate <files> <tests>         Compute adaptive timeout for build/test',
+  '  aegis verify <filepath>                Run deterministic Iron Cage validation',
+  '  aegis skeleton <filepath>              Generate token-saving AST Skeleton Map',
+  '  aegis skeleton:scan [dir]              Scan project and compute total token savings',
+  '  aegis cage:check [dir]                 Run Demir Kafes audit across all project code',
+  '  aegis diff <diff>                      Validate surgical unified diff compliance',
+  '  aegis audit <files>                    Run Immutable Oracle trust verification'
+];
 
 function handleHelp(): void {
   showBanner();
-  console.log('Commands:');
-  console.log('  aegis init                             Initialize worktrees and environment');
-  console.log('  aegis status                           View worktrees and active file locks');
-  console.log('  aegis auto                             Run autonomous task queue & dispatcher');
-  console.log('  aegis prompt [role|id] [id]         Compile surgical AST prompt caching context');
-  console.log('  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution');
-  console.log('  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria');
-  console.log('  aegis rfc:create "<title>" [desc]      Create architectural RFC, publish Wiki & GitHub Discussion');
-  console.log('  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues');
-  console.log('  aegis nlm:sync                         Export and synchronize architecture with NotebookLM');
-  console.log('  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations');
-  console.log('  aegis nlm:research "<topic>" [mode]    Run automated NotebookLM research and stage in Wiki');
-  console.log('  aegis gh:locate [domain]               Resolve authoritative GitHub & Research locations');
-  console.log('  aegis project:list [owner]             List GitHub Projects v2 boards');
-  console.log('  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column');
-  console.log('  aegis wiki:list                        List living memory pages directly from GitHub Wiki');
-  console.log('  aegis wiki:show <slug>                 Display page content directly from GitHub Wiki');
-  console.log('  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache');
-  console.log('  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo');
-  console.log('  aegis wiki:status                      Inspect GitHub Wiki remote git availability');
-  console.log('  aegis merge <solver|qa|docs> [branch]  4-step atomic merge & sibling synchronization');
-  console.log('  aegis dashboard [port]                 Launch Aegis Command Center web dashboard');
-  console.log('  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix');
-  console.log('  aegis ide:sync                         Synchronize MCP servers & Skills across all IDEs');
-  console.log('  aegis gh:status [token]                Inspect live GitHub authentication & limits');
-  console.log('  aegis gh:sync [token]                  Sync live issues & dispatch to agents');
-  console.log('  aegis gh:comment <num> <msg> [token]   Post comment to GitHub issue');
-  console.log('  aegis gh:pr <head> <base> <title> <body> Create GitHub pull request');
-  console.log('  aegis inspect                          Run zero-token BoundingBox UI inspection');
-  console.log('  aegis mutate [filepath]                Run Mutation Testing gate evaluation');
-  console.log('  aegis estimate <files> <tests>         Compute adaptive timeout for build/test');
-  console.log('  aegis verify <filepath>                Run deterministic Iron Cage validation');
-  console.log('  aegis skeleton <filepath>              Generate token-saving AST Skeleton Map');
-  console.log('  aegis skeleton:scan [dir]              Scan project and compute total token savings');
-  console.log('  aegis cage:check [dir]                 Run Demir Kafes audit across all project code');
-  console.log('  aegis diff <diff>                      Validate surgical unified diff compliance');
-  console.log('  aegis audit <files>                    Run Immutable Oracle trust verification');
+  console.log(HELP_LINES.join('\n'));
 }
 
 const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
@@ -114,6 +125,10 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'gh:sync': (a) => handleGhSync(a[1]),
   'gh:comment': (a) => handleGhComment(a[1], a[2], a[3]),
   'gh:pr': (a) => handleGhPr(a[1], a[2], a[3], a[4], a[5]),
+  godot: (a) => handleGodot(a.slice(1)),
+  'godot:init': (a) => handleGodotInit(a[1], a[2]),
+  'godot:status': () => handleGodotStatus(),
+  'godot:inspect': (a) => handleGodotInspect(a[1]),
   inspect: (a) => handleInspect(a[1]),
   mutate: (a) => handleMutate(a[1]),
   estimate: (a) => handleEstimate(a),

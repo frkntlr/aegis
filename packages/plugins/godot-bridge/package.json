@@ -1,0 +1,19 @@
+{
+  "name": "@aegis/godot-bridge",
+  "version": "0.1.0",
+  "description": "Aegis Godot Engine Autonomous Bridge, Zero-Bloat Oracle & Visual Telemetry",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x));if(f.length)process.exit(cp.spawnSync(process.execPath,['--test',...f],{stdio:'inherit'}).status||0)\""
+  },
+  "dependencies": {
+    "@aegis/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}

@@ -31,6 +31,7 @@
     "@aegis/mcp-security": "*",
     "@aegis/web-dashboard": "*",
     "@aegis/telemetry-tester": "*",
+    "@aegis/godot-bridge": "*",
     "typescript": "^5.7.2"
   },
   "devDependencies": {
