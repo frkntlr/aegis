@@ -25,13 +25,18 @@ export interface ReclaimResult {
 
 export interface OrphanReclaimerOptions {
   staleTimeoutMs?: number;
+  managedAgents?: string[];
 }
 
 export class OrphanTaskReclaimer {
   private staleTimeoutMs: number;
+  private managedAgents: Set<string>;
 
   constructor(options: OrphanReclaimerOptions = {}) {
     this.staleTimeoutMs = options.staleTimeoutMs ?? 10 * 60 * 1000;
+    this.managedAgents = new Set(
+      (options.managedAgents ?? ['solver', 'qa', 'docs', 'contributor']).map(a => a.toLowerCase())
+    );
   }
 
   private isAgentSessionActive(
@@ -61,6 +66,10 @@ export class OrphanTaskReclaimer {
     if (issue.status !== 'in_progress') return null;
     if (!issue.assignedAgent) {
       return 'Task marked in_progress with no assigned agent (Ghost task).';
+    }
+
+    if (!this.managedAgents.has(issue.assignedAgent.toLowerCase())) {
+      return null;
     }
 
     const sessionCheck = this.isAgentSessionActive(issue.assignedAgent, sessions);

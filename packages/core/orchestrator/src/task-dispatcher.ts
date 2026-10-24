@@ -74,16 +74,22 @@ export class TaskDispatcher {
     agentName: string,
     issueNumber: number,
     error: string,
-    client?: GitHubClient
+    client?: GitHubClient,
+    retainLocks = false
   ): Promise<{ blocked: boolean; reason?: string }> {
-    if (!this.loopBreaker) {
+    if (!retainLocks) {
       this.worktreeManager.releaseFileLocks(agentName);
+    }
+
+    if (!this.loopBreaker) {
       return { blocked: false };
     }
 
     const evalResult = this.loopBreaker.recordFailure(issueNumber, error);
     if (evalResult.blocked) {
-      this.worktreeManager.releaseFileLocks(agentName);
+      if (retainLocks) {
+        this.worktreeManager.releaseFileLocks(agentName);
+      }
       if (client) {
         await client.blockIssue(issueNumber, evalResult.reason ?? 'Threshold reached');
       }

@@ -9,9 +9,15 @@ export interface AuditInput {
 }
 
 export class ImmutableOracle {
-  private findTamperedTests(modifiedFiles: string[], details: string[]): string[] {
+  private findTamperedTests(
+    modifiedFiles: string[],
+    newTestContents: { filePath: string; content: string }[] | undefined,
+    details: string[]
+  ): string[] {
+    const newFiles = new Set((newTestContents ?? []).map(t => t.filePath));
     const tamperedTestFiles: string[] = [];
     for (const file of modifiedFiles) {
+      if (newFiles.has(file)) continue;
       if (file.match(/\.(test|spec)\.(ts|js|jsx|tsx|py)$/) || file.includes('__tests__')) {
         tamperedTestFiles.push(file);
         details.push(`Suspicious: Existing test file was modified by agent: ${file}`);
@@ -41,7 +47,7 @@ export class ImmutableOracle {
 
   public audit(input: AuditInput): TrustAuditReport {
     const details: string[] = [];
-    const tamperedTestFiles = this.findTamperedTests(input.modifiedFiles, details);
+    const tamperedTestFiles = this.findTamperedTests(input.modifiedFiles, input.newTestContents, details);
     const vacuousAssertionsFound = this.countVacuousAssertions(input.newTestContents, details);
 
     if (input.reportedFailedCount > 0) {

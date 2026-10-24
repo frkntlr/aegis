@@ -106,6 +106,38 @@ export class GoSkeletonExtractor implements LanguageExtractor {
     return i + 1;
   }
 
+  private handleCompositeType(
+    lines: string[],
+    i: number,
+    line: string,
+    trimmed: string,
+    output: string[]
+  ): number {
+    if (trimmed.includes('{') && trimmed.includes('}')) {
+      output.push(line);
+      return i + 1;
+    }
+    const header = this.consumeUntilBrace(lines, i);
+    const members: string[] = [];
+    let j = i + 1;
+    let depth = 1;
+    while (j < lines.length && depth > 0) {
+      const raw = lines[j];
+      for (const ch of raw) {
+        if (ch === '{') depth++;
+        else if (ch === '}') depth--;
+      }
+      if (depth === 0) break;
+      const memberTrimmed = raw.trim();
+      if (memberTrimmed && !memberTrimmed.startsWith('//')) {
+        members.push(`\t${memberTrimmed}`);
+      }
+      j++;
+    }
+    output.push(`${header} {\n${members.join('\n')}\n}`);
+    return j + 1;
+  }
+
   private handleDeclaration(
     lines: string[],
     i: number,
@@ -121,22 +153,7 @@ export class GoSkeletonExtractor implements LanguageExtractor {
 
     if (this.isTypeDeclaration(trimmed)) {
       if (trimmed.includes('struct') || trimmed.includes('interface')) {
-        if (trimmed.includes('{') && trimmed.includes('}')) {
-          output.push(line);
-          return i + 1;
-        }
-        const header = this.consumeUntilBrace(lines, i);
-        const members: string[] = [];
-        let j = i + 1;
-        while (j < lines.length && !lines[j].includes('}')) {
-          const memberTrimmed = lines[j].trim();
-          if (memberTrimmed && !memberTrimmed.startsWith('//')) {
-            members.push(`\t${memberTrimmed}`);
-          }
-          j++;
-        }
-        output.push(`${header} {\n${members.join('\n')}\n}`);
-        return j + 1;
+        return this.handleCompositeType(lines, i, line, trimmed, output);
       }
       output.push(line);
       return i + 1;

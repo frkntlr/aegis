@@ -193,6 +193,16 @@ test('GitHubKanbanService manages issues and sync_github responds via API', asyn
     const d = (await res.json()) as { success: boolean; issues: unknown[] };
     assert.strictEqual(d.success, true);
     assert.ok(d.issues.length >= 2);
+
+    const autoRes = await fetch(`http://localhost:${port}/api/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'auto' })
+    });
+    assert.strictEqual(autoRes.status, 200);
+    const autoData = (await autoRes.json()) as { success: boolean; message: string };
+    assert.strictEqual(typeof autoData.success, 'boolean');
+    assert.ok(typeof autoData.message === 'string');
   } finally {
     await server.stop();
   }

@@ -50,3 +50,27 @@ test('fake test', () => {
   assert.strictEqual(report.verdict, 'REJECTED');
   assert.strictEqual(report.vacuousAssertionsFound, 1);
 });
+
+test('ImmutableOracle approves new honest test files without flagging as tampered', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['src/feature.ts', 'tests/feature.test.ts'],
+    newTestContents: [
+      {
+        filePath: 'tests/feature.test.ts',
+        content: `
+test('genuine test', () => {
+  assert.strictEqual(2 + 2, 4);
+});
+        `.trim()
+      }
+    ],
+    reportedPassedCount: 1,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, false);
+  assert.strictEqual(report.verdict, 'APPROVED');
+  assert.strictEqual(report.tamperedTestFiles.length, 0);
+  assert.strictEqual(report.vacuousAssertionsFound, 0);
+});

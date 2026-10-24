@@ -112,15 +112,15 @@ export class DashboardServer {
     const sessions = ctx.detector.detectSessions();
     const target = ready[0];
     const inf = new RoleClassifier().classify({ title: target.title, targetFiles: target.targetFiles });
-    const idle = sessions.find(s => s.agentName === inf.role && s.status === 'idle')
-      || sessions.find(s => s.status === 'idle')
-      || sessions[0];
-    const lockRes = ctx.wtManager.acquireFileLocks(idle.agentName, target.targetFiles);
+    const idle = sessions.find(s => s.agentName === inf.role && s.status === 'idle') || sessions.find(s => s.status === 'idle') || sessions[0];
+    const agentName = idle?.agentName || inf.role || 'solver';
+    const ideType = idle?.ideType || 'Google Antigravity';
+    const lockRes = ctx.wtManager.acquireFileLocks(agentName, target.targetFiles);
     if (!lockRes.success) {
       return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
     }
-    ctx.metrics.assignIssue(target.number, idle.agentName, idle.ideType);
-    return { success: true, message: `Görev #${target.number} [@${idle.agentName}] (${idle.ideType}) atandı.` };
+    ctx.metrics.assignIssue(target.number, agentName, ideType);
+    return { success: true, message: `Görev #${target.number} [@${agentName}] (${ideType}) atandı.` };
   }
 
   private async handleIdeAndSync(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {

@@ -89,3 +89,22 @@ test('OrphanTaskReclaimer reclaims tasks when agent heartbeat has expired', () =
   assert.ok(result.reclaimed[0].reason.includes('heartbeat expired'));
   assert.strictEqual(result.updatedIssues[0].status, 'ready');
 });
+
+test('OrphanTaskReclaimer preserves tasks assigned to human developers without hijacking', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 5,
+      number: 5,
+      title: 'Human assigned task',
+      status: 'in_progress',
+      assignedAgent: 'frkntlr',
+      targetFiles: ['src/feature.ts']
+    }
+  ];
+  // Empty local sessions (human developer is working outside bot sessions)
+  const result = reclaimer.scanAndReclaim(issues, new Map(), []);
+  assert.strictEqual(result.reclaimed.length, 0);
+  assert.strictEqual(result.updatedIssues[0].status, 'in_progress');
+  assert.strictEqual(result.updatedIssues[0].assignedAgent, 'frkntlr');
+});

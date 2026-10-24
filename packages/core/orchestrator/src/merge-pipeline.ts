@@ -123,28 +123,50 @@ export class MergePipeline {
     }
   }
 
-  private step4SyncSiblings(siblingAgents: string[], mergingAgent: string, steps: MergeStepReport[]): void {
-    for (const sibling of siblingAgents) {
-      if (sibling === mergingAgent) continue;
-      const siblingDir = path.resolve(this.repoRoot, this.worktreePrefix, sibling);
-      try {
-        execFileSync('git', ['-C', siblingDir, 'reset', '--hard', this.baseBranch], {
-          stdio: 'pipe',
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
-        });
+  private syncSingleSibling(sibling: string, siblingDir: string, steps: MergeStepReport[]): void {
+    try {
+      const dirty = execFileSync('git', ['-C', siblingDir, 'status', '--porcelain'], {
+        stdio: 'pipe',
+        encoding: 'utf8',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      }).trim();
+
+      if (dirty.length > 0) {
         steps.push({
           step: 4,
           name: `Sibling sync: ${sibling}`,
           passed: true,
-          message: `Synchronized ${sibling} workspace with latest ${this.baseBranch}.`
+          message: `Sibling ${sibling} has uncommitted modifications; skipped hard reset to preserve data.`
         });
-      } catch {
-        steps.push({
-          step: 4,
-          name: `Sibling sync: ${sibling}`,
-          passed: false,
-          message: `Failed to reset sibling ${sibling} to ${this.baseBranch}.`
-        });
+        return;
+      }
+
+      execFileSync('git', ['-C', siblingDir, 'reset', '--hard', this.baseBranch], {
+        stdio: 'pipe',
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
+      steps.push({
+        step: 4,
+        name: `Sibling sync: ${sibling}`,
+        passed: true,
+        message: `Synchronized ${sibling} workspace with latest ${this.baseBranch}.`
+      });
+    } catch {
+      steps.push({
+        step: 4,
+        name: `Sibling sync: ${sibling}`,
+        passed: false,
+        message: `Failed to reset sibling ${sibling} to ${this.baseBranch}.`
+      });
+    }
+  }
+
+  private step4SyncSiblings(siblingAgents: string[], mergingAgent: string, steps: MergeStepReport[]): void {
+    for (const sibling of siblingAgents) {
+      if (sibling === mergingAgent) continue;
+      const siblingDir = path.resolve(this.repoRoot, this.worktreePrefix, sibling);
+      if (fs.existsSync(siblingDir)) {
+        this.syncSingleSibling(sibling, siblingDir, steps);
       }
     }
   }

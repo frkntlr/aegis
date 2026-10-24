@@ -50,7 +50,10 @@ export class CppSkeletonExtractor implements LanguageExtractor {
   }
 
   private isTypeDeclaration(trimmed: string): boolean {
-    const prefixes = ['class ', 'struct ', 'enum ', 'union ', 'template'];
+    if (trimmed.startsWith('template')) {
+      return trimmed.includes('class ') || trimmed.includes('struct ') || !trimmed.includes('(');
+    }
+    const prefixes = ['class ', 'struct ', 'enum ', 'union '];
     return prefixes.some(p => trimmed.startsWith(p));
   }
 

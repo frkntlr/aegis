@@ -85,3 +85,18 @@ test('TaskDispatcher skips blocked issues during dispatching', () => {
   const result = dispatcher.dispatchNextTask(['alice'], [issue]);
   assert.strictEqual(result.dispatched, false);
 });
+
+test('TaskDispatcher releases locks on non-terminal task failure', async () => {
+  const wt = new WorktreeManager();
+  wt.acquireFileLocks('alice', ['src/Failing.ts']);
+  assert.strictEqual(wt.getLockedFiles().get('src/Failing.ts'), 'alice');
+
+  const breaker = createCountingBreaker(10, 3);
+  const dispatcher = new TaskDispatcher(wt, breaker);
+
+  // Attempt 1 of 3 (non-terminal failure)
+  const res = await dispatcher.handleTaskFailure('alice', 10, 'transient test error');
+  assert.strictEqual(res.blocked, false);
+  // Lock must be released cleanly
+  assert.strictEqual(wt.getLockedFiles().has('src/Failing.ts'), false);
+});

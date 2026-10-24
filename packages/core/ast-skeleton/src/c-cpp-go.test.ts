@@ -126,3 +126,43 @@ pub fn second() -> i32 {
   assert.ok(res.skeletonContent.includes('pub fn first() { /* body omitted */ }'));
   assert.ok(res.skeletonContent.includes('pub fn second() -> i32 { /* body omitted */ }'));
 });
+
+test('GoSkeletonExtractor preserves nested structs with correct closing brace depth', () => {
+  const code = `
+package main
+type AppConfig struct {
+    Database struct {
+        Host string
+        Port int
+    }
+    TimeoutSeconds int
+}
+func Run() {}
+`.trim();
+
+  const extractor = new GoSkeletonExtractor();
+  const res = extractor.extract('config.go', code);
+  assert.ok(res.skeletonContent.includes('type AppConfig struct {'));
+  assert.ok(res.skeletonContent.includes('Database struct {'));
+  assert.ok(res.skeletonContent.includes('TimeoutSeconds int'));
+  assert.ok(res.skeletonContent.includes('func Run() { /* body omitted */ }'));
+});
+
+test('CppSkeletonExtractor omits function bodies on single-line template functions', () => {
+  const code = `
+template<typename T> void add(T a, T b) {
+    int x = 1;
+    return a + b;
+}
+template<typename T> class SafeContainer {
+public:
+    T val;
+};
+`.trim();
+
+  const extractor = new CppSkeletonExtractor();
+  const res = extractor.extract('math.hpp', code);
+  assert.ok(res.skeletonContent.includes('template<typename T> void add(T a, T b) { /* body omitted */ }'));
+  assert.ok(!res.skeletonContent.includes('int x = 1;'));
+  assert.ok(res.skeletonContent.includes('template<typename T> class SafeContainer {'));
+});
