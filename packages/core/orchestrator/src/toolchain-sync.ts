@@ -83,7 +83,11 @@ export class UniversalToolchainSync {
       }
     }
     if (servers.length === 0) {
-      servers.push({ name: 'aegis-engine', command: 'node', args: ['packages/cli/dist/bin/aegis.js'], transport: 'stdio' });
+      servers.push(
+        { name: 'aegis-engine', command: 'node', args: ['packages/cli/dist/bin/aegis.js'], transport: 'stdio' },
+        { name: 'ast-grep', command: 'npx', args: ['@ast-grep/mcp'], transport: 'stdio' },
+        { name: 'context7', command: 'npx', args: ['context7-mcp'], transport: 'stdio' }
+      );
     }
     return servers;
   }

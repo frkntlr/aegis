@@ -57,6 +57,9 @@ import { handleFind } from '../commands/find-command.js';
 import { handleTriage } from '../commands/triage-command.js';
 import { handleTrace } from '../commands/trace-command.js';
 import { handleGraphScan } from '../commands/graph-command.js';
+import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.js';
+import { handleRtkCompress } from '../commands/rtk-command.js';
+import { handleContext7Query } from '../commands/context7-command.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 
 const HELP_LINES: readonly string[] = [
@@ -101,7 +104,11 @@ const HELP_LINES: readonly string[] = [
   '  aegis find <symbol>                    Fast AST symbol lookup and precision surgical slice',
   '  aegis triage [dir]                     Run Evidence-Based Bug Triage (zero false-alarm bugs)',
   '  aegis trace <target>                   Trace relational callers, signal listeners & scenes',
-  '  aegis graph:scan [dir]                 Build cross-reference relational knowledge graph'
+  '  aegis graph:scan [dir]                 Build cross-reference relational knowledge graph',
+  '  aegis ast:search <pat> [dir]           Structural AST search via ast-grep',
+  '  aegis ast:replace <p> <r> <f>          Structural AST replacement via ast-grep',
+  '  aegis rtk:compress [file]              Compress terminal/test output via RTK Token Killer',
+  '  aegis context7:query <lib> <top>       Query official ground-truth library documentation'
 ];
 
 function handleHelp(): void {
@@ -160,7 +167,11 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   find: (a) => handleFind(a[1]),
   triage: (a) => handleTriage(a[1]),
   trace: (a) => handleTrace(a[1]),
-  'graph:scan': (a) => handleGraphScan(a[1])
+  'graph:scan': (a) => handleGraphScan(a[1]),
+  'ast:search': (a) => handleAstSearch(a[1], a[2]),
+  'ast:replace': (a) => handleAstReplace(a[1], a[2], a[3]),
+  'rtk:compress': (a) => handleRtkCompress(a[1]),
+  'context7:query': (a) => handleContext7Query(a[1], a[2])
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {

@@ -129,3 +129,16 @@ test('UniversalToolchainSync includes Godot Engine when project.godot is present
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+test('UniversalToolchainSync automatically registers ast-grep and context7 MCP servers', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mcp-defaults-'));
+  try {
+    const sync = new UniversalToolchainSync(tmpDir);
+    const mcps = sync.discoverMcpServers();
+    const names = mcps.map(m => m.name);
+    assert.ok(names.includes('ast-grep'));
+    assert.ok(names.includes('context7'));
+    assert.ok(names.includes('aegis-engine'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

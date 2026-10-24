@@ -21,6 +21,18 @@
       "args": [
         "packages/cli/dist/bin/aegis.js"
       ]
+    },
+    "ast-grep": {
+      "command": "npx",
+      "args": [
+        "@ast-grep/mcp"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "context7-mcp"
+      ]
     }
   }
 }

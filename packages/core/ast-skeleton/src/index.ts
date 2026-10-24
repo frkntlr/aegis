@@ -17,3 +17,4 @@ export * from './tscn-relation-parser.js';
 export * from './cross-reference-linker.js';
 export * from './graph-query-engine.js';
 export * from './fuzzy-matcher.js';
+export * from './ast-grep-bridge.js';

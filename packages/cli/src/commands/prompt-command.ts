@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SkeletonGenerator, PromptCacheManager, type LayeredPromptContext } from '@aegis/ast-skeleton';
-import { GitHubClient, type GitHubIssue } from '@aegis/github-live';
+import { GitHubClient, Context7Bridge, type GitHubIssue } from '@aegis/github-live';
 import { WorktreeManager, RoleClassifier } from '@aegis/orchestrator';
 import { showBanner } from './banner.js';
 
@@ -124,7 +124,8 @@ export async function compilePrompt(
   const constitution = generateLanguageConstitution(issue.targetFiles);
   const cacheManager = new PromptCacheManager(constitution);
 
-  const taskDesc = formatTaskDescription(agentName, issue);
+  const rawDesc = formatTaskDescription(agentName, issue);
+  const taskDesc = new Context7Bridge().injectDocumentationContext(rawDesc, issue.targetFiles);
   const context = cacheManager.assembleContext(skeletonResult.combinedMap, taskDesc);
 
   const promptMarkdown = [
