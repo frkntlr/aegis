@@ -38,6 +38,7 @@ test('GodotIdeAdapter detects Godot project and configures addon in project.godo
 
     const exclusions = adapter.setupExclusions(tmp);
     assert.strictEqual(exclusions.success, true);
+    assert.ok(fs.existsSync(path.join(tmp, 'addons', 'aegis_bridge')));
 
     const updated = fs.readFileSync(projectGodot, 'utf8');
     assert.ok(updated.includes('aegis_bridge'));

@@ -10,7 +10,21 @@ import {
 import { GitHubClient } from '@aegis/github-live';
 import { LoopBreaker, OrphanTaskReclaimer } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
+import { GodotInitWorkflow } from '@aegis/godot-bridge';
 import { showBanner } from './banner.js';
+
+function autoConfigureGodot(repoRoot: string): void {
+  try {
+    const res = GodotInitWorkflow.autoInstallIfGodot(repoRoot);
+    if (res && res.installedAddonFiles.length > 0) {
+      console.log(`🎮 Godot project detected: Automatically installed Aegis Bridge addon (${res.installedAddonFiles.length} files).`);
+    } else if (res) {
+      console.log('🎮 Godot project detected: Aegis Bridge verified and active.');
+    }
+  } catch {
+    // Ignore non-fatal auto-install errors
+  }
+}
 
 function setupIdeExclusions(repoRoot: string): void {
   const registry = new IdeAdapterRegistry();
@@ -21,6 +35,7 @@ function setupIdeExclusions(repoRoot: string): void {
       console.log(`✅ IDE isolation rules configured for [${r.ideId}] (${fileNames}).`);
     }
   }
+  autoConfigureGodot(repoRoot);
 }
 
 export function handleInit(): void {

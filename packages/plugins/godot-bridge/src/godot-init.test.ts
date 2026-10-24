@@ -72,3 +72,27 @@ test('GodotInitWorkflow preserves custom aspect ratios configured in existing ae
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('GodotInitWorkflow autoInstallIfGodot auto-installs addon when project.godot is present', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-auto-godot-'));
+  try {
+    // 1. Returns null for non-Godot projects
+    const nonGodotRes = GodotInitWorkflow.autoInstallIfGodot(tmpDir);
+    assert.strictEqual(nonGodotRes, null);
+
+    // 2. Automatically installs bridge if project.godot exists
+    fs.writeFileSync(path.join(tmpDir, 'project.godot'), 'config_version=5\n[application]\nconfig/name="Game"\n', 'utf8');
+    const autoRes = GodotInitWorkflow.autoInstallIfGodot(tmpDir);
+    assert.ok(autoRes);
+    assert.strictEqual(autoRes.success, true);
+    assert.ok(fs.existsSync(path.join(tmpDir, 'addons', 'aegis_bridge')));
+
+    // 3. Verifies active state without duplicate installation if called again
+    const secondRes = GodotInitWorkflow.autoInstallIfGodot(tmpDir);
+    assert.ok(secondRes);
+    assert.strictEqual(secondRes.success, true);
+    assert.strictEqual(secondRes.installedAddonFiles.length, 0);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

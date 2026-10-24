@@ -68,19 +68,9 @@ export class GodotIdeAdapter implements IdeAdapter {
   }
 
   private ensureProjectGodotAddon(repoRoot: string, configuredFiles: string[]): void {
-    const projectGodot = path.join(repoRoot, 'project.godot');
-    if (!fs.existsSync(projectGodot)) return;
-
-    try {
-      const content = fs.readFileSync(projectGodot, 'utf8');
-      const withPlugin = GodotInitWorkflow.mergePluginIntoConfig(content);
-      const updated = GodotInitWorkflow.mergeAutoloadIntoConfig(withPlugin);
-      if (updated !== content) {
-        fs.writeFileSync(projectGodot, updated, 'utf8');
-        configuredFiles.push(projectGodot);
-      }
-    } catch {
-      // ignore write errors
+    const res = GodotInitWorkflow.autoInstallIfGodot(repoRoot);
+    if (res && res.installedAddonFiles.length > 0) {
+      configuredFiles.push(...res.installedAddonFiles);
     }
   }
 }

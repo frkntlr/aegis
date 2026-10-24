@@ -37,6 +37,28 @@ export class GodotInitWorkflow {
     };
   }
 
+  public static autoInstallIfGodot(repoRoot: string): GodotInitResult | null {
+    const projectGodot = path.join(repoRoot, 'project.godot');
+    if (!fs.existsSync(projectGodot)) return null;
+
+    const addonDir = path.join(repoRoot, 'addons', 'aegis_bridge');
+    if (!fs.existsSync(addonDir)) {
+      return this.initProject({ projectDir: repoRoot });
+    }
+
+    const installation = GodotLocator.findGodot();
+    this.enablePluginInProjectGodot(repoRoot, installation?.majorVersion ?? 4);
+    this.enableAutoloadInProjectGodot(repoRoot);
+    this.ensureAegisConfigFile(repoRoot, 6850, installation?.binaryPath);
+
+    return {
+      success: true,
+      message: `Aegis Godot Bridge verified and active at ${repoRoot}`,
+      installation: installation || undefined,
+      installedAddonFiles: []
+    };
+  }
+
   private static ensureProjectGodotFile(projectDir: string): void {
     const projectGodotPath = path.join(projectDir, 'project.godot');
     if (!fs.existsSync(projectGodotPath)) {
@@ -81,7 +103,9 @@ export class GodotInitWorkflow {
       path.resolve(dir, '..', '..', 'gdscript', 'addons', 'aegis_bridge'),
       path.resolve(dir, '..', '..', '..', 'plugins', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge'),
       path.resolve(process.cwd(), 'packages', 'plugins', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge'),
-      path.resolve(process.cwd(), 'node_modules', '@aegis', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge')
+      path.resolve(process.cwd(), 'node_modules', '@aegis', 'godot-bridge', 'gdscript', 'addons', 'aegis_bridge'),
+      path.resolve(process.cwd(), '..', 'godot-aegis-bridge', 'addons', 'aegis_bridge'),
+      path.resolve(dir, '..', '..', '..', '..', 'godot-aegis-bridge', 'addons', 'aegis_bridge')
     ];
     for (const c of candidates) {
       if (fs.existsSync(c)) return c;

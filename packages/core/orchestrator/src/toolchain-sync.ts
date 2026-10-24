@@ -176,6 +176,11 @@ export class UniversalToolchainSync {
       syncedIdes.push('Google Antigravity');
     }
 
+    const isGodot = fs.existsSync(path.resolve(this.repoRoot, 'project.godot'));
+    if (isGodot) {
+      syncedIdes.push('Godot Engine (Aegis Bridge)');
+    }
+
     return {
       timestamp: new Date().toISOString(),
       skillsFound: skills.length,
