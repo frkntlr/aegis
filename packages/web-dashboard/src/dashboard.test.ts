@@ -207,3 +207,25 @@ test('GitHubKanbanService manages issues and sync_github responds via API', asyn
     await server.stop();
   }
 });
+
+test('GitHubKanbanService persists local issues to disk and reloads them', async () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-kanban-persist-'));
+  try {
+    const kanban1 = new GitHubKanbanService({ repoRoot: tmpRepo, offline: true });
+    const created = await kanban1.createIssue('Persistent Task', ['src/persist.ts']);
+    kanban1.updateIssueStatus(created.number, 'in_progress', 'solver');
+
+    const issuesFile = path.resolve(tmpRepo, '.aegis', 'issues.json');
+    assert.ok(fs.existsSync(issuesFile));
+
+    const kanban2 = new GitHubKanbanService({ repoRoot: tmpRepo, offline: true });
+    const loaded = kanban2.getIssues();
+    const found = loaded.find(i => i.number === created.number);
+    assert.ok(found);
+    assert.strictEqual(found?.title, 'Persistent Task');
+    assert.strictEqual(found?.status, 'in_progress');
+    assert.strictEqual(found?.assignedAgent, 'solver');
+  } finally {
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
+  }
+});

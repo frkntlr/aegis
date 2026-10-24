@@ -77,6 +77,14 @@ export class GitHubKanbanService {
     ];
   }
 
+  private persistIssues(): void {
+    try {
+      const sFile = path.resolve(this.repoRoot, '.aegis', 'issues.json');
+      fs.mkdirSync(path.dirname(sFile), { recursive: true });
+      fs.writeFileSync(sFile, JSON.stringify(this.issues, null, 2), 'utf8');
+    } catch { /* non-fatal */ }
+  }
+
   private initAdapter(customAdapter?: GitHubLiveAdapter, customProj?: GitHubProjectsAdapter): void {
     if (customAdapter) {
       this.adapter = customAdapter;
@@ -149,6 +157,18 @@ export class GitHubKanbanService {
     }
   }
 
+  private createLocalIssue(title: string, targetFiles: string[], labels: string[], body: string): SystemIssue {
+    const nextNum = this.issues.length > 0 ? Math.max(...this.issues.map(i => i.number)) + 1 : 1;
+    const localIssue: SystemIssue = {
+      id: nextNum, number: nextNum, title, status: 'ready',
+      targetFiles, labels, body,
+      url: `https://github.com/${this.owner}/${this.repo}/issues/${nextNum}`
+    };
+    this.issues.unshift(localIssue);
+    this.persistIssues();
+    return localIssue;
+  }
+
   public async createIssue(title: string, targetFiles: string[] = []): Promise<SystemIssue> {
     const defaultBody = this.buildIssueBody(title, targetFiles);
     const labels = ['status:ready', 'aegis:task', ...targetFiles.map(f => `lock:${f}`)];
@@ -158,35 +178,19 @@ export class GitHubKanbanService {
         const { issue, rateLimit } = await this.adapter.createIssue(title, defaultBody, labels);
         this.lastRateLimit = rateLimit;
         const newIssue: SystemIssue = {
-          id: issue.id,
-          number: issue.number,
-          title: issue.title,
-          status: 'ready',
-          targetFiles,
-          labels,
-          body: defaultBody,
-          acceptanceCriteria: issue.acceptanceCriteria,
+          id: issue.id, number: issue.number, title: issue.title, status: 'ready',
+          targetFiles, labels, body: defaultBody, acceptanceCriteria: issue.acceptanceCriteria,
           url: issue.url || `https://github.com/${this.owner}/${this.repo}/issues/${issue.number}`
         };
         this.issues.unshift(newIssue);
+        this.persistIssues();
         if (this.projectsAdapter && issue.number) {
           this.projectsAdapter.syncIssue(this.projectNumber, issue.number, 'ready').catch(() => { /* no-op */ });
         }
         return newIssue;
       } catch { /* ignore */ }
     }
-    const nextNum = this.issues.length > 0 ? Math.max(...this.issues.map(i => i.number)) + 1 : 1;
-    const localIssue: SystemIssue = {
-      id: nextNum,
-      number: nextNum,
-      title,
-      status: 'ready',
-      targetFiles,
-      labels,
-      url: `https://github.com/${this.owner}/${this.repo}/issues/${nextNum}`
-    };
-    this.issues.unshift(localIssue);
-    return localIssue;
+    return this.createLocalIssue(title, targetFiles, labels, defaultBody);
   }
 
   private buildIssueBody(title: string, targetFiles: string[]): string {
@@ -216,6 +220,7 @@ export class GitHubKanbanService {
       issue.assignedAgent = undefined;
       issue.assignedIde = undefined;
     }
+    this.persistIssues();
     this.dispatchGitHubStatusUpdate(num, targetStatus, issue, agent, ide);
     return issue;
   }
