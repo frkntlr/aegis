@@ -15,6 +15,7 @@ test('BoundingBoxInspector detects overlapping elements on same plane', () => {
   const res = inspector.inspectLayout([box1, box2], { width: 1920, height: 1080, name: 'desktop' });
   assert.strictEqual(res.passed, false);
   assert.ok(res.violations.some(v => v.type === 'OVERLAP'));
+  assert.strictEqual(res.violations[0].message, 'Unintended overlap between "btn-save" and "btn-cancel".');
   assert.strictEqual(res.tokenCost, 0); // 0 vision tokens used!
 });
 
@@ -71,4 +72,21 @@ function add(a: number, b: number): number {
   const failReport = gate.evaluateScore(mutants, () => false);
   assert.strictEqual(failReport.scorePercent, 0);
   assert.strictEqual(failReport.passedThreshold, false);
+});
+
+
+test('MutationGate handles consecutive lines matching same pattern without lastIndex drift', () => {
+  const gate = new MutationGate();
+  const sampleCode = [
+    'const flag1 = true;',
+    'const flag2 = true;',
+    'const flag3 = true;'
+  ].join('\n');
+
+  const mutants = gate.generateMutants(sampleCode);
+  const trueMutants = mutants.filter(m => m.id.includes('true to false'));
+  assert.strictEqual(trueMutants.length, 3);
+  assert.strictEqual(trueMutants[0].line, 1);
+  assert.strictEqual(trueMutants[1].line, 2);
+  assert.strictEqual(trueMutants[2].line, 3);
 });

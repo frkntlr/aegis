@@ -18,10 +18,10 @@ export interface MutationScoreReport {
 export class MutationGate {
   private readonly minThresholdPercent: number;
   private readonly mutationRules: Array<{ pattern: RegExp; replacement: string; desc: string }> = [
-    { pattern: /\s\+\s/g, replacement: ' - ', desc: '+ to -' },
-    { pattern: /\s===\s/g, replacement: ' !== ', desc: '=== to !==' },
-    { pattern: /\s>\s/g, replacement: ' <= ', desc: '> to <=' },
-    { pattern: /\btrue\b/g, replacement: 'false', desc: 'true to false' }
+    { pattern: /\s\+\s/, replacement: ' - ', desc: '+ to -' },
+    { pattern: /\s===\s/, replacement: ' !== ', desc: '=== to !==' },
+    { pattern: /\s>\s/, replacement: ' <= ', desc: '> to <=' },
+    { pattern: /\btrue\b/, replacement: 'false', desc: 'true to false' }
   ];
 
   constructor(options: { minThresholdPercent?: number } = {}) {
@@ -35,7 +35,9 @@ export class MutationGate {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       for (const rule of this.mutationRules) {
+        rule.pattern.lastIndex = 0;
         if (rule.pattern.test(line)) {
+          rule.pattern.lastIndex = 0;
           const mutatedLine = line.replace(rule.pattern, rule.replacement);
           const copy = [...lines];
           copy[i] = mutatedLine;

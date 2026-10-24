@@ -74,3 +74,18 @@ test('genuine test', () => {
   assert.strictEqual(report.tamperedTestFiles.length, 0);
   assert.strictEqual(report.vacuousAssertionsFound, 0);
 });
+
+
+test('ImmutableOracle prioritizes REJECTED when tests fail or assertions are vacuous even if tests were modified', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['tests/Header.test.ts'],
+    reportedPassedCount: 3,
+    reportedFailedCount: 1
+  });
+
+  assert.strictEqual(report.suspicious, true);
+  assert.strictEqual(report.verdict, 'REJECTED');
+  assert.deepStrictEqual(report.tamperedTestFiles, ['tests/Header.test.ts']);
+  assert.ok(report.details.some(d => d.includes('failing tests')));
+});

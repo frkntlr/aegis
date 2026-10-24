@@ -62,12 +62,12 @@ export class ImmutableOracle {
     let verdict: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW_REQUIRED' = 'APPROVED';
     let suspicious = false;
 
-    if (tamperedTestFiles.length > 0) {
-      suspicious = true;
-      verdict = 'MANUAL_REVIEW_REQUIRED';
-    } else if (vacuousAssertionsFound > 0 || input.reportedFailedCount > 0 || mutationScore < 70) {
+    if (vacuousAssertionsFound > 0 || input.reportedFailedCount > 0 || mutationScore < 70) {
       suspicious = true;
       verdict = 'REJECTED';
+    } else if (tamperedTestFiles.length > 0) {
+      suspicious = true;
+      verdict = 'MANUAL_REVIEW_REQUIRED';
     }
 
     return {
