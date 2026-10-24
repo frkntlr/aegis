@@ -45,7 +45,12 @@ import {
   handleGodot,
   handleGodotInit,
   handleGodotInspect,
-  handleGodotStatus
+  handleGodotStatus,
+  handleGodotValidate,
+  handleGodotQuery,
+  handleGodotRun,
+  handleGodotDoctool,
+  handleGodotPlaytest
 } from '../commands/godot-command.js';
 import { notifyDashboardFocus } from '../commands/focus-notifier.js';
 
@@ -129,6 +134,11 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'godot:init': (a) => handleGodotInit(a[1], a[2]),
   'godot:status': () => handleGodotStatus(),
   'godot:inspect': (a) => handleGodotInspect(a[1]),
+  'godot:validate': (a) => handleGodotValidate(a[1]),
+  'godot:query': (a) => handleGodotQuery(a[1]),
+  'godot:run': (a) => handleGodotRun(a[1], a[2]),
+  'godot:doctool': () => handleGodotDoctool(),
+  'godot:playtest': (a) => handleGodotPlaytest(a[1]),
   inspect: (a) => handleInspect(a[1]),
   mutate: (a) => handleMutate(a[1]),
   estimate: (a) => handleEstimate(a),

@@ -39,6 +39,18 @@ test('GodotInitWorkflow merges into existing editor_plugins without creating dup
   assert.strictEqual((merged.match(/\[editor_plugins\]/g) || []).length, 1);
 });
 
+test('GodotInitWorkflow merges AegisBridge into autoload without duplicates', () => {
+  const existing = '[autoload]\n\nSoundManager="*res://autoload/SoundManager.gd"\n';
+  const merged = GodotInitWorkflow.mergeAutoloadIntoConfig(existing);
+  assert.ok(merged.includes('SoundManager='));
+  assert.ok(merged.includes('AegisBridge='));
+  assert.strictEqual((merged.match(/AegisBridge=/g) || []).length, 1);
+
+  // Calling again must not duplicate
+  const second = GodotInitWorkflow.mergeAutoloadIntoConfig(merged);
+  assert.strictEqual(second, merged);
+});
+
 test('GodotInitWorkflow preserves custom aspect ratios configured in existing aegis.config.json', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-ratios-'));
   try {

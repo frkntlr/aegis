@@ -73,7 +73,8 @@ export class GodotIdeAdapter implements IdeAdapter {
 
     try {
       const content = fs.readFileSync(projectGodot, 'utf8');
-      const updated = GodotInitWorkflow.mergePluginIntoConfig(content);
+      const withPlugin = GodotInitWorkflow.mergePluginIntoConfig(content);
+      const updated = GodotInitWorkflow.mergeAutoloadIntoConfig(withPlugin);
       if (updated !== content) {
         fs.writeFileSync(projectGodot, updated, 'utf8');
         configuredFiles.push(projectGodot);

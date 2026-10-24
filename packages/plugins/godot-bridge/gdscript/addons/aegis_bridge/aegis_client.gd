@@ -1,6 +1,9 @@
 @tool
 extends Node
 
+const AegisUiVerifier = preload("res://addons/aegis_bridge/ui_verifier.gd")
+const AegisSyntheticPlayer = preload("res://addons/aegis_bridge/synthetic_player.gd")
+
 const DEFAULT_PORT = 6850
 var port: int = DEFAULT_PORT
 var http_request: HTTPRequest

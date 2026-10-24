@@ -8,6 +8,7 @@ import {
   handleGodotInspect,
   handleGodotQuery,
   handleGodotValidate,
+  handleGodotPlaytest,
   handleGodot
 } from './godot-command.js';
 
@@ -100,6 +101,28 @@ test('handleGodotInspect loads cached telemetry and flags overlapping UI control
     assert.ok(out.includes('Loaded 2 UI nodes from telemetry cache'));
     assert.ok(out.includes('FAIL (overlaps/clippings)'));
     assert.ok(out.includes('Overlap: "/root/Main/ButtonA" and "/root/Main/ButtonB"'));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('handleGodotPlaytest queues scenario actions from file and default smoke scenario', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-playtest-test-'));
+  try {
+    const scenarioFile = path.join(tmp, 'playtest.json');
+    fs.writeFileSync(scenarioFile, JSON.stringify([
+      { type: 'click_node', path: '/root/Game/Button' },
+      { type: 'wait', duration: 0.5 }
+    ]), 'utf8');
+
+    const fileOut = await captureOutput(() => handleGodotPlaytest(scenarioFile));
+    assert.ok(fileOut.includes('Scenario loaded from: playtest.json'));
+    assert.ok(fileOut.includes('Queued playtest scenario'));
+    assert.ok(fileOut.includes('with 2 action(s)'));
+
+    const defaultOut = await captureOutput(() => handleGodotPlaytest('nonexistent-path.json'));
+    assert.ok(defaultOut.includes('default smoke playtest scenario'));
+    assert.ok(defaultOut.includes('with 3 action(s)'));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

@@ -26,6 +26,7 @@ export class GodotInitWorkflow {
     this.ensureProjectGodotFile(projectDir);
     const installedFiles = this.copyAddonFiles(projectDir);
     this.enablePluginInProjectGodot(projectDir, installation?.majorVersion ?? 4);
+    this.enableAutoloadInProjectGodot(projectDir);
     this.ensureAegisConfigFile(projectDir, options.bridgePort ?? 6850, installation?.binaryPath);
 
     return {
@@ -121,6 +122,26 @@ export class GodotInitWorkflow {
     if (!fs.existsSync(pPath)) return;
     const content = fs.readFileSync(pPath, 'utf8');
     const updated = this.mergePluginIntoConfig(content, majorVersion);
+    if (updated !== content) {
+      fs.writeFileSync(pPath, updated, 'utf8');
+    }
+  }
+
+  public static mergeAutoloadIntoConfig(content: string): string {
+    const autoloadLine = 'AegisBridge="*res://addons/aegis_bridge/aegis_client.gd"';
+    if (content.includes('AegisBridge=')) return content;
+
+    if (content.includes('[autoload]')) {
+      return content.replace('[autoload]', `[autoload]\n\n${autoloadLine}`);
+    }
+    return `${content.trimEnd()}\n\n[autoload]\n\n${autoloadLine}\n`;
+  }
+
+  private static enableAutoloadInProjectGodot(projectDir: string): void {
+    const pPath = path.join(projectDir, 'project.godot');
+    if (!fs.existsSync(pPath)) return;
+    const content = fs.readFileSync(pPath, 'utf8');
+    const updated = this.mergeAutoloadIntoConfig(content);
     if (updated !== content) {
       fs.writeFileSync(pPath, updated, 'utf8');
     }

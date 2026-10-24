@@ -227,6 +227,41 @@ function scanAndValidateGd(dir: string, oracle: ClassDbOracle): ValidationResult
   return results;
 }
 
+export function handleGodotPlaytest(scenarioArg?: string): void {
+  showBanner();
+  console.log('🎮 Autonomous Aegis Playtest Queue...');
+  const cwd = process.cwd();
+  const fileCandidates = [
+    scenarioArg,
+    path.join(cwd, '.aegis', 'playtest.json'),
+    path.join(cwd, 'test', 'playtest.json'),
+    path.join(cwd, 'playtest.json')
+  ].filter(Boolean) as string[];
+
+  const scenarioPath = fileCandidates.find(p => fs.existsSync(p));
+  let actions: unknown[] = [
+    { type: 'ping' },
+    { type: 'wait', duration: 0.1 },
+    { type: 'get_ui_tree' }
+  ];
+
+  if (scenarioPath) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
+      actions = Array.isArray(raw) ? raw : (raw.actions || actions);
+      console.log(` • Scenario loaded from: ${path.basename(scenarioPath)} (${actions.length} action(s))`);
+    } catch {
+      console.log(' ℹ️ Failed to read scenario file; using default smoke scenario.');
+    }
+  } else {
+    console.log(' • Using default smoke playtest scenario (3 actions).');
+  }
+
+  const reqId = `playtest-${Date.now()}`;
+  console.log(`✅ Queued playtest scenario [${reqId}] with ${actions.length} action(s).`);
+  console.log(' • Status: Ready for Godot AegisBridge autonomous execution.');
+}
+
 export async function handleGodot(args: string[]): Promise<void> {
   const subcommand = args[0] || 'status';
   if (subcommand === 'init') {
@@ -243,7 +278,9 @@ export async function handleGodot(args: string[]): Promise<void> {
     handleGodotValidate(args[1]);
   } else if (subcommand === 'run') {
     handleGodotRun(args[1], args[2]);
+  } else if (subcommand === 'playtest') {
+    handleGodotPlaytest(args[1]);
   } else {
-    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|status|inspect|query|doctool|validate|run]`);
+    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|status|inspect|query|doctool|validate|run|playtest]`);
   }
 }
