@@ -1,7 +1,18 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CrossReferenceLinker, GraphQueryEngine, RelationalGraph } from '@aegis/ast-skeleton';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
+
+function autoBuildGraph(graph: RelationalGraph, cachePath: string): void {
+  console.log('🔄 Building Relational Knowledge Graph for workspace...');
+  const pkgDir = path.resolve(process.cwd(), 'packages');
+  const baseDir = fs.existsSync(pkgDir) ? pkgDir : process.cwd();
+  const srcFiles = collectSourceFiles(baseDir, true);
+  const linker = new CrossReferenceLinker(graph);
+  linker.linkFiles(srcFiles, process.cwd());
+  graph.saveCache(cachePath);
+}
 
 export function handleTrace(queryArg?: string): void {
   showBanner();
@@ -12,14 +23,8 @@ export function handleTrace(queryArg?: string): void {
 
   const cachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
   const graph = new RelationalGraph();
-  const cacheLoaded = graph.loadCache(cachePath);
-
-  if (!cacheLoaded) {
-    console.log('🔄 Building Relational Knowledge Graph for workspace...');
-    const srcFiles = collectSourceFiles(path.resolve(process.cwd(), 'packages'));
-    const linker = new CrossReferenceLinker(graph);
-    linker.linkFiles(srcFiles, process.cwd());
-    graph.saveCache(cachePath);
+  if (!graph.loadCache(cachePath)) {
+    autoBuildGraph(graph, cachePath);
   }
 
   const engine = new GraphQueryEngine(graph);

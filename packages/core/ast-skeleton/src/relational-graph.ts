@@ -42,11 +42,16 @@ export class RelationalGraph {
   private incoming: Map<string, RelationalEdge[]> = new Map();
 
   public addNode(node: RelationalNode): void {
-    this.nodes.set(node.id, node);
+    const normalized: RelationalNode = {
+      ...node,
+      id: node.id.replace(/\\/g, '/'),
+      filePath: node.filePath.replace(/\\/g, '/')
+    };
+    this.nodes.set(normalized.id, normalized);
   }
 
   public getNode(id: string): RelationalNode | undefined {
-    return this.nodes.get(id);
+    return this.nodes.get(id.replace(/\\/g, '/'));
   }
 
   public getAllNodes(): RelationalNode[] {
@@ -54,29 +59,37 @@ export class RelationalGraph {
   }
 
   public addEdge(edge: RelationalEdge): void {
-    const outList = this.outgoing.get(edge.from) || [];
-    outList.push(edge);
-    this.outgoing.set(edge.from, outList);
+    const from = edge.from.replace(/\\/g, '/');
+    const to = edge.to.replace(/\\/g, '/');
+    const normalized: RelationalEdge = { ...edge, from, to };
 
-    const inList = this.incoming.get(edge.to) || [];
-    inList.push(edge);
-    this.incoming.set(edge.to, inList);
+    const outList = this.outgoing.get(from) || [];
+    const exists = outList.some(e => e.to === to && e.type === normalized.type);
+    if (!exists) {
+      outList.push(normalized);
+      this.outgoing.set(from, outList);
+
+      const inList = this.incoming.get(to) || [];
+      inList.push(normalized);
+      this.incoming.set(to, inList);
+    }
   }
 
   public getOutgoing(id: string, type?: RelationalEdgeType): RelationalEdge[] {
-    const edges = this.outgoing.get(id) || [];
+    const edges = this.outgoing.get(id.replace(/\\/g, '/')) || [];
     return type ? edges.filter(e => e.type === type) : edges;
   }
 
   public getIncoming(id: string, type?: RelationalEdgeType): RelationalEdge[] {
-    const edges = this.incoming.get(id) || [];
+    const edges = this.incoming.get(id.replace(/\\/g, '/')) || [];
     return type ? edges.filter(e => e.type === type) : edges;
   }
 
   public removeFileEdges(filePath: string): void {
+    const normPath = filePath.replace(/\\/g, '/');
     const toRemove = new Set<string>();
     for (const [id, node] of this.nodes.entries()) {
-      if (node.filePath === filePath) toRemove.add(id);
+      if (node.filePath === normPath) toRemove.add(id);
     }
     for (const id of toRemove) {
       this.nodes.delete(id);

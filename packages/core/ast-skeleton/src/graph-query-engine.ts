@@ -44,12 +44,20 @@ export class GraphQueryEngine {
   }
 
   private resolveTargetNode(query: string): RelationalNode | undefined {
-    const direct = this.graph.getNode(query);
+    const normQuery = query.replace(/\\/g, '/');
+    const direct = this.graph.getNode(normQuery);
     if (direct) return direct;
 
-    const lower = query.toLowerCase();
+    const lower = normQuery.toLowerCase();
+    const parts = lower.split(/[.::]/).filter(Boolean);
+    const lastPart = parts[parts.length - 1];
+
     for (const node of this.graph.getAllNodes()) {
-      if (node.name.toLowerCase() === lower || node.id.toLowerCase().endsWith(`::${lower}`)) {
+      const nodeLower = node.name.toLowerCase();
+      if (nodeLower === lower || node.id.toLowerCase().endsWith(`::${lower}`)) {
+        return node;
+      }
+      if (parts.length > 1 && nodeLower === lastPart && node.id.toLowerCase().includes(parts[0])) {
         return node;
       }
     }
@@ -128,14 +136,14 @@ export class GraphQueryEngine {
       const nFrom = this.graph.getNode(e.from);
       if (nFrom?.filePath) files.add(nFrom.filePath);
       else {
-        const f1 = e.from.split('::')[0];
+        const f1 = e.from.split('::')[0].replace(/\\/g, '/');
         if (f1.includes('.') || f1.includes('/')) files.add(f1);
       }
 
       const nTo = this.graph.getNode(e.to);
       if (nTo?.filePath) files.add(nTo.filePath);
       else {
-        const f2 = e.to.split('::')[0];
+        const f2 = e.to.split('::')[0].replace(/\\/g, '/');
         if (f2.includes('.') || f2.includes('/')) files.add(f2);
       }
     }
@@ -155,9 +163,10 @@ export class GraphQueryEngine {
       ` • Blast Radius (${res.blastRadiusFiles.length} files): ${res.blastRadiusFiles.slice(0, 5).join(', ')}`,
       '──────────────────────────────────────────────────'
     ];
-    if (res.upstreamEdges.length > 0) {
+    const keyEdges = [...res.upstreamEdges.slice(0, 3), ...res.downstreamEdges.slice(0, 3)];
+    if (keyEdges.length > 0) {
       lines.push('🔗 Key Connections:');
-      for (const e of res.upstreamEdges.slice(0, 5)) {
+      for (const e of keyEdges) {
         lines.push(`   - [${e.type}] ${e.from} -> ${e.to}`);
       }
     }

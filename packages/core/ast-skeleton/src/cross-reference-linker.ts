@@ -28,22 +28,23 @@ export class CrossReferenceLinker {
   }
 
   public linkSingleFile(filePath: string, content: string): void {
-    const ext = path.extname(filePath).toLowerCase();
-    this.graph.removeFileEdges(filePath);
+    const normPath = filePath.replace(/\\/g, '/');
+    const ext = path.extname(normPath).toLowerCase();
+    this.graph.removeFileEdges(normPath);
 
-    if (ext === '.tscn') {
-      const parsed = TscnRelationParser.parse(filePath, content);
+    if (ext === '.tscn' || ext === '.tres') {
+      const parsed = TscnRelationParser.parse(normPath, content);
       for (const n of parsed.nodes) this.graph.addNode(n);
       for (const e of parsed.edges) this.graph.addEdge(e);
       return;
     }
 
-    this.graph.addNode({ id: filePath, name: path.basename(filePath), kind: 'file', filePath });
+    this.graph.addNode({ id: normPath, name: path.basename(normPath), kind: 'file', filePath: normPath });
 
     if (ext === '.gd') {
-      this.linkGDScript(filePath, content);
+      this.linkGDScript(normPath, content);
     } else if (['.ts', '.tsx', '.js'].includes(ext)) {
-      this.linkTypeScript(filePath, content);
+      this.linkTypeScript(normPath, content);
     }
   }
 
@@ -91,13 +92,17 @@ export class CrossReferenceLinker {
   }
 
   private parseGdConnections(filePath: string, line: string): void {
-    const connMatch = line.match(/([a-zA-Z_]\w*)\.connect\(\s*([a-zA-Z_]\w*)/);
-    if (connMatch) {
+    const conn1 = line.match(/([a-zA-Z_]\w*)\.connect\(\s*([a-zA-Z_]\w*)/);
+    const conn2 = line.match(/connect\(\s*["']([a-zA-Z_]\w*)["']\s*,\s*(?:Callable\([^)]*,\s*["']([a-zA-Z_]\w*)["']\)|([a-zA-Z_]\w*))/);
+    const sig = conn1 ? conn1[1] : (conn2 ? conn2[1] : undefined);
+    const method = conn1 ? conn1[2] : (conn2 ? (conn2[2] || conn2[3]) : undefined);
+
+    if (sig && method) {
       this.graph.addEdge({
-        from: `${filePath}::${connMatch[1]}`,
-        to: `${filePath}::${connMatch[2]}`,
+        from: `${filePath}::${sig}`,
+        to: `${filePath}::${method}`,
         type: 'CONNECTS_SIGNAL',
-        metadata: { signal: connMatch[1], method: connMatch[2] }
+        metadata: { signal: sig, method }
       });
     }
   }

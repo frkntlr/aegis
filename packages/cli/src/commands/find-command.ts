@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   SymbolIndexer,
@@ -14,7 +15,9 @@ function resolveMatches(indexer: SymbolIndexer, queryArg: string): SymbolEntry[]
   indexer.loadCache(cachePath);
   let matches = indexer.findSymbols(queryArg);
   if (matches.length === 0) {
-    const srcFiles = collectSourceFiles(path.resolve(process.cwd(), 'packages'));
+    const pkgDir = path.resolve(process.cwd(), 'packages');
+    const baseDir = fs.existsSync(pkgDir) ? pkgDir : process.cwd();
+    const srcFiles = collectSourceFiles(baseDir);
     indexer.indexFiles(srcFiles, process.cwd(), cachePath);
     matches = indexer.findSymbols(queryArg);
   }

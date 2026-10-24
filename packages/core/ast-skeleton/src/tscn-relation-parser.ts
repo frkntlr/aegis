@@ -14,30 +14,32 @@ export interface ParsedSceneRelations {
 interface NodeContext {
   curNode: { name: string; scriptId?: string; instanceId?: string } | null;
   rootScriptPath: string | null;
+  nodeScripts: Map<string, string>;
 }
 
 export class TscnRelationParser {
   public static parse(sceneFilePath: string, content: string): ParsedSceneRelations {
+    const normScenePath = sceneFilePath.replace(/\\/g, '/');
     const lines = content.split(/\r?\n/);
     const extResources = new Map<string, ExtResourceItem>();
-    const sceneNodes: RelationalNode[] = [{ id: sceneFilePath, name: sceneFilePath, kind: 'scene', filePath: sceneFilePath }];
+    const sceneNodes: RelationalNode[] = [{ id: normScenePath, name: normScenePath, kind: 'scene', filePath: normScenePath }];
     const edges: RelationalEdge[] = [];
-    const ctx: NodeContext = { curNode: null, rootScriptPath: null };
+    const ctx: NodeContext = { curNode: null, rootScriptPath: null, nodeScripts: new Map() };
 
     for (const rawLine of lines) {
       const line = rawLine.trim();
       TscnRelationParser.parseExtResource(line, extResources);
       if (line.startsWith('[node ')) {
-        if (ctx.curNode) TscnRelationParser.flushNodeEdges(sceneFilePath, ctx.curNode, extResources, edges);
+        if (ctx.curNode) TscnRelationParser.flushNodeEdges(normScenePath, ctx.curNode, extResources, edges);
         ctx.curNode = TscnRelationParser.extractNodeInfo(line);
-        sceneNodes.push({ id: `${sceneFilePath}::${ctx.curNode.name}`, name: ctx.curNode.name, kind: 'scene', filePath: sceneFilePath });
+        sceneNodes.push({ id: `${normScenePath}::${ctx.curNode.name}`, name: ctx.curNode.name, kind: 'scene', filePath: normScenePath });
       } else if (line.startsWith('[connection ')) {
-        TscnRelationParser.parseConnection(sceneFilePath, line, ctx.rootScriptPath, edges);
+        TscnRelationParser.parseConnection(normScenePath, line, ctx, edges);
       } else if (ctx.curNode) {
         TscnRelationParser.applyNodeProperty(line, ctx, extResources, sceneNodes.length === 2);
       }
     }
-    if (ctx.curNode) TscnRelationParser.flushNodeEdges(sceneFilePath, ctx.curNode, extResources, edges);
+    if (ctx.curNode) TscnRelationParser.flushNodeEdges(normScenePath, ctx.curNode, extResources, edges);
 
     return { nodes: sceneNodes, edges };
   }
@@ -51,9 +53,10 @@ export class TscnRelationParser {
     if (!ctx.curNode) return;
     if (line.startsWith('script =')) {
       ctx.curNode.scriptId = TscnRelationParser.extractExtResourceId(line);
-      if (ctx.curNode.name === '.' || isFirstChild) {
-        const res = extResources.get(ctx.curNode.scriptId || '');
-        if (res) ctx.rootScriptPath = res.path;
+      const res = extResources.get(ctx.curNode.scriptId || '');
+      if (res) {
+        ctx.nodeScripts.set(ctx.curNode.name, res.path);
+        if (ctx.curNode.name === '.' || isFirstChild) ctx.rootScriptPath = res.path;
       }
     } else if (line.startsWith('instance =')) {
       ctx.curNode.instanceId = TscnRelationParser.extractExtResourceId(line);
@@ -64,9 +67,9 @@ export class TscnRelationParser {
     if (!line.startsWith('[ext_resource ')) return;
     const typeM = line.match(/type=["']([^"']+)["']/);
     const pathM = line.match(/path=["']([^"']+)["']/);
-    const idM = line.match(/id=["']([^"']+)["']/);
+    const idM = line.match(/id=["']?([^"'\s\]]+)["']?/);
     if (typeM && pathM && idM) {
-      const cleanPath = pathM[1].replace(/^res:\/\//, '');
+      const cleanPath = pathM[1].replace(/^res:\/\//, '').replace(/\\/g, '/');
       extResources.set(idM[1], { id: idM[1], type: typeM[1], path: cleanPath });
     }
   }
@@ -105,7 +108,7 @@ export class TscnRelationParser {
   private static parseConnection(
     scenePath: string,
     line: string,
-    rootScriptPath: string | null,
+    ctx: NodeContext,
     edges: RelationalEdge[]
   ): void {
     const sigM = line.match(/signal=["']([^"']+)["']/);
@@ -116,7 +119,7 @@ export class TscnRelationParser {
     if (sigM && fromM && methodM) {
       const fromNodeId = `${scenePath}::${fromM[1]}`;
       const toTarget = toM ? toM[1] : '.';
-      const targetScript = rootScriptPath || scenePath;
+      const targetScript = (toTarget === '.' ? ctx.rootScriptPath : ctx.nodeScripts.get(toTarget)) || ctx.rootScriptPath || scenePath;
       const targetHandlerId = `${targetScript}::${methodM[1]}`;
 
       edges.push({

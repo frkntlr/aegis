@@ -55,16 +55,18 @@ export function runMutationGateOnFile(file: string, gate: MutationGate): boolean
   return report.passedThreshold;
 }
 
-export function collectSourceFiles(dir: string): string[] {
+export function collectSourceFiles(dir: string, includeScenes = false): string[] {
   const results: string[] = [];
   if (!fs.existsSync(dir)) return results;
   const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const regex = includeScenes ? /\.(ts|tsx|py|gd|tscn|tres)$/ : /\.(ts|tsx|py|gd)$/;
+
   for (const entry of entries) {
     if (['node_modules', 'dist', '.git', 'experimental', '.mcp', '.aegis', '.godot'].includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      results.push(...collectSourceFiles(full));
-    } else if (/\.(ts|tsx|py|gd)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
+      results.push(...collectSourceFiles(full, includeScenes));
+    } else if (regex.test(entry.name) && !entry.name.endsWith('.d.ts')) {
       results.push(full);
     }
   }

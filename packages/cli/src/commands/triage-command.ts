@@ -7,7 +7,8 @@ import { collectSourceFiles } from './dev-helpers.js';
 
 export function handleTriage(targetDir?: string): void {
   showBanner();
-  const base = targetDir ? path.resolve(process.cwd(), targetDir) : path.resolve(process.cwd(), 'packages');
+  const pkgDir = path.resolve(process.cwd(), 'packages');
+  const base = targetDir ? path.resolve(process.cwd(), targetDir) : (fs.existsSync(pkgDir) ? pkgDir : process.cwd());
   console.log(`🛡️  Running Evidence-Based Bug Triage on: ${path.relative(process.cwd(), base) || '.'}...`);
 
   const files = collectSourceFiles(base);

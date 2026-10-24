@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SymbolIndexer } from './symbol-indexer.js';
+import { SymbolParser, type SymbolEntry } from './symbol-parser.js';
 import { SymbolSliceExtractor } from './symbol-slice-extractor.js';
 
 const sampleTs = [
@@ -113,4 +114,27 @@ test('SymbolSliceExtractor slices function context and computes token savings', 
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test('SymbolParser extracts TS variable functions, type aliases, and GDScript bracketed types', () => {
+  const tsCode = [
+    'export type State = "active" | "idle";',
+    'export const calculateScore = (x: number) => x * 2;',
+    'export const runTask = function() { return true; };'
+  ].join('\n');
+  const tsSymbols = SymbolParser.parseTypeScript('src/state.ts', tsCode);
+  assert.ok(tsSymbols.find((s: SymbolEntry) => s.name === 'State'));
+  assert.ok(tsSymbols.find((s: SymbolEntry) => s.name === 'calculateScore'));
+  assert.ok(tsSymbols.find((s: SymbolEntry) => s.name === 'runTask'));
+
+  const gdCode = [
+    'class_name Inventory',
+    'func get_items() -> Array[Item]:',
+    '    return []',
+    'func get_dict() -> Dictionary[String, int]:',
+    '    return {}'
+  ].join('\n');
+  const gdSymbols = SymbolParser.parseGDScript('scripts/inventory.gd', gdCode);
+  assert.ok(gdSymbols.find((s: SymbolEntry) => s.name === 'Inventory.get_items'));
+  assert.ok(gdSymbols.find((s: SymbolEntry) => s.name === 'Inventory.get_dict'));
 });

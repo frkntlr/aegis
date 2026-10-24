@@ -1,15 +1,22 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CrossReferenceLinker, RelationalGraph } from '@aegis/ast-skeleton';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
 
+function resolveTargetDirectory(targetDir?: string): string {
+  if (targetDir) return path.resolve(process.cwd(), targetDir);
+  const pkgPath = path.resolve(process.cwd(), 'packages');
+  return fs.existsSync(pkgPath) ? pkgPath : process.cwd();
+}
+
 export function handleGraphScan(targetDir?: string): void {
   showBanner();
-  const base = targetDir ? path.resolve(process.cwd(), targetDir) : path.resolve(process.cwd(), 'packages');
+  const base = resolveTargetDirectory(targetDir);
   console.log(`🕸️  Building Relational Knowledge Graph for: ${path.relative(process.cwd(), base) || '.'}...`);
 
   const t0 = performance.now();
-  const files = collectSourceFiles(base);
+  const files = collectSourceFiles(base, true);
   const graph = new RelationalGraph();
   const linker = new CrossReferenceLinker(graph);
 

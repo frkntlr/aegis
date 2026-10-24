@@ -91,3 +91,42 @@ test('RelationalGraph serializes and deserializes accurately', () => {
   assert.ok(graph2.getNode('srv'));
   assert.strictEqual(graph2.getOutgoing('srv').length, 1);
 });
+
+test('RelationalGraph normalizes Windows backslashes and deduplicates edges', () => {
+  const graph = new RelationalGraph();
+  graph.addNode({ id: 'src\\hero.ts::Hero', name: 'Hero', kind: 'symbol', filePath: 'src\\hero.ts' });
+  assert.ok(graph.getNode('src/hero.ts::Hero'));
+
+  graph.addEdge({ from: 'src\\hero.ts', to: 'src\\utils.ts', type: 'CALLS' });
+  graph.addEdge({ from: 'src/hero.ts', to: 'src/utils.ts', type: 'CALLS' });
+  assert.strictEqual(graph.getOutgoing('src/hero.ts').length, 1);
+});
+
+test('TscnRelationParser handles unquoted id=1 and child node script connections', () => {
+  const customTscn = [
+    '[gd_scene format=3]',
+    '[ext_resource path="res://child.gd" type="Script" id=1]',
+    '[node name="Root" type="Node2D"]',
+    '[node name="ChildUI" type="Control" parent="."] ',
+    'script = ExtResource(1)',
+    '[connection signal="click" from="ChildUI" to="ChildUI" method="_on_click"]'
+  ].join('\n');
+
+  const res = TscnRelationParser.parse('scenes/test.tscn', customTscn);
+  const conn = res.edges.find(e => e.type === 'CONNECTS_SIGNAL');
+  assert.ok(conn);
+  assert.strictEqual(conn.to, 'child.gd::_on_click');
+});
+
+test('GraphQueryEngine resolves scoped dot-syntax queries like Hero.take_damage', () => {
+  const graph = new RelationalGraph();
+  graph.addNode({ id: 'scripts/hero.gd::Hero', name: 'Hero', kind: 'symbol', filePath: 'scripts/hero.gd' });
+  graph.addNode({ id: 'scripts/hero.gd::take_damage', name: 'take_damage', kind: 'symbol', filePath: 'scripts/hero.gd' });
+  graph.addEdge({ from: 'scenes/main.tscn', to: 'scripts/hero.gd::take_damage', type: 'CALLS' });
+
+  const engine = new GraphQueryEngine(graph);
+  const trace = engine.trace('Hero.take_damage');
+  assert.ok(trace.foundNode);
+  assert.strictEqual(trace.foundNode.name, 'take_damage');
+  assert.strictEqual(trace.upstreamEdges.length, 1);
+});

@@ -52,40 +52,43 @@ export class SymbolIndexer {
   }
 
   public indexFile(filePath: string, content: string, mtime = Date.now()): SymbolEntry[] {
+    const normPath = filePath.replace(/\\/g, '/');
     const hash = SymbolIndexer.hashContent(content);
-    const existing = this.db.files[filePath];
+    const existing = this.db.files[normPath];
     if (existing && existing.hash === hash) {
       return existing.symbols;
     }
 
-    const symbols = this.extractSymbols(filePath, content);
-    this.db.files[filePath] = { hash, mtime, symbols };
+    const symbols = this.extractSymbols(normPath, content);
+    this.db.files[normPath] = { hash, mtime, symbols };
     this.db.lastUpdated = new Date().toISOString();
     return symbols;
   }
 
   private extractSymbols(filePath: string, content: string): SymbolEntry[] {
-    const ext = path.extname(filePath).toLowerCase();
+    const normPath = filePath.replace(/\\/g, '/');
+    const ext = path.extname(normPath).toLowerCase();
     if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
-      return SymbolParser.parseTypeScript(filePath, content);
+      return SymbolParser.parseTypeScript(normPath, content);
     }
     if (ext === '.gd') {
-      return SymbolParser.parseGDScript(filePath, content);
+      return SymbolParser.parseGDScript(normPath, content);
     }
-    return SymbolParser.parseGeneric(filePath, content);
+    return SymbolParser.parseGeneric(normPath, content);
   }
 
   public indexFiles(filePaths: string[], baseDir = process.cwd(), cachePath?: string): SymbolDatabase {
     if (cachePath) this.loadCache(cachePath);
 
     for (const relPath of filePaths) {
-      const fullPath = path.isAbsolute(relPath) ? relPath : path.join(baseDir, relPath);
+      const normRel = relPath.replace(/\\/g, '/');
+      const fullPath = path.isAbsolute(normRel) ? normRel : path.join(baseDir, normRel);
       if (!fs.existsSync(fullPath)) continue;
 
       try {
         const stats = fs.statSync(fullPath);
         const content = fs.readFileSync(fullPath, 'utf8');
-        this.indexFile(relPath, content, stats.mtimeMs);
+        this.indexFile(normRel, content, stats.mtimeMs);
       } catch { /* ignore unreadable files */ }
     }
 
@@ -96,18 +99,22 @@ export class SymbolIndexer {
   public findSymbols(query: string, customDb?: SymbolDatabase): SymbolEntry[] {
     const targetDb = customDb || this.db;
     const lowerQuery = query.toLowerCase().trim();
-    const results: SymbolEntry[] = [];
+    const exact: SymbolEntry[] = [];
+    const suffix: SymbolEntry[] = [];
+    const substr: SymbolEntry[] = [];
 
     for (const fileData of Object.values(targetDb.files)) {
       for (const s of fileData.symbols) {
         const lowerName = s.name.toLowerCase();
         if (lowerName === lowerQuery) {
-          results.unshift(s); // Exact match prioritised at top
+          exact.push(s);
+        } else if (lowerName.endsWith(`.${lowerQuery}`) || lowerName.endsWith(`::${lowerQuery}`)) {
+          suffix.push(s);
         } else if (lowerName.includes(lowerQuery)) {
-          results.push(s);
+          substr.push(s);
         }
       }
     }
-    return results;
+    return [...exact, ...suffix, ...substr];
   }
 }
