@@ -32,3 +32,4 @@ export * from './language-barrier-gate.js';
 export * from './godot-topic-resolver.js';
 export * from './deprecation-linter.js';
 export * from './active-head-resolver.js';
+export * from './live-hot-patcher.js';

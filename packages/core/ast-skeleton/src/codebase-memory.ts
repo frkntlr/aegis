@@ -11,6 +11,7 @@ import { LruFileBuffer } from './lru-file-buffer.js';
 import { MemoryDiskStore } from './memory-disk-store.js';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
+import { LiveHotPatcher } from './live-hot-patcher.js';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -54,7 +55,7 @@ export interface MemoryStats {
   estimatedTokenSavings: number;
 }
 
-interface MemoryNamespace {
+export interface MemoryNamespace {
   indexer: SymbolIndexer;
   extractor: SymbolSliceExtractor;
   graph: RelationalGraph;
@@ -190,7 +191,7 @@ export class CodebaseMemoryEngine {
     } catch { /* skip read error */ }
   }
 
-  private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number): SliceResult | null {
+  private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number, worktreeId = 'default'): SliceResult | null {
     let matches = ns.indexer.findSymbols(symbol);
     if (matches.length === 0) {
       const norm = symbol.replace(/\\/g, '/');
@@ -204,17 +205,11 @@ export class CodebaseMemoryEngine {
       }
     }
     if (matches.length === 0) return null;
-    const target = matches[0];
-    let stored = ns.fileContents.get(target.filePath);
-    if (!stored) {
-      const fullPath = path.isAbsolute(target.filePath) ? target.filePath : path.resolve(process.cwd(), target.filePath);
-      if (fs.existsSync(fullPath)) {
-        try {
-          stored = fs.readFileSync(fullPath, 'utf8');
-          ns.fileContents.set(target.filePath, stored);
-        } catch { /* ignore read failure */ }
-      }
-    }
+    let target = matches[0];
+    const stored = LiveHotPatcher.getOrLoadContent(this, ns, target.filePath, worktreeId);
+    const reMatches = ns.indexer.findSymbols(symbol);
+    if (reMatches.length > 0) target = reMatches[0];
+
     if (stored) {
       if (target.kind === 'class' && (target.filePath.endsWith('.ts') || target.filePath.endsWith('.tsx'))) {
         const classSkel = ns.extractor.extractClassSkeletonSlice(target.name, target.filePath, stored, target.startLine, target.endLine);
@@ -226,8 +221,11 @@ export class CodebaseMemoryEngine {
   }
 
   public queryMemory(symbol: string, options: MemoryQueryOptions = {}): MemoryQueryResult {
-    const ns = this.getNamespace(options.worktreeId || 'default');
-    const sliceResult = this.resolveSlice(ns, symbol, options.contextLines ?? 3);
+    const worktreeId = options.worktreeId || 'default';
+    const ns = this.getNamespace(worktreeId);
+    LiveHotPatcher.patchUncommitted(this, ns, worktreeId);
+
+    const sliceResult = this.resolveSlice(ns, symbol, options.contextLines ?? 3, worktreeId);
     const traceResult = ns.queryEngine.trace(symbol, options.maxDepth ?? 5);
 
     const isClass = /^[A-Z]\w+$/.test(symbol) || ns.indexer.findSymbols(symbol).some(s => s.kind === 'class');
