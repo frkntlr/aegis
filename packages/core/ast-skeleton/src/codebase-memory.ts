@@ -231,7 +231,7 @@ export class CodebaseMemoryEngine {
   }
 
   public queryMemory(symbol: string, options: MemoryQueryOptions = {}): MemoryQueryResult {
-    const worktreeId = options.worktreeId || 'default';
+    const worktreeId = options.worktreeId || ActiveHeadResolver.resolveActiveWorktree();
     const ns = this.getNamespace(worktreeId);
     LiveHotPatcher.patchUncommitted(this, ns, worktreeId);
 

@@ -41,12 +41,27 @@ function formatEdgeEndpoint(endpoint: string): string {
   return path.basename(endpoint);
 }
 
-function printMemoryQueryResult(res: MemoryQueryResult): void {
-  console.log(`🧠 Codebase Memory: '${res.symbol}' [${res.filePath || 'virtual'}]`);
+function printMemoryQueryResult(res: MemoryQueryResult, worktreeId?: string): void {
+  console.log(`🧠 Codebase Memory: '${res.symbol}' [${res.filePath || 'virtual'}] (Worktree: ${worktreeId || 'default'})`);
   console.log(` • Sliced Tokens:  ~${res.tokenSavingsPercent}% Token Savings`);
   console.log(` • Upstream:       ${res.callers.length > 0 ? res.callers.map(formatEdgeEndpoint).join(', ') : 'None'}`);
   console.log(` • Downstream:     ${res.callees.length > 0 ? res.callees.map(formatEdgeEndpoint).join(', ') : 'None'}`);
   console.log(` • Blast Radius:   ${res.blastRadius.length} file(s)`);
+
+  if (res.activeLock) {
+    const lockMsg = res.activeLock.isLockedByOther
+      ? `LOCKED by '${res.activeLock.lockedBy}'${res.activeLock.lockId ? ` (${res.activeLock.lockId})` : ''} ⚠️`
+      : `OWNED by current agent (${res.activeLock.lockedBy}) ✅`;
+    console.log(`\n🔒 Mutex Status:   ${lockMsg}`);
+  }
+
+  if (res.diffBudget) {
+    console.log('\n📏 Demir Kafes Line Budget:');
+    console.log(` • File Lines:     ${res.diffBudget.fileLines}/${res.diffBudget.maxFileLines} (Quota: ${res.diffBudget.fileQuotaRemaining} lines)`);
+    if (res.diffBudget.funcLines !== undefined) {
+      console.log(` • Function Lines: ${res.diffBudget.funcLines}/${res.diffBudget.maxFunctionLines} (Quota: ${res.diffBudget.funcQuotaRemaining} lines)`);
+    }
+  }
 
   if (res.groundTruthDocs.length > 0) {
     console.log('\n📚 Ground-Truth Engine Documentation (Context7):');
@@ -91,7 +106,7 @@ export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsP
     console.log(`⚠️  Symbol '${symbol}' not found in Codebase Memory [worktree: ${activeWorktree}].`);
     return;
   }
-  printMemoryQueryResult(res);
+  printMemoryQueryResult(res, activeWorktree);
 }
 
 export function handleMemoryStats(worktreeId?: string): void {

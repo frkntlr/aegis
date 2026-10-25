@@ -66,3 +66,38 @@ test('handleMemoryWatch initializes watcher on target directory', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('handleMemoryQuery: prints worktree header, mutex lock status, and line budget', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cli-lock-'));
+  const prevCwd = process.cwd();
+  process.chdir(tmpDir);
+
+  const aegisDir = path.join(tmpDir, '.aegis');
+  fs.mkdirSync(aegisDir, { recursive: true });
+  fs.writeFileSync(path.join(aegisDir, 'locks.json'), JSON.stringify({
+    'src/locked.ts': { agent: 'aegis/qa', lockId: 'lk_cli_test' }
+  }), 'utf8');
+
+  const srcDir = path.join(tmpDir, 'src');
+  fs.mkdirSync(srcDir, { recursive: true });
+  fs.writeFileSync(path.join(srcDir, 'locked.ts'), 'export class LockedModule { execute(): void {} }', 'utf8');
+
+  const engine = getSharedMemoryEngine();
+  engine.indexFile('src/locked.ts', 'export class LockedModule { execute(): void {} }', 'solver');
+
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
+
+  try {
+    handleMemoryQuery('execute', 'solver');
+    assert.ok(output.includes('Worktree: solver'), 'must print worktree name');
+    assert.ok(output.includes('Demir Kafes Line Budget'), 'must print line budget');
+    assert.ok(output.includes('Quota:'), 'must print line quota');
+    assert.ok(output.includes("LOCKED by 'aegis/qa'"), 'must display active lock warning');
+  } finally {
+    console.log = origLog;
+    process.chdir(prevCwd);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
