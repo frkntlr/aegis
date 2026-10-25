@@ -68,7 +68,7 @@ test('CodebaseMemoryEngine: queries memory and provides 5-layer enriched context
   assert.strictEqual(result.found, true);
   assert.ok(result.slice && result.slice.includes('take_damage'));
   assert.ok(result.groundTruthDocs.length > 0, 'Must have ground-truth docs for Godot class');
-  assert.ok(result.groundTruthDocs[0].includes('godot4:signals') || result.groundTruthDocs[0].includes('godot4:lifecycle'));
+  assert.ok(result.groundTruthDocs[0].includes('godot4:physics'));
   assert.ok(result.constitutionRules.includes('Rule: Max 40 lines per function'));
   assert.ok(result.compressedLogs && result.compressedLogs.includes('[PRUNED]'));
 

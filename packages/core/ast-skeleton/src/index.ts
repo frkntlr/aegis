@@ -29,3 +29,4 @@ export * from './memory-disk-store.js';
 export * from './transitive-type-resolver.js';
 export * from './callee-signature-extractor.js';
 export * from './language-barrier-gate.js';
+export * from './godot-topic-resolver.js';

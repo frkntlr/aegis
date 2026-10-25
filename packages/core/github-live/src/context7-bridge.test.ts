@@ -55,3 +55,29 @@ test('Context7Bridge persists and loads cache from disk', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('Context7Bridge resolves Godot topics via AST extends and ClassDB hierarchy', () => {
+  const bridge = new Context7Bridge();
+
+  const physicsCode = 'extends CharacterBody2D\n\nfunc _physics_process(delta):\n\tpass';
+  const physResult = bridge.queryGodotTopic(physicsCode);
+  assert.strictEqual(physResult.matched, true);
+  assert.strictEqual(physResult.doc?.topic, 'physics');
+  assert.ok(physResult.doc?.signatures.some(s => s.includes('move_and_slide')));
+
+  const uiCode = 'extends MarginContainer\n\nfunc _ready():\n\tpass';
+  const uiResult = bridge.queryGodotTopic(uiCode);
+  assert.strictEqual(uiResult.matched, true);
+  assert.strictEqual(uiResult.doc?.topic, 'ui');
+  assert.ok(uiResult.doc?.summary.includes('Touch Target'));
+
+  const signalCode = 'class_name Bus\nsignal event_occurred(val)\n\nfunc trigger():\n\tpass';
+  const sigResult = bridge.queryGodotTopic(signalCode);
+  assert.strictEqual(sigResult.matched, true);
+  assert.strictEqual(sigResult.doc?.topic, 'signals');
+
+  const lifecycleCode = 'extends Node\n\nfunc spawn():\n\tpass';
+  const lifeResult = bridge.queryGodotTopic(lifecycleCode);
+  assert.strictEqual(lifeResult.matched, true);
+  assert.strictEqual(lifeResult.doc?.topic, 'lifecycle');
+});

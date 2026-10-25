@@ -1,6 +1,7 @@
 import type { RelationalGraph } from './relational-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
 import { LanguageBarrierGate } from './language-barrier-gate.js';
+import { GodotTopicResolver } from './godot-topic-resolver.js';
 
 export interface MemoryResolverAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -16,7 +17,7 @@ export class MemoryAdapterResolver {
     const ecosystem = LanguageBarrierGate.resolveTargetEcosystem(filePath, code);
 
     if (ecosystem === 'godot') {
-      const topic = /velocity|move_and_slide/.test(code) ? 'physics' : (/signal|emit|connect/.test(code) ? 'signals' : 'lifecycle');
+      const topic = GodotTopicResolver.resolveTopic(code);
       const doc = adapters.docProvider('godot4', topic) || adapters.docProvider('godot4', 'lifecycle');
       if (doc && LanguageBarrierGate.isAllowedDoc('godot', 'godot4')) docs.push(doc);
     } else if (ecosystem === 'typescript') {

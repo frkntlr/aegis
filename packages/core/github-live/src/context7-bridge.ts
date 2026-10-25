@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { GodotTopicResolver } from '@aegis/shared';
 
 export interface Context7DocEntry {
   library: string;
@@ -137,6 +138,15 @@ export class Context7Bridge {
     }
 
     return { matched: false, source: 'miss' };
+  }
+
+  public resolveGodotTopic(codeOrClass: string): 'physics' | 'ui' | 'signals' | 'lifecycle' {
+    return GodotTopicResolver.resolveTopic(codeOrClass);
+  }
+
+  public queryGodotTopic(codeOrClass: string): Context7QueryResult {
+    const topic = this.resolveGodotTopic(codeOrClass);
+    return this.query('godot4', topic);
   }
 
   public saveToCache(cacheDir = path.resolve(process.cwd(), '.aegis', 'cache', 'context7')): void {
