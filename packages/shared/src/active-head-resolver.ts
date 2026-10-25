@@ -60,7 +60,7 @@ export class ActiveHeadResolver {
       for (const wt of list) {
         if (!wt.path) continue;
         const wtNorm = wt.path.replace(/\\/g, '/');
-        if (normCwd.startsWith(wtNorm) || wtNorm.startsWith(normCwd)) {
+        if (normCwd === wtNorm || normCwd.startsWith(`${wtNorm}/`)) {
           return wt.agentName || wt.name || path.basename(wtNorm);
         }
       }

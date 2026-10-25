@@ -20,7 +20,12 @@ export class MemoryDiskStore {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
     fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tmpPath, filePath);
+    try {
+      fs.renameSync(tmpPath, filePath);
+    } catch {
+      fs.copyFileSync(tmpPath, filePath);
+      try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+    }
   }
 
   public static readSafe<T>(filePath: string): T | null {
@@ -31,8 +36,13 @@ export class MemoryDiskStore {
     } catch {
       try {
         const corruptPath = `${filePath}.corrupted.${Date.now()}`;
-        fs.renameSync(filePath, corruptPath);
-      } catch { /* ignore rename error */ }
+        try {
+          fs.renameSync(filePath, corruptPath);
+        } catch {
+          fs.copyFileSync(filePath, corruptPath);
+          try { fs.rmSync(filePath, { force: true }); } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
       return null;
     }
   }

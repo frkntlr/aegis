@@ -104,38 +104,43 @@ export class SymbolParser {
     let curClass = '';
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
+      const trimmed = lines[i].trim();
       const codeOnly = trimmed.replace(/#.*$/, '').trim();
-      const lineNum = i + 1;
-
-      const clsMatch = codeOnly.match(/^class_name\s+([a-zA-Z_]\w*)/);
-      if (clsMatch) {
-        curClass = clsMatch[1];
-        symbols.push({ name: curClass, kind: 'class', filePath: normPath, startLine: lineNum, endLine: lines.length, signature: `class_name ${curClass}` });
+      const cls = codeOnly.match(/^class_name\s+([a-zA-Z_]\w*)/);
+      if (cls) {
+        curClass = cls[1];
+        symbols.push({ name: curClass, kind: 'class', filePath: normPath, startLine: i + 1, endLine: lines.length, signature: `class_name ${curClass}` });
       }
-
-      const sigMatch = codeOnly.match(/^signal\s+([a-zA-Z_]\w*)(.*)/);
-      if (sigMatch) {
-        symbols.push({ name: sigMatch[1], kind: 'signal', filePath: normPath, startLine: lineNum, endLine: lineNum, signature: `signal ${sigMatch[1]}${sigMatch[2]}`.trim() });
+      const sig = codeOnly.match(/^signal\s+([a-zA-Z_]\w*)(.*)/);
+      if (sig) {
+        symbols.push({ name: sig[1], kind: 'signal', filePath: normPath, startLine: i + 1, endLine: i + 1, signature: `signal ${sig[1]}${sig[2]}`.trim() });
       }
+      const fn = codeOnly.match(/^(?:@\w+(?:\([^)]*\))?\s+)*(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
+      if (fn) SymbolParser.parseGdFunction(lines, i, normPath, curClass, codeOnly, fn, symbols);
+    }
+    SymbolParser.attachFallbackClass(normPath, curClass, lines.length, symbols);
+    return symbols;
+  }
 
-      const funcMatch = codeOnly.match(/^(?:@\w+(?:\([^)]*\))?\s+)*(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
-      if (funcMatch) {
-        const fnName = curClass ? `${curClass}.${funcMatch[1]}` : funcMatch[1];
-        const startLine = SymbolParser.findDecoratorStart(lines, lineNum);
-        const endLine = SymbolParser.findGdFuncEnd(lines, i);
-        symbols.push({
-          name: fnName,
-          kind: curClass ? 'method' : 'function',
-          filePath: normPath,
-          startLine,
-          endLine,
-          signature: codeOnly.replace(/:$/, '')
-        });
+  private static parseGdFunction(lines: string[], i: number, normPath: string, curClass: string, codeOnly: string, fn: RegExpMatchArray, symbols: SymbolEntry[]): void {
+    const fnName = curClass ? `${curClass}.${fn[1]}` : fn[1];
+    const startLine = SymbolParser.findDecoratorStart(lines, i + 1);
+    const endLine = SymbolParser.findGdFuncEnd(lines, i);
+    symbols.push({ name: fnName, kind: curClass ? 'method' : 'function', filePath: normPath, startLine, endLine, signature: codeOnly.replace(/:$/, '') });
+    if (!curClass) {
+      const fallback = normPath.split('/').pop()?.replace(/\.[^.]+$/, '') || '';
+      if (fallback) {
+        symbols.push({ name: `${fallback}.${fn[1]}`, kind: 'method', filePath: normPath, startLine, endLine, signature: codeOnly.replace(/:$/, '') });
       }
     }
-    return symbols;
+  }
+
+  private static attachFallbackClass(normPath: string, curClass: string, lineCount: number, symbols: SymbolEntry[]): void {
+    if (curClass) return;
+    const fallback = normPath.split('/').pop()?.replace(/\.[^.]+$/, '') || '';
+    if (fallback) {
+      symbols.unshift({ name: fallback, kind: 'class', filePath: normPath, startLine: 1, endLine: lineCount, signature: `class ${fallback}` });
+    }
   }
 
   private static findDecoratorStart(lines: string[], lineNum: number): number {

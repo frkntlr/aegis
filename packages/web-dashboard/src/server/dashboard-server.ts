@@ -187,7 +187,8 @@ export class DashboardServer {
       return;
     }
 
-    const url = req.url || '/';
+    const rawUrl = req.url || '/';
+    const url = rawUrl.split('?')[0] || '/';
     if (url === '/' || url === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(getDashboardHtml());

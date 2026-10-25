@@ -185,3 +185,23 @@ test('ImmutableOracle detects vacuous assert.deepStrictEqual and assert.deepEqua
   assert.strictEqual(report.verdict, 'REJECTED');
   assert.strictEqual(report.vacuousAssertionsFound, 2);
 });
+
+
+test('ImmutableOracle ignores commented vacuous assertions', () => {
+  const oracle = new ImmutableOracle();
+  const report = oracle.audit({
+    modifiedFiles: ['src/calc.ts'],
+    newTestContents: [
+      {
+        filePath: 'test/commented.test.ts',
+        content: `test('comments', () => {\n  // expect(true).toBe(true);\n  # assert True\n  /* assert(true) */\n  * expect(a).toBe(a)\n  expect(calc(2, 2)).toBe(4);\n});`
+      }
+    ],
+    reportedPassedCount: 1,
+    reportedFailedCount: 0
+  });
+
+  assert.strictEqual(report.suspicious, false);
+  assert.strictEqual(report.verdict, 'APPROVED');
+  assert.strictEqual(report.vacuousAssertionsFound, 0);
+});

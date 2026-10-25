@@ -114,6 +114,51 @@ export class Context7Bridge {
       summary: 'Demir Kafes architectural constraints and multi-agent worktree protocols.',
       signatures: ['Max 300 lines per file', 'Max 40 lines per function', 'Surgical Unified Diffs only']
     });
+
+    this.initPolyglotDocs();
+  }
+
+  private initPolyglotDocs(): void {
+    this.registerDoc({
+      library: 'python',
+      topic: 'typing',
+      version: '3.12',
+      summary: 'Python typing conventions and PEP 8 standards.',
+      signatures: ['def fn(x: int) -> str:', 'Optional[T] | None', 'class Model(BaseModel):'],
+      codeExample: 'def greet(name: str) -> str:\n    return f"Hello {name}"',
+      breakingChanges: ['Use Type | None instead of Optional[Type] in Python 3.10+.']
+    });
+
+    this.registerDoc({
+      library: 'rust',
+      topic: 'error-handling',
+      version: '1.78',
+      summary: 'Rust Result and Option idiomatic error handling standards.',
+      signatures: ['Result<T, E>', 'Option<T>', 'fn run() -> Result<(), Box<dyn Error>>'],
+      codeExample: 'let val = opt.ok_or_else(|| "error")?;',
+      breakingChanges: ['Never use unwrap() or expect() in production library code.']
+    });
+
+    this.registerDoc({
+      library: 'go',
+      topic: 'idioms',
+      version: '1.22',
+      summary: 'Go error handling and goroutine concurrency standards.',
+      signatures: ['if err != nil { return err }', 'context.Context', 'sync.WaitGroup'],
+      codeExample: 'if err != nil {\n    return fmt.Errorf("failed: %w", err)\n}',
+      breakingChanges: ['Always propagate errors with %w for wrapping.']
+    });
+  }
+
+  private static findRepoRoot(start = process.cwd()): string {
+    let cur = path.resolve(start);
+    while (cur) {
+      if (fs.existsSync(path.join(cur, '.git')) || fs.existsSync(path.join(cur, '.aegis'))) return cur;
+      const parent = path.dirname(cur);
+      if (parent === cur) break;
+      cur = parent;
+    }
+    return start;
   }
 
   private makeKey(lib: string, topic: string): string {
@@ -148,7 +193,7 @@ export class Context7Bridge {
   }
 
   private queryDiskCache(library: string, topic: string, cacheDir?: string): Context7DocEntry | null {
-    const targetDir = cacheDir || path.resolve(process.cwd(), '.aegis', 'cache', 'context7');
+    const targetDir = cacheDir || path.resolve(Context7Bridge.findRepoRoot(), '.aegis', 'cache', 'context7');
     if (!fs.existsSync(targetDir)) return null;
     try {
       const files = fs.readdirSync(targetDir);

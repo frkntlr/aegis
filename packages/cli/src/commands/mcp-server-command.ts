@@ -27,15 +27,27 @@ const MCP_TOOLS = [
   { name: 'trace_relational', description: 'Trace callers, signals and blast radius', inputSchema: { type: 'object', properties: { target: { type: 'string' } }, required: ['target'] } }
 ];
 
+function ensureIndexed(engine: ReturnType<typeof getSharedMemoryEngine>, wt = 'default'): void {
+  const stats = engine.getMemoryStats(wt);
+  if (stats.totalFiles === 0 || stats.totalEdges === 0) {
+    const scanDir = fs.existsSync('packages') ? 'packages' : '.';
+    engine.indexDirectory(scanDir, wt);
+  }
+}
+
 export function executeMcpTool(name: string, args: Record<string, unknown> = {}): string {
   const engine = getSharedMemoryEngine();
   switch (name) {
     case 'memory_query': {
-      const q = engine.queryMemory(String(args.symbol || ''), { worktreeId: String(args.worktreeId || 'default') });
+      const wt = String(args.worktreeId || 'default');
+      ensureIndexed(engine, wt);
+      const q = engine.queryMemory(String(args.symbol || ''), { worktreeId: wt });
       return JSON.stringify(q, null, 2);
     }
     case 'memory_stats': {
-      const s = engine.getMemoryStats(String(args.worktreeId || 'default'));
+      const wt = String(args.worktreeId || 'default');
+      ensureIndexed(engine, wt);
+      const s = engine.getMemoryStats(wt);
       return JSON.stringify(s, null, 2);
     }
     case 'context7_query': {
@@ -66,10 +78,12 @@ export function executeMcpTool(name: string, args: Record<string, unknown> = {})
 function executeSecondaryTool(name: string, args: Record<string, unknown>): string {
   const engine = getSharedMemoryEngine();
   if (name === 'find_symbol') {
+    ensureIndexed(engine);
     const q = engine.queryMemory(String(args.symbol || ''));
     return JSON.stringify({ found: q.found, symbol: q.symbol, filePath: q.filePath, slice: q.slice, tokenSavingsPercent: q.tokenSavingsPercent }, null, 2);
   }
   if (name === 'trace_relational') {
+    ensureIndexed(engine);
     const q = engine.queryMemory(String(args.target || ''));
     return JSON.stringify({ target: q.symbol, callers: q.callers, callees: q.callees, blastRadius: q.blastRadius, signals: q.connectedSignals, scenes: q.connectedScenes }, null, 2);
   }

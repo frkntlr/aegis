@@ -159,7 +159,12 @@ export class RelationalGraph {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const tmpPath = `${cachePath}.tmp.${process.pid}.${Date.now()}`;
       fs.writeFileSync(tmpPath, JSON.stringify(this.toJSON(), null, 2), 'utf8');
-      fs.renameSync(tmpPath, cachePath);
+      try {
+        fs.renameSync(tmpPath, cachePath);
+      } catch {
+        fs.copyFileSync(tmpPath, cachePath);
+        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+      }
     } catch { /* ignore non-fatal */ }
   }
 

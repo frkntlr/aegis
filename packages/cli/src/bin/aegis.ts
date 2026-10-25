@@ -63,7 +63,7 @@ import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.
 import { handleRtkCompress } from '../commands/rtk-command.js';
 import { handleContext7Query } from '../commands/context7-command.js';
 import { startMcpServer } from '../commands/mcp-server-command.js';
-import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh, handleMemoryWatch } from '../commands/memory-command.js';
+import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh, handleMemoryWatch, handleMemoryPrune } from '../commands/memory-command.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 
 const HELP_LINES: readonly string[] = [
@@ -188,6 +188,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'memory:query': (a) => handleMemoryQuery(a[1], a[2], a[3]),
   'memory:stats': (a) => handleMemoryStats(a[1]),
   'memory:refresh': (a) => handleMemoryRefresh(a[1], a[2]),
+  'memory:prune': (a) => handleMemoryPrune(a[1]),
   'memory:watch': (a) => { handleMemoryWatch(a[1], a[2]); },
   'loop:status': () => handleLoopStatus(),
   'loop:reset': (a) => handleLoopReset(a[1]),

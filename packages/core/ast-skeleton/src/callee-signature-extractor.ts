@@ -17,9 +17,20 @@ export interface CalleeExtractorOptions {
 
 export class CalleeSignatureExtractor {
   private options: CalleeExtractorOptions;
+  private astCache = new Map<string, ts.SourceFile>();
 
   constructor(options: CalleeExtractorOptions = {}) {
     this.options = options;
+  }
+
+  private getOrCreateSourceFile(filePath: string, content: string): ts.SourceFile {
+    let sf = this.astCache.get(filePath);
+    if (!sf) {
+      sf = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+      if (this.astCache.size > 50) this.astCache.clear();
+      this.astCache.set(filePath, sf);
+    }
+    return sf;
   }
 
   private findTargetFunction(sf: ts.SourceFile, symbolName: string): ts.Node | null {
@@ -27,15 +38,15 @@ export class CalleeSignatureExtractor {
     let target: ts.Node | null = null;
     const walk = (n: ts.Node): void => {
       if (target) return;
-      if (
-        (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) &&
-        n.name && n.name.getText(sf) === targetName
-      ) {
+      if ((ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) && n.name && n.name.getText(sf) === targetName) {
         target = n;
         return;
       }
-      if (ts.isVariableDeclaration(n) && n.name.getText(sf) === targetName && n.initializer && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) {
-        target = n.initializer;
+      const isPropOrVar = (ts.isVariableDeclaration(n) || ts.isPropertyDeclaration(n)) &&
+        n.name.getText(sf) === targetName && n.initializer &&
+        (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer));
+      if (isPropOrVar) {
+        target = (n as { initializer: ts.Node }).initializer;
         return;
       }
       ts.forEachChild(n, walk);
@@ -106,12 +117,12 @@ export class CalleeSignatureExtractor {
 
     const content = this.readTargetFile(targetEntry.filePath);
     if (!content) return null;
-    const sf = ts.createSourceFile(targetEntry.filePath, content, ts.ScriptTarget.Latest, true);
+    const sf = this.getOrCreateSourceFile(targetEntry.filePath, content);
     return this.findLocalSignature(sf, callText);
   }
 
   public extractCalleeSignatures(symbolName: string, filePath: string, sourceCode: string): CalleeSignatureResult {
-    const sf = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
+    const sf = this.getOrCreateSourceFile(filePath, sourceCode);
     const targetNode = this.findTargetFunction(sf, symbolName);
     if (!targetNode) {
       return { callees: [], signatures: [], formattedBlock: '' };

@@ -42,6 +42,17 @@ export function handleFind(queryArg?: string): void {
   }
 
   const target = matches[0];
+  if (process.argv.includes('--json')) {
+    const extractor = new SymbolSliceExtractor(indexer);
+    const slice = extractor.extractSliceFromEntry(target, process.cwd(), 3);
+    console.log(JSON.stringify({ query: queryArg, target, slice, matchesCount: matches.length }, null, 2));
+    return;
+  }
+  showBanner();
+  printHumanResult(queryArg, target, matches, durationMs, indexer);
+}
+
+function printHumanResult(queryArg: string, target: SymbolEntry, matches: SymbolEntry[], durationMs: string, indexer: SymbolIndexer): void {
   const isFuzzy = target.name.toLowerCase() !== queryArg.toLowerCase() && !target.name.toLowerCase().includes(queryArg.toLowerCase());
   const header = isFuzzy
     ? `🔍 Fuzzy Match: '${queryArg}' -> '${target.name}' [${target.filePath}:${target.startLine}-${target.endLine}]`
@@ -51,9 +62,7 @@ export function handleFind(queryArg?: string): void {
   if (matches.length > 1) {
     console.log(` • Other matches (${matches.length - 1}): ${matches.slice(1, 4).map((m: SymbolEntry) => m.name).join(', ')}`);
   }
-
   printRelationalLinks(target.name);
-
   const extractor = new SymbolSliceExtractor(indexer);
   const slice = extractor.extractSliceFromEntry(target, process.cwd(), 3);
   if (slice) {

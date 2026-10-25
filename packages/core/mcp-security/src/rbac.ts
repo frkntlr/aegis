@@ -14,13 +14,15 @@ export class MCPSecurityManager {
   constructor(options: { maxCallsPerMinute?: number } = {}) {
     this.maxCallsPerMinute = options.maxCallsPerMinute ?? 30;
     const godotTools = ['godot_status', 'godot_inspect', 'godot_query', 'godot_validate', 'godot_playtest'];
-    this.registerAgent('solver', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools]);
-    this.registerAgent('qa', ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools]);
-    this.registerAgent('ui', ['read_file', 'write_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools]);
-    this.registerAgent('docs', ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton']);
-    this.registerAgent('contributor', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton']);
-    this.registerAgent('alice', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools]);
-    this.registerAgent('bob', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools]);
+    const memTools = ['memory_query', 'memory_stats', 'ast_search', 'ast_replace', 'rtk_compress', 'context7_query', 'cage_check', 'triage', 'find_symbol', 'trace_relational'];
+    this.registerAgent('solver', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools]);
+    this.registerAgent('qa', ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools]);
+    this.registerAgent('ui', ['read_file', 'write_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools]);
+    const readOnlyMem = ['memory_query', 'memory_stats', 'context7_query', 'find_symbol', 'trace_relational', 'rtk_compress', 'cage_check'];
+    this.registerAgent('docs', ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton', ...readOnlyMem]);
+    this.registerAgent('contributor', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...memTools]);
+    this.registerAgent('alice', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools]);
+    this.registerAgent('bob', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools]);
     this.registerAgent('human', ['*']);
   }
 

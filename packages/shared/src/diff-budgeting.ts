@@ -43,7 +43,7 @@ export class PreEmptiveDiffBudgeting {
     const funcBudget = PreEmptiveDiffBudgeting.calcFuncBudget(funcLines, maxFunc);
     const isExceeded = fileExceeded || Boolean(funcBudget.exceeded);
     const directive = PreEmptiveDiffBudgeting.resolveDirective(fileLines, maxFile, funcLines, maxFunc);
-    const formattedWarning = PreEmptiveDiffBudgeting.buildWarningString(fileLines, maxFile, fileQuota, funcBudget, directive);
+    const formattedWarning = PreEmptiveDiffBudgeting.buildWarningString(fileLines, maxFile, fileQuota, funcBudget, directive, maxFunc);
 
     return {
       fileLines,
@@ -83,7 +83,8 @@ export class PreEmptiveDiffBudgeting {
     maxF: number,
     fQuota: number,
     funcBudget: { quota?: number; exceeded?: boolean },
-    directive?: string
+    directive?: string,
+    maxFunc = PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES
   ): string {
     const lines = [
       '🛡️ Demir Kafes Proaktif Kotası:',
@@ -91,7 +92,7 @@ export class PreEmptiveDiffBudgeting {
     ];
     if (funcBudget.quota !== undefined) {
       lines.push(
-        `   - Hedef Fonksiyon: ${PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES - funcBudget.quota} satır (Azami Tavan: ${PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES}) -> Bu fonksiyona EN FAZLA ${funcBudget.quota} satır ekleyebilirsiniz!`
+        `   - Hedef Fonksiyon: ${maxFunc - funcBudget.quota} satır (Azami Tavan: ${maxFunc}) -> Bu fonksiyona EN FAZLA ${funcBudget.quota} satır ekleyebilirsiniz!`
       );
     }
     if (directive) lines.push(`   ${directive}`);

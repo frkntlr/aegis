@@ -22,12 +22,19 @@ export interface FailureEvaluation {
   reason?: string;
 }
 
+function findRepoRoot(start = process.cwd()): string {
+  let cur = path.resolve(start);
+  while (cur) {
+    if (fs.existsSync(path.join(cur, '.git')) || fs.existsSync(path.join(cur, '.aegis'))) return cur;
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return start;
+}
+
 function resolveDefaultPersistPath(): string {
-  const localAegis = path.resolve(process.cwd(), '.aegis');
-  if (fs.existsSync(localAegis)) return path.join(localAegis, 'loop_breaker.json');
-  const parentAegis = path.resolve(process.cwd(), '..', '..', '.aegis');
-  if (fs.existsSync(parentAegis)) return path.join(parentAegis, 'loop_breaker.json');
-  return path.join(localAegis, 'loop_breaker.json');
+  return path.join(findRepoRoot(), '.aegis', 'loop_breaker.json');
 }
 
 export class LoopBreaker {

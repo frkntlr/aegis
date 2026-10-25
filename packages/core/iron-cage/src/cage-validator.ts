@@ -172,15 +172,31 @@ export class IronCageValidator {
 
   private validateLineBased(filePath: string, lines: string[], violations: CageViolation[]): void {
     const state: ScanState = { inFunction: false, funcStartLine: 0, braceDepth: 0 };
+    let inBlockComment = false;
     for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
+      let line = lines[i];
+      if (inBlockComment) {
+        if (line.includes('*/')) {
+          line = line.slice(line.indexOf('*/') + 2);
+          inBlockComment = false;
+        } else { continue; }
+      }
+      if (line.includes('/*')) {
+        if (!line.includes('*/')) {
+          inBlockComment = true;
+          line = line.slice(0, line.indexOf('/*'));
+        } else {
+          line = line.replace(/\/\*.*?\*\//g, '');
+        }
+      }
+      const trimmed = line.trim();
       if (!state.inFunction && this.isLineFunctionStart(trimmed)) {
         state.inFunction = true;
         state.funcStartLine = i + 1;
         state.braceDepth = 0;
       }
       if (state.inFunction) {
-        this.updateBraces(lines[i], state, i, violations, filePath);
+        this.updateBraces(line, state, i, violations, filePath);
       }
     }
   }

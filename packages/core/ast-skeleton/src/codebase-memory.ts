@@ -24,6 +24,7 @@ export interface CodebaseMemoryAdapters {
 
 export interface MemoryQueryOptions {
   worktreeId?: string;
+  filePath?: string;
   rawLogs?: string;
   contextLines?: number;
   maxDepth?: number;
@@ -33,6 +34,7 @@ export interface MemoryQueryResult {
   symbol: string;
   found: boolean;
   filePath?: string;
+  ambiguousMatches?: string[];
   slice?: string;
   startLine?: number;
   endLine?: number;
@@ -50,23 +52,15 @@ export interface MemoryQueryResult {
 }
 
 export interface MemoryStats {
-  worktreeId: string;
-  totalFiles: number;
-  totalSymbols: number;
-  totalNodes: number;
-  totalEdges: number;
-  estimatedTokenSavings: number;
+  worktreeId: string; totalFiles: number; totalSymbols: number;
+  totalNodes: number; totalEdges: number; estimatedTokenSavings: number;
 }
 
 export interface MemoryNamespace {
-  indexer: SymbolIndexer;
-  extractor: SymbolSliceExtractor;
-  graph: RelationalGraph;
-  linker: CrossReferenceLinker;
-  queryEngine: GraphQueryEngine;
-  fileHashes: Map<string, string>;
-  mtimeFingerprints: Map<string, string>;
-  fileContents: LruFileBuffer;
+  indexer: SymbolIndexer; extractor: SymbolSliceExtractor;
+  graph: RelationalGraph; linker: CrossReferenceLinker;
+  queryEngine: GraphQueryEngine; fileHashes: Map<string, string>;
+  mtimeFingerprints: Map<string, string>; fileContents: LruFileBuffer;
   lastCommit?: string;
 }
 
@@ -103,18 +97,20 @@ export class CodebaseMemoryEngine {
     return ns;
   }
 
-  public saveNamespaceToDisk(id = 'default'): void {
-    const ns = this.namespaces.get(id);
-    if (ns) MemoryDiskStore.save(id, ns, this.adapters.persistToDisk);
+  public saveNamespaceToDisk(id?: string): void {
+    const active = id || ActiveHeadResolver.resolveActiveWorktree();
+    const ns = this.namespaces.get(active);
+    if (ns) MemoryDiskStore.save(active, ns, this.adapters.persistToDisk);
   }
 
   public static hashContent(content: string): string {
     return crypto.createHash('sha256').update(content).digest('hex');
   }
 
-  public indexFile(filePath: string, content: string, worktreeId = 'default'): boolean {
+  public indexFile(filePath: string, content: string, worktreeId?: string): boolean {
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
     const norm = filePath.replace(/\\/g, '/');
-    const ns = this.getNamespace(worktreeId);
+    const ns = this.getNamespace(active);
     const hash = CodebaseMemoryEngine.hashContent(content);
     if (ns.fileHashes.get(norm) === hash) return false;
 
@@ -128,25 +124,27 @@ export class CodebaseMemoryEngine {
     return true;
   }
 
-  public removeFile(filePath: string, worktreeId = 'default'): boolean {
+  public removeFile(filePath: string, worktreeId?: string): boolean {
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
     const norm = filePath.replace(/\\/g, '/');
-    const ns = this.getNamespace(worktreeId);
+    const ns = this.getNamespace(active);
     if (!ns.fileHashes.has(norm)) return false;
     ns.fileHashes.delete(norm);
     ns.fileContents.delete(norm);
     ns.mtimeFingerprints.delete(norm);
     delete ns.indexer.getDatabase().files[norm];
     ns.graph.removeFileEdges(norm);
-    this.saveNamespaceToDisk(worktreeId);
+    this.saveNamespaceToDisk(active);
     return true;
   }
 
   public indexDirectory(
     dirPath: string,
-    worktreeId = 'default',
+    worktreeId?: string,
     exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp']
   ): { indexed: number; cached: number; fastSynced?: boolean } {
-    const ns = this.getNamespace(worktreeId);
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
+    const ns = this.getNamespace(active);
     if (!fs.existsSync(dirPath)) return { indexed: 0, cached: 0 };
 
     const fastSync = GitFastSyncEngine.evaluateFastSync(ns.lastCommit);
@@ -161,14 +159,14 @@ export class CodebaseMemoryEngine {
         if (e.isDirectory() && !['node_modules', '.git', 'dist', '.aegis'].includes(e.name)) {
           scan(full);
         } else if (e.isFile()) {
-          this.scanFileEntry(full, full.replace(/\\/g, '/'), exts, ns, worktreeId, stats);
+          this.scanFileEntry(full, full.replace(/\\/g, '/'), exts, ns, active, stats);
         }
       }
     };
     scan(dirPath);
     if (stats.indexed > 0 || (fastSync.headCommit && fastSync.headCommit !== ns.lastCommit)) {
       if (fastSync.headCommit) ns.lastCommit = fastSync.headCommit;
-      this.saveNamespaceToDisk(worktreeId);
+      this.saveNamespaceToDisk(active);
     }
     return { indexed: stats.indexed, cached: stats.cached, fastSynced: false };
   }
@@ -194,7 +192,7 @@ export class CodebaseMemoryEngine {
     } catch { /* skip read error */ }
   }
 
-  private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number, worktreeId = 'default'): SliceResult | null {
+  private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number, worktreeId = 'default', filePathFilter?: string): { slice: SliceResult | null; ambiguous?: string[] } {
     let matches = ns.indexer.findSymbols(symbol);
     if (matches.length === 0) {
       const norm = symbol.replace(/\\/g, '/');
@@ -207,7 +205,12 @@ export class CodebaseMemoryEngine {
         }
       }
     }
-    if (matches.length === 0) return null;
+    if (matches.length === 0) return { slice: null };
+    const ambiguous = matches.length > 1 ? [...new Set(matches.map(m => m.filePath))] : undefined;
+    if (filePathFilter) {
+      const filtered = matches.filter(m => m.filePath.endsWith(filePathFilter) || m.filePath === filePathFilter);
+      if (filtered.length > 0) matches = filtered;
+    }
     let target = matches[0];
     const stored = LiveHotPatcher.getOrLoadContent(this, ns, target.filePath, worktreeId);
     const reMatches = ns.indexer.findSymbols(symbol);
@@ -216,18 +219,17 @@ export class CodebaseMemoryEngine {
     if (stored) {
       if (target.kind === 'class' && (target.filePath.endsWith('.ts') || target.filePath.endsWith('.tsx'))) {
         const classSkel = ns.extractor.extractClassSkeletonSlice(target.name, target.filePath, stored, target.startLine, target.endLine);
-        if (classSkel) return classSkel;
+        if (classSkel) return { slice: classSkel, ambiguous };
       }
-      return ns.extractor.sliceContent(target.name, target.filePath, stored, target.startLine, target.endLine, contextLines);
+      return { slice: ns.extractor.sliceContent(target.name, target.filePath, stored, target.startLine, target.endLine, contextLines), ambiguous };
     }
-    return ns.extractor.extractSliceFromEntry(target, process.cwd(), contextLines);
+    return { slice: ns.extractor.extractSliceFromEntry(target, process.cwd(), contextLines), ambiguous };
   }
 
   private formatLockDecoratedSlice(slice?: string, filePath?: string, activeLock?: ActiveLockInfo | null): string | undefined {
     if (!slice || !activeLock?.warning) return slice;
     const pfx = (filePath?.endsWith('.gd') || filePath?.endsWith('.py')) ? '#' : '//';
-    const warningText = activeLock.warning.split('\n').map(l => `${pfx} ${l}`).join('\n');
-    return `${warningText}\n${slice}`;
+    return `${activeLock.warning.split('\n').map(l => `${pfx} ${l}`).join('\n')}\n${slice}`;
   }
 
   public queryMemory(symbol: string, options: MemoryQueryOptions = {}): MemoryQueryResult {
@@ -235,7 +237,7 @@ export class CodebaseMemoryEngine {
     const ns = this.getNamespace(worktreeId);
     LiveHotPatcher.patchUncommitted(this, ns, worktreeId);
 
-    const sliceResult = this.resolveSlice(ns, symbol, options.contextLines ?? 3, worktreeId);
+    const { slice: sliceResult, ambiguous: ambiguousMatches } = this.resolveSlice(ns, symbol, options.contextLines ?? 3, worktreeId, options.filePath);
     const traceResult = ns.queryEngine.trace(symbol, options.maxDepth ?? 5);
 
     const isClass = /^[A-Z]\w+$/.test(symbol) || ns.indexer.findSymbols(symbol).some(s => s.kind === 'class');
@@ -248,47 +250,44 @@ export class CodebaseMemoryEngine {
     const slice = this.formatLockDecoratedSlice(sliceResult?.codeSlice, targetFile, activeLock);
 
     return {
-      symbol,
-      found: Boolean(sliceResult || traceResult.foundNode),
-      filePath: targetFile,
-      slice,
-      startLine: sliceResult?.startLine,
-      endLine: sliceResult?.endLine,
+      symbol, found: Boolean(sliceResult || traceResult.foundNode),
+      filePath: targetFile, ambiguousMatches, slice,
+      startLine: sliceResult?.startLine, endLine: sliceResult?.endLine,
       tokenSavingsPercent: sliceResult?.tokenSavingsPercent ?? 0,
-      callers: [...new Set(callers)],
-      callees: [...new Set(callees)],
+      callers: [...new Set(callers)], callees: [...new Set(callees)],
       blastRadius: traceResult.blastRadiusFiles,
       connectedSignals: traceResult.connectedSignals,
       connectedScenes: traceResult.connectedScenes,
       groundTruthDocs: MemoryAdapterResolver.resolveGroundTruth(slice || symbol, this.adapters, targetFile),
       constitutionRules: MemoryAdapterResolver.resolveConstitution(this.adapters, targetFile),
       compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters),
-      diffBudget: sliceResult?.diffBudget,
-      activeLock: activeLock || undefined
+      diffBudget: sliceResult?.diffBudget, activeLock: activeLock || undefined
     };
   }
 
-  public getMemoryStats(worktreeId = 'default'): MemoryStats {
-    const ns = this.getNamespace(worktreeId);
+  public getMemoryStats(worktreeId?: string): MemoryStats {
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
+    const ns = this.getNamespace(active);
     const db = ns.indexer.getDatabase();
     const files = Object.keys(db.files);
     const totalSymbols = files.reduce((acc, f) => acc + (db.files[f]?.symbols?.length || 0), 0);
     const nodes = ns.graph.getAllNodes();
     const totalEdges = nodes.reduce((acc, n) => acc + ns.graph.getOutgoing(n.id).length, 0);
-    return {
-      worktreeId,
-      totalFiles: files.length,
-      totalSymbols,
-      totalNodes: nodes.length,
-      totalEdges,
-      estimatedTokenSavings: files.length > 0 ? 75 : 0
-    };
+    return { worktreeId: active, totalFiles: files.length, totalSymbols, totalNodes: nodes.length, totalEdges, estimatedTokenSavings: files.length > 0 ? 75 : 0 };
+  }
+
+  public getNamespaceFiles(worktreeId = 'default'): string[] {
+    return Object.keys(this.getNamespace(worktreeId).indexer.getDatabase().files);
+  }
+
+  public pruneDeletedFiles(worktreeId?: string, cwd = process.cwd()): { prunedFiles: string[] } {
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
+    return { prunedFiles: MemoryAdapterResolver.pruneDeleted(this, active, cwd) };
   }
 
   public clearCache(worktreeId?: string): void {
     if (worktreeId) {
-      const ns = this.namespaces.get(worktreeId);
-      if (ns) ns.fileContents.clear();
+      this.namespaces.get(worktreeId)?.fileContents.clear();
       this.namespaces.delete(worktreeId);
     } else {
       for (const ns of this.namespaces.values()) ns.fileContents.clear();

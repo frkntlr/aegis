@@ -52,6 +52,30 @@ export class LiveHotPatcher {
     return stored;
   }
 
+  private static purgeDeletedGitFiles(engine: CodebaseMemoryEngine, ns: MemoryNamespace, worktreeId: string, cwd: string, patched: string[]): void {
+    const deletedFiles = GitFastSyncEngine.getDeletedFiles(cwd);
+    for (const relPath of deletedFiles) {
+      const norm = relPath.replace(/\\/g, '/');
+      const fullPath = path.isAbsolute(relPath) ? relPath : path.resolve(cwd, relPath);
+      if (ns.fileHashes.has(norm) && !fs.existsSync(fullPath)) {
+        engine.removeFile(norm, worktreeId);
+        patched.push(norm);
+      }
+    }
+  }
+
+  private static patchDirtyGitFiles(engine: CodebaseMemoryEngine, ns: MemoryNamespace, worktreeId: string, cwd: string, patched: string[]): void {
+    const dirtyGitFiles = GitFastSyncEngine.getPorcelainStatus(cwd) || [];
+    for (const relPath of dirtyGitFiles) {
+      const norm = relPath.replace(/\\/g, '/');
+      if (patched.includes(norm) || !LiveHotPatcher.SUPPORTED_EXTS.some(ext => norm.endsWith(ext))) continue;
+      const fullPath = path.isAbsolute(relPath) ? relPath : path.resolve(cwd, relPath);
+      if (LiveHotPatcher.isDirty(fullPath, ns.mtimeFingerprints.get(norm)) && LiveHotPatcher.patchDirtyFile(engine, fullPath, worktreeId)) {
+        patched.push(norm);
+      }
+    }
+  }
+
   public static patchUncommitted(
     engine: CodebaseMemoryEngine,
     ns: MemoryNamespace,
@@ -61,7 +85,6 @@ export class LiveHotPatcher {
     const t0 = performance.now();
     const patched: string[] = [];
 
-    // 1. Check tracked files in memory namespace
     for (const [norm, cachedFp] of ns.mtimeFingerprints.entries()) {
       const fullPath = path.isAbsolute(norm) ? norm : path.resolve(cwd, norm);
       if (LiveHotPatcher.isDirty(fullPath, cachedFp)) {
@@ -71,19 +94,8 @@ export class LiveHotPatcher {
       }
     }
 
-    // 2. Check uncommitted git files (including untracked new files)
-    const dirtyGitFiles = GitFastSyncEngine.getPorcelainStatus(cwd) || [];
-    for (const relPath of dirtyGitFiles) {
-      const norm = relPath.replace(/\\/g, '/');
-      if (patched.includes(norm)) continue;
-      if (!LiveHotPatcher.SUPPORTED_EXTS.some(ext => norm.endsWith(ext))) continue;
-      const fullPath = path.isAbsolute(relPath) ? relPath : path.resolve(cwd, relPath);
-      if (LiveHotPatcher.isDirty(fullPath, ns.mtimeFingerprints.get(norm))) {
-        if (LiveHotPatcher.patchDirtyFile(engine, fullPath, worktreeId)) {
-          patched.push(norm);
-        }
-      }
-    }
+    LiveHotPatcher.purgeDeletedGitFiles(engine, ns, worktreeId, cwd, patched);
+    LiveHotPatcher.patchDirtyGitFiles(engine, ns, worktreeId, cwd, patched);
 
     return { patchedFiles: patched, durationMs: performance.now() - t0 };
   }

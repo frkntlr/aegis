@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import type { RelationalGraph } from './relational-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
 import { LanguageBarrierGate } from './language-barrier-gate.js';
@@ -91,5 +92,18 @@ export class MemoryAdapterResolver {
         }
       }
     }
+  }
+
+  public static pruneDeleted(engine: { removeFile: (f: string, wt?: string) => boolean; getNamespaceFiles: (wt: string) => string[] }, activeWorktree: string, cwd = process.cwd()): string[] {
+    const files = engine.getNamespaceFiles(activeWorktree);
+    const pruned: string[] = [];
+    for (const f of files) {
+      const full = f.startsWith('/') || f.includes(':') ? f : `${cwd}/${f}`.replace(/\\/g, '/');
+      if (!fs.existsSync(full)) {
+        engine.removeFile(f, activeWorktree);
+        pruned.push(f);
+      }
+    }
+    return pruned;
   }
 }

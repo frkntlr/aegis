@@ -8,6 +8,13 @@ export interface FastSyncEvaluation {
 }
 
 export class GitFastSyncEngine {
+  private static statusCache: { cwd: string; timestamp: number; files: string[] } | null = null;
+  private static readonly CACHE_TTL_MS = 1000;
+
+  public static clearCache(): void {
+    GitFastSyncEngine.statusCache = null;
+  }
+
   public static getHeadCommit(cwd = process.cwd()): string | null {
     try {
       return cp.execSync('git rev-parse HEAD', {
@@ -21,7 +28,47 @@ export class GitFastSyncEngine {
     }
   }
 
-  public static getPorcelainStatus(cwd = process.cwd()): string[] | null {
+  private static parseStatusLine(line: string): string | null {
+    if (!line.trim()) return null;
+    let filePath = line.slice(3).trim().replace(/^"/, '').replace(/"$/, '');
+    if (filePath.includes('->')) {
+      const parts = filePath.split('->');
+      filePath = parts[parts.length - 1].trim().replace(/^"/, '').replace(/"$/, '');
+    }
+    return filePath ? filePath.replace(/\\/g, '/') : null;
+  }
+
+  public static getDeletedFiles(cwd = process.cwd()): string[] {
+    try {
+      const output = cp.execSync('git status --porcelain', {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        timeout: 3000
+      });
+      const deleted: string[] = [];
+      for (const line of output.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        const status = line.slice(0, 2);
+        if (status.includes('D')) {
+          const parsed = GitFastSyncEngine.parseStatusLine(line);
+          if (parsed) deleted.push(parsed);
+        }
+      }
+      return deleted;
+    } catch {
+      return [];
+    }
+  }
+
+  public static getPorcelainStatus(cwd = process.cwd(), forceRefresh = false): string[] | null {
+    const now = Date.now();
+    if (!forceRefresh && GitFastSyncEngine.statusCache &&
+        GitFastSyncEngine.statusCache.cwd === cwd &&
+        now - GitFastSyncEngine.statusCache.timestamp < GitFastSyncEngine.CACHE_TTL_MS) {
+      return [...GitFastSyncEngine.statusCache.files];
+    }
+
     try {
       const output = cp.execSync('git status --porcelain', {
         cwd,
@@ -31,10 +78,10 @@ export class GitFastSyncEngine {
       });
       const files: string[] = [];
       for (const line of output.split(/\r?\n/)) {
-        if (!line.trim()) continue;
-        const filePath = line.slice(3).trim().replace(/^"/, '').replace(/"$/, '');
-        if (filePath) files.push(filePath.replace(/\\/g, '/'));
+        const parsed = GitFastSyncEngine.parseStatusLine(line);
+        if (parsed) files.push(parsed);
       }
+      GitFastSyncEngine.statusCache = { cwd, timestamp: now, files };
       return files;
     } catch {
       return null;

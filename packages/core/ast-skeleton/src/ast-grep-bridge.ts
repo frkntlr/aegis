@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { WorktreeMutexShield } from '@aegis/shared';
 
 export interface AstGrepMatch {
   file?: string;
@@ -48,7 +49,7 @@ export class AstGrepBridge {
 
     p = p.replace(/\$([a-zA-Z_]\w*)/g, (_, name) => {
       varNames.push(name);
-      return `(?<${name}>(?:"[^"]*"|'[^']*'|[^,();\n]+?))`;
+      return `(?<${name}>(?:"[^"]*"|'[^']*'|\`[^\`]*\`|[^,();\n]+?))`;
     });
 
     const normalized = p.replace(/\s+/g, '\\s+');
@@ -161,6 +162,10 @@ export class AstGrepBridge {
   public static replaceInFile(filePath: string, pattern: string, rewrite: string): AstGrepReplaceResult & { written: boolean } {
     if (!fs.existsSync(filePath)) {
       return { transformed: '', matchCount: 0, hasChanges: false, matches: [], written: false };
+    }
+    const lockInfo = WorktreeMutexShield.inspectLock(filePath);
+    if (lockInfo?.isLockedByOther) {
+      throw new Error(`File is locked by another agent (${lockInfo.lockedBy}): ${filePath}`);
     }
     const content = fs.readFileSync(filePath, 'utf8');
     const result = AstGrepBridge.replace(content, pattern, rewrite);

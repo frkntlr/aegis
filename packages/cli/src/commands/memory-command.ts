@@ -79,13 +79,14 @@ function printMemoryQueryResult(res: MemoryQueryResult, worktreeId?: string): vo
 }
 
 export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsPath?: string): void {
-  showBanner();
+  const isJson = process.argv.includes('--json') || rawLogsPath === '--json' || worktreeId === '--json';
+  if (!isJson) showBanner();
   if (!symbol) {
-    console.error('❌ Usage: aegis memory:query <symbol> [worktreeId] [rawLogsPath]');
+    console.error('❌ Usage: aegis memory:query <symbol> [worktreeId] [rawLogsPath] [--json]');
     process.exit(1);
   }
 
-  const activeWorktree = (worktreeId && worktreeId !== 'default')
+  const activeWorktree = (worktreeId && worktreeId !== 'default' && worktreeId !== '--json')
     ? worktreeId
     : ActiveHeadResolver.resolveActiveWorktree();
 
@@ -97,16 +98,36 @@ export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsP
   }
 
   let rawLogs: string | undefined;
-  if (rawLogsPath && fs.existsSync(rawLogsPath)) {
+  if (rawLogsPath && rawLogsPath !== '--json' && fs.existsSync(rawLogsPath)) {
     rawLogs = fs.readFileSync(rawLogsPath, 'utf8');
   }
 
   const res = engine.queryMemory(symbol, { worktreeId: activeWorktree, rawLogs });
+  if (isJson) {
+    console.log(JSON.stringify(res, null, 2));
+    return;
+  }
   if (!res.found) {
     console.log(`⚠️  Symbol '${symbol}' not found in Codebase Memory [worktree: ${activeWorktree}].`);
     return;
   }
   printMemoryQueryResult(res, activeWorktree);
+}
+
+export function handleMemoryPrune(worktreeId?: string): void {
+  showBanner();
+  const activeWorktree = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+  const engine = getSharedMemoryEngine();
+  console.log(`🧹 Pruning deleted files from Codebase Memory [Worktree: ${activeWorktree}]...`);
+  const { prunedFiles } = engine.pruneDeletedFiles(activeWorktree);
+  if (prunedFiles.length === 0) {
+    console.log('✅ Memory is clean - zero orphaned files found.');
+  } else {
+    console.log(`✅ Pruned ${prunedFiles.length} orphaned file(s):`);
+    for (const f of prunedFiles) console.log(`   - ${f}`);
+  }
 }
 
 export function handleMemoryStats(worktreeId?: string): void {

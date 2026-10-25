@@ -127,6 +127,41 @@ export class SymbolSliceExtractor {
     return ['# 🎮 [GDScript Ambient State - Signals & Onready Nodes]', ...ambientLines].join('\n');
   }
 
+  public static extractFileImports(content: string, prefix = '//'): string {
+    const lines = content.split(/\r?\n/);
+    const importLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('import ') || trimmed.startsWith('export {') || trimmed.startsWith('from ')) {
+        importLines.push(trimmed);
+      }
+    }
+    if (importLines.length === 0) return '';
+    return [`${prefix} 📦 [File Imports]`, ...importLines.map(l => `${prefix} - ${l}`)].join('\n');
+  }
+
+  public static extractPolyglotAmbient(filePath: string, content: string): string {
+    const lines = content.split(/\r?\n/);
+    const ambient: string[] = [];
+    const isPy = filePath.endsWith('.py');
+    const isRs = filePath.endsWith('.rs');
+    const prefix = isPy ? '#' : '//';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (isPy && (trimmed.startsWith('import ') || trimmed.startsWith('from ') || trimmed.startsWith('class '))) {
+        ambient.push(trimmed);
+      } else if (isRs && (trimmed.startsWith('use ') || trimmed.startsWith('pub use ') || trimmed.startsWith('mod '))) {
+        ambient.push(trimmed);
+      } else if (filePath.endsWith('.go') && (trimmed.startsWith('package ') || trimmed.startsWith('import ') || trimmed.startsWith('type '))) {
+        ambient.push(trimmed);
+      }
+    }
+    if (ambient.length === 0) return '';
+    const tag = isPy ? 'Python' : (isRs ? 'Rust' : 'Go');
+    return [`${prefix} 🌐 [${tag} Ambient State - Imports & Scope]`, ...ambient.map(l => `${prefix} - ${l}`)].join('\n');
+  }
+
   private computeDynamicFromLine(lines: string[], startLine: number, contextLines: number): number {
     let from = Math.max(1, startLine - contextLines);
     let cur = startLine - 1;
@@ -176,9 +211,12 @@ export class SymbolSliceExtractor {
   } {
     const isTs = filePath.endsWith('.ts') || filePath.endsWith('.tsx');
     const isGd = filePath.endsWith('.gd');
+    const isPoly = filePath.endsWith('.py') || filePath.endsWith('.rs') || filePath.endsWith('.go');
     const headerBlocks: string[] = [];
 
     if (isTs) {
+      const fileImports = SymbolSliceExtractor.extractFileImports(content);
+      if (fileImports) headerBlocks.push(fileImports);
       const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
       if (ambient.formattedBlock) headerBlocks.push(ambient.formattedBlock);
       const callee = this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content);
@@ -188,6 +226,10 @@ export class SymbolSliceExtractor {
     if (isGd) {
       const gdAmbient = SymbolSliceExtractor.extractGdscriptAmbient(content);
       if (gdAmbient) headerBlocks.push(gdAmbient);
+    }
+    if (isPoly) {
+      const polyAmbient = SymbolSliceExtractor.extractPolyglotAmbient(filePath, content);
+      if (polyAmbient) headerBlocks.push(polyAmbient);
     }
     return { headerBlocks };
   }
