@@ -8,6 +8,8 @@ import { GraphQueryEngine, type TraceResult } from './graph-query-engine.js';
 import { CrossReferenceLinker } from './cross-reference-linker.js';
 import { MemoryAdapterResolver } from './memory-adapter-resolver.js';
 import { LruFileBuffer } from './lru-file-buffer.js';
+import { MemoryDiskStore } from './memory-disk-store.js';
+import { GitFastSyncEngine } from './git-fast-sync.js';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -58,7 +60,9 @@ interface MemoryNamespace {
   linker: CrossReferenceLinker;
   queryEngine: GraphQueryEngine;
   fileHashes: Map<string, string>;
+  mtimeFingerprints: Map<string, string>;
   fileContents: LruFileBuffer;
+  lastCommit?: string;
 }
 
 export class CodebaseMemoryEngine {
@@ -78,39 +82,16 @@ export class CodebaseMemoryEngine {
       const linker = new CrossReferenceLinker(graph);
       const queryEngine = new GraphQueryEngine(graph);
       const fileContents = new LruFileBuffer(this.adapters.lruCapacity ?? 100);
-      ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), fileContents };
-      this.loadNamespaceFromDisk(id, ns);
+      ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), mtimeFingerprints: new Map(), fileContents };
+      MemoryDiskStore.load(id, ns, this.adapters.persistToDisk);
       this.namespaces.set(id, ns);
     }
     return ns;
   }
 
-  private loadNamespaceFromDisk(id: string, ns: MemoryNamespace): void {
-    if (this.adapters.persistToDisk === false) return;
-    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
-    const symPath = path.join(cacheDir, 'symbols.json');
-    const graphPath = path.join(cacheDir, 'graph.json');
-    const metaPath = path.join(cacheDir, 'meta.json');
-    if (fs.existsSync(symPath)) ns.indexer.loadCache(symPath);
-    if (fs.existsSync(graphPath)) ns.graph.loadCache(graphPath);
-    if (fs.existsSync(metaPath)) {
-      try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-        if (meta.hashes) ns.fileHashes = new Map(Object.entries(meta.hashes));
-      } catch { /* ignore parse error */ }
-    }
-  }
-
   public saveNamespaceToDisk(id = 'default'): void {
-    if (this.adapters.persistToDisk === false) return;
     const ns = this.namespaces.get(id);
-    if (!ns) return;
-    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
-    fs.mkdirSync(cacheDir, { recursive: true });
-    ns.indexer.saveCache(path.join(cacheDir, 'symbols.json'));
-    ns.graph.saveCache(path.join(cacheDir, 'graph.json'));
-    const meta = { hashes: Object.fromEntries(ns.fileHashes) };
-    fs.writeFileSync(path.join(cacheDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+    if (ns) MemoryDiskStore.save(id, ns, this.adapters.persistToDisk);
   }
 
   public static hashContent(content: string): string {
@@ -125,6 +106,9 @@ export class CodebaseMemoryEngine {
 
     ns.fileHashes.set(norm, hash);
     ns.fileContents.set(norm, content);
+    const fp = GitFastSyncEngine.getFileFingerprint(norm);
+    if (fp) ns.mtimeFingerprints.set(norm, fp);
+
     ns.indexer.indexFile(norm, content);
     ns.linker.linkSingleFile(norm, content);
     return true;
@@ -136,34 +120,64 @@ export class CodebaseMemoryEngine {
     if (!ns.fileHashes.has(norm)) return false;
     ns.fileHashes.delete(norm);
     ns.fileContents.delete(norm);
+    ns.mtimeFingerprints.delete(norm);
     delete ns.indexer.getDatabase().files[norm];
     ns.graph.removeFileEdges(norm);
     this.saveNamespaceToDisk(worktreeId);
     return true;
   }
 
-  public indexDirectory(dirPath: string, worktreeId = 'default', exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp']): { indexed: number; cached: number } {
-    let indexed = 0;
-    let cached = 0;
-    if (!fs.existsSync(dirPath)) return { indexed, cached };
+  public indexDirectory(
+    dirPath: string,
+    worktreeId = 'default',
+    exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp']
+  ): { indexed: number; cached: number; fastSynced?: boolean } {
+    const ns = this.getNamespace(worktreeId);
+    if (!fs.existsSync(dirPath)) return { indexed: 0, cached: 0 };
 
+    const fastSync = GitFastSyncEngine.evaluateFastSync(ns.lastCommit);
+    if (fastSync.canSkipScan && ns.fileHashes.size > 0) {
+      return { indexed: 0, cached: ns.fileHashes.size, fastSynced: true };
+    }
+
+    const stats = { indexed: 0, cached: 0 };
     const scan = (cur: string) => {
       for (const e of fs.readdirSync(cur, { withFileTypes: true })) {
         const full = path.join(cur, e.name);
-        if (e.isDirectory()) {
-          if (!['node_modules', '.git', 'dist', '.aegis'].includes(e.name)) scan(full);
-        } else if (e.isFile() && exts.some(x => e.name.endsWith(x))) {
-          try {
-            const content = fs.readFileSync(full, 'utf8');
-            if (this.indexFile(full, content, worktreeId)) indexed++;
-            else cached++;
-          } catch { /* skip read error */ }
+        if (e.isDirectory() && !['node_modules', '.git', 'dist', '.aegis'].includes(e.name)) {
+          scan(full);
+        } else if (e.isFile()) {
+          this.scanFileEntry(full, full.replace(/\\/g, '/'), exts, ns, worktreeId, stats);
         }
       }
     };
     scan(dirPath);
-    if (indexed > 0) this.saveNamespaceToDisk(worktreeId);
-    return { indexed, cached };
+    if (stats.indexed > 0 || (fastSync.headCommit && fastSync.headCommit !== ns.lastCommit)) {
+      if (fastSync.headCommit) ns.lastCommit = fastSync.headCommit;
+      this.saveNamespaceToDisk(worktreeId);
+    }
+    return { indexed: stats.indexed, cached: stats.cached, fastSynced: false };
+  }
+
+  private scanFileEntry(
+    full: string,
+    norm: string,
+    exts: string[],
+    ns: MemoryNamespace,
+    worktreeId: string,
+    stats: { indexed: number; cached: number }
+  ): void {
+    if (!exts.some(x => norm.endsWith(x))) return;
+    const fp = GitFastSyncEngine.getFileFingerprint(full);
+    if (fp && ns.mtimeFingerprints.get(norm) === fp && ns.fileHashes.has(norm)) {
+      stats.cached++;
+      return;
+    }
+    try {
+      const content = fs.readFileSync(full, 'utf8');
+      if (this.indexFile(full, content, worktreeId)) stats.indexed++;
+      else stats.cached++;
+    } catch { /* skip read error */ }
   }
 
   private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number): SliceResult | null {
@@ -238,24 +252,16 @@ export class CodebaseMemoryEngine {
     for (const node of ns.graph.getAllNodes()) {
       if (node.name.startsWith(methodPrefix) || node.id.includes(`::${methodPrefix}`)) {
         const methodTrace = ns.queryEngine.trace(node.id, 2);
-        for (const edge of methodTrace.upstreamEdges) {
-          const key = `${edge.from}->${edge.to}:${edge.type}`;
-          if (!seenEdges.has(key)) {
-            seenEdges.add(key);
-            traceResult.upstreamEdges.push(edge);
-          }
+        for (const e of methodTrace.upstreamEdges) {
+          const k = `${e.from}->${e.to}:${e.type}`;
+          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.upstreamEdges.push(e); }
         }
-        for (const edge of methodTrace.downstreamEdges) {
-          const key = `${edge.from}->${edge.to}:${edge.type}`;
-          if (!seenEdges.has(key)) {
-            seenEdges.add(key);
-            traceResult.downstreamEdges.push(edge);
-          }
+        for (const e of methodTrace.downstreamEdges) {
+          const k = `${e.from}->${e.to}:${e.type}`;
+          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.downstreamEdges.push(e); }
         }
-        for (const file of methodTrace.blastRadiusFiles) {
-          if (!traceResult.blastRadiusFiles.includes(file)) {
-            traceResult.blastRadiusFiles.push(file);
-          }
+        for (const f of methodTrace.blastRadiusFiles) {
+          if (!traceResult.blastRadiusFiles.includes(f)) traceResult.blastRadiusFiles.push(f);
         }
       }
     }
@@ -266,14 +272,10 @@ export class CodebaseMemoryEngine {
     const db = ns.indexer.getDatabase();
     const files = Object.keys(db.files);
     let totalSymbols = 0;
-    for (const f of files) {
-      totalSymbols += db.files[f]?.symbols?.length || 0;
-    }
+    for (const f of files) totalSymbols += db.files[f]?.symbols?.length || 0;
     const nodes = ns.graph.getAllNodes();
     let totalEdges = 0;
-    for (const n of nodes) {
-      totalEdges += ns.graph.getOutgoing(n.id).length;
-    }
+    for (const n of nodes) totalEdges += ns.graph.getOutgoing(n.id).length;
     return {
       worktreeId,
       totalFiles: files.length,
