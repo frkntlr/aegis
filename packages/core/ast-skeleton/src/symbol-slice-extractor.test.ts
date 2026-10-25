@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
+import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
 import { SymbolSliceExtractor } from './symbol-slice-extractor.js';
 import { SymbolIndexer } from './symbol-indexer.js';
 
@@ -72,4 +73,46 @@ test('SymbolSliceExtractor: prepends ambient type closure block to surgical slic
   assert.ok(slice.codeSlice.includes('interface OrderReceipt'));
   assert.ok(slice.ambientTypes?.includes('OrderOptions'));
   assert.ok(slice.ambientTypes?.includes('OrderReceipt'));
+});
+
+test('CalleeSignatureExtractor: extracts 1st-degree method signatures within class and functions', () => {
+  const extractor = new CalleeSignatureExtractor();
+  const code = [
+    'export class Calculator {',
+    '  private multiply(a: number, b: number): number { return a * b; }',
+    '  public computeSquare(n: number): number {',
+    '    return this.multiply(n, n);',
+    '  }',
+    '}'
+  ].join('\n');
+
+  const res = extractor.extractCalleeSignatures('computeSquare', 'calc.ts', code);
+  assert.strictEqual(res.signatures.length, 1);
+  assert.ok(res.signatures[0].includes('this.multiply(a: number, b: number): number;'));
+  assert.ok(res.formattedBlock.includes('// 🔗 [Callee Signatures - 1st Degree Invocations]'));
+});
+
+test('SymbolSliceExtractor: injects both ambient types and callee signatures into slice', () => {
+  const indexer = new SymbolIndexer();
+  const extractor = new SymbolSliceExtractor(indexer);
+
+  const code = [
+    'export interface PaymentRequest { amount: number; }',
+    'export interface PaymentResponse { ok: boolean; }',
+    'export class Cashier {',
+    '  private authorize(req: PaymentRequest): boolean { return req.amount > 0; }',
+    '  public checkout(req: PaymentRequest): PaymentResponse {',
+    '    const valid = this.authorize(req);',
+    '    return { ok: valid };',
+    '  }',
+    '}'
+  ].join('\n');
+
+  const slice = extractor.sliceContent('checkout', 'cashier.ts', code, 5, 8, 1);
+  assert.ok(slice.codeSlice.includes('// 📦 [Ambient Type Closure - Param & Return Types]'));
+  assert.ok(slice.codeSlice.includes('interface PaymentRequest'));
+  assert.ok(slice.codeSlice.includes('interface PaymentResponse'));
+  assert.ok(slice.codeSlice.includes('// 🔗 [Callee Signatures - 1st Degree Invocations]'));
+  assert.ok(slice.codeSlice.includes('this.authorize(req: PaymentRequest): boolean;'));
+  assert.ok(slice.calleeSignatures?.some(s => s.includes('authorize')));
 });

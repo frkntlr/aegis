@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import type { SymbolDatabase, SymbolEntry } from './symbol-indexer.js';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
+import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
 
 export interface SliceResult {
   symbol: string;
@@ -14,15 +15,18 @@ export interface SliceResult {
   originalFileLineCount: number;
   tokenSavingsPercent: number;
   ambientTypes?: string[];
+  calleeSignatures?: string[];
 }
 
 export class SymbolSliceExtractor {
   private indexer: SymbolIndexer;
   private typeResolver: TransitiveTypeResolver;
+  private calleeExtractor: CalleeSignatureExtractor;
 
   constructor(indexer?: SymbolIndexer) {
     this.indexer = indexer || new SymbolIndexer();
     this.typeResolver = new TransitiveTypeResolver({ indexer: this.indexer });
+    this.calleeExtractor = new CalleeSignatureExtractor({ indexer: this.indexer });
   }
 
   public extractSlice(
@@ -61,9 +65,17 @@ export class SymbolSliceExtractor {
     return formatted;
   }
 
-  private buildSliceHeader(symbolName: string, filePath: string, startLine: number, endLine: number, ambientBlock?: string): string[] {
+  private buildSliceHeader(
+    symbolName: string,
+    filePath: string,
+    startLine: number,
+    endLine: number,
+    ambientBlock?: string,
+    calleeBlock?: string
+  ): string[] {
     const header = [`// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`];
     if (ambientBlock) header.push(ambientBlock);
+    if (calleeBlock) header.push(calleeBlock);
     return header;
   }
 
@@ -81,11 +93,15 @@ export class SymbolSliceExtractor {
     const to = Math.min(totalLines, endLine + contextLines);
 
     const formattedLines = this.formatSliceLines(lines, from, to, startLine, endLine);
-    const ambient = (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))
+    const isTs = filePath.endsWith('.ts') || filePath.endsWith('.tsx');
+    const ambient = isTs
       ? this.typeResolver.resolveAmbientClosure(symbolName, filePath, content)
       : { typeNames: [], declarations: [], formattedBlock: '' };
+    const calleeResult = isTs
+      ? this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content)
+      : { callees: [], signatures: [], formattedBlock: '' };
 
-    const sliceHeader = this.buildSliceHeader(symbolName, filePath, startLine, endLine, ambient.formattedBlock);
+    const sliceHeader = this.buildSliceHeader(symbolName, filePath, startLine, endLine, ambient.formattedBlock, calleeResult.formattedBlock);
     const codeSlice = [...sliceHeader, ...formattedLines, '// --- End Slice ---'].join('\n');
     const slicedLineCount = to - from + 1;
     const savings = totalLines > 0 ? Math.round(((totalLines - slicedLineCount) / totalLines) * 100) : 0;
@@ -99,7 +115,8 @@ export class SymbolSliceExtractor {
       lineCount: slicedLineCount,
       originalFileLineCount: totalLines,
       tokenSavingsPercent: Math.max(0, savings),
-      ambientTypes: ambient.typeNames
+      ambientTypes: ambient.typeNames,
+      calleeSignatures: calleeResult.signatures
     };
   }
 }

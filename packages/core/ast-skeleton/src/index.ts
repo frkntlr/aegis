@@ -27,3 +27,4 @@ export * from './lru-file-buffer.js';
 export * from './git-fast-sync.js';
 export * from './memory-disk-store.js';
 export * from './transitive-type-resolver.js';
+export * from './callee-signature-extractor.js';
