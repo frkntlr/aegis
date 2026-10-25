@@ -81,3 +81,54 @@ test('Context7Bridge resolves Godot topics via AST extends and ClassDB hierarchy
   assert.strictEqual(lifeResult.matched, true);
   assert.strictEqual(lifeResult.doc?.topic, 'lifecycle');
 });
+
+test('DeprecationLinter catches Godot 3 deprecations', () => {
+  const bridge = new Context7Bridge();
+  const legacyGodot = [
+    'var bullet = bullet_scene.instance()',
+    'move_and_slide(velocity, Vector2.UP)',
+    'button.connect("pressed", self, "_on_button_pressed")',
+    'yield(get_tree().create_timer(1.0), "timeout")'
+  ].join('\n');
+
+  const gWarnings = bridge.lintDeprecations(legacyGodot, 'godot');
+  assert.strictEqual(gWarnings.length, 4);
+  assert.ok(gWarnings.some(w => w.code === 'GD_DEP_001'));
+  assert.ok(gWarnings.some(w => w.code === 'GD_DEP_002'));
+  assert.ok(gWarnings.some(w => w.code === 'GD_DEP_003'));
+  assert.ok(gWarnings.some(w => w.code === 'GD_DEP_004'));
+
+  const cleanGodot = [
+    'var bullet = bullet_scene.instantiate()',
+    'velocity = Vector2.ZERO',
+    'move_and_slide()',
+    'button.pressed.connect(_on_button_pressed)',
+    'await get_tree().create_timer(1.0).timeout'
+  ].join('\n');
+  assert.strictEqual(bridge.lintDeprecations(cleanGodot, 'godot').length, 0);
+});
+
+test('DeprecationLinter catches TypeScript strict violations and injects warnings', () => {
+  const bridge = new Context7Bridge();
+  const unsafeTs = [
+    'const x: any = JSON.parse(str);',
+    'const y = obj as any;',
+    'try { doTask(); } catch (err) {}'
+  ].join('\n');
+
+  const tsWarnings = bridge.lintDeprecations(unsafeTs, 'typescript');
+  assert.strictEqual(tsWarnings.length, 3);
+  assert.ok(tsWarnings.some(w => w.code === 'TS_DEP_001'));
+  assert.ok(tsWarnings.some(w => w.code === 'TS_DEP_002'));
+
+  const cleanTs = [
+    'const x: unknown = JSON.parse(str);',
+    'try { doTask(); } catch (err) { logger.error(err); }'
+  ].join('\n');
+  assert.strictEqual(bridge.lintDeprecations(cleanTs, 'typescript').length, 0);
+
+  const legacy = 'var b = scene.instance()';
+  const injected = bridge.injectDocumentationContext('Shoot', ['b.gd'], [legacy]);
+  assert.ok(injected.includes('Active Deprecation Warnings'));
+  assert.ok(injected.includes('scene.instantiate()'));
+});

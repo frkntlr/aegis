@@ -5,3 +5,4 @@ export * from './iron-cage.js';
 export * from './trust.js';
 export * from './fuzzy-matcher.js';
 export * from './godot-topic-resolver.js';
+export * from './deprecation-linter.js';

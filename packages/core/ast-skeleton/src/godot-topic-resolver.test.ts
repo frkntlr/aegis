@@ -61,4 +61,10 @@ test('MemoryAdapterResolver integrates GodotTopicResolver for ground-truth resol
   const codeUi = 'extends MarginContainer\nfunc _ready(): pass';
   MemoryAdapterResolver.resolveGroundTruth(codeUi, adapters, 'hud.gd');
   assert.ok(queried.includes('godot4::ui'));
+
+  const codeWithDep = 'extends Node\nfunc spawn():\n\tvar b = scene.instance()';
+  const depDocs = MemoryAdapterResolver.resolveGroundTruth(codeWithDep, adapters, 'spawner.gd');
+  assert.strictEqual(depDocs.length, 1);
+  assert.ok(depDocs[0].includes('Active Deprecation Warnings'));
+  assert.ok(depDocs[0].includes('scene.instantiate()'));
 });

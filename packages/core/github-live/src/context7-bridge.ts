@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GodotTopicResolver } from '@aegis/shared';
+import { GodotTopicResolver, DeprecationLinter, type DeprecationWarning } from '@aegis/shared';
 
 export interface Context7DocEntry {
   library: string;
@@ -149,6 +149,10 @@ export class Context7Bridge {
     return this.query('godot4', topic);
   }
 
+  public lintDeprecations(code: string, ecosystem?: 'godot' | 'typescript'): DeprecationWarning[] {
+    return DeprecationLinter.lint(code, ecosystem);
+  }
+
   public saveToCache(cacheDir = path.resolve(process.cwd(), '.aegis', 'cache', 'context7')): void {
     try {
       fs.mkdirSync(cacheDir, { recursive: true });
@@ -166,27 +170,30 @@ export class Context7Bridge {
     } catch { /* ignore cache read errors */ }
   }
 
-  public injectDocumentationContext(basePrompt: string, targetFiles: string[]): string {
+  public injectDocumentationContext(basePrompt: string, targetFiles: string[], codeSnippets: string[] = []): string {
     const snippets: string[] = [];
     const hasGodot = targetFiles.some(f => f.endsWith('.gd') || f.endsWith('.tscn'));
     const hasTs = targetFiles.some(f => f.endsWith('.ts') || f.endsWith('.tsx'));
 
     if (hasGodot) {
       const gDoc = this.query('godot4', 'lifecycle');
-      if (gDoc.doc) snippets.push(this.formatDocSnippet(gDoc.doc));
+      const gWarnings = codeSnippets.flatMap(c => this.lintDeprecations(c, 'godot'));
+      if (gDoc.doc) snippets.push(this.formatDocSnippet(gDoc.doc, gWarnings));
     }
     if (hasTs) {
       const tDoc = this.query('typescript', 'node-test');
-      if (tDoc.doc) snippets.push(this.formatDocSnippet(tDoc.doc));
+      const tsWarnings = codeSnippets.flatMap(c => this.lintDeprecations(c, 'typescript'));
+      if (tDoc.doc) snippets.push(this.formatDocSnippet(tDoc.doc, tsWarnings));
     }
 
     if (snippets.length === 0) return basePrompt;
     return `${basePrompt}\n\n## 📚 Context7 Ground-Truth Documentation\n${snippets.join('\n\n')}\n`;
   }
 
-  private formatDocSnippet(doc: Context7DocEntry): string {
+  public formatDocSnippet(doc: Context7DocEntry, warnings: DeprecationWarning[] = []): string {
     const sigs = doc.signatures.map(s => `  - \`${s}\``).join('\n');
     const breaks = doc.breakingChanges ? `\n- Breaking Changes:\n${doc.breakingChanges.map(b => `  ⚠️ ${b}`).join('\n')}` : '';
-    return `### [${doc.library.toUpperCase()} v${doc.version}] ${doc.topic}\n- **Summary:** ${doc.summary}\n- **Key Signatures:**\n${sigs}${breaks}`;
+    const activeWarns = warnings.length > 0 ? `\n- Active Deprecation Warnings:\n${warnings.map(w => `  🚨 ${w.message}`).join('\n')}` : '';
+    return `### [${doc.library.toUpperCase()} v${doc.version}] ${doc.topic}\n- **Summary:** ${doc.summary}\n- **Key Signatures:**\n${sigs}${breaks}${activeWarns}`;
   }
 }

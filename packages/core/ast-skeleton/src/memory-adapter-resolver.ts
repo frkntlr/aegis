@@ -2,6 +2,7 @@ import type { RelationalGraph } from './relational-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
 import { LanguageBarrierGate } from './language-barrier-gate.js';
 import { GodotTopicResolver } from './godot-topic-resolver.js';
+import { DeprecationLinter, type DeprecationWarning } from './deprecation-linter.js';
 
 export interface MemoryResolverAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -10,6 +11,12 @@ export interface MemoryResolverAdapters {
 }
 
 export class MemoryAdapterResolver {
+  private static attachWarnings(doc: string, warnings: DeprecationWarning[], header: string): string {
+    if (warnings.length === 0) return doc;
+    const warnText = warnings.map(w => `  ⚠️ ${w.message}`).join('\n');
+    return `${doc}\n\n${header}\n${warnText}`;
+  }
+
   public static resolveGroundTruth(code: string, adapters: MemoryResolverAdapters, filePath?: string): string[] {
     const docs: string[] = [];
     if (!adapters.docProvider) return docs;
@@ -19,11 +26,15 @@ export class MemoryAdapterResolver {
     if (ecosystem === 'godot') {
       const topic = GodotTopicResolver.resolveTopic(code);
       const doc = adapters.docProvider('godot4', topic) || adapters.docProvider('godot4', 'lifecycle');
-      if (doc && LanguageBarrierGate.isAllowedDoc('godot', 'godot4')) docs.push(doc);
+      if (doc && LanguageBarrierGate.isAllowedDoc('godot', 'godot4')) {
+        docs.push(MemoryAdapterResolver.attachWarnings(doc, DeprecationLinter.lintGodot(code), '## 🚨 Active Deprecation Warnings'));
+      }
     } else if (ecosystem === 'typescript') {
       const topic = /test|assert/.test(code) ? 'node-test' : 'clean-arch';
       const doc = adapters.docProvider('typescript', topic) || adapters.docProvider('typescript', 'node-test');
-      if (doc && LanguageBarrierGate.isAllowedDoc('typescript', 'typescript')) docs.push(doc);
+      if (doc && LanguageBarrierGate.isAllowedDoc('typescript', 'typescript')) {
+        docs.push(MemoryAdapterResolver.attachWarnings(doc, DeprecationLinter.lintTypeScript(code), '## 🚨 Active Strict Linter Warnings'));
+      }
     }
     return docs;
   }

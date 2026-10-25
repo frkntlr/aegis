@@ -30,3 +30,4 @@ export * from './transitive-type-resolver.js';
 export * from './callee-signature-extractor.js';
 export * from './language-barrier-gate.js';
 export * from './godot-topic-resolver.js';
+export * from './deprecation-linter.js';
