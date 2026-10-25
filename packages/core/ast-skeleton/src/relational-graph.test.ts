@@ -130,3 +130,26 @@ test('GraphQueryEngine resolves scoped dot-syntax queries like Hero.take_damage'
   assert.strictEqual(trace.foundNode.name, 'take_damage');
   assert.strictEqual(trace.upstreamEdges.length, 1);
 });
+
+test('CrossReferenceLinker resolves relative TypeScript imports to normalized target file paths', () => {
+  const linker = new CrossReferenceLinker();
+  const callerCode = "import { helper } from './utils/helper.js';";
+  linker.linkSingleFile('src/services/user.ts', callerCode);
+
+  const graph = linker.getGraph();
+  const edges = graph.getOutgoing('src/services/user.ts');
+  assert.strictEqual(edges.length, 1);
+  assert.strictEqual(edges[0].to, 'src/services/utils/helper.ts');
+});
+
+test('GraphQueryEngine extractBlastRadius excludes dot-syntax symbols from file blast radius', () => {
+  const graph = new RelationalGraph();
+  graph.addEdge({ from: 'Hero.take_damage', to: 'Enemy.die', type: 'CALLS' });
+  graph.addEdge({ from: 'src/battle.ts', to: 'Hero.take_damage', type: 'CALLS' });
+
+  const engine = new GraphQueryEngine(graph);
+  const trace = engine.trace('Hero.take_damage');
+  assert.strictEqual(trace.blastRadiusFiles.includes('Hero.take_damage'), false);
+  assert.strictEqual(trace.blastRadiusFiles.includes('Enemy.die'), false);
+  assert.strictEqual(trace.blastRadiusFiles.includes('src/battle.ts'), true);
+});

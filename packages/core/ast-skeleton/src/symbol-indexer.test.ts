@@ -185,3 +185,15 @@ test('SymbolParser and CrossReferenceLinker parse Python/polyglot files with mul
   assert.ok(nodes.some(n => n.name === 'compute'));
   assert.ok(nodes.some(n => n.name === 'DataProcessor'));
 });
+
+test('SymbolIndexer findSymbols resolves all symbols in file when queried by file path', () => {
+  const indexer = new SymbolIndexer();
+  indexer.indexFile('src/models/user.ts', 'export class User { id: string; } export function createUser() {}');
+
+  const matchesDirect = indexer.findSymbols('src/models/user.ts');
+  assert.strictEqual(matchesDirect.length, 2);
+  assert.strictEqual(matchesDirect[0].name, 'User');
+
+  const matchesFilename = indexer.findSymbols('user.ts');
+  assert.strictEqual(matchesFilename.length, 2);
+});

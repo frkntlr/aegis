@@ -171,13 +171,21 @@ export class AstGrepBridge {
   }
 
   public static checkCliAvailable(): boolean {
-    const res = spawnSync('sg', ['--version'], { encoding: 'utf8', shell: true });
-    return res.status === 0;
+    try {
+      const res = spawnSync('sg', ['--version'], { encoding: 'utf8', shell: true });
+      return res.status === 0;
+    } catch {
+      return false;
+    }
   }
 
   public static runCli(args: string[], cwd = process.cwd()): string | null {
     if (!AstGrepBridge.checkCliAvailable()) return null;
-    const res = spawnSync('sg', args, { cwd, encoding: 'utf8', shell: true });
-    return res.stdout || res.stderr || '';
+    try {
+      const res = spawnSync('sg', args, { cwd, encoding: 'utf8', shell: true });
+      return res.stdout || res.stderr || '';
+    } catch {
+      return null;
+    }
   }
 }

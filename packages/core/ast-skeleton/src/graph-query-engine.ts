@@ -134,6 +134,12 @@ export class GraphQueryEngine {
     return Array.from(signals);
   }
 
+  private static isFilePath(val: string): boolean {
+    const clean = val.replace(/\\/g, '/');
+    if (clean.includes('/')) return true;
+    return /\.(ts|tsx|js|jsx|gd|py|rs|go|cpp|c|h|hpp|tscn|tres|json|md)$/i.test(clean);
+  }
+
   private extractBlastRadius(startId: string, upstream: RelationalEdge[], downstream: RelationalEdge[]): string[] {
     const files = new Set<string>();
     const startNode = this.graph.getNode(startId);
@@ -143,15 +149,15 @@ export class GraphQueryEngine {
       const nFrom = this.graph.getNode(e.from);
       if (nFrom?.filePath) files.add(nFrom.filePath);
       else {
-        const f1 = e.from.split('::')[0].replace(/\\/g, '/');
-        if (f1.includes('.') || f1.includes('/')) files.add(f1);
+        const f1 = e.from.split('::')[0];
+        if (GraphQueryEngine.isFilePath(f1)) files.add(f1.replace(/\\/g, '/'));
       }
 
       const nTo = this.graph.getNode(e.to);
       if (nTo?.filePath) files.add(nTo.filePath);
       else {
-        const f2 = e.to.split('::')[0].replace(/\\/g, '/');
-        if (f2.includes('.') || f2.includes('/')) files.add(f2);
+        const f2 = e.to.split('::')[0];
+        if (GraphQueryEngine.isFilePath(f2)) files.add(f2.replace(/\\/g, '/'));
       }
     }
     return Array.from(files);

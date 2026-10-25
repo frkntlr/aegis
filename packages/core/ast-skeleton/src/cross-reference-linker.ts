@@ -45,8 +45,27 @@ export class CrossReferenceLinker {
       this.linkGDScript(normPath, content);
     } else if (['.ts', '.tsx', '.js'].includes(ext)) {
       this.linkTypeScript(normPath, content);
-    } else if (['.py', '.rs', '.go'].includes(ext)) {
+    } else if (ext === '.py') {
+      this.linkPython(normPath, content);
+    } else if (['.rs', '.go'].includes(ext)) {
       this.linkGeneric(normPath, content);
+    }
+  }
+
+  private linkPython(filePath: string, content: string): void {
+    const symbols = SymbolParser.parseGeneric(filePath, content);
+    this.registerSymbols(filePath, symbols);
+    const lines = content.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const extMatch = trimmed.match(/class\s+([a-zA-Z_]\w*)\s*\(\s*([a-zA-Z_]\w*)\s*\):/);
+      if (extMatch) {
+        this.graph.addEdge({ from: `${filePath}::${extMatch[1]}`, to: extMatch[2], type: 'EXTENDS' });
+      }
+      const impMatch = trimmed.match(/from\s+([.\w]+)\s+import/);
+      if (impMatch) {
+        this.graph.addEdge({ from: filePath, to: impMatch[1], type: 'CALLS' });
+      }
     }
   }
 
@@ -127,7 +146,14 @@ export class CrossReferenceLinker {
       }
       const impMatch = trimmed.match(/import\s+.*from\s+['"]([^'"]+)['"]/);
       if (impMatch) {
-        this.graph.addEdge({ from: filePath, to: impMatch[1], type: 'CALLS' });
+        let target = impMatch[1];
+        if (target.startsWith('.')) {
+          const dir = path.posix.dirname(filePath);
+          const raw = path.posix.normalize(path.posix.join(dir, target));
+          target = raw.replace(/\.jsx?$/, '.ts').replace(/\.mjsx?$/, '.mts').replace(/\.cjsx?$/, '.cts');
+          if (!path.posix.extname(target)) target += '.ts';
+        }
+        this.graph.addEdge({ from: filePath, to: target, type: 'CALLS' });
       }
     }
   }

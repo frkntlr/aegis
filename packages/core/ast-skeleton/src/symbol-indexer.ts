@@ -100,6 +100,9 @@ export class SymbolIndexer {
   public findSymbols(query: string, customDb?: SymbolDatabase): SymbolEntry[] {
     const targetDb = customDb || this.db;
     const lowerQuery = query.toLowerCase().trim();
+    const fileMatches = this.findSymbolsByFilePath(lowerQuery, targetDb);
+    if (fileMatches.length > 0) return fileMatches;
+
     const exact: SymbolEntry[] = [];
     const suffix: SymbolEntry[] = [];
     const substr: SymbolEntry[] = [];
@@ -129,5 +132,16 @@ export class SymbolIndexer {
     }
     const fuzzy = FuzzyMatcher.findMatches(lowerQuery, allSymbols, s => s.name.toLowerCase(), 2);
     return fuzzy.map(f => f.item);
+  }
+
+  private findSymbolsByFilePath(lowerQuery: string, targetDb: SymbolDatabase): SymbolEntry[] {
+    const norm = lowerQuery.replace(/\\/g, '/');
+    for (const [fPath, fileData] of Object.entries(targetDb.files)) {
+      const lowerFPath = fPath.toLowerCase();
+      if (lowerFPath === norm || lowerFPath.endsWith('/' + norm) || lowerFPath.endsWith(norm)) {
+        if (fileData.symbols.length > 0) return fileData.symbols;
+      }
+    }
+    return [];
   }
 }

@@ -236,3 +236,42 @@ test('OrphanTaskReclaimer manages autonomous agents alice and bob', () => {
   assert.strictEqual(result.updatedIssues[0].status, 'ready');
   assert.strictEqual(result.updatedIssues[1].status, 'ready');
 });
+
+test('OrphanTaskReclaimer preserves active task in headless mode when agent holds file locks', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 20,
+      number: 20,
+      title: 'Headless task',
+      status: 'in_progress',
+      assignedAgent: 'solver',
+      targetFiles: ['src/solver.ts']
+    }
+  ];
+  const locks = new Map<string, string>([['src/solver.ts', 'solver']]);
+
+  // sessions is omitted/empty in headless CLI
+  const result = reclaimer.scanAndReclaim(issues, locks, []);
+  assert.strictEqual(result.reclaimed.length, 0);
+  assert.strictEqual(result.updatedIssues[0].status, 'in_progress');
+});
+
+test('OrphanTaskReclaimer reclaims headless task when agent holds no file locks', () => {
+  const reclaimer = new OrphanTaskReclaimer();
+  const issues: ReclaimCandidate[] = [
+    {
+      id: 21,
+      number: 21,
+      title: 'Stalled headless task',
+      status: 'in_progress',
+      assignedAgent: 'solver',
+      targetFiles: ['src/solver.ts']
+    }
+  ];
+  const locks = new Map<string, string>(); // Zero locks!
+
+  const result = reclaimer.scanAndReclaim(issues, locks, []);
+  assert.strictEqual(result.reclaimed.length, 1);
+  assert.ok(result.reclaimed[0].reason.includes('zero active file locks'));
+});

@@ -77,7 +77,7 @@ export class OrphanTaskReclaimer {
       return null;
     }
 
-    const sessionCheck = this.isAgentSessionActive(issue.assignedAgent, sessions);
+    const sessionCheck = sessions.length > 0 ? this.isAgentSessionActive(issue.assignedAgent, sessions) : { active: true };
     if (!sessionCheck.active) {
       return sessionCheck.reason ?? 'Agent session is inactive.';
     }
@@ -89,6 +89,11 @@ export class OrphanTaskReclaimer {
       });
       if (!hasAnyLock) {
         return `Assigned agent [${issue.assignedAgent}] holds zero active file locks for target files.`;
+      }
+    } else if (sessions.length === 0) {
+      const hasAny = Array.from(lockedFiles.values()).some(h => h.toLowerCase() === issue.assignedAgent?.toLowerCase());
+      if (!hasAny) {
+        return `Assigned agent [${issue.assignedAgent}] holds zero active file locks in workspace.`;
       }
     }
 

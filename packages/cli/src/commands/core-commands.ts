@@ -92,7 +92,6 @@ async function reclaimStaleTasks(ghClient: GitHubClient, wtManager: WorktreeMana
 async function syncOrLoadAutoIssues(ghClient: GitHubClient, wtManager: WorktreeManager): Promise<void> {
   if (ghClient.isLive()) {
     await ghClient.syncFromLive('all');
-    await reclaimStaleTasks(ghClient, wtManager);
   } else {
     const localIssuesFile = path.resolve(process.cwd(), '.aegis', 'issues.json');
     if (fs.existsSync(localIssuesFile)) {
@@ -104,6 +103,7 @@ async function syncOrLoadAutoIssues(ghClient: GitHubClient, wtManager: WorktreeM
       } catch { /* ignore */ }
     }
   }
+  await reclaimStaleTasks(ghClient, wtManager);
 }
 
 function printClaimedTask(result: { agentName: string; issue: { number: number; title: string; targetFiles: string[] } }): void {
