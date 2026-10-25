@@ -15,8 +15,9 @@ export function getSharedMemoryEngine(): CodebaseMemoryEngine {
       docProvider: (lib, top) => {
         const res = bridge.query(lib, top);
         if (res.matched && res.doc) {
-          const sigs = res.doc.signatures.map(s => `  - ${s}`).join('\n');
-          return `[${res.doc.library.toUpperCase()} v${res.doc.version}] ${res.doc.summary}\n${sigs}`;
+          const sigs = res.doc.signatures.slice(0, 3).map(s => `  - ${s}`).join('\n');
+          const breaks = res.doc.breakingChanges?.length ? `\n  ⚠️ ${res.doc.breakingChanges[0]}` : '';
+          return `[${res.doc.library.toUpperCase()} v${res.doc.version}] ${res.doc.summary}\n${sigs}${breaks}`;
         }
         return null;
       },

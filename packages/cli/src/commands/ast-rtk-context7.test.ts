@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import { handleAstSearch, handleAstReplace } from './ast-grep-command.js';
 import { handleRtkCompress } from './rtk-command.js';
 import { handleContext7Query } from './context7-command.js';
+import { handleMemoryQuery } from './memory-command.js';
 
 test('handleAstSearch and handleAstReplace execute without error and transform target files', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ast-cmd-test-'));
@@ -15,7 +16,7 @@ test('handleAstSearch and handleAstReplace execute without error and transform t
   try {
     let output = '';
     const origLog = console.log;
-    console.log = (...args) => { output += args.join(' ') + '\n'; };
+    console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
     try {
       handleAstSearch('function $F($X, $Y) { $$$B }', tmpDir);
@@ -41,7 +42,7 @@ test('handleRtkCompress compresses terminal output from file', () => {
   try {
     let output = '';
     const origLog = console.log;
-    console.log = (...args) => { output += args.join(' ') + '\n'; };
+    console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
     try {
       handleRtkCompress(logFile);
@@ -59,12 +60,27 @@ test('handleRtkCompress compresses terminal output from file', () => {
 test('handleContext7Query retrieves official library documentation', () => {
   let output = '';
   const origLog = console.log;
-  console.log = (...args) => { output += args.join(' ') + '\n'; };
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
   try {
     handleContext7Query('godot4', 'lifecycle');
     assert.ok(output.includes('Context7 Documentation [GODOT4'));
     assert.ok(output.includes('PackedScene.instantiate()'));
+  } finally {
+    console.log = origLog;
+  }
+});
+
+test('handleMemoryQuery injects surgical Ground-Truth without ecosystem bleeding', () => {
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
+
+  try {
+    handleMemoryQuery('handleAstSearch');
+    assert.ok(output.includes('Ground-Truth Engine Documentation (Context7)'));
+    assert.ok(output.includes('TYPESCRIPT'));
+    assert.ok(!output.includes('GODOT4'));
   } finally {
     console.log = origLog;
   }

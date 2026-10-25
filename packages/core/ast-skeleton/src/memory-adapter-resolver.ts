@@ -13,7 +13,7 @@ export interface MemoryResolverAdapters {
 export class MemoryAdapterResolver {
   private static attachWarnings(doc: string, warnings: DeprecationWarning[], header: string): string {
     if (warnings.length === 0) return doc;
-    const warnText = warnings.map(w => `  ⚠️ ${w.message}`).join('\n');
+    const warnText = warnings.slice(0, 2).map(w => `  ⚠️ ${w.message}`).join('\n');
     return `${doc}\n\n${header}\n${warnText}`;
   }
 
