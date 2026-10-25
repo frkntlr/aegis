@@ -120,3 +120,24 @@ test('CodebaseMemoryEngine: indexes directories and tracks cache hits', () => {
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('CodebaseMemoryEngine: queryMemory returns real callers, callees, and surgical blast radius for class and functions', () => {
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  const gatewayCode = 'export class PaymentGateway { charge() { return true; } }';
+  const serviceCode = "import { PaymentGateway } from './gateway.js'; export class OrderService { pay() { const gw = new PaymentGateway(); gw.charge(); } }";
+  const controllerCode = "import { OrderService } from './service.js'; export function handleCheckout() { const s = new OrderService(); s.pay(); }";
+
+  engine.indexFile('src/gateway.ts', gatewayCode);
+  engine.indexFile('src/service.ts', serviceCode);
+  engine.indexFile('src/controller.ts', controllerCode);
+
+  const qGateway = engine.queryMemory('PaymentGateway');
+  assert.strictEqual(qGateway.found, true);
+  assert.ok(qGateway.callers.some(c => c.includes('OrderService') || c.includes('service.ts')), 'Gateway callers must include OrderService');
+  assert.ok(qGateway.blastRadius.includes('src/service.ts'));
+
+  const qService = engine.queryMemory('OrderService');
+  assert.strictEqual(qService.found, true);
+  assert.ok(qService.callers.some(c => c.includes('handleCheckout') || c.includes('controller.ts')), 'OrderService callers must include handleCheckout');
+  assert.ok(qService.callees.some(c => c.includes('charge') || c.includes('PaymentGateway')), 'OrderService callees must include charge');
+});

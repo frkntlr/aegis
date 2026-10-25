@@ -32,11 +32,19 @@ export function getSharedMemoryEngine(): CodebaseMemoryEngine {
   return sharedEngine;
 }
 
+function formatEdgeEndpoint(endpoint: string): string {
+  if (endpoint.includes('::')) {
+    const [fp, sym] = endpoint.split('::');
+    return `${path.basename(fp)}::${sym}`;
+  }
+  return path.basename(endpoint);
+}
+
 function printMemoryQueryResult(res: MemoryQueryResult): void {
   console.log(`🧠 Codebase Memory: '${res.symbol}' [${res.filePath || 'virtual'}]`);
   console.log(` • Sliced Tokens:  ~${res.tokenSavingsPercent}% Token Savings`);
-  console.log(` • Upstream:       ${res.callers.length > 0 ? res.callers.join(', ') : 'None'}`);
-  console.log(` • Downstream:     ${res.callees.length > 0 ? res.callees.join(', ') : 'None'}`);
+  console.log(` • Upstream:       ${res.callers.length > 0 ? res.callers.map(formatEdgeEndpoint).join(', ') : 'None'}`);
+  console.log(` • Downstream:     ${res.callees.length > 0 ? res.callees.map(formatEdgeEndpoint).join(', ') : 'None'}`);
   console.log(` • Blast Radius:   ${res.blastRadius.length} file(s)`);
 
   if (res.groundTruthDocs.length > 0) {
@@ -63,7 +71,7 @@ export function handleMemoryQuery(symbol?: string, worktreeId = 'default', rawLo
 
   const engine = getSharedMemoryEngine();
   const stats = engine.getMemoryStats(worktreeId);
-  if (stats.totalFiles === 0) {
+  if (stats.totalFiles === 0 || stats.totalEdges === 0) {
     const scanDir = fs.existsSync('packages') ? 'packages' : '.';
     engine.indexDirectory(scanDir, worktreeId);
   }

@@ -4,8 +4,9 @@ import * as path from 'node:path';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { SymbolSliceExtractor, type SliceResult } from './symbol-slice-extractor.js';
 import { RelationalGraph } from './relational-graph.js';
-import { GraphQueryEngine } from './graph-query-engine.js';
+import { GraphQueryEngine, type TraceResult } from './graph-query-engine.js';
 import { CrossReferenceLinker } from './cross-reference-linker.js';
+import { MemoryAdapterResolver } from './memory-adapter-resolver.js';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -189,6 +190,8 @@ export class CodebaseMemoryEngine {
     const sliceResult = this.resolveSlice(ns, symbol, options.contextLines ?? 3);
     const traceResult = ns.queryEngine.trace(symbol, options.maxDepth ?? 5);
 
+    this.enrichClassTrace(ns, symbol, traceResult);
+
     const callers = traceResult.upstreamEdges.map(e => e.from);
     const callees = traceResult.downstreamEdges.map(e => e.to);
     const targetFile = sliceResult ? sliceResult.filePath : undefined;
@@ -206,53 +209,44 @@ export class CodebaseMemoryEngine {
       blastRadius: traceResult.blastRadiusFiles,
       connectedSignals: traceResult.connectedSignals,
       connectedScenes: traceResult.connectedScenes,
-      groundTruthDocs: this.resolveGroundTruth(sliceResult?.codeSlice || symbol, targetFile),
-      constitutionRules: this.resolveConstitution(targetFile),
-      compressedLogs: this.compressLogs(options.rawLogs)
+      groundTruthDocs: MemoryAdapterResolver.resolveGroundTruth(sliceResult?.codeSlice || symbol, this.adapters, targetFile),
+      constitutionRules: MemoryAdapterResolver.resolveConstitution(this.adapters, targetFile),
+      compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters)
     };
   }
 
-  private resolveGroundTruth(code: string, filePath?: string): string[] {
-    const docs: string[] = [];
-    if (!this.adapters.docProvider) return docs;
+  private enrichClassTrace(ns: MemoryNamespace, symbol: string, traceResult: TraceResult): void {
+    const isClass = /^[A-Z]\w+$/.test(symbol) || ns.indexer.findSymbols(symbol).some(s => s.kind === 'class');
+    if (!isClass) return;
 
-    const isGodot = (filePath && filePath.endsWith('.gd')) || /PackedScene|CharacterBody2D|Node|signal/.test(code);
-    if (isGodot) {
-      const topic = /velocity|move_and_slide/.test(code) ? 'physics' : (/signal|emit|connect/.test(code) ? 'signals' : 'lifecycle');
-      const doc = this.adapters.docProvider('godot4', topic) || this.adapters.docProvider('godot4', 'lifecycle');
-      if (doc) docs.push(doc);
-    }
-    const isTs = (filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))) || /interface|type\s+|declare/.test(code);
-    if (isTs) {
-      const topic = /test|assert/.test(code) ? 'node-test' : 'clean-arch';
-      const doc = this.adapters.docProvider('typescript', topic) || this.adapters.docProvider('typescript', 'node-test');
-      if (doc) docs.push(doc);
-    }
-    return docs;
-  }
+    const className = traceResult.foundNode?.name || symbol;
+    const methodPrefix = `${className}.`;
+    const seenEdges = new Set(traceResult.upstreamEdges.map(e => `${e.from}->${e.to}:${e.type}`));
 
-  private resolveConstitution(filePath?: string): string[] {
-    if (this.adapters.constitutionProvider && filePath) {
-      return this.adapters.constitutionProvider(filePath);
+    for (const node of ns.graph.getAllNodes()) {
+      if (node.name.startsWith(methodPrefix) || node.id.includes(`::${methodPrefix}`)) {
+        const methodTrace = ns.queryEngine.trace(node.id, 2);
+        for (const edge of methodTrace.upstreamEdges) {
+          const key = `${edge.from}->${edge.to}:${edge.type}`;
+          if (!seenEdges.has(key)) {
+            seenEdges.add(key);
+            traceResult.upstreamEdges.push(edge);
+          }
+        }
+        for (const edge of methodTrace.downstreamEdges) {
+          const key = `${edge.from}->${edge.to}:${edge.type}`;
+          if (!seenEdges.has(key)) {
+            seenEdges.add(key);
+            traceResult.downstreamEdges.push(edge);
+          }
+        }
+        for (const file of methodTrace.blastRadiusFiles) {
+          if (!traceResult.blastRadiusFiles.includes(file)) {
+            traceResult.blastRadiusFiles.push(file);
+          }
+        }
+      }
     }
-    const rules = [
-      'Iron Cage Rule 1: Max 300 lines per source file.',
-      'Iron Cage Rule 2: Max 40 lines per function body.',
-      'Iron Cage Rule 3: Surgical unified diff modifications only.'
-    ];
-    if (filePath && filePath.endsWith('.gd')) {
-      rules.push('Godot Rule GD_007: Do not use get_parent() directly; decouple with signals.');
-      rules.push('Godot Rule GD_005: Always free or add instantiated nodes to the scene tree.');
-    }
-    return rules;
-  }
-
-  private compressLogs(rawLogs?: string): string | undefined {
-    if (!rawLogs) return undefined;
-    if (this.adapters.logCompressor) {
-      return this.adapters.logCompressor(rawLogs).text;
-    }
-    return rawLogs.split('\n').filter(l => !l.includes('node:internal')).join('\n');
   }
 
   public getMemoryStats(worktreeId = 'default'): MemoryStats {
