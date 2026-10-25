@@ -2,10 +2,10 @@
 ### Hızlı Cerrahi Kod Arama (Symbol Slicing) ve Sahte Bug Patlamasını Önleyen Katmanlı Triage Mimarisi
 
 - **RFC ID:** RFC-003
-- **Durum:** Approved / Implementation Blueprint Ready 🎯
+- **Durum:** Implemented (Tamamlandı) ✅
 - **Tarih:** 2026-10-24
 - **Yazar:** Furkan Canberk Atalar & Aegis Architecture Guild
-- **Kaynak Tartışma:** [GitHub Discussion #53](https://github.com/frkntlr/aegis/discussions/53)
+- **Kaynak Tartışma:** [GitHub Discussion #53](https://github.com/frkntlr/aegis/discussions/53) | **Çözülen Issue:** [#54](https://github.com/frkntlr/aegis/issues/54)
 - **Kapsam:** `@aegis/ast-skeleton`, `@aegis/iron-cage`, `@aegis/orchestrator`, `@aegis/cli`, `@aegis/shared`
 
 ---
@@ -206,8 +206,8 @@ npm run aegis -- triage packages/core
 
 ## 🎯 6. Atomik Görev Dağılımı ve Uygulama Yol Haritası
 
-- [ ] **Görev 1 (Index Engine):** `packages/core/ast-skeleton/src/symbol-indexer.ts` ve birim testleri (`symbol-indexer.test.ts`).
-- [ ] **Görev 2 (Slice Engine):** `packages/core/ast-skeleton/src/symbol-slice-extractor.ts` ve cerrahi dilimleme testleri.
-- [ ] **Görev 3 (Triage Gate):** `packages/core/iron-cage/src/triage-gate.ts` ve kanıt ayrıştırma testleri (`triage-gate.test.ts`).
-- [ ] **Görev 4 (CLI & Ajan Köprüsü):** `packages/cli/src/commands/find-command.ts`, `triage-command.ts` ve `compilePrompt` entegrasyonu.
-- [ ] **Görev 5 (Doğrulama):** Demir Kafes %100 uyumu ve `npm test` tam yeşil geçişi.
+- [x] **Görev 1 (Index Engine):** `packages/core/ast-skeleton/src/symbol-indexer.ts` ve birim testleri (`symbol-indexer.test.ts`).
+- [x] **Görev 2 (Slice Engine):** `packages/core/ast-skeleton/src/symbol-slice-extractor.ts` ve cerrahi dilimleme testleri.
+- [x] **Görev 3 (Triage Gate):** `packages/core/iron-cage/src/triage-gate.ts` ve kanıt ayrıştırma testleri (`triage-gate.test.ts`).
+- [x] **Görev 4 (CLI & Ajan Köprüsü):** `packages/cli/src/commands/find-command.ts`, `triage-command.ts` ve `compilePrompt` entegrasyonu.
+- [x] **Görev 5 (Doğrulama):** Demir Kafes %100 uyumu ve `npm test` tam yeşil geçişi.

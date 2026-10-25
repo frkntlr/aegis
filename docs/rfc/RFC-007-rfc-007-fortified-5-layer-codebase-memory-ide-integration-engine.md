@@ -1,7 +1,8 @@
 # 🏛️ RFC-007: Fortified 5-Layer Codebase Memory IDE Integration Engine
 ### Aegis Autonomous Architecture Blueprint & Living Memory
 
-- **RFC ID:** RFC-007 | **Durum:** Approved | **Tarih:** 2026-10-25 | **Origin:** User Architectural Proposal & Meta-Reflex
+- **RFC ID:** RFC-007 | **Durum:** Implemented (Tamamlandı) ✅ | **Tarih:** 2026-10-25 | **Origin:** User Architectural Proposal & Meta-Reflex
+- **Tartışma:** [Discussion #61](https://github.com/frkntlr/aegis/discussions/61) | **Çözülen Issue:** [#62](https://github.com/frkntlr/aegis/issues/62)
 
 ---
 
@@ -64,9 +65,9 @@ Bu RFC, söz konusu 5 zaafı kökten gideren **5 Katmanlı Birleşik Codebase-Me
 ---
 
 ## 🎯 4. Kabul Kriterleri (Acceptance Criteria)
-- [ ] `CodebaseMemoryOrchestrator` sınıfı `packages/core/ast-skeleton` içinde 5 katmanı birleştirecek şekilde inşa edildi.
-- [ ] Artımlı SHA-256 tabanlı parmak izi ve worktree namespace desteği eklendi.
-- [ ] Context7 çapa enjeksiyonu ve RTK token killer temizliği hafıza sorgularına entegre edildi.
-- [ ] CLI komutu `aegis memory:query <symbol>` ve `aegis memory:stats` hayata geçirildi.
-- [ ] Antigravity ve IDE araç şemalarına `memory_query` MCP aracı eklendi.
-- [ ] Kapsamlı birim testleri hazırlandı ve %100 Demir Kafes / Mutasyon uyumluluğu sağlandı.
+- [x] `CodebaseMemoryOrchestrator` sınıfı `packages/core/ast-skeleton` içinde 5 katmanı birleştirecek şekilde inşa edildi.
+- [x] Artımlı SHA-256 tabanlı parmak izi ve worktree namespace desteği eklendi.
+- [x] Context7 çapa enjeksiyonu ve RTK token killer temizliği hafıza sorgularına entegre edildi.
+- [x] CLI komutu `aegis memory:query <symbol>` ve `aegis memory:stats` hayata geçirildi.
+- [x] Antigravity ve IDE araç şemalarına `memory_query` MCP aracı eklendi.
+- [x] Kapsamlı birim testleri hazırlandı ve %100 Demir Kafes / Mutasyon uyumluluğu sağlandı.

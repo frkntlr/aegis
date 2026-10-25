@@ -2,10 +2,10 @@
 ### Godot Sahneleri (.tscn), GDScript Sinyalleri, Sınıf Kalıtımları ve Kod Bağımlılıkları İçin Deterministik İlişki Haritası
 
 - **RFC ID:** RFC-004
-- **Durum:** Approved / Implementation Blueprint Ready 🎯
+- **Durum:** Implemented (Tamamlandı) ✅
 - **Tarih:** 2026-10-24
 - **Yazar:** Furkan Canberk Atalar & Aegis Architecture Guild
-- **Kaynak Tartışma:** [GitHub Discussion #55](https://github.com/frkntlr/aegis/discussions/55)
+- **Kaynak Tartışma:** [GitHub Discussion #55](https://github.com/frkntlr/aegis/discussions/55) | **Çözülen Issue:** [#56](https://github.com/frkntlr/aegis/issues/56)
 - **Kapsam:** `@aegis/ast-skeleton`, `@aegis/godot-bridge`, `@aegis/orchestrator`, `@aegis/cli`, `@aegis/shared`
 
 ---
@@ -136,10 +136,10 @@ Tüm çalışma alanını tarar, sahneleri, scriptleri ve sinyalleri birbirine b
 
 ## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
 
-- [ ] `packages/core/ast-skeleton/src/relational-graph.ts` (Düğüm, kenar ekleme, silme, serialization).
-- [ ] `packages/core/ast-skeleton/src/tscn-relation-parser.ts` (`.tscn` içindeki script, düğüm, connection ve instance eşleştirmesi).
-- [ ] `packages/core/ast-skeleton/src/graph-query-engine.ts` (Döngü korumalı trace, blast radius ve caller/listener sorguları).
-- [ ] `packages/core/ast-skeleton/src/cross-reference-linker.ts` (`res://` yollarını çözme, sinyalleri ve çağrıları bağlama).
-- [ ] CLI komutları: `aegis trace <target>` ve `aegis graph:scan [dir]`.
-- [ ] `aegis find` çıktısına bağlantılı sinyal ve sahne ilişkilerini otomatik ekleme.
-- [ ] Demir Kafes (%100 temiz, <40 satır/fonksiyon, <300 satır/dosya) ve tam yeşil testler.
+- [x] `packages/core/ast-skeleton/src/relational-graph.ts` (Düğüm, kenar ekleme, silme, serialization).
+- [x] `packages/core/ast-skeleton/src/tscn-relation-parser.ts` (`.tscn` içindeki script, düğüm, connection ve instance eşleştirmesi).
+- [x] `packages/core/ast-skeleton/src/graph-query-engine.ts` (Döngü korumalı trace, blast radius ve caller/listener sorguları).
+- [x] `packages/core/ast-skeleton/src/cross-reference-linker.ts` (`res://` yollarını çözme, sinyalleri ve çağrıları bağlama).
+- [x] CLI komutları: `aegis trace <target>` ve `aegis graph:scan [dir]`.
+- [x] `aegis find` çıktısına bağlantılı sinyal ve sahne ilişkilerini otomatik ekleme.
+- [x] Demir Kafes (%100 temiz, <40 satır/fonksiyon, <300 satır/dosya) ve tam yeşil testler.

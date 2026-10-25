@@ -1,8 +1,8 @@
 # 🏛️ RFC-005: Language-Specific Clean Architecture and Anti-Spaghetti Guardrails Engine
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-005 | **Durum:** Approved | **Tarih:** 2026-10-25
-- **Tartışma:** [Discussion #57](https://github.com/frkntlr/aegis/discussions/57) | **Takip Eden Issue:** [#58](https://github.com/frkntlr/aegis/issues/58)
+- **RFC ID:** RFC-005 | **Durum:** Implemented (Tamamlandı) ✅ | **Tarih:** 2026-10-25
+- **Tartışma:** [Discussion #57](https://github.com/frkntlr/aegis/discussions/57) | **Çözülen Issue:** [#58](https://github.com/frkntlr/aegis/issues/58)
 
 ---
 
@@ -30,8 +30,8 @@ RFC-005, iki katmanlı hibrit bir kalkan getirir:
 ---
 
 ## 🎯 3. Kabul Kriterleri (Acceptance Criteria)
-- [ ] Hedeflenen dosya tipine göre dinamik temiz mimari anayasası üreten `LanguageConstitutionGenerator` modülü.
-- [ ] Godot 4 için `GD_007` ve `GD_008` AST kurallarının `gdscript-rules.ts` içine eklenmesi.
-- [ ] TypeScript için `TS_001`, `TS_002` ve `TS_003` AST kurallarının `clean-architecture-rules.ts` içinde uygulanması.
-- [ ] Tüm yeni kuralların birim testlerle doğrulanması.
-- [ ] Demir Kafes %100 uyumluluğu ve izole worktree (`experimental/solver`) boru hattından geçiş.
+- [x] Hedeflenen dosya tipine göre dinamik temiz mimari anayasası üreten `LanguageConstitutionGenerator` modülü.
+- [x] Godot 4 için `GD_007` ve `GD_008` AST kurallarının `gdscript-rules.ts` içine eklenmesi.
+- [x] TypeScript için `TS_001`, `TS_002` ve `TS_003` AST kurallarının `clean-architecture-rules.ts` içinde uygulanması.
+- [x] Tüm yeni kuralların birim testlerle doğrulanması.
+- [x] Demir Kafes %100 uyumluluğu ve izole worktree (`experimental/solver`) boru hattından geçiş.
