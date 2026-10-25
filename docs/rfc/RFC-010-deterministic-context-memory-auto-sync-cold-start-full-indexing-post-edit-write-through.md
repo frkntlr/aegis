@@ -39,7 +39,28 @@ Aegis'in 5-Katmanlı Kod Hafızası (`CodebaseMemoryEngine`), dil modellerine ve
 
 ---
 
-## 📊 3. Mevcut vs Hedeflenen Mantık Kıyaslama Matrisi
+## 💬 3. Tartışılan Açık Sorular ve Kesin Mimari Kararlar (Resolved Decisions)
+
+Discussion #219 altında yürütülen müzakere sonucunda aşağıdaki mimari kararlar kesinleştirilmiştir:
+
+### A. Performans, Bellek Tüketimi ve Token Dengesi (3-Tier Model)
+- **Tier 1 (RAM / Micro-Cache):** Aktif dosyalar için `LruFileBuffer` (kapasite: 100 dosya, RAM <50MB).
+- **Tier 2 (Disk FastSync Index):** `.aegis/memory/<worktree>.json` dosyasında tam metinler yerine yalnızca sembol AST'si ve parmak izi saklanır (disk boyutu 3-5MB tavanı).
+- **Tier 3 (Ground-Truth On-Demand):** Context7 dokümantasyonu ve loglar yalnızca sorgu anında dinamik okunur ve RTK Token Killer ile sıkıştırılır.
+- **Token Tasarrufu:** `SymbolSliceExtractor` ham dosya yerine yalnızca hedeflenen sembolün 1-derinlik dilimini sunarak %85-%95 token tasarrufu sağlar.
+
+### B. Geriye Dönük Uyumluluk ve Çoklu Worktree Senkronizasyonu
+- **İzole Ad Alanı:** `ActiveHeadResolver` ile her worktree (`solver`, `qa`, `docs`) izole CoW disk hafızasında yaşar; ajanlar arası çizge kirliliği sıfırdır.
+- **Bellek Füzyonu (`MemoryFusionSync`):** 4-aşamalı atomik merge hattında (`AgentMergeWorkflow`), birleştirilen dosya sembolleri otomatik olarak `master.json` ve kardeş worktree hafızalarına aktarılır.
+- **Şema Göçü:** Eski sürüm önbellekler açılışta taranarak yeni alanlar varsayılanlarla doldurulur; önbellek sıfırlanmadan yumuşak göç sağlanır.
+
+### C. Alternatif Yaklaşımlar: Neden Vektör/RAG Değil, 5-Katmanlı Motor?
+- Vektör tabanlı anlamsal benzerlik arama yöntemleri derleyici kesinliği sağlayamaz, halüsinasyona (uydurma fonksiyon/import) açıktır ve ağır Python/Torch bağımlılıkları gerektirir.
+- Aegis 5-Katmanlı Motor (AST İskeleti, İlişkisel Çizge, Context7, Demir Kafes, Worktree Mutex) sıfır harici bağımlılıkla milisaniyeler seviyesinde kesinlik, proaktif satır kotası denetimi ve determinizm sunar.
+
+---
+
+## 📊 4. Mevcut vs Hedeflenen Mantık Kıyaslama Matrisi
 
 | Kabiliyet | Mevcut Durum (Nasıl Yapıyor?) | Hedeflenen Mantık (Ne İstiyoruz?) | Uyum & Karar |
 | :--- | :--- | :--- | :---: |
@@ -52,7 +73,7 @@ Aegis'in 5-Katmanlı Kod Hafızası (`CodebaseMemoryEngine`), dil modellerine ve
 
 ---
 
-## ⚠️ 4. Riskler & Etki Alanı Analizi (Blast Radius & Mitigation Strategies)
+## ⚠️ 5. Riskler & Etki Alanı Analizi (Blast Radius & Mitigation Strategies)
 
 Canlı Aegis hafıza telemetrisi (`memory:query`, `memory:stats`, `trace`) üzerinden yürütülen tanı araştırmasında aşağıdaki riskler tespit edilmiştir:
 
@@ -72,14 +93,14 @@ Canlı Aegis hafıza telemetrisi (`memory:query`, `memory:stats`, `trace`) üzer
 
 ---
 
-## 🔒 5. Demir Kafes ve Mimari Standartlar
+## 🔒 6. Demir Kafes ve Mimari Standartlar
 - Maksimum 300 satır/dosya, maksimum 40 satır/fonksiyon.
 - Non-blocking asenkron tam tarama (arka plan worker veya chunked event loop).
 - Sadece cerrahi unified diff ve 0 false-alarm garantisi.
 
 ---
 
-## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
+## 🎯 7. Kabul Kriterleri (Acceptance Criteria)
 - [ ] `CodebaseMemoryEngine.ensureColdStartIndexed(repoRoot)` metodu eklendi; bellek boşsa tüm proje ağacını proaktif indeksliyor.
 - [ ] `CodebaseMemoryEngine.notifyFileChanged(filePath, content)` write-through hook'u tanımlandı.
 - [ ] CLI, Auto Runner ve Task Dispatcher başlangıcında cold-start tetikleniyor.
