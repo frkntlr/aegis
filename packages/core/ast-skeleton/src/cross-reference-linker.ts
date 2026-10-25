@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { RelationalGraph } from './relational-graph.js';
 import { TscnRelationParser } from './tscn-relation-parser.js';
 import { SymbolParser, type SymbolEntry } from './symbol-parser.js';
+import { TsCallGraphExtractor } from './ts-call-graph-extractor.js';
 
 export class CrossReferenceLinker {
   private graph: RelationalGraph;
@@ -136,6 +137,11 @@ export class CrossReferenceLinker {
   private linkTypeScript(filePath: string, content: string): void {
     const symbols = SymbolParser.parseTypeScript(filePath, content);
     this.registerSymbols(filePath, symbols);
+
+    const callEdges = TsCallGraphExtractor.extractCallEdges(filePath, content);
+    for (const edge of callEdges) {
+      this.graph.addEdge(edge);
+    }
 
     const lines = content.split(/\r?\n/);
     for (const line of lines) {
