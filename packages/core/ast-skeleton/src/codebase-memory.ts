@@ -10,6 +10,7 @@ import { MemoryAdapterResolver } from './memory-adapter-resolver.js';
 import { LruFileBuffer } from './lru-file-buffer.js';
 import { MemoryDiskStore } from './memory-disk-store.js';
 import { GitFastSyncEngine } from './git-fast-sync.js';
+import { ActiveHeadResolver } from './active-head-resolver.js';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -74,14 +75,7 @@ export class CodebaseMemoryEngine {
   }
 
   public static resolveWorktreeIdFromCwd(cwd = process.cwd()): string {
-    const norm = cwd.replace(/\\/g, '/');
-    const match = norm.match(/(?:experimental|worktrees|\.worktrees)\/([^/]+)/);
-    if (match) return match[1];
-    const base = path.basename(norm);
-    if (base.includes('-solver') || base.includes('-qa') || base.includes('-docs') || base.includes('-ui')) {
-      return base;
-    }
-    return 'default';
+    return ActiveHeadResolver.resolveActiveWorktree(cwd);
   }
 
   private getNamespace(id = 'default'): MemoryNamespace {

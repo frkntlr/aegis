@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { CodebaseMemoryEngine, CodebaseMemoryWatcher, type MemoryQueryResult } from '@aegis/ast-skeleton';
+import { CodebaseMemoryEngine, CodebaseMemoryWatcher, ActiveHeadResolver, type MemoryQueryResult } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import { showBanner } from './banner.js';
@@ -63,18 +63,22 @@ function printMemoryQueryResult(res: MemoryQueryResult): void {
   }
 }
 
-export function handleMemoryQuery(symbol?: string, worktreeId = 'default', rawLogsPath?: string): void {
+export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsPath?: string): void {
   showBanner();
   if (!symbol) {
     console.error('❌ Usage: aegis memory:query <symbol> [worktreeId] [rawLogsPath]');
     process.exit(1);
   }
 
+  const activeWorktree = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+
   const engine = getSharedMemoryEngine();
-  const stats = engine.getMemoryStats(worktreeId);
+  const stats = engine.getMemoryStats(activeWorktree);
   if (stats.totalFiles === 0 || stats.totalEdges === 0) {
     const scanDir = fs.existsSync('packages') ? 'packages' : '.';
-    engine.indexDirectory(scanDir, worktreeId);
+    engine.indexDirectory(scanDir, activeWorktree);
   }
 
   let rawLogs: string | undefined;
@@ -82,18 +86,22 @@ export function handleMemoryQuery(symbol?: string, worktreeId = 'default', rawLo
     rawLogs = fs.readFileSync(rawLogsPath, 'utf8');
   }
 
-  const res = engine.queryMemory(symbol, { worktreeId, rawLogs });
+  const res = engine.queryMemory(symbol, { worktreeId: activeWorktree, rawLogs });
   if (!res.found) {
-    console.log(`⚠️  Symbol '${symbol}' not found in Codebase Memory [worktree: ${worktreeId}].`);
+    console.log(`⚠️  Symbol '${symbol}' not found in Codebase Memory [worktree: ${activeWorktree}].`);
     return;
   }
   printMemoryQueryResult(res);
 }
 
-export function handleMemoryStats(worktreeId = 'default'): void {
+export function handleMemoryStats(worktreeId?: string): void {
   showBanner();
+  const activeWorktree = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+
   const engine = getSharedMemoryEngine();
-  const s = engine.getMemoryStats(worktreeId);
+  const s = engine.getMemoryStats(activeWorktree);
 
   console.log(`🧠 Codebase Memory Diagnostics [Worktree: ${s.worktreeId}]`);
   console.log(` • Indexed Files:       ${s.totalFiles}`);
@@ -103,14 +111,18 @@ export function handleMemoryStats(worktreeId = 'default'): void {
   console.log(` • Estimated Savings:   ~${s.estimatedTokenSavings}% Token Reduction`);
 }
 
-export function handleMemoryRefresh(dirPath = 'packages', worktreeId = 'default'): void {
+export function handleMemoryRefresh(dirPath = 'packages', worktreeId?: string): void {
   showBanner();
+  const activeWorktree = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+
   const engine = getSharedMemoryEngine();
   const target = path.resolve(process.cwd(), dirPath);
   console.log(`🔄 Refreshing Codebase Memory for: ${path.relative(process.cwd(), target) || '.'}...`);
 
   const t0 = performance.now();
-  const report = engine.indexDirectory(target, worktreeId);
+  const report = engine.indexDirectory(target, activeWorktree);
   const dur = (performance.now() - t0).toFixed(2);
 
   console.log(`✅ Memory Refreshed in ${dur}ms:`);
@@ -118,13 +130,17 @@ export function handleMemoryRefresh(dirPath = 'packages', worktreeId = 'default'
   console.log(` • Cache Hits:          ${report.cached}`);
 }
 
-export function handleMemoryWatch(dirPath = 'packages', worktreeId = 'default'): CodebaseMemoryWatcher | null {
+export function handleMemoryWatch(dirPath = 'packages', worktreeId?: string): CodebaseMemoryWatcher | null {
   showBanner();
+  const activeWorktree = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+
   const engine = getSharedMemoryEngine();
   const target = path.resolve(process.cwd(), dirPath);
-  console.log(`👁️  Live Codebase Memory Watcher active on: ${path.relative(process.cwd(), target) || '.'} [${worktreeId}]`);
+  console.log(`👁️  Live Codebase Memory Watcher active on: ${path.relative(process.cwd(), target) || '.'} [${activeWorktree}]`);
 
-  const watcher = new CodebaseMemoryWatcher(engine, { worktreeId, debounceMs: 150 });
+  const watcher = new CodebaseMemoryWatcher(engine, { worktreeId: activeWorktree, debounceMs: 150 });
   const started = watcher.start(target);
   if (!started) {
     console.error(`❌ Could not start watcher on: ${target}`);

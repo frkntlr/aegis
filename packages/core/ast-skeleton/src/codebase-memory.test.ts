@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { CodebaseMemoryEngine } from './codebase-memory.js';
+import { ActiveHeadResolver } from './active-head-resolver.js';
 
 test('CodebaseMemoryEngine: indexes files incrementally and caches identical content', () => {
   const engine = new CodebaseMemoryEngine({ persistToDisk: false });
@@ -162,10 +163,22 @@ test('CodebaseMemoryEngine: inherits base memory into new worktree with copy-on-
 });
 
 test('CodebaseMemoryEngine: resolves worktree id dynamically from CWD path', () => {
-  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/project/experimental/solver'), 'solver');
-  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('/home/user/repo/worktrees/qa'), 'qa');
-  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/games/HakeGame-ui'), 'HakeGame-ui');
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/project/experimental/solver/packages/cli'), 'solver');
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('/home/user/repo/worktrees/qa/src'), 'qa');
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/games/HakeGame-ui/scenes'), 'ui');
   assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/project/src'), 'default');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'active-head-test-'));
+  try {
+    const aegisDir = path.join(tmpDir, '.aegis');
+    fs.mkdirSync(aegisDir, { recursive: true });
+    fs.writeFileSync(path.join(aegisDir, 'worktrees.json'), JSON.stringify({
+      worktrees: [{ agentName: 'feature-agent', path: path.join(tmpDir, 'custom-branch') }]
+    }));
+    assert.strictEqual(ActiveHeadResolver.resolveActiveWorktree(path.join(tmpDir, 'custom-branch', 'sub'), tmpDir), 'feature-agent');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('MemoryDiskStore: loads base memory when worktree cache is not found on disk', () => {
