@@ -44,20 +44,25 @@ test('WikiMemoryManager extracts selective tagged memory summaries for prompt co
   assert.ok(taggedSummary.includes('AST 1'));
 });
 
-test('GitHubWikiLiveAdapter seeds 8-page living architecture suite into git cache', () => {
+test('GitHubWikiLiveAdapter seeds 13-page living architecture suite into git cache', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-seed-test-'));
   try {
     const adapter = new GitHubWikiLiveAdapter({ localCloneDir: tmpDir });
     const res = adapter.seedComprehensiveWikiSuite();
-    assert.strictEqual(res.created, 8);
+    assert.strictEqual(res.created, 13);
     assert.ok(res.pages.includes('Home'));
     assert.ok(res.pages.includes('Architecture'));
+    assert.ok(res.pages.includes('Codebase-Memory-Engine'));
+    assert.ok(res.pages.includes('Godot-Bridge-Deep-Integration'));
+    assert.ok(res.pages.includes('Dialogue-Engine'));
     assert.ok(res.pages.includes('Toolchain-and-IDEs'));
     assert.ok(res.pages.includes('MCP-and-Skills-Ecosystem'));
     assert.ok(res.pages.includes('Plugin-and-Extensibility'));
     assert.ok(res.pages.includes('NotebookLM-Integration'));
     assert.ok(res.pages.includes('Quality-Shields-and-Gates'));
     assert.ok(res.pages.includes('Autonomous-Kanban-Protocol'));
+    assert.ok(res.pages.includes('RFC-Index'));
+    assert.ok(res.pages.includes('Research-Index'));
 
     const home = adapter.getPage('Home');
     assert.ok(home);
