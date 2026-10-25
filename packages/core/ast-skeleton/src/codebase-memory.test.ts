@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { CodebaseMemoryEngine } from './codebase-memory.js';
 
 test('CodebaseMemoryEngine: indexes files incrementally and caches identical content', () => {
-  const engine = new CodebaseMemoryEngine();
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
   const filePath = 'src/player.ts';
   const content = 'export class PlayerController { public updateScore(): void {} }';
 
@@ -21,7 +21,7 @@ test('CodebaseMemoryEngine: indexes files incrementally and caches identical con
 });
 
 test('CodebaseMemoryEngine: isolates namespaces across worktrees', () => {
-  const engine = new CodebaseMemoryEngine();
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
   engine.indexFile('src/a.ts', 'export class Alpha {}', 'master');
   engine.indexFile('src/b.ts', 'export class Beta {}', 'solver');
 
@@ -53,6 +53,7 @@ test('CodebaseMemoryEngine: queries memory and provides 5-layer enriched context
   fs.writeFileSync(targetFile, code, 'utf8');
 
   const engine = new CodebaseMemoryEngine({
+    persistToDisk: false,
     docProvider: (lib, topic) => `[${lib}:${topic}] Ground truth doc`,
     logCompressor: (raw) => ({ text: raw.replace(/node:internal/g, '[PRUNED]'), tokenSavingsPercent: 50 }),
     constitutionProvider: () => ['Rule: Max 40 lines per function']
@@ -79,21 +80,21 @@ test('CodebaseMemoryEngine: indexes directories and tracks cache hits', () => {
   fs.writeFileSync(path.join(tmpDir, 'one.ts'), 'export const ONE = 1;');
   fs.writeFileSync(path.join(tmpDir, 'two.ts'), 'export const TWO = 2;');
 
-  const engine = new CodebaseMemoryEngine();
-  const firstScan = engine.indexDirectory(tmpDir);
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  const firstScan = engine.indexDirectory(tmpDir, 'test-dir-wt');
   assert.strictEqual(firstScan.indexed, 2);
   assert.strictEqual(firstScan.cached, 0);
 
-  const secondScan = engine.indexDirectory(tmpDir);
+  const secondScan = engine.indexDirectory(tmpDir, 'test-dir-wt');
   assert.strictEqual(secondScan.indexed, 0);
   assert.strictEqual(secondScan.cached, 2);
 
-  const stats = engine.getMemoryStats();
+  const stats = engine.getMemoryStats('test-dir-wt');
   assert.strictEqual(stats.totalFiles, 2);
   assert.ok(stats.estimatedTokenSavings > 0);
 
   engine.clearCache();
-  assert.strictEqual(engine.getMemoryStats().totalFiles, 0);
+  assert.strictEqual(engine.getMemoryStats('test-dir-wt').totalFiles, 0);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

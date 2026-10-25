@@ -11,6 +11,7 @@ export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
   logCompressor?: (rawText: string) => { text: string; tokenSavingsPercent: number };
   constitutionProvider?: (filePath: string) => string[];
+  persistToDisk?: boolean;
 }
 
 export interface MemoryQueryOptions {
@@ -74,9 +75,38 @@ export class CodebaseMemoryEngine {
       const linker = new CrossReferenceLinker(graph);
       const queryEngine = new GraphQueryEngine(graph);
       ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), fileContents: new Map() };
+      this.loadNamespaceFromDisk(id, ns);
       this.namespaces.set(id, ns);
     }
     return ns;
+  }
+
+  private loadNamespaceFromDisk(id: string, ns: MemoryNamespace): void {
+    if (this.adapters.persistToDisk === false) return;
+    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
+    const symPath = path.join(cacheDir, 'symbols.json');
+    const graphPath = path.join(cacheDir, 'graph.json');
+    const metaPath = path.join(cacheDir, 'meta.json');
+    if (fs.existsSync(symPath)) ns.indexer.loadCache(symPath);
+    if (fs.existsSync(graphPath)) ns.graph.loadCache(graphPath);
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        if (meta.hashes) ns.fileHashes = new Map(Object.entries(meta.hashes));
+      } catch { /* ignore parse error */ }
+    }
+  }
+
+  public saveNamespaceToDisk(id = 'default'): void {
+    if (this.adapters.persistToDisk === false) return;
+    const ns = this.namespaces.get(id);
+    if (!ns) return;
+    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
+    fs.mkdirSync(cacheDir, { recursive: true });
+    ns.indexer.saveCache(path.join(cacheDir, 'symbols.json'));
+    ns.graph.saveCache(path.join(cacheDir, 'graph.json'));
+    const meta = { hashes: Object.fromEntries(ns.fileHashes) };
+    fs.writeFileSync(path.join(cacheDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
   }
 
   public static hashContent(content: string): string {
@@ -116,6 +146,7 @@ export class CodebaseMemoryEngine {
       }
     };
     scan(dirPath);
+    if (indexed > 0) this.saveNamespaceToDisk(worktreeId);
     return { indexed, cached };
   }
 
