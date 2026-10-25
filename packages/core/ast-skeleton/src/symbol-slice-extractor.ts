@@ -101,6 +101,40 @@ export class SymbolSliceExtractor {
     };
   }
 
+  public static extractGdscriptAmbient(content: string): string {
+    const lines = content.split(/\r?\n/);
+    const ambientLines: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (
+        trimmed.startsWith('extends ') ||
+        trimmed.startsWith('class_name ') ||
+        trimmed.startsWith('signal ') ||
+        trimmed.startsWith('@onready ') ||
+        (trimmed.startsWith('@export ') && trimmed.includes('var '))
+      ) {
+        ambientLines.push(trimmed);
+      }
+    }
+    if (ambientLines.length === 0) return '';
+    return ['# 🎮 [GDScript Ambient State - Signals & Onready Nodes]', ...ambientLines].join('\n');
+  }
+
+  private computeDynamicFromLine(lines: string[], startLine: number, contextLines: number): number {
+    let from = Math.max(1, startLine - contextLines);
+    let cur = startLine - 1;
+    while (cur >= 1) {
+      const trimmed = lines[cur - 1].trim();
+      if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+        from = Math.min(from, cur);
+        cur--;
+      } else {
+        break;
+      }
+    }
+    return Math.max(1, from);
+  }
+
   private formatSliceLines(lines: string[], from: number, to: number, start: number, end: number): string[] {
     const formatted: string[] = [];
     for (let i = from; i <= to; i++) {
@@ -126,6 +160,29 @@ export class SymbolSliceExtractor {
     return header;
   }
 
+  private resolveAmbientBlocks(symbolName: string, filePath: string, content: string): {
+    headerBlocks: string[];
+    ambientTypes?: string[];
+    calleeSignatures?: string[];
+  } {
+    const isTs = filePath.endsWith('.ts') || filePath.endsWith('.tsx');
+    const isGd = filePath.endsWith('.gd');
+    const headerBlocks: string[] = [];
+
+    if (isTs) {
+      const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
+      if (ambient.formattedBlock) headerBlocks.push(ambient.formattedBlock);
+      const callee = this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content);
+      if (callee.formattedBlock) headerBlocks.push(callee.formattedBlock);
+      return { headerBlocks, ambientTypes: ambient.typeNames, calleeSignatures: callee.signatures };
+    }
+    if (isGd) {
+      const gdAmbient = SymbolSliceExtractor.extractGdscriptAmbient(content);
+      if (gdAmbient) headerBlocks.push(gdAmbient);
+    }
+    return { headerBlocks };
+  }
+
   public sliceContent(
     symbolName: string,
     filePath: string,
@@ -136,19 +193,12 @@ export class SymbolSliceExtractor {
   ): SliceResult {
     const lines = content.split(/\r?\n/);
     const totalLines = lines.length;
-    const from = Math.max(1, startLine - contextLines);
+    const from = this.computeDynamicFromLine(lines, startLine, contextLines);
     const to = Math.min(totalLines, endLine + contextLines);
-
     const formattedLines = this.formatSliceLines(lines, from, to, startLine, endLine);
-    const isTs = filePath.endsWith('.ts') || filePath.endsWith('.tsx');
-    const ambient = isTs
-      ? this.typeResolver.resolveAmbientClosure(symbolName, filePath, content)
-      : { typeNames: [], declarations: [], formattedBlock: '' };
-    const calleeResult = isTs
-      ? this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content)
-      : { callees: [], signatures: [], formattedBlock: '' };
 
-    const sliceHeader = this.buildSliceHeader(symbolName, filePath, startLine, endLine, ambient.formattedBlock, calleeResult.formattedBlock);
+    const { headerBlocks, ambientTypes, calleeSignatures } = this.resolveAmbientBlocks(symbolName, filePath, content);
+    const sliceHeader = [`// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`, ...headerBlocks];
     const codeSlice = [...sliceHeader, ...formattedLines, '// --- End Slice ---'].join('\n');
     const slicedLineCount = to - from + 1;
     const savings = totalLines > 0 ? Math.round(((totalLines - slicedLineCount) / totalLines) * 100) : 0;
@@ -162,8 +212,8 @@ export class SymbolSliceExtractor {
       lineCount: slicedLineCount,
       originalFileLineCount: totalLines,
       tokenSavingsPercent: Math.max(0, savings),
-      ambientTypes: ambient.typeNames,
-      calleeSignatures: calleeResult.signatures
+      ambientTypes,
+      calleeSignatures
     };
   }
 }

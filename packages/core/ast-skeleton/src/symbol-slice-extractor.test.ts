@@ -147,3 +147,48 @@ test('SymbolSliceExtractor: activates adaptive ClassSkeleton mode for class symb
   assert.ok(!slice.codeSlice.includes('connectionPool.push'));
   assert.ok(slice.tokenSavingsPercent >= 50);
 });
+
+test('SymbolSliceExtractor: preserves GDScript signals, extends, and @onready ambient state', () => {
+  const extractor = new SymbolSliceExtractor();
+  const gdCode = [
+    'class_name Hero',
+    'extends CharacterBody2D',
+    'signal hero_damaged(amount: int)',
+    '@onready var anim = $AnimationPlayer',
+    '@export var speed: float = 200.0',
+    '',
+    'func take_damage(amount: int) -> void:',
+    '    hero_damaged.emit(amount)',
+    '    anim.play("hurt")'
+  ].join('\n');
+
+  const slice = extractor.sliceContent('take_damage', 'hero.gd', gdCode, 7, 9, 1);
+  assert.ok(slice.codeSlice.includes('# 🎮 [GDScript Ambient State - Signals & Onready Nodes]'));
+  assert.ok(slice.codeSlice.includes('extends CharacterBody2D'));
+  assert.ok(slice.codeSlice.includes('signal hero_damaged(amount: int)'));
+  assert.ok(slice.codeSlice.includes('@onready var anim = $AnimationPlayer'));
+  assert.ok(slice.codeSlice.includes('@export var speed: float = 200.0'));
+});
+
+test('SymbolSliceExtractor: dynamically expands context lines upwards to capture entire multi-line docstring', () => {
+  const extractor = new SymbolSliceExtractor();
+  const code = [
+    '// line 1',
+    '// line 2',
+    '// line 3',
+    '/**',
+    ' * Calculates player level based on experience points',
+    ' * @param xp Total experience points',
+    ' * @returns Level number between 1 and 100',
+    ' */',
+    'export function calculateLevel(xp: number): number {',
+    '  return Math.min(100, Math.floor(xp / 1000) + 1);',
+    '}'
+  ].join('\n');
+
+  // Requesting slice with contextLines = 1 should still capture the 5-line docstring above calculateLevel
+  const slice = extractor.sliceContent('calculateLevel', 'calc.ts', code, 9, 11, 1);
+  assert.ok(slice.codeSlice.includes('Calculates player level based on experience points'));
+  assert.ok(slice.codeSlice.includes('@param xp Total experience points'));
+  assert.ok(slice.codeSlice.includes('@returns Level number between 1 and 100'));
+});
