@@ -7,3 +7,4 @@ export * from './fuzzy-matcher.js';
 export * from './godot-topic-resolver.js';
 export * from './deprecation-linter.js';
 export * from './active-head-resolver.js';
+export * from './diff-budgeting.js';

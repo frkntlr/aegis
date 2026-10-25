@@ -12,6 +12,7 @@ import { MemoryDiskStore } from './memory-disk-store.js';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
 import { LiveHotPatcher } from './live-hot-patcher.js';
+import type { DiffBudgetReport } from '@aegis/shared';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -44,6 +45,7 @@ export interface MemoryQueryResult {
   groundTruthDocs: string[];
   constitutionRules: string[];
   compressedLogs?: string;
+  diffBudget?: DiffBudgetReport;
 }
 
 export interface MemoryStats {
@@ -250,7 +252,8 @@ export class CodebaseMemoryEngine {
       connectedScenes: traceResult.connectedScenes,
       groundTruthDocs: MemoryAdapterResolver.resolveGroundTruth(sliceResult?.codeSlice || symbol, this.adapters, targetFile),
       constitutionRules: MemoryAdapterResolver.resolveConstitution(this.adapters, targetFile),
-      compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters)
+      compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters),
+      diffBudget: sliceResult?.diffBudget
     };
   }
 

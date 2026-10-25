@@ -6,6 +6,7 @@ import { SymbolIndexer } from './symbol-indexer.js';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
 import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
 import { TypeScriptSkeletonExtractor } from './ts-extractor.js';
+import { PreEmptiveDiffBudgeting, type DiffBudgetReport } from '@aegis/shared';
 
 export interface SliceResult {
   symbol: string;
@@ -18,6 +19,7 @@ export interface SliceResult {
   tokenSavingsPercent: number;
   ambientTypes?: string[];
   calleeSignatures?: string[];
+  diffBudget?: DiffBudgetReport;
 }
 
 export class SymbolSliceExtractor {
@@ -60,6 +62,20 @@ export class SymbolSliceExtractor {
     }
   }
 
+  private findClassDeclaration(sf: ts.SourceFile, name: string): ts.ClassDeclaration | null {
+    let targetClass: ts.ClassDeclaration | null = null;
+    const walk = (n: ts.Node): void => {
+      if (targetClass) return;
+      if (ts.isClassDeclaration(n) && n.name?.text === name) {
+        targetClass = n;
+        return;
+      }
+      ts.forEachChild(n, walk);
+    };
+    walk(sf);
+    return targetClass;
+  }
+
   public extractClassSkeletonSlice(
     symbolName: string,
     filePath: string,
@@ -68,36 +84,27 @@ export class SymbolSliceExtractor {
     endLine: number
   ): SliceResult | null {
     const sf = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
-    let targetClass: ts.ClassDeclaration | null = null;
-    const walk = (n: ts.Node): void => {
-      if (targetClass) return;
-      if (ts.isClassDeclaration(n) && n.name?.text === symbolName) {
-        targetClass = n;
-        return;
-      }
-      ts.forEachChild(n, walk);
-    };
-    walk(sf);
+    const targetClass = this.findClassDeclaration(sf, symbolName);
     if (!targetClass) return null;
 
     const classSkeleton = TypeScriptSkeletonExtractor.formatClassSkeleton(targetClass, sf);
     const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
-    const sliceHeader = this.buildSliceHeader(symbolName, filePath, startLine, endLine, ambient.formattedBlock, '// 🧩 [Adaptive ClassSkeleton - Folded Method Bodies]');
+    const totalLines = content.split(/\r?\n/).length;
+    const diffBudget = PreEmptiveDiffBudgeting.calculateBudget(totalLines);
+    const budgetWarning = PreEmptiveDiffBudgeting.formatWarningForSlice(totalLines, undefined, '//');
+    const sliceHeader = this.buildSliceHeader(
+      symbolName, filePath, startLine, endLine, ambient.formattedBlock,
+      '// 🧩 [Adaptive ClassSkeleton - Folded Method Bodies]', budgetWarning
+    );
     const codeSlice = [...sliceHeader, classSkeleton, '// --- End Slice ---'].join('\n');
-    const skeletonLineCount = classSkeleton.split('\n').length;
-    const originalLineCount = Math.max(1, endLine - startLine + 1);
-    const savings = Math.round(((originalLineCount - skeletonLineCount) / originalLineCount) * 100);
+    const skelLines = classSkeleton.split('\n').length;
+    const origLines = Math.max(1, endLine - startLine + 1);
+    const savings = Math.max(80, Math.round(((origLines - skelLines) / origLines) * 100));
 
     return {
-      symbol: symbolName,
-      filePath,
-      startLine,
-      endLine,
-      codeSlice,
-      lineCount: skeletonLineCount,
-      originalFileLineCount: originalLineCount,
-      tokenSavingsPercent: Math.max(80, savings),
-      ambientTypes: ambient.typeNames
+      symbol: symbolName, filePath, startLine, endLine, codeSlice,
+      lineCount: skelLines, originalFileLineCount: origLines,
+      tokenSavingsPercent: savings, ambientTypes: ambient.typeNames, diffBudget
     };
   }
 
@@ -152,9 +159,11 @@ export class SymbolSliceExtractor {
     startLine: number,
     endLine: number,
     ambientBlock?: string,
-    calleeBlock?: string
+    calleeBlock?: string,
+    budgetWarning?: string
   ): string[] {
     const header = [`// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`];
+    if (budgetWarning) header.push(budgetWarning);
     if (ambientBlock) header.push(ambientBlock);
     if (calleeBlock) header.push(calleeBlock);
     return header;
@@ -183,6 +192,14 @@ export class SymbolSliceExtractor {
     return { headerBlocks };
   }
 
+  private createSliceBudget(filePath: string, totalLines: number, startLine: number, endLine: number) {
+    const prefix = (filePath.endsWith('.gd') || filePath.endsWith('.py')) ? '#' : '//';
+    const funcLines = Math.max(1, endLine - startLine + 1);
+    const diffBudget = PreEmptiveDiffBudgeting.calculateBudget(totalLines, funcLines);
+    const budgetWarning = PreEmptiveDiffBudgeting.formatWarningForSlice(totalLines, funcLines, prefix);
+    return { prefix, diffBudget, budgetWarning };
+  }
+
   public sliceContent(
     symbolName: string,
     filePath: string,
@@ -192,16 +209,20 @@ export class SymbolSliceExtractor {
     contextLines = 3
   ): SliceResult {
     const lines = content.split(/\r?\n/);
-    const totalLines = lines.length;
     const from = this.computeDynamicFromLine(lines, startLine, contextLines);
-    const to = Math.min(totalLines, endLine + contextLines);
+    const to = Math.min(lines.length, endLine + contextLines);
     const formattedLines = this.formatSliceLines(lines, from, to, startLine, endLine);
 
+    const { prefix, diffBudget, budgetWarning } = this.createSliceBudget(filePath, lines.length, startLine, endLine);
     const { headerBlocks, ambientTypes, calleeSignatures } = this.resolveAmbientBlocks(symbolName, filePath, content);
-    const sliceHeader = [`// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`, ...headerBlocks];
-    const codeSlice = [...sliceHeader, ...formattedLines, '// --- End Slice ---'].join('\n');
+    const sliceHeader = [
+      `${prefix} --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`,
+      budgetWarning,
+      ...headerBlocks
+    ];
+    const codeSlice = [...sliceHeader, ...formattedLines, `${prefix} --- End Slice ---`].join('\n');
     const slicedLineCount = to - from + 1;
-    const savings = totalLines > 0 ? Math.round(((totalLines - slicedLineCount) / totalLines) * 100) : 0;
+    const savings = lines.length > 0 ? Math.round(((lines.length - slicedLineCount) / lines.length) * 100) : 0;
 
     return {
       symbol: symbolName,
@@ -210,10 +231,11 @@ export class SymbolSliceExtractor {
       endLine,
       codeSlice,
       lineCount: slicedLineCount,
-      originalFileLineCount: totalLines,
+      originalFileLineCount: lines.length,
       tokenSavingsPercent: Math.max(0, savings),
       ambientTypes,
-      calleeSignatures
+      calleeSignatures,
+      diffBudget
     };
   }
 }

@@ -207,3 +207,26 @@ test('MemoryDiskStore: loads base memory when worktree cache is not found on dis
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('CodebaseMemoryEngine: queryMemory injects PreEmptiveDiffBudgeting into slice and metadata', () => {
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  const code = [
+    'export class PaymentProcessor {',
+    '  public process(): boolean {',
+    '    return true;',
+    '  }',
+    '}'
+  ].join('\n');
+  engine.indexFile('src/payment.ts', code);
+
+  const res = engine.queryMemory('process');
+  assert.strictEqual(res.found, true);
+  assert.ok(res.slice?.includes('🛡️ Demir Kafes Proaktif Kotası:'));
+  assert.ok(res.slice?.includes('Hedef Dosya: 5 satır'));
+  assert.ok(res.diffBudget !== undefined);
+  assert.strictEqual(res.diffBudget?.fileLines, 5);
+  assert.strictEqual(res.diffBudget?.fileQuotaRemaining, 295);
+  assert.strictEqual(res.diffBudget?.funcLines, 3);
+  assert.strictEqual(res.diffBudget?.funcQuotaRemaining, 37);
+  assert.strictEqual(res.diffBudget?.isExceeded, false);
+});
