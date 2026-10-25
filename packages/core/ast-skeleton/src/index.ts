@@ -28,3 +28,4 @@ export * from './git-fast-sync.js';
 export * from './memory-disk-store.js';
 export * from './transitive-type-resolver.js';
 export * from './callee-signature-extractor.js';
+export * from './language-barrier-gate.js';

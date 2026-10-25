@@ -1,5 +1,6 @@
 import type { RelationalGraph } from './relational-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
+import { LanguageBarrierGate } from './language-barrier-gate.js';
 
 export interface MemoryResolverAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -12,17 +13,16 @@ export class MemoryAdapterResolver {
     const docs: string[] = [];
     if (!adapters.docProvider) return docs;
 
-    const isGodot = (filePath && filePath.endsWith('.gd')) || /PackedScene|CharacterBody2D|Node|signal/.test(code);
-    if (isGodot) {
+    const ecosystem = LanguageBarrierGate.resolveTargetEcosystem(filePath, code);
+
+    if (ecosystem === 'godot') {
       const topic = /velocity|move_and_slide/.test(code) ? 'physics' : (/signal|emit|connect/.test(code) ? 'signals' : 'lifecycle');
       const doc = adapters.docProvider('godot4', topic) || adapters.docProvider('godot4', 'lifecycle');
-      if (doc) docs.push(doc);
-    }
-    const isTs = (filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))) || /interface|type\s+|declare/.test(code);
-    if (isTs) {
+      if (doc && LanguageBarrierGate.isAllowedDoc('godot', 'godot4')) docs.push(doc);
+    } else if (ecosystem === 'typescript') {
       const topic = /test|assert/.test(code) ? 'node-test' : 'clean-arch';
       const doc = adapters.docProvider('typescript', topic) || adapters.docProvider('typescript', 'node-test');
-      if (doc) docs.push(doc);
+      if (doc && LanguageBarrierGate.isAllowedDoc('typescript', 'typescript')) docs.push(doc);
     }
     return docs;
   }
