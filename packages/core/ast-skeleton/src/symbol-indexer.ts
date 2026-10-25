@@ -46,7 +46,7 @@ export class SymbolIndexer {
   }
 
   public loadCacheData(data: SymbolDatabase): SymbolDatabase {
-    if (data && data.files) {
+    if (data?.files) {
       this.db = JSON.parse(JSON.stringify(data));
     }
     return this.db;

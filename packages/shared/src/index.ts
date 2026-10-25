@@ -9,3 +9,4 @@ export * from './deprecation-linter.js';
 export * from './active-head-resolver.js';
 export * from './diff-budgeting.js';
 export * from './worktree-mutex-shield.js';
+export * from './ide.js';

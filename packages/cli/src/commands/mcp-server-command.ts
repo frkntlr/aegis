@@ -150,7 +150,7 @@ export function startMcpServer(): void {
       const req = JSON.parse(trimmed) as JsonRpcRequest;
       const res = handleJsonRpc(req);
       if (res) process.stdout.write(JSON.stringify(res) + '\n');
-    } catch (e: unknown) {
+    } catch (_e: unknown) {
       const err = { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } };
       process.stdout.write(JSON.stringify(err) + '\n');
     }

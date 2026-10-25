@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import type { RelationalGraph } from './relational-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
 import { LanguageBarrierGate } from './language-barrier-gate.js';
