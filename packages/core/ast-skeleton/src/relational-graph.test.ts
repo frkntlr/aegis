@@ -153,3 +153,28 @@ test('GraphQueryEngine extractBlastRadius excludes dot-syntax symbols from file 
   assert.strictEqual(trace.blastRadiusFiles.includes('Enemy.die'), false);
   assert.strictEqual(trace.blastRadiusFiles.includes('src/battle.ts'), true);
 });
+
+test('RelationalGraph supports multi-dimensional nodes, edges, and fast querying', () => {
+  const graph = new RelationalGraph();
+  graph.addNode({ id: 'src/types.ts::Payload', name: 'Payload', kind: 'type', filePath: 'src/types.ts' });
+  graph.addNode({ id: 'res://scenes/Hero.tscn#HitBox', name: 'HitBox', kind: 'scene_node', filePath: 'res://scenes/Hero.tscn' });
+  graph.addNode({ id: 'res://hero.gd::damaged', name: 'damaged', kind: 'signal', filePath: 'res://hero.gd' });
+  graph.addNode({ id: 'src/hero.ts::takeDamage', name: 'takeDamage', kind: 'symbol', filePath: 'src/hero.ts' });
+
+  assert.strictEqual(graph.nodeCount, 4);
+  assert.strictEqual(graph.hasNode('src/types.ts::Payload'), true);
+  assert.strictEqual(graph.getNodesByKind('type').length, 1);
+  assert.strictEqual(graph.getNodesByKind('signal').length, 1);
+
+  graph.addEdge({ from: 'src/hero.ts::takeDamage', to: 'src/types.ts::Payload', type: 'REFERENCES_TYPE' });
+  graph.addEdge({ from: 'src/hero.ts::takeDamage', to: 'src/hero.ts::applyDamage', type: 'CALLS_SYMBOL' });
+  graph.addEdge({ from: 'res://scenes/Hero.tscn#HitBox', to: 'res://hero.gd', type: 'ATTACHED_SCRIPT' });
+
+  assert.strictEqual(graph.edgeCount, 3);
+  assert.strictEqual(graph.hasEdge('src/hero.ts::takeDamage', 'src/types.ts::Payload', 'REFERENCES_TYPE'), true);
+  assert.strictEqual(graph.hasEdge('src/hero.ts::takeDamage', 'nonexistent'), false);
+
+  graph.clear();
+  assert.strictEqual(graph.nodeCount, 0);
+  assert.strictEqual(graph.edgeCount, 0);
+});

@@ -1,7 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-export type RelationalNodeType = 'symbol' | 'file' | 'scene' | 'resource';
+export type RelationalNodeType =
+  | 'file'
+  | 'symbol'
+  | 'type'
+  | 'scene'
+  | 'scene_node'
+  | 'resource'
+  | 'signal';
 
 export interface RelationalNode {
   id: string;
@@ -13,14 +20,17 @@ export interface RelationalNode {
 }
 
 export type RelationalEdgeType =
+  | 'CALLS'
+  | 'CALLS_SYMBOL'
+  | 'INSTANTIATES'
   | 'EXTENDS'
   | 'IMPLEMENTS'
+  | 'REFERENCES_TYPE'
   | 'DEFINES_SIGNAL'
   | 'EMITS_SIGNAL'
   | 'CONNECTS_SIGNAL'
   | 'ATTACHES_SCRIPT'
-  | 'INSTANTIATES'
-  | 'CALLS';
+  | 'ATTACHED_SCRIPT';
 
 export interface RelationalEdge {
   from: string;
@@ -54,8 +64,16 @@ export class RelationalGraph {
     return this.nodes.get(id.replace(/\\/g, '/'));
   }
 
+  public hasNode(id: string): boolean {
+    return this.nodes.has(id.replace(/\\/g, '/'));
+  }
+
   public getAllNodes(): RelationalNode[] {
     return Array.from(this.nodes.values());
+  }
+
+  public getNodesByKind(kind: RelationalNodeType): RelationalNode[] {
+    return Array.from(this.nodes.values()).filter(n => n.kind === kind);
   }
 
   public addEdge(edge: RelationalEdge): void {
@@ -73,6 +91,12 @@ export class RelationalGraph {
       inList.push(normalized);
       this.incoming.set(to, inList);
     }
+  }
+
+  public hasEdge(from: string, to: string, type?: RelationalEdgeType): boolean {
+    const edges = this.getOutgoing(from, type);
+    const normTo = to.replace(/\\/g, '/');
+    return edges.some(e => e.to === normTo);
   }
 
   public getOutgoing(id: string, type?: RelationalEdgeType): RelationalEdge[] {
@@ -114,7 +138,7 @@ export class RelationalGraph {
       edges.push(...list);
     }
     return {
-      version: '1.0.0',
+      version: '1.1.0',
       lastUpdated: new Date().toISOString(),
       nodes: Array.from(this.nodes.values()),
       edges
@@ -145,5 +169,21 @@ export class RelationalGraph {
     } catch {
       return false;
     }
+  }
+
+  public clear(): void {
+    this.nodes.clear();
+    this.outgoing.clear();
+    this.incoming.clear();
+  }
+
+  public get nodeCount(): number {
+    return this.nodes.size;
+  }
+
+  public get edgeCount(): number {
+    let count = 0;
+    for (const list of this.outgoing.values()) count += list.length;
+    return count;
   }
 }
