@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SymbolDatabase, SymbolEntry } from './symbol-indexer.js';
 import { SymbolIndexer } from './symbol-indexer.js';
+import { TransitiveTypeResolver } from './transitive-type-resolver.js';
 
 export interface SliceResult {
   symbol: string;
@@ -12,13 +13,16 @@ export interface SliceResult {
   lineCount: number;
   originalFileLineCount: number;
   tokenSavingsPercent: number;
+  ambientTypes?: string[];
 }
 
 export class SymbolSliceExtractor {
   private indexer: SymbolIndexer;
+  private typeResolver: TransitiveTypeResolver;
 
   constructor(indexer?: SymbolIndexer) {
     this.indexer = indexer || new SymbolIndexer();
+    this.typeResolver = new TransitiveTypeResolver({ indexer: this.indexer });
   }
 
   public extractSlice(
@@ -57,6 +61,12 @@ export class SymbolSliceExtractor {
     return formatted;
   }
 
+  private buildSliceHeader(symbolName: string, filePath: string, startLine: number, endLine: number, ambientBlock?: string): string[] {
+    const header = [`// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`];
+    if (ambientBlock) header.push(ambientBlock);
+    return header;
+  }
+
   public sliceContent(
     symbolName: string,
     filePath: string,
@@ -71,12 +81,12 @@ export class SymbolSliceExtractor {
     const to = Math.min(totalLines, endLine + contextLines);
 
     const formattedLines = this.formatSliceLines(lines, from, to, startLine, endLine);
-    const codeSlice = [
-      `// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`,
-      ...formattedLines,
-      '// --- End Slice ---'
-    ].join('\n');
+    const ambient = (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))
+      ? this.typeResolver.resolveAmbientClosure(symbolName, filePath, content)
+      : { typeNames: [], declarations: [], formattedBlock: '' };
 
+    const sliceHeader = this.buildSliceHeader(symbolName, filePath, startLine, endLine, ambient.formattedBlock);
+    const codeSlice = [...sliceHeader, ...formattedLines, '// --- End Slice ---'].join('\n');
     const slicedLineCount = to - from + 1;
     const savings = totalLines > 0 ? Math.round(((totalLines - slicedLineCount) / totalLines) * 100) : 0;
 
@@ -88,7 +98,8 @@ export class SymbolSliceExtractor {
       codeSlice,
       lineCount: slicedLineCount,
       originalFileLineCount: totalLines,
-      tokenSavingsPercent: Math.max(0, savings)
+      tokenSavingsPercent: Math.max(0, savings),
+      ambientTypes: ambient.typeNames
     };
   }
 }
