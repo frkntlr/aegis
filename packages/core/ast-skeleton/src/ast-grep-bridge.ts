@@ -158,6 +158,18 @@ export class AstGrepBridge {
     return allMatches;
   }
 
+  public static replaceInFile(filePath: string, pattern: string, rewrite: string): AstGrepReplaceResult & { written: boolean } {
+    if (!fs.existsSync(filePath)) {
+      return { transformed: '', matchCount: 0, hasChanges: false, matches: [], written: false };
+    }
+    const content = fs.readFileSync(filePath, 'utf8');
+    const result = AstGrepBridge.replace(content, pattern, rewrite);
+    if (result.hasChanges) {
+      fs.writeFileSync(filePath, result.transformed, 'utf8');
+    }
+    return { ...result, written: result.hasChanges };
+  }
+
   public static checkCliAvailable(): boolean {
     const res = spawnSync('sg', ['--version'], { encoding: 'utf8', shell: true });
     return res.status === 0;

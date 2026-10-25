@@ -41,3 +41,39 @@ test('handleJsonRpc returns error for unknown method', () => {
   assert.ok(res);
   assert.ok(res.error);
 });
+
+test('handleJsonRpc executes triage tool', () => {
+  const res = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 5,
+    method: 'tools/call',
+    params: { name: 'triage', arguments: { dir: 'packages/cli/src' } }
+  });
+  assert.ok(res);
+  const result = res.result as { content: Array<{ type: string; text: string }> };
+  assert.strictEqual(result.content[0].type, 'text');
+  const report = JSON.parse(result.content[0].text);
+  assert.strictEqual(typeof report.clean, 'boolean');
+});
+
+test('handleJsonRpc executes find_symbol and trace_relational tools', () => {
+  const symRes = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 6,
+    method: 'tools/call',
+    params: { name: 'find_symbol', arguments: { symbol: 'IronCageValidator' } }
+  });
+  assert.ok(symRes);
+  const symContent = (symRes.result as { content: Array<{ type: string; text: string }> }).content[0].text;
+  assert.ok(symContent.includes('IronCageValidator') || symContent.includes('found'));
+
+  const traceRes = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 7,
+    method: 'tools/call',
+    params: { name: 'trace_relational', arguments: { target: 'IronCageValidator' } }
+  });
+  assert.ok(traceRes);
+  const traceContent = (traceRes.result as { content: Array<{ type: string; text: string }> }).content[0].text;
+  assert.ok(traceContent.includes('callers'));
+});

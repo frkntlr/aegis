@@ -22,7 +22,7 @@ export class CodebaseMemoryWatcher {
     this.engine = engine;
     this.worktreeId = options.worktreeId || 'default';
     this.debounceMs = options.debounceMs ?? 150;
-    this.exts = options.exts || ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.tscn'];
+    this.exts = options.exts || ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.tscn', '.tres'];
   }
 
   public isWatching(): boolean {
@@ -88,7 +88,10 @@ export class CodebaseMemoryWatcher {
     let updated = 0;
 
     for (const f of files) {
-      if (!fs.existsSync(f)) continue;
+      if (!fs.existsSync(f)) {
+        if (this.engine.removeFile(f, this.worktreeId)) updated++;
+        continue;
+      }
       try {
         const content = fs.readFileSync(f, 'utf8');
         if (this.engine.indexFile(f, content, this.worktreeId)) {

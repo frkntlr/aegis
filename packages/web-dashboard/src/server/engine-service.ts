@@ -231,4 +231,16 @@ export class AegisEngineService {
   public runMemoryStats(worktreeId?: string): Record<string, unknown> {
     return this.analysisTools.runMemoryStats(worktreeId);
   }
+
+  public runAstSearch(pattern?: string, targetDir?: string): Record<string, unknown> {
+    return this.analysisTools.runAstSearch(pattern, targetDir);
+  }
+
+  public runRtkCompress(text?: string): Record<string, unknown> {
+    return this.analysisTools.runRtkCompress(text);
+  }
+
+  public runContext7Query(library?: string, topic?: string): Record<string, unknown> {
+    return this.analysisTools.runContext7Query(library, topic);
+  }
 }

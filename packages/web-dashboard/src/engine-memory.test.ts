@@ -77,3 +77,18 @@ test('DashboardServer enforces Circuit Breaker loop_status, blocked tasks, and l
     await server.stop();
   }
 });
+
+test('DashboardServer executes ast_search, rtk_compress, and context7_query tools', async () => {
+  const engine = new AegisEngineService();
+  const astRes = engine.runAstSearch('class $NAME');
+  assert.strictEqual(astRes.tool, 'ast_search');
+  assert.strictEqual(typeof astRes.matchCount, 'number');
+
+  const rtkRes = engine.runRtkCompress('error\n    at node:internal/test:1:1\nok');
+  assert.strictEqual(rtkRes.tool, 'rtk_compress');
+  assert.strictEqual(typeof rtkRes.tokenSavingsPercent, 'number');
+
+  const c7Res = engine.runContext7Query('godot4', 'lifecycle');
+  assert.strictEqual(c7Res.tool, 'context7_query');
+  assert.strictEqual(c7Res.found, true);
+});

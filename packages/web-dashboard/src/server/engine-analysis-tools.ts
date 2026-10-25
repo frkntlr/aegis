@@ -1,7 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { IronCageValidator, EvidenceBasedTriageGate } from '@aegis/iron-cage';
-import { SymbolIndexer, GraphQueryEngine, RelationalGraph, CodebaseMemoryEngine } from '@aegis/ast-skeleton';
+import { SymbolIndexer, GraphQueryEngine, RelationalGraph, CodebaseMemoryEngine, AstGrepBridge } from '@aegis/ast-skeleton';
+import { RTKTokenKiller } from '@aegis/watchdog';
+import { Context7Bridge } from '@aegis/github-live';
 import type { CageViolation } from '@aegis/shared';
 import { collectSourceFiles } from './metrics-helpers.js';
 
@@ -168,6 +170,44 @@ export class EngineAnalysisTools {
       totalEdges: stats.totalEdges,
       estimatedTokenSavings: stats.estimatedTokenSavings,
       summary: `Hafıza İstatistikleri [${worktreeId}]: ${stats.totalFiles} dosya, ${stats.totalSymbols} sembol (~%${stats.estimatedTokenSavings} tasarruf) 🧠`
+    };
+  }
+
+  public runAstSearch(pattern?: string, targetDir?: string): Record<string, unknown> {
+    const pat = pattern?.trim() || 'class $NAME';
+    const base = resolveTargetDir(targetDir);
+    const matches = AstGrepBridge.searchDirectory(base, pat);
+    return {
+      tool: 'ast_search',
+      pattern: pat,
+      matchCount: matches.length,
+      matches: matches.slice(0, 5),
+      summary: `AST Arama: '${pat}' ile ${matches.length} eşleşme bulundu 🔎`
+    };
+  }
+
+  public runRtkCompress(text?: string): Record<string, unknown> {
+    const input = text || 'Test Log\n    at node:internal/process/task_queues:95:5\nPASSED (10ms)';
+    const res = RTKTokenKiller.compress(input);
+    return {
+      tool: 'rtk_compress',
+      tokenSavingsPercent: res.tokenSavingsPercent,
+      compressedText: res.compressedText,
+      summary: `RTK Sıkıştırma: %${res.tokenSavingsPercent} token tasarrufu sağlandı ⚡`
+    };
+  }
+
+  public runContext7Query(library?: string, topic?: string): Record<string, unknown> {
+    const lib = library?.trim() || 'godot4';
+    const top = topic?.trim() || 'lifecycle';
+    const doc = new Context7Bridge().query(lib, top);
+    return {
+      tool: 'context7_query',
+      library: lib,
+      topic: top,
+      found: Boolean(doc),
+      content: doc,
+      summary: doc ? `Context7 Dokümanı: [${lib}::${top}] başarıyla alındı 📚` : `Context7: [${lib}::${top}] dokümanı bulunamadı ⚠️`
     };
   }
 }

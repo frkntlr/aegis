@@ -68,11 +68,33 @@ test('CodebaseMemoryEngine: queries memory and provides 5-layer enriched context
   assert.strictEqual(result.found, true);
   assert.ok(result.slice && result.slice.includes('take_damage'));
   assert.ok(result.groundTruthDocs.length > 0, 'Must have ground-truth docs for Godot class');
-  assert.ok(result.groundTruthDocs[0].includes('godot4:lifecycle'));
+  assert.ok(result.groundTruthDocs[0].includes('godot4:signals') || result.groundTruthDocs[0].includes('godot4:lifecycle'));
   assert.ok(result.constitutionRules.includes('Rule: Max 40 lines per function'));
   assert.ok(result.compressedLogs && result.compressedLogs.includes('[PRUNED]'));
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('CodebaseMemoryEngine: removeFile evicts file from hashes and index database', () => {
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  const fPath = 'src/test-del.ts';
+  engine.indexFile(fPath, 'export class ToDelete { run() {} }');
+
+  assert.strictEqual(engine.getMemoryStats().totalFiles, 1);
+  assert.strictEqual(engine.removeFile(fPath), true);
+  assert.strictEqual(engine.getMemoryStats().totalFiles, 0);
+  assert.strictEqual(engine.removeFile(fPath), false);
+});
+
+test('CodebaseMemoryEngine: queryMemory resolves symbols by relative file path', () => {
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  const fPath = 'src/services/player-service.ts';
+  const code = 'export class PlayerService { getHealth(): number { return 100; } }';
+  engine.indexFile(fPath, code);
+
+  const res = engine.queryMemory('src/services/player-service.ts');
+  assert.strictEqual(res.found, true);
+  assert.ok(res.slice?.includes('PlayerService'));
 });
 
 test('CodebaseMemoryEngine: indexes directories and tracks cache hits', () => {

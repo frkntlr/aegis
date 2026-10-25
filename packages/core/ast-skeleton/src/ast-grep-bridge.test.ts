@@ -59,6 +59,21 @@ const c = ok();
   assert.strictEqual(violations[0].severity, 'error');
 });
 
+test('AstGrepBridge replaceInFile updates file content on disk when patterns match', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ast-grep-replace-'));
+  const target = path.join(tmpDir, 'mod.ts');
+  fs.writeFileSync(target, 'const value = calculate(1, 2);', 'utf8');
+
+  try {
+    const res = AstGrepBridge.replaceInFile(target, 'calculate($A, $B)', 'compute($A, $B)');
+    assert.strictEqual(res.written, true);
+    assert.strictEqual(res.matchCount, 1);
+    assert.strictEqual(fs.readFileSync(target, 'utf8'), 'const value = compute(1, 2);');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('AstGrepBridge searchDirectory scans files and returns matching paths', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ast-grep-test-'));
   const file1 = path.join(tmpDir, 'service.ts');

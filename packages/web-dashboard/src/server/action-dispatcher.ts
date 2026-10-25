@@ -178,6 +178,9 @@ export class ActionDispatcher {
     else if (t === 'relational_trace') res = this.ctx.engineSvc.runRelationalTrace(payload.target as string | undefined);
     else if (t === 'memory_query') res = this.ctx.engineSvc.runMemoryQuery(payload.symbol as string | undefined, payload.worktreeId as string | undefined);
     else if (t === 'memory_stats') res = this.ctx.engineSvc.runMemoryStats(payload.worktreeId as string | undefined);
+    else if (t === 'ast_search') res = this.ctx.engineSvc.runAstSearch(payload.pattern as string | undefined, payload.dir as string | undefined);
+    else if (t === 'rtk_compress') res = this.ctx.engineSvc.runRtkCompress(payload.text as string | undefined);
+    else if (t === 'context7_query') res = this.ctx.engineSvc.runContext7Query(payload.library as string | undefined, payload.topic as string | undefined);
     else return { success: false, error: 'Bilinmeyen araç: ' + t, message: 'Bilinmeyen araç: ' + t };
     return { success: true, result: res, message: (res.summary as string) || 'Motor aracı çalıştırıldı.' };
   }

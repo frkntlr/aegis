@@ -30,6 +30,11 @@ export class Context7Bridge {
   }
 
   private initGodotDocs(): void {
+    this.initGodotCoreDocs();
+    this.initGodotFeatureDocs();
+  }
+
+  private initGodotCoreDocs(): void {
     this.registerDoc({
       library: 'godot4',
       topic: 'lifecycle',
@@ -58,6 +63,28 @@ export class Context7Bridge {
     });
   }
 
+  private initGodotFeatureDocs(): void {
+    this.registerDoc({
+      library: 'godot4',
+      topic: 'physics',
+      version: '4.3',
+      summary: 'Godot 4 CharacterBody2D and kinematics standard.',
+      signatures: ['velocity: Vector2', 'move_and_slide() -> bool'],
+      codeExample: 'velocity = direction * SPEED\nmove_and_slide()',
+      breakingChanges: ['move_and_slide() takes 0 arguments in Godot 4; set self.velocity before calling.']
+    });
+
+    this.registerDoc({
+      library: 'godot4',
+      topic: 'ui',
+      version: '4.3',
+      summary: 'Godot 4 UI Controls, Containers and Touch Target specifications.',
+      signatures: ['custom_minimum_size: Vector2', 'anchors_preset: int'],
+      codeExample: 'custom_minimum_size = Vector2(48, 48)',
+      breakingChanges: ['Interactive touch elements require at least 48x48px touch targets.']
+    });
+  }
+
   private initGeneralDocs(): void {
     this.registerDoc({
       library: 'typescript',
@@ -66,6 +93,16 @@ export class Context7Bridge {
       summary: 'Node.js built-in test runner with strict assertions.',
       signatures: ['test(name: string, fn: () => void | Promise<void>)', 'assert.strictEqual(actual, expected)', 'assert.ok(value)'],
       codeExample: 'import { test } from "node:test";\nimport * as assert from "node:assert";'
+    });
+
+    this.registerDoc({
+      library: 'typescript',
+      topic: 'clean-arch',
+      version: '5.5',
+      summary: 'TypeScript Clean Domain Architecture & Demir Kafes compliance.',
+      signatures: ['TS_001_NO_ANY', 'TS_002_EMPTY_CATCH', 'TS_003_NESTING_DEPTH'],
+      codeExample: 'try { doTask(); } catch (err) { logger.error(err); }',
+      breakingChanges: ['No explicit any. No uncommented swallowed catches. Max nesting depth <= 4.']
     });
 
     this.registerDoc({

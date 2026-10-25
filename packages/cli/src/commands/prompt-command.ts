@@ -113,14 +113,24 @@ export function extractMemoryContext(targetFiles: string[], worktreeId = 'defaul
   const lines: string[] = ['### 🧠 Codebase Memory & Relational Impact'];
   let found = false;
   for (const f of targetFiles) {
-    const base = path.basename(f, path.extname(f));
-    const res = engine.queryMemory(base, { worktreeId });
+    const norm = f.replace(/\\/g, '/');
+    let res = engine.queryMemory(norm, { worktreeId });
+    if (!res.found) {
+      const base = path.basename(f, path.extname(f));
+      res = engine.queryMemory(base, { worktreeId });
+      if (!res.found) {
+        const pascal = base.split(/[-_]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+        res = engine.queryMemory(pascal, { worktreeId });
+      }
+    }
     if (res.found) {
       found = true;
       lines.push(`• **Symbol:** ${res.symbol} (${res.filePath || f})`);
       lines.push(`  - **Upstream Callers:** ${res.callers.length > 0 ? res.callers.join(', ') : 'None'}`);
       lines.push(`  - **Downstream Callees:** ${res.callees.length > 0 ? res.callees.join(', ') : 'None'}`);
       lines.push(`  - **Blast Radius:** ${res.blastRadius.length} affected file(s)`);
+      if (res.connectedSignals.length > 0) lines.push(`  - **Signals:** ${res.connectedSignals.join(', ')}`);
+      if (res.connectedScenes.length > 0) lines.push(`  - **Scenes:** ${res.connectedScenes.join(', ')}`);
     }
   }
   if (!found) {

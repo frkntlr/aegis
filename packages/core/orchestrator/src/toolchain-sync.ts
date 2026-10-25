@@ -178,7 +178,8 @@ export class UniversalToolchainSync {
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
       const userHome = process.env.USERPROFILE || process.env.HOME || '';
-      if (userHome && fs.existsSync(path.resolve(userHome, '.gemini'))) {
+      const isTemp = this.repoRoot.includes('Temp') || this.repoRoot.includes('tmp') || !fs.existsSync(path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js'));
+      if (!isTemp && userHome && fs.existsSync(path.resolve(userHome, '.gemini'))) {
         this.syncGlobalAntigravity(userHome);
       }
       return true;

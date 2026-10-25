@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import * as readline from 'node:readline';
-import { AstGrepBridge, SymbolSliceExtractor, GraphQueryEngine, RelationalGraph } from '@aegis/ast-skeleton';
+import { AstGrepBridge } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
-import { IronCageValidator } from '@aegis/iron-cage';
+import { IronCageValidator, EvidenceBasedTriageGate } from '@aegis/iron-cage';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
 
@@ -64,17 +64,35 @@ export function executeMcpTool(name: string, args: Record<string, unknown> = {})
 }
 
 function executeSecondaryTool(name: string, args: Record<string, unknown>): string {
+  const engine = getSharedMemoryEngine();
   if (name === 'find_symbol') {
-    const slice = new SymbolSliceExtractor().extractSlice(String(args.symbol || ''));
-    return slice ? JSON.stringify(slice, null, 2) : JSON.stringify({ found: false });
+    const q = engine.queryMemory(String(args.symbol || ''));
+    return JSON.stringify({ found: q.found, symbol: q.symbol, filePath: q.filePath, slice: q.slice, tokenSavingsPercent: q.tokenSavingsPercent }, null, 2);
   }
   if (name === 'trace_relational') {
-    const trace = new GraphQueryEngine(new RelationalGraph()).trace(String(args.target || ''));
-    return JSON.stringify(trace, null, 2);
+    const q = engine.queryMemory(String(args.target || ''));
+    return JSON.stringify({ target: q.symbol, callers: q.callers, callees: q.callees, blastRadius: q.blastRadius, signals: q.connectedSignals, scenes: q.connectedScenes }, null, 2);
   }
   if (name === 'ast_search') {
     const matches = AstGrepBridge.searchDirectory(String(args.path || '.'), String(args.pattern || ''));
     return JSON.stringify({ count: matches.length, matches: matches.slice(0, 10) }, null, 2);
+  }
+  if (name === 'ast_replace') {
+    const res = AstGrepBridge.replaceInFile(String(args.file || ''), String(args.pattern || ''), String(args.rewrite || ''));
+    return JSON.stringify(res, null, 2);
+  }
+  if (name === 'triage') {
+    const files = collectSourceFiles(String(args.dir || 'packages'));
+    const validator = new IronCageValidator();
+    const violations = files.flatMap(f => {
+      try {
+        return validator.validateFileContent(f, fs.readFileSync(f, 'utf8')).violations;
+      } catch {
+        return [];
+      }
+    });
+    const report = new EvidenceBasedTriageGate(validator).evaluate({ targetFiles: files, violations });
+    return JSON.stringify(report, null, 2);
   }
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }

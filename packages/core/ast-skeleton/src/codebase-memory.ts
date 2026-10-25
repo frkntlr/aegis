@@ -126,7 +126,19 @@ export class CodebaseMemoryEngine {
     return true;
   }
 
-  public indexDirectory(dirPath: string, worktreeId = 'default', exts = ['.ts', '.gd', '.py']): { indexed: number; cached: number } {
+  public removeFile(filePath: string, worktreeId = 'default'): boolean {
+    const norm = filePath.replace(/\\/g, '/');
+    const ns = this.getNamespace(worktreeId);
+    if (!ns.fileHashes.has(norm)) return false;
+    ns.fileHashes.delete(norm);
+    ns.fileContents.delete(norm);
+    delete ns.indexer.getDatabase().files[norm];
+    ns.graph.removeFileEdges(norm);
+    this.saveNamespaceToDisk(worktreeId);
+    return true;
+  }
+
+  public indexDirectory(dirPath: string, worktreeId = 'default', exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp']): { indexed: number; cached: number } {
     let indexed = 0;
     let cached = 0;
     if (!fs.existsSync(dirPath)) return { indexed, cached };
@@ -151,7 +163,18 @@ export class CodebaseMemoryEngine {
   }
 
   private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number): SliceResult | null {
-    const matches = ns.indexer.findSymbols(symbol);
+    let matches = ns.indexer.findSymbols(symbol);
+    if (matches.length === 0) {
+      const norm = symbol.replace(/\\/g, '/');
+      for (const [fPath, fileObj] of Object.entries(ns.indexer.getDatabase().files)) {
+        if (fPath === norm || fPath.endsWith('/' + norm) || fPath.endsWith('/' + symbol)) {
+          if (fileObj.symbols && fileObj.symbols.length > 0) {
+            matches = [fileObj.symbols[0]];
+            break;
+          }
+        }
+      }
+    }
     if (matches.length === 0) return null;
     const target = matches[0];
     const stored = ns.fileContents.get(target.filePath);
@@ -195,12 +218,14 @@ export class CodebaseMemoryEngine {
 
     const isGodot = (filePath && filePath.endsWith('.gd')) || /PackedScene|CharacterBody2D|Node|signal/.test(code);
     if (isGodot) {
-      const doc = this.adapters.docProvider('godot4', 'lifecycle');
+      const topic = /velocity|move_and_slide/.test(code) ? 'physics' : (/signal|emit|connect/.test(code) ? 'signals' : 'lifecycle');
+      const doc = this.adapters.docProvider('godot4', topic) || this.adapters.docProvider('godot4', 'lifecycle');
       if (doc) docs.push(doc);
     }
     const isTs = (filePath && (filePath.endsWith('.ts') || filePath.endsWith('.tsx'))) || /interface|type\s+|declare/.test(code);
     if (isTs) {
-      const doc = this.adapters.docProvider('typescript', 'compiler');
+      const topic = /test|assert/.test(code) ? 'node-test' : 'clean-arch';
+      const doc = this.adapters.docProvider('typescript', topic) || this.adapters.docProvider('typescript', 'node-test');
       if (doc) docs.push(doc);
     }
     return docs;

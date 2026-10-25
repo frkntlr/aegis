@@ -47,3 +47,25 @@ test('CodebaseMemoryWatcher: filters ignored files and flushes pending changes',
   watcher.stop();
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('CodebaseMemoryWatcher: evicts deleted files from engine on flush', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-watch-del-'));
+  const target = path.join(tmpDir, 'to_remove.ts');
+  fs.writeFileSync(target, 'export class DeletedModel {}', 'utf8');
+
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  const watcher = new CodebaseMemoryWatcher(engine, { worktreeId: 'del-test' });
+
+  watcher.handleRawEvent(tmpDir, 'to_remove.ts');
+  watcher.flushPendingFiles();
+  assert.strictEqual(engine.getMemoryStats('del-test').totalFiles, 1);
+
+  fs.unlinkSync(target);
+  watcher.handleRawEvent(tmpDir, 'to_remove.ts');
+  const flushRes = watcher.flushPendingFiles();
+  assert.strictEqual(flushRes.processed, 1);
+  assert.strictEqual(engine.getMemoryStats('del-test').totalFiles, 0);
+
+  watcher.stop();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
