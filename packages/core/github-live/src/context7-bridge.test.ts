@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { Context7Bridge } from './context7-bridge.js';
+import { DependencyMapper } from './dependency-mapper.js';
 
 test('Context7Bridge queries built-in Godot and TypeScript documentation', () => {
   const bridge = new Context7Bridge();
@@ -131,4 +132,56 @@ test('DeprecationLinter catches TypeScript strict violations and injects warning
   const injected = bridge.injectDocumentationContext('Shoot', ['b.gd'], [legacy]);
   assert.ok(injected.includes('Active Deprecation Warnings'));
   assert.ok(injected.includes('scene.instantiate()'));
+});
+
+test('DependencyMapper scans package.json and project.godot with addons', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dep-scan-test-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+      dependencies: { zod: '^3.23.8' },
+      devDependencies: { vitest: '^2.0.0' }
+    }));
+    fs.writeFileSync(path.join(tmpDir, 'project.godot'), 'config/features=PackedStringArray("4.3")\n');
+    const addonDir = path.join(tmpDir, 'addons', 'dialogic');
+    fs.mkdirSync(addonDir, { recursive: true });
+    fs.writeFileSync(path.join(addonDir, 'plugin.cfg'), '[plugin]\nname="Dialogic"\nversion="2.0-alpha"\n');
+
+    const deps = DependencyMapper.scanWorkspace(tmpDir);
+    assert.ok(deps.some(d => d.name === 'zod' && d.ecosystem === 'npm'));
+    assert.ok(deps.some(d => d.name === 'vitest' && d.ecosystem === 'npm'));
+    assert.ok(deps.some(d => d.name === 'godot' && d.version === '4.3'));
+    assert.ok(deps.some(d => d.name === 'dialogic' && d.version === '2.0-alpha'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('Context7Bridge multi-level disk cache provides <2ms offline lookup', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cache-level-test-'));
+  try {
+    const bridgeA = new Context7Bridge();
+    bridgeA.registerDoc({
+      library: 'zod',
+      topic: 'schema',
+      version: '3.23',
+      summary: 'TypeScript-first schema validation with static type inference.',
+      signatures: ['z.object({ ... })', 'z.string().parse(data)']
+    });
+    bridgeA.saveToCache(tmpDir);
+
+    const bridgeB = new Context7Bridge();
+    const t0 = performance.now();
+    const res = bridgeB.query('zod', 'schema', tmpDir);
+    const duration = performance.now() - t0;
+
+    assert.strictEqual(res.matched, true);
+    assert.strictEqual(res.source, 'cache');
+    assert.ok(res.doc?.signatures.includes('z.object({ ... })'));
+    assert.ok(duration < 15, `Disk cache access took ${duration}ms, expected fast lookup`);
+
+    const cachedRes = bridgeB.query('zod', 'schema', tmpDir);
+    assert.strictEqual(cachedRes.source, 'builtin');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

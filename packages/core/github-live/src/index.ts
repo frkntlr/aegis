@@ -11,3 +11,4 @@ export * from './projects-adapter.js';
 export * from './context-router.js';
 export * from './research-engine.js';
 export * from './context7-bridge.js';
+export * from './dependency-mapper.js';

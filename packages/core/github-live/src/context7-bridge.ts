@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { GodotTopicResolver, DeprecationLinter, type DeprecationWarning } from '@aegis/shared';
+import { DependencyMapper, type DiscoveredDependency } from './dependency-mapper.js';
 
 export interface Context7DocEntry {
   library: string;
@@ -123,7 +124,7 @@ export class Context7Bridge {
     this.docs.set(this.makeKey(entry.library, entry.topic), entry);
   }
 
-  public query(library: string, topic: string): Context7QueryResult {
+  public query(library: string, topic: string, cacheDir?: string): Context7QueryResult {
     const key = this.makeKey(library, topic);
     const exact = this.docs.get(key);
     if (exact) {
@@ -137,7 +138,31 @@ export class Context7Bridge {
       return { matched: true, doc: libMatch, source: 'builtin' };
     }
 
+    const diskDoc = this.queryDiskCache(library, topic, cacheDir);
+    if (diskDoc) {
+      this.registerDoc(diskDoc);
+      return { matched: true, doc: diskDoc, source: 'cache' };
+    }
+
     return { matched: false, source: 'miss' };
+  }
+
+  private queryDiskCache(library: string, topic: string, cacheDir?: string): Context7DocEntry | null {
+    const targetDir = cacheDir || path.resolve(process.cwd(), '.aegis', 'cache', 'context7');
+    if (!fs.existsSync(targetDir)) return null;
+    try {
+      const files = fs.readdirSync(targetDir);
+      for (const f of files) {
+        if (!f.endsWith('.json') || f === 'docs.json') continue;
+        if (f.toLowerCase().startsWith(library.toLowerCase())) {
+          const entry = JSON.parse(fs.readFileSync(path.join(targetDir, f), 'utf8')) as Context7DocEntry;
+          if (entry.library.toLowerCase() === library.toLowerCase() && (!topic || entry.topic.toLowerCase().includes(topic.toLowerCase()))) {
+            return entry;
+          }
+        }
+      }
+    } catch { /* ignore cache read error */ }
+    return null;
   }
 
   public resolveGodotTopic(codeOrClass: string): 'physics' | 'ui' | 'signals' | 'lifecycle' {
@@ -153,20 +178,38 @@ export class Context7Bridge {
     return DeprecationLinter.lint(code, ecosystem);
   }
 
+  public syncDependencies(rootDir: string, cacheDir?: string): DiscoveredDependency[] {
+    const deps = DependencyMapper.scanWorkspace(rootDir);
+    if (cacheDir) this.loadFromCache(cacheDir);
+    return deps;
+  }
+
   public saveToCache(cacheDir = path.resolve(process.cwd(), '.aegis', 'cache', 'context7')): void {
     try {
       fs.mkdirSync(cacheDir, { recursive: true });
       const records = Array.from(this.docs.values());
       fs.writeFileSync(path.join(cacheDir, 'docs.json'), JSON.stringify(records, null, 2), 'utf8');
+      for (const doc of records) {
+        const fname = `${doc.library.toLowerCase()}-${doc.version.toLowerCase().replace(/[^a-z0-9.]/g, '')}.json`;
+        fs.writeFileSync(path.join(cacheDir, fname), JSON.stringify(doc, null, 2), 'utf8');
+      }
     } catch { /* ignore non-fatal cache write errors */ }
   }
 
   public loadFromCache(cacheDir = path.resolve(process.cwd(), '.aegis', 'cache', 'context7')): void {
-    const file = path.join(cacheDir, 'docs.json');
-    if (!fs.existsSync(file)) return;
+    if (!fs.existsSync(cacheDir)) return;
     try {
-      const records = JSON.parse(fs.readFileSync(file, 'utf8')) as Context7DocEntry[];
-      for (const r of records) this.registerDoc(r);
+      const mainFile = path.join(cacheDir, 'docs.json');
+      if (fs.existsSync(mainFile)) {
+        const records = JSON.parse(fs.readFileSync(mainFile, 'utf8')) as Context7DocEntry[];
+        for (const r of records) this.registerDoc(r);
+      }
+      const files = fs.readdirSync(cacheDir);
+      for (const f of files) {
+        if (!f.endsWith('.json') || f === 'docs.json') continue;
+        const entry = JSON.parse(fs.readFileSync(path.join(cacheDir, f), 'utf8')) as Context7DocEntry;
+        if (entry.library && entry.topic) this.registerDoc(entry);
+      }
     } catch { /* ignore cache read errors */ }
   }
 
