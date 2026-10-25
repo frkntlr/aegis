@@ -5,14 +5,20 @@ import type { CodebaseMemoryEngine } from './codebase-memory.js';
 export interface WatcherOptions {
   worktreeId?: string;
   debounceMs?: number;
+  settlingMs?: number;
+  backoffDelays?: number[];
   exts?: string[];
+  fileReader?: (filePath: string) => string;
 }
 
 export class CodebaseMemoryWatcher {
   private engine: CodebaseMemoryEngine;
   private worktreeId: string;
   private debounceMs: number;
+  private settlingMs: number;
+  private backoffDelays: number[];
   private exts: string[];
+  private fileReader: ((filePath: string) => string) | null = null;
   private fsWatcher: fs.FSWatcher | null = null;
   private watchedDir: string | null = null;
   private pendingFiles = new Set<string>();
@@ -22,7 +28,10 @@ export class CodebaseMemoryWatcher {
     this.engine = engine;
     this.worktreeId = options.worktreeId || 'default';
     this.debounceMs = options.debounceMs ?? 150;
+    this.settlingMs = options.settlingMs ?? 20;
+    this.backoffDelays = options.backoffDelays ?? [50, 150, 300];
     this.exts = options.exts || ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.tscn', '.tres'];
+    this.fileReader = options.fileReader || null;
   }
 
   public isWatching(): boolean {
@@ -82,22 +91,52 @@ export class CodebaseMemoryWatcher {
     return !this.exts.includes(ext);
   }
 
+  public readFileWithSettling(filePath: string): string | null {
+    for (let attempt = 0; attempt <= this.backoffDelays.length; attempt++) {
+      try {
+        if (!fs.existsSync(filePath)) return null;
+        const size1 = fs.statSync(filePath).size;
+        if (this.settlingMs > 0) {
+          const waitBuf = new Int32Array(new SharedArrayBuffer(4));
+          Atomics.wait(waitBuf, 0, 0, this.settlingMs);
+          if (!fs.existsSync(filePath)) return null;
+          if (fs.statSync(filePath).size !== size1) {
+            throw Object.assign(new Error('File mutating'), { code: 'EBUSY' });
+          }
+        }
+        return this.fileReader ? this.fileReader(filePath) : fs.readFileSync(filePath, 'utf8');
+      } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        if (attempt < this.backoffDelays.length && (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')) {
+          const delay = this.backoffDelays[attempt];
+          const waitBuf = new Int32Array(new SharedArrayBuffer(4));
+          Atomics.wait(waitBuf, 0, 0, delay);
+          continue;
+        }
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private processSingleFile(filePath: string): boolean {
+    if (!fs.existsSync(filePath)) {
+      return this.engine.removeFile(filePath, this.worktreeId);
+    }
+    const content = this.readFileWithSettling(filePath);
+    if (content === null) return false;
+    return this.engine.indexFile(filePath, content, this.worktreeId);
+  }
+
   public flushPendingFiles(): { processed: number; updated: number } {
     const files = Array.from(this.pendingFiles);
     this.pendingFiles.clear();
     let updated = 0;
 
     for (const f of files) {
-      if (!fs.existsSync(f)) {
-        if (this.engine.removeFile(f, this.worktreeId)) updated++;
-        continue;
+      if (this.processSingleFile(f)) {
+        updated++;
       }
-      try {
-        const content = fs.readFileSync(f, 'utf8');
-        if (this.engine.indexFile(f, content, this.worktreeId)) {
-          updated++;
-        }
-      } catch { /* skip read errors */ }
     }
 
     if (updated > 0) {
