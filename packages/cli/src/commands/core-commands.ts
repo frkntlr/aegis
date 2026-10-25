@@ -5,7 +5,8 @@ import {
   TaskDispatcher,
   MergePipeline,
   IdeAdapterRegistry,
-  McpSkillsSyncEngine
+  McpSkillsSyncEngine,
+  UniversalToolchainSync
 } from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
 import { LoopBreaker, OrphanTaskReclaimer } from '@aegis/watchdog';
@@ -29,6 +30,8 @@ function autoConfigureGodot(repoRoot: string): void {
 function setupIdeExclusions(repoRoot: string): void {
   const registry = new IdeAdapterRegistry();
   const results = registry.setupAll(repoRoot);
+  const universal = new UniversalToolchainSync(process.cwd());
+  universal.syncAll();
   for (const r of results) {
     if (r.success) {
       const fileNames = r.configuredFiles.map(f => path.basename(f)).join(', ');
