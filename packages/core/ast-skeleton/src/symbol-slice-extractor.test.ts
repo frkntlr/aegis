@@ -116,3 +116,34 @@ test('SymbolSliceExtractor: injects both ambient types and callee signatures int
   assert.ok(slice.codeSlice.includes('this.authorize(req: PaymentRequest): boolean;'));
   assert.ok(slice.calleeSignatures?.some(s => s.includes('authorize')));
 });
+
+test('SymbolSliceExtractor: activates adaptive ClassSkeleton mode for class symbols with folded method bodies', () => {
+  const indexer = new SymbolIndexer();
+  const extractor = new SymbolSliceExtractor(indexer);
+
+  const heavyClassCode = [
+    'export class DatabaseCluster {',
+    '  private connectionPool: any[];',
+    '  constructor(url: string) {',
+    '    this.connectionPool = [];',
+    '    for (let i = 0; i < 50; i++) { this.connectionPool.push({ id: i, active: true }); }',
+    '  }',
+    '  public executeQuery(sql: string): any {',
+    '    const log = "Executing query: " + sql;',
+    '    return { rows: [], time: 12 };',
+    '  }',
+    '  public close(): void {',
+    '    this.connectionPool = [];',
+    '  }',
+    '}'
+  ].join('\n');
+
+  const slice = extractor.extractClassSkeletonSlice('DatabaseCluster', 'db.ts', heavyClassCode, 1, 14);
+  assert.ok(slice !== null);
+  assert.ok(slice.codeSlice.includes('class DatabaseCluster'));
+  assert.ok(slice.codeSlice.includes('constructor(url: string) { /* folded */ }'));
+  assert.ok(slice.codeSlice.includes('executeQuery(sql: string): any { /* folded */ }'));
+  assert.ok(slice.codeSlice.includes('close(): void { /* folded */ }'));
+  assert.ok(!slice.codeSlice.includes('connectionPool.push'));
+  assert.ok(slice.tokenSavingsPercent >= 50);
+});

@@ -34,13 +34,14 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
     return `${modifiers}const ${decls}`;
   }
 
-  private formatClassMember(m: ts.ClassElement, sf: ts.SourceFile): string {
+  public static formatClassMember(m: ts.ClassElement, sf: ts.SourceFile, foldBody = true): string {
+    const foldSuffix = foldBody ? ' { /* folded */ }' : ';';
     if (ts.isMethodDeclaration(m)) {
       const isStatic = ts.canHaveModifiers(m) && ts.getModifiers(m)?.some(x => x.kind === ts.SyntaxKind.StaticKeyword) ? 'static ' : '';
       const name = m.name.getText(sf);
       const params = m.parameters.map(p => p.getText(sf)).join(', ');
       const returnType = m.type ? `: ${m.type.getText(sf)}` : '';
-      return `  ${isStatic}${name}(${params})${returnType};`;
+      return `  ${isStatic}${name}(${params})${returnType}${foldSuffix}`;
     }
     if (ts.isPropertyDeclaration(m)) {
       const isStatic = ts.canHaveModifiers(m) && ts.getModifiers(m)?.some(x => x.kind === ts.SyntaxKind.StaticKeyword) ? 'static ' : '';
@@ -50,12 +51,12 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
     }
     if (ts.isConstructorDeclaration(m)) {
       const params = m.parameters.map(p => p.getText(sf)).join(', ');
-      return `  constructor(${params});`;
+      return `  constructor(${params})${foldSuffix}`;
     }
     return '';
   }
 
-  private formatClass(node: ts.ClassDeclaration, sf: ts.SourceFile): string {
+  public static formatClassSkeleton(node: ts.ClassDeclaration, sf: ts.SourceFile): string {
     const modifiers = ts.canHaveModifiers(node) && ts.getModifiers(node)
       ? ts.getModifiers(node)?.map(m => m.getText(sf)).join(' ') + ' '
       : '';
@@ -64,7 +65,7 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
     const members: string[] = [];
 
     for (const m of node.members) {
-      const memStr = this.formatClassMember(m, sf);
+      const memStr = TypeScriptSkeletonExtractor.formatClassMember(m, sf, true);
       if (memStr) members.push(memStr);
     }
     return `${modifiers}class ${name}${heritage} {\n${members.join('\n')}\n}`;
@@ -78,7 +79,7 @@ export class TypeScriptSkeletonExtractor implements LanguageExtractor {
     } else if (ts.isFunctionDeclaration(node)) {
       skeletonLines.push(this.formatFunction(node, sf));
     } else if (ts.isClassDeclaration(node)) {
-      skeletonLines.push(this.formatClass(node, sf));
+      skeletonLines.push(TypeScriptSkeletonExtractor.formatClassSkeleton(node, sf));
     } else if (ts.isVariableStatement(node)) {
       skeletonLines.push(this.formatVariables(node, sf));
     }

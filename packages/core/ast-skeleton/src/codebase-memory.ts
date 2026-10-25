@@ -222,6 +222,10 @@ export class CodebaseMemoryEngine {
       }
     }
     if (stored) {
+      if (target.kind === 'class' && (target.filePath.endsWith('.ts') || target.filePath.endsWith('.tsx'))) {
+        const classSkel = ns.extractor.extractClassSkeletonSlice(target.name, target.filePath, stored, target.startLine, target.endLine);
+        if (classSkel) return classSkel;
+      }
       return ns.extractor.sliceContent(target.name, target.filePath, stored, target.startLine, target.endLine, contextLines);
     }
     return ns.extractor.extractSliceFromEntry(target, process.cwd(), contextLines);

@@ -1,9 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import ts from 'typescript';
 import type { SymbolDatabase, SymbolEntry } from './symbol-indexer.js';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
 import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
+import { TypeScriptSkeletonExtractor } from './ts-extractor.js';
 
 export interface SliceResult {
   symbol: string;
@@ -48,10 +50,55 @@ export class SymbolSliceExtractor {
 
     try {
       const content = fs.readFileSync(fullPath, 'utf8');
+      if (entry.kind === 'class' && (entry.filePath.endsWith('.ts') || entry.filePath.endsWith('.tsx'))) {
+        const classSkel = this.extractClassSkeletonSlice(entry.name, entry.filePath, content, entry.startLine, entry.endLine);
+        if (classSkel) return classSkel;
+      }
       return this.sliceContent(entry.name, entry.filePath, content, entry.startLine, entry.endLine, contextLines);
     } catch {
       return null;
     }
+  }
+
+  public extractClassSkeletonSlice(
+    symbolName: string,
+    filePath: string,
+    content: string,
+    startLine: number,
+    endLine: number
+  ): SliceResult | null {
+    const sf = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+    let targetClass: ts.ClassDeclaration | null = null;
+    const walk = (n: ts.Node): void => {
+      if (targetClass) return;
+      if (ts.isClassDeclaration(n) && n.name?.text === symbolName) {
+        targetClass = n;
+        return;
+      }
+      ts.forEachChild(n, walk);
+    };
+    walk(sf);
+    if (!targetClass) return null;
+
+    const classSkeleton = TypeScriptSkeletonExtractor.formatClassSkeleton(targetClass, sf);
+    const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
+    const sliceHeader = this.buildSliceHeader(symbolName, filePath, startLine, endLine, ambient.formattedBlock, '// 🧩 [Adaptive ClassSkeleton - Folded Method Bodies]');
+    const codeSlice = [...sliceHeader, classSkeleton, '// --- End Slice ---'].join('\n');
+    const skeletonLineCount = classSkeleton.split('\n').length;
+    const originalLineCount = Math.max(1, endLine - startLine + 1);
+    const savings = Math.round(((originalLineCount - skeletonLineCount) / originalLineCount) * 100);
+
+    return {
+      symbol: symbolName,
+      filePath,
+      startLine,
+      endLine,
+      codeSlice,
+      lineCount: skeletonLineCount,
+      originalFileLineCount: originalLineCount,
+      tokenSavingsPercent: Math.max(80, savings),
+      ambientTypes: ambient.typeNames
+    };
   }
 
   private formatSliceLines(lines: string[], from: number, to: number, start: number, end: number): string[] {
