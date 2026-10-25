@@ -60,7 +60,9 @@ export function collectSourceFiles(dir: string, includeScenes = false): string[]
   if (!fs.existsSync(dir)) return results;
   if (fs.statSync(dir).isFile()) return [dir];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const regex = includeScenes ? /\.(ts|tsx|py|gd|tscn|tres)$/ : /\.(ts|tsx|py|gd)$/;
+  const regex = includeScenes
+    ? /\.(ts|tsx|py|gd|tscn|tres|cs|rs|go|cpp|c|h|hpp|sh|bash|xaml)$/
+    : /\.(ts|tsx|py|gd|cs|rs|go|cpp|c|h|hpp|sh|bash)$/;
 
   for (const entry of entries) {
     if (['node_modules', 'dist', '.git', 'experimental', '.mcp', '.aegis', '.godot'].includes(entry.name)) continue;

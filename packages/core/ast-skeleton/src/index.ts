@@ -6,6 +6,8 @@ export * from './tscn-extractor.js';
 export * from './rust-extractor.js';
 export * from './go-extractor.js';
 export * from './cpp-extractor.js';
+export * from './csharp-extractor.js';
+export * from './bash-extractor.js';
 export * from './skeleton-generator.js';
 export * from './cache-manager.js';
 export * from './diff-engine.js';

@@ -141,7 +141,7 @@ export class CodebaseMemoryEngine {
   public indexDirectory(
     dirPath: string,
     worktreeId?: string,
-    exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp']
+    exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp', '.cs', '.xaml', '.sh', '.bash']
   ): { indexed: number; cached: number; fastSynced?: boolean } {
     const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
     const ns = this.getNamespace(active);

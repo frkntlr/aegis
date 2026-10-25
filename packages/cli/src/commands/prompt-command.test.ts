@@ -33,6 +33,22 @@ test('generateLanguageConstitution generates base constitution for non-code file
   assert.strictEqual(constitution.includes('TypeScript Clean Domain Architecture:'), false);
 });
 
+test('generateLanguageConstitution generates .NET-specific constitution for C# files', () => {
+  const constitution = generateLanguageConstitution(['src/Services/OrderService.cs', 'src/Views/Main.xaml']);
+  assert.ok(constitution.includes('Demir Kafes Constitution:'));
+  assert.ok(constitution.includes('.NET & Windows Desktop Clean Architecture:'));
+  assert.ok(constitution.includes('File-scoped namespaces'));
+  assert.strictEqual(constitution.includes('TypeScript Clean Domain Architecture:'), false);
+});
+
+test('generateLanguageConstitution generates Linux-specific constitution for Shell files', () => {
+  const constitution = generateLanguageConstitution(['scripts/deploy.sh', 'scripts/setup.bash']);
+  assert.ok(constitution.includes('Demir Kafes Constitution:'));
+  assert.ok(constitution.includes('Linux System & Shell Robust Execution:'));
+  assert.ok(constitution.includes('set -euo pipefail'));
+  assert.strictEqual(constitution.includes('.NET & Windows Desktop Clean Architecture:'), false);
+});
+
 test('extractMemoryContext extracts relational memory for target files', () => {
   const engine = new CodebaseMemoryEngine({ persistToDisk: false });
   engine.indexFile('src/hero.ts', 'export class Hero {}', 'test-wt');

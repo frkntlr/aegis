@@ -175,6 +175,8 @@ export class SymbolParser {
     if (normPath.endsWith('.py')) return PolyglotParser.parsePython(filePath, content);
     if (normPath.endsWith('.rs')) return PolyglotParser.parseRust(filePath, content);
     if (normPath.endsWith('.go')) return PolyglotParser.parseGo(filePath, content);
+    if (normPath.endsWith('.cs')) return PolyglotParser.parseCSharp(filePath, content);
+    if (normPath.endsWith('.sh') || normPath.endsWith('.bash')) return PolyglotParser.parseBash(filePath, content);
     const symbols: SymbolEntry[] = [];
     const lines = content.split(/\r?\n/);
     const fnPattern = /(?:def|fn|func)\s+([a-zA-Z_]\w*)\s*\(/;

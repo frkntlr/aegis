@@ -9,7 +9,7 @@ export interface HotPatchReport {
 }
 
 export class LiveHotPatcher {
-  private static readonly SUPPORTED_EXTS = ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cpp'];
+  private static readonly SUPPORTED_EXTS = ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cpp', '.cs', '.xaml', '.sh', '.bash'];
 
   public static isDirty(filePath: string, cachedFingerprint?: string): boolean {
     if (!fs.existsSync(filePath)) return false;

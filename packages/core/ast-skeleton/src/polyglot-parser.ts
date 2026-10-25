@@ -136,4 +136,101 @@ export class PolyglotParser {
     }
     return symbols;
   }
+
+  public static parseCSharp(filePath: string, content: string): SymbolEntry[] {
+    const normPath = filePath.replace(/\\/g, '/');
+    const symbols: SymbolEntry[] = [];
+    const lines = content.split(/\r?\n/);
+    let curClass = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
+
+      const typeMatch = trimmed.match(
+        /^(?:public|private|protected|internal|static|abstract|sealed|partial|\s)*(?:class|interface|struct|record|enum)\s+([a-zA-Z_]\w*)/
+      );
+      if (typeMatch) {
+        curClass = typeMatch[1];
+        symbols.push({
+          name: curClass,
+          kind: trimmed.includes('interface') ? 'interface' : 'class',
+          filePath: normPath,
+          startLine: i + 1,
+          endLine: lines.length,
+          signature: trimmed.replace(/\{.*$/, '').trim()
+        });
+        continue;
+      }
+
+      PolyglotParser.parseCSharpMember(lines, i, normPath, curClass, trimmed, symbols);
+    }
+    return symbols;
+  }
+
+  private static parseCSharpMember(
+    _lines: string[],
+    i: number,
+    normPath: string,
+    curClass: string,
+    trimmed: string,
+    symbols: SymbolEntry[]
+  ): void {
+    const methodMatch = trimmed.match(
+      /^(?:public|private|protected|internal|static|async|virtual|override|abstract|sealed|partial|\s)*(?:[\w<>\[\],\s\?]+)\s+([a-zA-Z_]\w*)\s*\((.*?)\)/
+    );
+    if (methodMatch && !trimmed.startsWith('new ') && !trimmed.startsWith('return ')) {
+      const methodName = curClass ? `${curClass}.${methodMatch[1]}` : methodMatch[1];
+      symbols.push({
+        name: methodName,
+        kind: curClass ? 'method' : 'function',
+        filePath: normPath,
+        startLine: i + 1,
+        endLine: i + 1,
+        signature: trimmed.replace(/\{.*$/, '').trim()
+      });
+      return;
+    }
+
+    const propMatch = trimmed.match(
+      /^(?:public|private|protected|internal|static|virtual|override|\s)*(?:[\w<>\[\],\s\?]+)\s+([a-zA-Z_]\w*)\s*\{\s*(?:get|set|init)/
+    );
+    if (propMatch) {
+      const propName = curClass ? `${curClass}.${propMatch[1]}` : propMatch[1];
+      symbols.push({
+        name: propName,
+        kind: 'variable',
+        filePath: normPath,
+        startLine: i + 1,
+        endLine: i + 1,
+        signature: trimmed
+      });
+    }
+  }
+
+  public static parseBash(filePath: string, content: string): SymbolEntry[] {
+    const normPath = filePath.replace(/\\/g, '/');
+    const symbols: SymbolEntry[] = [];
+    const lines = content.split(/\r?\n/);
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (trimmed.startsWith('#')) continue;
+
+      const fnMatch = trimmed.match(/^(?:function\s+)?([a-zA-Z_0-9\-]+)\s*(?:\(\))?\s*\{?/);
+      if (fnMatch && !['if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'do', 'done', 'case', 'esac', 'export', 'set', 'return'].includes(fnMatch[1])) {
+        if (trimmed.includes('()') || trimmed.startsWith('function ')) {
+          symbols.push({
+            name: fnMatch[1],
+            kind: 'function',
+            filePath: normPath,
+            startLine: i + 1,
+            endLine: i + 1,
+            signature: trimmed.replace(/\{.*$/, '').trim()
+          });
+        }
+      }
+    }
+    return symbols;
+  }
 }
