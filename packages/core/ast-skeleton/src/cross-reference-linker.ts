@@ -4,6 +4,7 @@ import { RelationalGraph } from './relational-graph.js';
 import { TscnRelationParser } from './tscn-relation-parser.js';
 import { SymbolParser, type SymbolEntry } from './symbol-parser.js';
 import { TsCallGraphExtractor } from './ts-call-graph-extractor.js';
+import { GdSignalExtractor } from './gdscript-signal-extractor.js';
 
 export class CrossReferenceLinker {
   private graph: RelationalGraph;
@@ -83,15 +84,24 @@ export class CrossReferenceLinker {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       this.parseGdInheritance(filePath, line);
-      this.parseGdSignalTriggers(filePath, line);
-      this.parseGdConnections(filePath, line);
+    }
+
+    const { edges, nodes } = GdSignalExtractor.extract(filePath, content, symbols);
+    for (const node of nodes) {
+      if (!this.graph.getNode(node.id)) {
+        this.graph.addNode(node);
+      }
+    }
+    for (const edge of edges) {
+      this.graph.addEdge(edge);
     }
   }
 
   private registerSymbols(filePath: string, symbols: SymbolEntry[]): void {
     for (const s of symbols) {
       const id = `${filePath}::${s.name}`;
-      this.graph.addNode({ id, name: s.name, kind: 'symbol', filePath, line: s.startLine });
+      const kind = s.kind === 'signal' ? 'signal' : 'symbol';
+      this.graph.addNode({ id, name: s.name, kind, filePath, line: s.startLine });
       if (s.kind === 'signal') {
         this.graph.addEdge({ from: filePath, to: id, type: 'DEFINES_SIGNAL' });
       }
@@ -103,34 +113,6 @@ export class CrossReferenceLinker {
     if (extMatch) {
       const base = (extMatch[1] || extMatch[2]).replace(/^res:\/\//, '');
       this.graph.addEdge({ from: filePath, to: base, type: 'EXTENDS' });
-    }
-  }
-
-  private parseGdSignalTriggers(filePath: string, line: string): void {
-    const emitMatch = line.match(/\b([a-zA-Z_]\w*)\.emit\s*\(/) || line.match(/emit_signal\(\s*["']([^"']+)["']/);
-    if (emitMatch && emitMatch[1] !== 'self') {
-      this.graph.addEdge({
-        from: filePath,
-        to: emitMatch[1],
-        type: 'EMITS_SIGNAL',
-        metadata: { signal: emitMatch[1] }
-      });
-    }
-  }
-
-  private parseGdConnections(filePath: string, line: string): void {
-    const conn1 = line.match(/([a-zA-Z_]\w*)\.connect\(\s*([a-zA-Z_]\w*)/);
-    const conn2 = line.match(/connect\(\s*["']([a-zA-Z_]\w*)["']\s*,\s*(?:Callable\([^)]*,\s*["']([a-zA-Z_]\w*)["']\)|([a-zA-Z_]\w*))/);
-    const sig = conn1 ? conn1[1] : (conn2 ? conn2[1] : undefined);
-    const method = conn1 ? conn1[2] : (conn2 ? (conn2[2] || conn2[3]) : undefined);
-
-    if (sig && method) {
-      this.graph.addEdge({
-        from: `${filePath}::${sig}`,
-        to: `${filePath}::${method}`,
-        type: 'CONNECTS_SIGNAL',
-        metadata: { signal: sig, method }
-      });
     }
   }
 

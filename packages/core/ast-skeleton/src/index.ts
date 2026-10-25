@@ -21,3 +21,4 @@ export * from './ast-grep-bridge.js';
 export * from './codebase-memory.js';
 export * from './codebase-memory-watcher.js';
 export * from './ts-call-graph-extractor.js';
+export * from './gdscript-signal-extractor.js';
