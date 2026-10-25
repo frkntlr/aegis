@@ -52,14 +52,34 @@ Aegis'in 5-Katmanlı Kod Hafızası (`CodebaseMemoryEngine`), dil modellerine ve
 
 ---
 
-## 🔒 4. Demir Kafes ve Mimari Standartlar
+## ⚠️ 4. Riskler & Etki Alanı Analizi (Blast Radius & Mitigation Strategies)
+
+Canlı Aegis hafıza telemetrisi (`memory:query`, `memory:stats`, `trace`) üzerinden yürütülen tanı araştırmasında aşağıdaki riskler tespit edilmiştir:
+
+1. **Demir Kafes Satır Kotası Riski (`codebase-memory.ts`):**
+   - `codebase-memory.ts` şu anda 298/300 satırdadır (kalan kota: 2 satır).
+   - *Çözüm:* Cold-start ve write-through mantığı bağımsız modüllere (`ColdStartIndexer`, `MemoryWriteThroughHook`) çıkarılmalı, ana motor yalnızca 1 satırlık delege çağrısı yapmalıdır.
+2. **Cold-Start Latency & Event Loop Blokajı:**
+   - Binlerce dosyalık depolarda senkron `fs.readdirSync` CLI başlangıç hedefini (100ms) aşabilir.
+   - *Çözüm:* `GitFastSyncEngine` mtime + dosya boyutu kontrolüyle önbellek eşleşmeleri 0ms'de geçilmeli, asenkron chunked event loop kullanılmalıdır.
+3. **Disk I/O ve Windows `EBUSY` Çakışması:**
+   - Çoklu peş peşe yazmalarda tüm JSON hafızasının diske yazılması I/O yükü oluşturur.
+   - *Çözüm:* RAM bellek güncellemesi anlık (senkron, 0ms), disk önbelleğe yazma (`MemoryDiskStore.save`) ise 100ms debounced ve atomik (`tmp -> rename`) olmalıdır.
+4. **Çoklu Worktree Sibling Senkronizasyonu:**
+   - Worktree merge (`aegis merge solver master`) sonrasında kardeş worktree hafızalarının bayat kalmaması için `AgentMergeWorkflow` otomatik hafıza senkronizasyonu adımı içermelidir.
+5. **Hayalet Semboller (Ghost Symbols):**
+   - Silinen dosyaların çizgeden temizlenmesi için write-through kancası dosya silme operasyonlarında `removeFile` tetiklemelidir.
+
+---
+
+## 🔒 5. Demir Kafes ve Mimari Standartlar
 - Maksimum 300 satır/dosya, maksimum 40 satır/fonksiyon.
 - Non-blocking asenkron tam tarama (arka plan worker veya chunked event loop).
 - Sadece cerrahi unified diff ve 0 false-alarm garantisi.
 
 ---
 
-## 🎯 5. Kabul Kriterleri (Acceptance Criteria)
+## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
 - [ ] `CodebaseMemoryEngine.ensureColdStartIndexed(repoRoot)` metodu eklendi; bellek boşsa tüm proje ağacını proaktif indeksliyor.
 - [ ] `CodebaseMemoryEngine.notifyFileChanged(filePath, content)` write-through hook'u tanımlandı.
 - [ ] CLI, Auto Runner ve Task Dispatcher başlangıcında cold-start tetikleniyor.
