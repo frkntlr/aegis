@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export const normPath = (p: string): string => p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
+export { WorktreeMutexShield, type ActiveLockInfo } from '@aegis/shared';
 
 export function cleanGitEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };

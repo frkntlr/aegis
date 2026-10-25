@@ -12,7 +12,7 @@ import { MemoryDiskStore } from './memory-disk-store.js';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
 import { LiveHotPatcher } from './live-hot-patcher.js';
-import type { DiffBudgetReport } from '@aegis/shared';
+import { type DiffBudgetReport, WorktreeMutexShield, type ActiveLockInfo } from '@aegis/shared';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
@@ -46,6 +46,7 @@ export interface MemoryQueryResult {
   constitutionRules: string[];
   compressedLogs?: string;
   diffBudget?: DiffBudgetReport;
+  activeLock?: ActiveLockInfo;
 }
 
 export interface MemoryStats {
@@ -222,6 +223,13 @@ export class CodebaseMemoryEngine {
     return ns.extractor.extractSliceFromEntry(target, process.cwd(), contextLines);
   }
 
+  private formatLockDecoratedSlice(slice?: string, filePath?: string, activeLock?: ActiveLockInfo | null): string | undefined {
+    if (!slice || !activeLock?.warning) return slice;
+    const pfx = (filePath?.endsWith('.gd') || filePath?.endsWith('.py')) ? '#' : '//';
+    const warningText = activeLock.warning.split('\n').map(l => `${pfx} ${l}`).join('\n');
+    return `${warningText}\n${slice}`;
+  }
+
   public queryMemory(symbol: string, options: MemoryQueryOptions = {}): MemoryQueryResult {
     const worktreeId = options.worktreeId || 'default';
     const ns = this.getNamespace(worktreeId);
@@ -235,13 +243,15 @@ export class CodebaseMemoryEngine {
 
     const callers = traceResult.upstreamEdges.map(e => e.from);
     const callees = traceResult.downstreamEdges.map(e => e.to);
-    const targetFile = sliceResult ? sliceResult.filePath : undefined;
+    const targetFile = sliceResult?.filePath || ns.indexer.findSymbols(symbol)[0]?.filePath;
+    const activeLock = targetFile ? WorktreeMutexShield.inspectLock(targetFile, worktreeId) : null;
+    const slice = this.formatLockDecoratedSlice(sliceResult?.codeSlice, targetFile, activeLock);
 
     return {
       symbol,
       found: Boolean(sliceResult || traceResult.foundNode),
       filePath: targetFile,
-      slice: sliceResult?.codeSlice,
+      slice,
       startLine: sliceResult?.startLine,
       endLine: sliceResult?.endLine,
       tokenSavingsPercent: sliceResult?.tokenSavingsPercent ?? 0,
@@ -250,10 +260,11 @@ export class CodebaseMemoryEngine {
       blastRadius: traceResult.blastRadiusFiles,
       connectedSignals: traceResult.connectedSignals,
       connectedScenes: traceResult.connectedScenes,
-      groundTruthDocs: MemoryAdapterResolver.resolveGroundTruth(sliceResult?.codeSlice || symbol, this.adapters, targetFile),
+      groundTruthDocs: MemoryAdapterResolver.resolveGroundTruth(slice || symbol, this.adapters, targetFile),
       constitutionRules: MemoryAdapterResolver.resolveConstitution(this.adapters, targetFile),
       compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters),
-      diffBudget: sliceResult?.diffBudget
+      diffBudget: sliceResult?.diffBudget,
+      activeLock: activeLock || undefined
     };
   }
 
@@ -261,11 +272,9 @@ export class CodebaseMemoryEngine {
     const ns = this.getNamespace(worktreeId);
     const db = ns.indexer.getDatabase();
     const files = Object.keys(db.files);
-    let totalSymbols = 0;
-    for (const f of files) totalSymbols += db.files[f]?.symbols?.length || 0;
+    const totalSymbols = files.reduce((acc, f) => acc + (db.files[f]?.symbols?.length || 0), 0);
     const nodes = ns.graph.getAllNodes();
-    let totalEdges = 0;
-    for (const n of nodes) totalEdges += ns.graph.getOutgoing(n.id).length;
+    const totalEdges = nodes.reduce((acc, n) => acc + ns.graph.getOutgoing(n.id).length, 0);
     return {
       worktreeId,
       totalFiles: files.length,

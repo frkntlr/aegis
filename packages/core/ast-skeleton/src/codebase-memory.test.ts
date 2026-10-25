@@ -230,3 +230,38 @@ test('CodebaseMemoryEngine: queryMemory injects PreEmptiveDiffBudgeting into sli
   assert.strictEqual(res.diffBudget?.funcQuotaRemaining, 37);
   assert.strictEqual(res.diffBudget?.isExceeded, false);
 });
+
+test('CodebaseMemoryEngine: queryMemory flags active locks from .aegis/locks.json', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mem-lock-'));
+  const prevCwd = process.cwd();
+  process.chdir(tmpDir);
+
+  try {
+    const aegisDir = path.join(tmpDir, '.aegis');
+    fs.mkdirSync(aegisDir, { recursive: true });
+    fs.writeFileSync(path.join(aegisDir, 'locks.json'), JSON.stringify({
+      'src/hero.ts': { agent: 'aegis/qa', lockId: 'lk_hero' }
+    }), 'utf8');
+
+    const srcDir = path.join(tmpDir, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(path.join(srcDir, 'hero.ts'), 'export class Hero { slash(): void {} }', 'utf8');
+
+    const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+    engine.indexFile('src/hero.ts', 'export class Hero { slash(): void {} }');
+
+    const resSolver = engine.queryMemory('slash', { worktreeId: 'solver' });
+    assert.strictEqual(resSolver.found, true);
+    assert.ok(resSolver.activeLock?.isLockedByOther, 'must flag as locked by other');
+    assert.strictEqual(resSolver.activeLock?.lockedBy, 'aegis/qa');
+    assert.ok(resSolver.slice?.includes('🔒 Worktree Mutex Uyarısı'));
+    assert.ok(resSolver.slice?.includes("Bu dosya şu anda 'aegis/qa' ajanı tarafından kilitlenmiştir"));
+
+    const resQa = engine.queryMemory('slash', { worktreeId: 'qa' });
+    assert.strictEqual(resQa.activeLock?.isLockedByOther, false);
+    assert.ok(!resQa.slice?.includes('🔒 Worktree Mutex Uyarısı'));
+  } finally {
+    process.chdir(prevCwd);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
