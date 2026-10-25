@@ -141,3 +141,56 @@ test('CodebaseMemoryEngine: queryMemory returns real callers, callees, and surgi
   assert.ok(qService.callers.some(c => c.includes('handleCheckout') || c.includes('controller.ts')), 'OrderService callers must include handleCheckout');
   assert.ok(qService.callees.some(c => c.includes('charge') || c.includes('PaymentGateway')), 'OrderService callees must include charge');
 });
+
+test('CodebaseMemoryEngine: inherits base memory into new worktree with copy-on-write overlay', () => {
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  engine.indexFile('src/base.ts', 'export class BaseService { ping(): boolean { return true; } }', 'default');
+
+  // Querying in fresh solver worktree should inherit BaseService seamlessly
+  const qSolver = engine.queryMemory('BaseService', { worktreeId: 'solver' });
+  assert.strictEqual(qSolver.found, true, 'solver should inherit BaseService from default base memory');
+
+  // Add worktree-specific feature in solver
+  engine.indexFile('src/solver-patch.ts', 'export class SolverPatch {}', 'solver');
+
+  // solver has both BaseService and SolverPatch
+  assert.strictEqual(engine.queryMemory('BaseService', { worktreeId: 'solver' }).found, true);
+  assert.strictEqual(engine.queryMemory('SolverPatch', { worktreeId: 'solver' }).found, true);
+
+  // default remains untouched (Copy-On-Write isolation)
+  assert.strictEqual(engine.queryMemory('SolverPatch', { worktreeId: 'default' }).found, false, 'default base must not contain solver changes');
+});
+
+test('CodebaseMemoryEngine: resolves worktree id dynamically from CWD path', () => {
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/project/experimental/solver'), 'solver');
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('/home/user/repo/worktrees/qa'), 'qa');
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/games/HakeGame-ui'), 'HakeGame-ui');
+  assert.strictEqual(CodebaseMemoryEngine.resolveWorktreeIdFromCwd('c:/project/src'), 'default');
+});
+
+test('MemoryDiskStore: loads base memory when worktree cache is not found on disk', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cow-disk-'));
+  const prevCwd = process.cwd();
+  process.chdir(tmpDir);
+
+  try {
+    const engine1 = new CodebaseMemoryEngine({ persistToDisk: true });
+    engine1.indexFile('src/shared.ts', 'export class SharedEngine {}', 'default');
+    engine1.saveNamespaceToDisk('default');
+
+    // Fresh engine instance querying 'new-worktree' should inherit from 'default' on disk
+    const engine2 = new CodebaseMemoryEngine({ persistToDisk: true });
+    const res = engine2.queryMemory('SharedEngine', { worktreeId: 'new-worktree' });
+    assert.strictEqual(res.found, true, 'new-worktree must load shared memory from base default');
+
+    // Modify in worktree and save
+    engine2.indexFile('src/feature.ts', 'export class LocalFeature {}', 'new-worktree');
+    engine2.saveNamespaceToDisk('new-worktree');
+
+    // Verify .aegis/memory/new-worktree exists independently now
+    assert.strictEqual(fs.existsSync(path.join(tmpDir, '.aegis', 'memory', 'new-worktree', 'symbols.json')), true);
+  } finally {
+    process.chdir(prevCwd);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

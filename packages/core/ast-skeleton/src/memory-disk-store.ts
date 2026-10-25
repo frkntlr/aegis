@@ -37,12 +37,24 @@ export class MemoryDiskStore {
     }
   }
 
+  private static resolveSourceDir(id: string): string | null {
+    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
+    if (fs.existsSync(cacheDir)) return cacheDir;
+    if (id === 'default') return null;
+
+    const baseDir = path.resolve(process.cwd(), '.aegis', 'memory', 'default');
+    if (fs.existsSync(baseDir)) return baseDir;
+    return null;
+  }
+
   public static load(id: string, ns: DiskNamespaceData, persistToDisk?: boolean): void {
     if (persistToDisk === false) return;
-    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
-    const symPath = path.join(cacheDir, 'symbols.json');
-    const graphPath = path.join(cacheDir, 'graph.json');
-    const metaPath = path.join(cacheDir, 'meta.json');
+    const sourceDir = MemoryDiskStore.resolveSourceDir(id);
+    if (!sourceDir) return;
+
+    const symPath = path.join(sourceDir, 'symbols.json');
+    const graphPath = path.join(sourceDir, 'graph.json');
+    const metaPath = path.join(sourceDir, 'meta.json');
 
     if (fs.existsSync(symPath)) ns.indexer.loadCache(symPath);
     if (fs.existsSync(graphPath)) ns.graph.loadCache(graphPath);
@@ -56,6 +68,14 @@ export class MemoryDiskStore {
       if (meta.fingerprints) ns.mtimeFingerprints = new Map(Object.entries(meta.fingerprints));
       if (meta.lastCommit) ns.lastCommit = meta.lastCommit;
     }
+  }
+
+  public static inherit(target: DiskNamespaceData, source: DiskNamespaceData): void {
+    target.indexer.loadCacheData(source.indexer.getDatabase());
+    target.graph.fromJSON(source.graph.toJSON());
+    for (const [k, v] of source.fileHashes) target.fileHashes.set(k, v);
+    for (const [k, v] of source.mtimeFingerprints) target.mtimeFingerprints.set(k, v);
+    target.lastCommit = source.lastCommit;
   }
 
   public static save(id: string, ns: DiskNamespaceData, persistToDisk?: boolean): void {

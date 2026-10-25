@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { SymbolSliceExtractor, type SliceResult } from './symbol-slice-extractor.js';
 import { RelationalGraph } from './relational-graph.js';
-import { GraphQueryEngine, type TraceResult } from './graph-query-engine.js';
+import { GraphQueryEngine } from './graph-query-engine.js';
 import { CrossReferenceLinker } from './cross-reference-linker.js';
 import { MemoryAdapterResolver } from './memory-adapter-resolver.js';
 import { LruFileBuffer } from './lru-file-buffer.js';
@@ -73,6 +73,17 @@ export class CodebaseMemoryEngine {
     this.adapters = adapters;
   }
 
+  public static resolveWorktreeIdFromCwd(cwd = process.cwd()): string {
+    const norm = cwd.replace(/\\/g, '/');
+    const match = norm.match(/(?:experimental|worktrees|\.worktrees)\/([^/]+)/);
+    if (match) return match[1];
+    const base = path.basename(norm);
+    if (base.includes('-solver') || base.includes('-qa') || base.includes('-docs') || base.includes('-ui')) {
+      return base;
+    }
+    return 'default';
+  }
+
   private getNamespace(id = 'default'): MemoryNamespace {
     let ns = this.namespaces.get(id);
     if (!ns) {
@@ -84,6 +95,11 @@ export class CodebaseMemoryEngine {
       const fileContents = new LruFileBuffer(this.adapters.lruCapacity ?? 100);
       ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), mtimeFingerprints: new Map(), fileContents };
       MemoryDiskStore.load(id, ns, this.adapters.persistToDisk);
+
+      if (ns.fileHashes.size === 0 && id !== 'default') {
+        const baseNs = this.namespaces.get('default');
+        if (baseNs) MemoryDiskStore.inherit(ns, baseNs);
+      }
       this.namespaces.set(id, ns);
     }
     return ns;
@@ -216,7 +232,8 @@ export class CodebaseMemoryEngine {
     const sliceResult = this.resolveSlice(ns, symbol, options.contextLines ?? 3);
     const traceResult = ns.queryEngine.trace(symbol, options.maxDepth ?? 5);
 
-    this.enrichClassTrace(ns, symbol, traceResult);
+    const isClass = /^[A-Z]\w+$/.test(symbol) || ns.indexer.findSymbols(symbol).some(s => s.kind === 'class');
+    MemoryAdapterResolver.enrichClassTrace(ns.graph, ns.queryEngine, symbol, traceResult, isClass);
 
     const callers = traceResult.upstreamEdges.map(e => e.from);
     const callees = traceResult.downstreamEdges.map(e => e.to);
@@ -239,32 +256,6 @@ export class CodebaseMemoryEngine {
       constitutionRules: MemoryAdapterResolver.resolveConstitution(this.adapters, targetFile),
       compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters)
     };
-  }
-
-  private enrichClassTrace(ns: MemoryNamespace, symbol: string, traceResult: TraceResult): void {
-    const isClass = /^[A-Z]\w+$/.test(symbol) || ns.indexer.findSymbols(symbol).some(s => s.kind === 'class');
-    if (!isClass) return;
-
-    const className = traceResult.foundNode?.name || symbol;
-    const methodPrefix = `${className}.`;
-    const seenEdges = new Set(traceResult.upstreamEdges.map(e => `${e.from}->${e.to}:${e.type}`));
-
-    for (const node of ns.graph.getAllNodes()) {
-      if (node.name.startsWith(methodPrefix) || node.id.includes(`::${methodPrefix}`)) {
-        const methodTrace = ns.queryEngine.trace(node.id, 2);
-        for (const e of methodTrace.upstreamEdges) {
-          const k = `${e.from}->${e.to}:${e.type}`;
-          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.upstreamEdges.push(e); }
-        }
-        for (const e of methodTrace.downstreamEdges) {
-          const k = `${e.from}->${e.to}:${e.type}`;
-          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.downstreamEdges.push(e); }
-        }
-        for (const f of methodTrace.blastRadiusFiles) {
-          if (!traceResult.blastRadiusFiles.includes(f)) traceResult.blastRadiusFiles.push(f);
-        }
-      }
-    }
   }
 
   public getMemoryStats(worktreeId = 'default'): MemoryStats {

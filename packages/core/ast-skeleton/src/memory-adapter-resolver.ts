@@ -1,3 +1,6 @@
+import type { RelationalGraph } from './relational-graph.js';
+import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
+
 export interface MemoryResolverAdapters {
   docProvider?: (library: string, topic: string) => string | null;
   logCompressor?: (raw: string) => { text: string; tokenSavingsPercent: number };
@@ -46,5 +49,35 @@ export class MemoryAdapterResolver {
       return adapters.logCompressor(rawLogs).text;
     }
     return rawLogs.split('\n').filter(l => !l.includes('node:internal')).join('\n');
+  }
+
+  public static enrichClassTrace(
+    graph: RelationalGraph,
+    queryEngine: GraphQueryEngine,
+    symbol: string,
+    traceResult: TraceResult,
+    isClass: boolean
+  ): void {
+    if (!isClass) return;
+    const className = traceResult.foundNode?.name || symbol;
+    const methodPrefix = `${className}.`;
+    const seenEdges = new Set(traceResult.upstreamEdges.map(e => `${e.from}->${e.to}:${e.type}`));
+
+    for (const node of graph.getAllNodes()) {
+      if (node.name.startsWith(methodPrefix) || node.id.includes(`::${methodPrefix}`)) {
+        const methodTrace = queryEngine.trace(node.id, 2);
+        for (const e of methodTrace.upstreamEdges) {
+          const k = `${e.from}->${e.to}:${e.type}`;
+          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.upstreamEdges.push(e); }
+        }
+        for (const e of methodTrace.downstreamEdges) {
+          const k = `${e.from}->${e.to}:${e.type}`;
+          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.downstreamEdges.push(e); }
+        }
+        for (const f of methodTrace.blastRadiusFiles) {
+          if (!traceResult.blastRadiusFiles.includes(f)) traceResult.blastRadiusFiles.push(f);
+        }
+      }
+    }
   }
 }

@@ -45,6 +45,13 @@ export class SymbolIndexer {
     return this.db;
   }
 
+  public loadCacheData(data: SymbolDatabase): SymbolDatabase {
+    if (data && data.files) {
+      this.db = JSON.parse(JSON.stringify(data));
+    }
+    return this.db;
+  }
+
   public saveCache(cachePath: string): void {
     try {
       const dir = path.dirname(cachePath);
