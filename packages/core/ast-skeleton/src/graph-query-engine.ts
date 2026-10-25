@@ -19,7 +19,7 @@ export class GraphQueryEngine {
     this.graph = graph;
   }
 
-  public trace(query: string, maxDepth = 6): TraceResult {
+  public trace(query: string, maxDepth = 4): TraceResult {
     const t0 = performance.now();
     const targetNode = this.resolveTargetNode(query);
     const targetId = targetNode ? targetNode.id : query;
@@ -71,17 +71,57 @@ export class GraphQueryEngine {
     return matches.length > 0 ? matches[0].item : undefined;
   }
 
+  private collectIncomingEdges(curId: string): RelationalEdge[] {
+    const edges = [...this.graph.getIncoming(curId)];
+    if (curId.includes('::')) {
+      const shortName = curId.split('::').pop();
+      if (shortName) {
+        for (const e of this.graph.getIncoming(shortName)) {
+          if (!edges.some(x => x.from === e.from && x.to === e.to && x.type === e.type)) {
+            edges.push(e);
+          }
+        }
+      }
+    }
+    return edges;
+  }
+
+  private collectOutgoingEdges(curId: string): RelationalEdge[] {
+    const edges = [...this.graph.getOutgoing(curId)];
+    if (curId.includes('::')) {
+      const shortName = curId.split('::').pop();
+      if (shortName) {
+        for (const e of this.graph.getOutgoing(shortName)) {
+          if (!edges.some(x => x.from === e.from && x.to === e.to && x.type === e.type)) {
+            edges.push(e);
+          }
+        }
+      }
+    }
+    return edges;
+  }
+
   private traverseIncoming(startId: string, maxDepth: number): RelationalEdge[] {
     const result: RelationalEdge[] = [];
     const visited = new Set<string>([startId]);
     const queue: { id: string; depth: number }[] = [{ id: startId, depth: 0 }];
+    const seenEdges = new Set<string>();
+
+    const targetNode = this.graph.getNode(startId);
+    if (targetNode?.name && targetNode.name !== startId) {
+      visited.add(targetNode.name);
+    }
 
     while (queue.length > 0) {
       const cur = queue.shift();
       if (!cur || cur.depth >= maxDepth) continue;
 
-      for (const edge of this.graph.getIncoming(cur.id)) {
-        result.push(edge);
+      for (const edge of this.collectIncomingEdges(cur.id)) {
+        const edgeKey = `${edge.from}->${edge.to}:${edge.type}`;
+        if (!seenEdges.has(edgeKey)) {
+          seenEdges.add(edgeKey);
+          result.push(edge);
+        }
         if (!visited.has(edge.from)) {
           visited.add(edge.from);
           queue.push({ id: edge.from, depth: cur.depth + 1 });
@@ -95,13 +135,23 @@ export class GraphQueryEngine {
     const result: RelationalEdge[] = [];
     const visited = new Set<string>([startId]);
     const queue: { id: string; depth: number }[] = [{ id: startId, depth: 0 }];
+    const seenEdges = new Set<string>();
+
+    const targetNode = this.graph.getNode(startId);
+    if (targetNode?.name && targetNode.name !== startId) {
+      visited.add(targetNode.name);
+    }
 
     while (queue.length > 0) {
       const cur = queue.shift();
       if (!cur || cur.depth >= maxDepth) continue;
 
-      for (const edge of this.graph.getOutgoing(cur.id)) {
-        result.push(edge);
+      for (const edge of this.collectOutgoingEdges(cur.id)) {
+        const edgeKey = `${edge.from}->${edge.to}:${edge.type}`;
+        if (!seenEdges.has(edgeKey)) {
+          seenEdges.add(edgeKey);
+          result.push(edge);
+        }
         if (!visited.has(edge.to)) {
           visited.add(edge.to);
           queue.push({ id: edge.to, depth: cur.depth + 1 });
@@ -143,24 +193,31 @@ export class GraphQueryEngine {
   private extractBlastRadius(startId: string, upstream: RelationalEdge[], downstream: RelationalEdge[]): string[] {
     const files = new Set<string>();
     const startNode = this.graph.getNode(startId);
-    if (startNode?.filePath) files.add(startNode.filePath);
+    if (startNode?.filePath) {
+      files.add(startNode.filePath.replace(/\\/g, '/'));
+    } else {
+      const f0 = startId.split('::')[0];
+      if (GraphQueryEngine.isFilePath(f0)) files.add(f0.replace(/\\/g, '/'));
+    }
 
     for (const e of [...upstream, ...downstream]) {
       const nFrom = this.graph.getNode(e.from);
-      if (nFrom?.filePath) files.add(nFrom.filePath);
-      else {
+      if (nFrom?.filePath) {
+        files.add(nFrom.filePath.replace(/\\/g, '/'));
+      } else {
         const f1 = e.from.split('::')[0];
         if (GraphQueryEngine.isFilePath(f1)) files.add(f1.replace(/\\/g, '/'));
       }
 
       const nTo = this.graph.getNode(e.to);
-      if (nTo?.filePath) files.add(nTo.filePath);
-      else {
+      if (nTo?.filePath) {
+        files.add(nTo.filePath.replace(/\\/g, '/'));
+      } else {
         const f2 = e.to.split('::')[0];
         if (GraphQueryEngine.isFilePath(f2)) files.add(f2.replace(/\\/g, '/'));
       }
     }
-    return Array.from(files);
+    return Array.from(files).sort();
   }
 
   public formatTrace(res: TraceResult): string {
