@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "@aegis/trust-verifier",
   "version": "0.1.0",
   "description": "Aegis Decoupled Trust Verifier & Immutable Oracle",
@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x));if(f.length)process.exit(cp.spawnSync(process.execPath,['--test',...f],{stdio:'inherit'}).status||0)\""
+    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x));if(f.length)process.exit(cp.spawnSync(process.execPath,['--test','--test-timeout=20000',...f],{stdio:'inherit',timeout:60000}).status||0)\""
   },
   "dependencies": {
     "@aegis/shared": "*"

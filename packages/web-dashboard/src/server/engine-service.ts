@@ -223,4 +223,12 @@ export class AegisEngineService {
   public runRelationalTrace(target?: string): Record<string, unknown> {
     return this.analysisTools.runRelationalTrace(target);
   }
+
+  public runMemoryQuery(symbol?: string, worktreeId?: string): Record<string, unknown> {
+    return this.analysisTools.runMemoryQuery(symbol, worktreeId);
+  }
+
+  public runMemoryStats(worktreeId?: string): Record<string, unknown> {
+    return this.analysisTools.runMemoryStats(worktreeId);
+  }
 }

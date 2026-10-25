@@ -19,3 +19,4 @@ export * from './graph-query-engine.js';
 export * from './fuzzy-matcher.js';
 export * from './ast-grep-bridge.js';
 export * from './codebase-memory.js';
+export * from './codebase-memory-watcher.js';

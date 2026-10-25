@@ -101,6 +101,8 @@ function renderEngineModal(): string {
         <button class="btn btn-secondary" onclick="runEngineTool('bug_triage')">Kanıt Bazlı Triage</button>
         <button class="btn btn-secondary" onclick="runEngineTool('symbol_find')">AST Sembol Arama</button>
         <button class="btn btn-secondary" onclick="runEngineTool('relational_trace')">İlişkisel Trace</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('memory_query')">Bellek Sorgusu</button>
+        <button class="btn btn-secondary" onclick="runEngineTool('memory_stats')">Hafıza İstatistikleri</button>
       </div>
       <pre id="engine-output" style="background:#0d1117; padding:0.5rem; border-radius:6px; font-size:0.75rem; max-height:200px; overflow:auto; margin-top:0.75rem;"></pre>
     </div>

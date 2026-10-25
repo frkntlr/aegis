@@ -134,6 +134,7 @@ export class UniversalToolchainSync {
         mcpConfig.mcpServers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js'] };
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
+      this.registerAegisMcpServer(mcpJsonPath);
       this.updateCursorRules(skills);
       return true;
     } catch (e: unknown) {
@@ -188,6 +189,23 @@ export class UniversalToolchainSync {
     }
   }
 
+  private registerAegisMcpServer(mcpJsonPath: string): void {
+    if (!fs.existsSync(path.dirname(mcpJsonPath))) return;
+    try {
+      const cliPath = path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js');
+      let data: { mcpServers?: Record<string, unknown> } = {};
+      if (fs.existsSync(mcpJsonPath)) {
+        data = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf8'));
+      }
+      data.mcpServers = data.mcpServers || {};
+      data.mcpServers.aegis = {
+        command: process.execPath,
+        args: [cliPath, 'mcp']
+      };
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(data, null, 2), 'utf8');
+    } catch { /* ignore non-fatal */ }
+  }
+
   private syncGlobalAntigravity(userHome: string): void {
     const globalSkillDir = path.resolve(userHome, '.gemini', 'config', 'skills', 'aegis');
     const localSkill = path.resolve(this.repoRoot, '.agents', 'skills', 'aegis', 'SKILL.md');
@@ -198,6 +216,8 @@ export class UniversalToolchainSync {
     const schemaDir = path.resolve(userHome, '.gemini', 'antigravity', 'mcp', 'aegis');
     fs.mkdirSync(schemaDir, { recursive: true });
     this.writeAegisMcpSchemas(schemaDir);
+    const globalMcp = path.resolve(userHome, '.gemini', 'config', 'mcp_config.json');
+    this.registerAegisMcpServer(globalMcp);
   }
 
   private writeAegisMcpSchemas(dir: string): void {

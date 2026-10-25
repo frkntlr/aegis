@@ -1,0 +1,43 @@
+import test from 'node:test';
+import * as assert from 'node:assert';
+import { handleJsonRpc } from './mcp-server-command.js';
+
+test('handleJsonRpc handles initialize request', () => {
+  const res = handleJsonRpc({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  assert.ok(res);
+  assert.strictEqual(res.id, 1);
+  const result = res.result as Record<string, unknown>;
+  assert.strictEqual(result.protocolVersion, '2024-11-05');
+  assert.ok((result.serverInfo as Record<string, unknown>).name === 'aegis');
+});
+
+test('handleJsonRpc handles tools/list request', () => {
+  const res = handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+  assert.ok(res);
+  const result = res.result as { tools: Array<{ name: string }> };
+  assert.ok(result.tools.length >= 10);
+  const names = result.tools.map(t => t.name);
+  assert.ok(names.includes('memory_query'));
+  assert.ok(names.includes('memory_stats'));
+  assert.ok(names.includes('context7_query'));
+  assert.ok(names.includes('rtk_compress'));
+});
+
+test('handleJsonRpc handles tools/call and executes tools', () => {
+  const res = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 3,
+    method: 'tools/call',
+    params: { name: 'context7_query', arguments: { library: 'godot4', topic: 'lifecycle' } }
+  });
+  assert.ok(res);
+  const result = res.result as { content: Array<{ type: string; text: string }> };
+  assert.strictEqual(result.content[0].type, 'text');
+  assert.ok(result.content[0].text.includes('instantiate'));
+});
+
+test('handleJsonRpc returns error for unknown method', () => {
+  const res = handleJsonRpc({ jsonrpc: '2.0', id: 4, method: 'unknown_method' });
+  assert.ok(res);
+  assert.ok(res.error);
+});

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { IronCageValidator, EvidenceBasedTriageGate } from '@aegis/iron-cage';
-import { SymbolIndexer, GraphQueryEngine, RelationalGraph } from '@aegis/ast-skeleton';
+import { SymbolIndexer, GraphQueryEngine, RelationalGraph, CodebaseMemoryEngine } from '@aegis/ast-skeleton';
 import type { CageViolation } from '@aegis/shared';
 import { collectSourceFiles } from './metrics-helpers.js';
 
@@ -126,6 +126,48 @@ export class EngineAnalysisTools {
       connectedSignalsCount: trace.connectedSignals.length,
       blastRadiusFilesCount: trace.blastRadiusFiles.length,
       summary: `İlişkisel İzleme '${query}': ${trace.upstreamEdges.length} çağıran, ${trace.blastRadiusFiles.length} etkilenen dosya`
+    };
+  }
+
+  public runMemoryQuery(symbol?: string, worktreeId = 'default'): Record<string, unknown> {
+    const sym = symbol?.trim() || 'IronCageValidator';
+    const engine = new CodebaseMemoryEngine();
+    const stats = engine.getMemoryStats(worktreeId);
+    if (stats.totalFiles === 0) {
+      engine.indexDirectory(resolveTargetDir(), worktreeId);
+    }
+    const res = engine.queryMemory(sym, { worktreeId });
+    return {
+      tool: 'memory_query',
+      symbol: sym,
+      found: res.found,
+      filePath: res.filePath,
+      callersCount: res.callers.length,
+      calleesCount: res.callees.length,
+      blastRadiusCount: res.blastRadius.length,
+      tokenSavingsPercent: res.tokenSavingsPercent,
+      summary: res.found
+        ? `Bellek Sorgusu '${sym}': ${res.callers.length} çağıran, %${res.tokenSavingsPercent} token tasarrufu ✅`
+        : `Bellek Sorgusu: '${sym}' sembolü hafızada bulunamadı ⚠️`
+    };
+  }
+
+  public runMemoryStats(worktreeId = 'default'): Record<string, unknown> {
+    const engine = new CodebaseMemoryEngine();
+    let stats = engine.getMemoryStats(worktreeId);
+    if (stats.totalFiles === 0) {
+      engine.indexDirectory(resolveTargetDir(), worktreeId);
+      stats = engine.getMemoryStats(worktreeId);
+    }
+    return {
+      tool: 'memory_stats',
+      worktreeId,
+      totalFiles: stats.totalFiles,
+      totalSymbols: stats.totalSymbols,
+      totalNodes: stats.totalNodes,
+      totalEdges: stats.totalEdges,
+      estimatedTokenSavings: stats.estimatedTokenSavings,
+      summary: `Hafıza İstatistikleri [${worktreeId}]: ${stats.totalFiles} dosya, ${stats.totalSymbols} sembol (~%${stats.estimatedTokenSavings} tasarruf) 🧠`
     };
   }
 }

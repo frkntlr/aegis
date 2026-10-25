@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SkeletonGenerator, PromptCacheManager, type LayeredPromptContext } from '@aegis/ast-skeleton';
+import { SkeletonGenerator, PromptCacheManager, CodebaseMemoryEngine, type LayeredPromptContext } from '@aegis/ast-skeleton';
 import { GitHubClient, Context7Bridge, type GitHubIssue } from '@aegis/github-live';
 import { WorktreeManager, RoleClassifier } from '@aegis/orchestrator';
 import { showBanner } from './banner.js';
@@ -109,6 +109,26 @@ export function generateLanguageConstitution(targetFiles: string[]): string {
   return baseLines.join('\n');
 }
 
+export function extractMemoryContext(targetFiles: string[], worktreeId = 'default', engine = new CodebaseMemoryEngine()): string {
+  const lines: string[] = ['### 🧠 Codebase Memory & Relational Impact'];
+  let found = false;
+  for (const f of targetFiles) {
+    const base = path.basename(f, path.extname(f));
+    const res = engine.queryMemory(base, { worktreeId });
+    if (res.found) {
+      found = true;
+      lines.push(`• **Symbol:** ${res.symbol} (${res.filePath || f})`);
+      lines.push(`  - **Upstream Callers:** ${res.callers.length > 0 ? res.callers.join(', ') : 'None'}`);
+      lines.push(`  - **Downstream Callees:** ${res.callees.length > 0 ? res.callees.join(', ') : 'None'}`);
+      lines.push(`  - **Blast Radius:** ${res.blastRadius.length} affected file(s)`);
+    }
+  }
+  if (!found) {
+    lines.push('• No high-risk relational dependencies detected.');
+  }
+  return lines.join('\n');
+}
+
 export async function compilePrompt(
   agentName: string,
   issueNumber: number,
@@ -125,7 +145,9 @@ export async function compilePrompt(
   const cacheManager = new PromptCacheManager(constitution);
 
   const rawDesc = formatTaskDescription(agentName, issue);
-  const taskDesc = new Context7Bridge().injectDocumentationContext(rawDesc, issue.targetFiles);
+  const memCtx = extractMemoryContext(issue.targetFiles, agentName);
+  const combined = `${rawDesc}\n\n${memCtx}`;
+  const taskDesc = new Context7Bridge().injectDocumentationContext(combined, issue.targetFiles);
   const context = cacheManager.assembleContext(skeletonResult.combinedMap, taskDesc);
 
   const promptMarkdown = [

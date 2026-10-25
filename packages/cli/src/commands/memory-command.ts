@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { CodebaseMemoryEngine, type MemoryQueryResult } from '@aegis/ast-skeleton';
+import { CodebaseMemoryEngine, CodebaseMemoryWatcher, type MemoryQueryResult } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import { showBanner } from './banner.js';
@@ -107,4 +107,20 @@ export function handleMemoryRefresh(dirPath = 'packages', worktreeId = 'default'
   console.log(`✅ Memory Refreshed in ${dur}ms:`);
   console.log(` • Newly Indexed Files: ${report.indexed}`);
   console.log(` • Cache Hits:          ${report.cached}`);
+}
+
+export function handleMemoryWatch(dirPath = 'packages', worktreeId = 'default'): CodebaseMemoryWatcher | null {
+  showBanner();
+  const engine = getSharedMemoryEngine();
+  const target = path.resolve(process.cwd(), dirPath);
+  console.log(`👁️  Live Codebase Memory Watcher active on: ${path.relative(process.cwd(), target) || '.'} [${worktreeId}]`);
+
+  const watcher = new CodebaseMemoryWatcher(engine, { worktreeId, debounceMs: 150 });
+  const started = watcher.start(target);
+  if (!started) {
+    console.error(`❌ Could not start watcher on: ${target}`);
+    return null;
+  }
+  console.log('   Watching for file changes... (Press Ctrl+C to terminate)');
+  return watcher;
 }

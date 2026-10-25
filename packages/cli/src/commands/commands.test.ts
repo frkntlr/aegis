@@ -78,3 +78,12 @@ test('dev-helpers collectSourceFiles and verifyFile validate correctly', async (
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('handleLoopStatus and handleLoopReset execute cleanly', async () => {
+  const { handleLoopStatus, handleLoopReset } = await import('./core-commands.js');
+  const statusOut = captureOutput(() => handleLoopStatus());
+  assert.ok(statusOut.includes('Circuit Breaker'));
+
+  const resetOut = captureOutput(() => handleLoopReset('999'));
+  assert.ok(resetOut.includes('Issue #999'));
+});

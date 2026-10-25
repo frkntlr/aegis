@@ -1,6 +1,15 @@
 import test from 'node:test';
 import * as assert from 'node:assert';
-import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh, getSharedMemoryEngine } from './memory-command.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import {
+  handleMemoryQuery,
+  handleMemoryStats,
+  handleMemoryRefresh,
+  handleMemoryWatch,
+  getSharedMemoryEngine
+} from './memory-command.js';
 
 test('handleMemoryQuery: queries memory and handles non-existent or existing symbol', () => {
   const engine = getSharedMemoryEngine();
@@ -38,5 +47,22 @@ test('handleMemoryStats and handleMemoryRefresh execute cleanly', () => {
     assert.ok(output.includes('Memory Refreshed in'));
   } finally {
     console.log = origLog;
+  }
+});
+
+test('handleMemoryWatch initializes watcher on target directory', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cli-watch-'));
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
+  let watcher: ReturnType<typeof handleMemoryWatch> = null;
+
+  try {
+    watcher = handleMemoryWatch(tmpDir, 'cli-watch-test');
+    assert.ok(output.includes('Live Codebase Memory Watcher active'));
+  } finally {
+    if (watcher) watcher.stop();
+    console.log = origLog;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });

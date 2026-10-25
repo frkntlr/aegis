@@ -89,14 +89,7 @@ async function reclaimStaleTasks(ghClient: GitHubClient, wtManager: WorktreeMana
   }
 }
 
-export async function handleAuto(): Promise<void> {
-  showBanner();
-  console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
-  const ghClient = new GitHubClient({ autoConnectLive: true });
-  const wtManager = new WorktreeManager({ persistLocks: true });
-  const loopBreaker = new LoopBreaker();
-  const dispatcher = new TaskDispatcher(wtManager, loopBreaker);
-
+async function syncOrLoadAutoIssues(ghClient: GitHubClient, wtManager: WorktreeManager): Promise<void> {
   if (ghClient.isLive()) {
     await ghClient.syncFromLive('all');
     await reclaimStaleTasks(ghClient, wtManager);
@@ -111,22 +104,37 @@ export async function handleAuto(): Promise<void> {
       } catch { /* ignore */ }
     }
   }
+}
 
+function printClaimedTask(result: { agentName: string; issue: { number: number; title: string; targetFiles: string[] } }): void {
+  console.log(`🎯 Task Claimed!`);
+  console.log(` • Agent Role:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
+  console.log(` • Issue:       #${result.issue.number} - "${result.issue.title}"`);
+  console.log(` • Target:      ${result.issue.targetFiles.join(', ') || 'General repository'} (Locked)`);
+}
+
+export async function handleAuto(): Promise<void> {
+  showBanner();
+  console.log('🤖 Running Autonomous Task Dispatcher (/auto)...');
+  const ghClient = new GitHubClient({ autoConnectLive: true });
+  const wtManager = new WorktreeManager({ persistLocks: true });
+  const loopBreaker = new LoopBreaker();
+  const dispatcher = new TaskDispatcher(wtManager, loopBreaker);
+
+  await syncOrLoadAutoIssues(ghClient, wtManager);
   const ready = ghClient.listReadyIssues();
   const result = dispatcher.dispatchNextTask(['solver', 'qa', 'docs', 'ui'], ready);
 
   if (result.dispatched && result.agentName && result.issue) {
-    if (ghClient.isLive()) {
-      await ghClient.claimLiveIssue(result.issue.number, result.agentName);
-    } else {
-      ghClient.claimIssue(result.issue.number, result.agentName);
-    }
-    console.log(`🎯 Task Claimed!`);
-    console.log(` • Agent Role:  ${result.agentName.toUpperCase()} (in worktree: experimental/${result.agentName})`);
-    console.log(` • Issue:       #${result.issue.number} - "${result.issue.title}"`);
-    console.log(` • Target:      ${result.issue.targetFiles.join(', ') || 'General repository'} (Locked)`);
+    if (ghClient.isLive()) await ghClient.claimLiveIssue(result.issue.number, result.agentName);
+    else ghClient.claimIssue(result.issue.number, result.agentName);
+    printClaimedTask({ agentName: result.agentName, issue: result.issue });
   } else {
     console.log(`⏸️  No dispatchable tasks: ${result.reason}`);
+    const blocked = loopBreaker.getBlockedIssues();
+    if (blocked.length > 0) {
+      console.log(`🛑 Circuit Breaker: ${blocked.length} task(s) blocked after 3 failures (#${blocked.join(', #')}). Use 'aegis loop:reset <num>' to unblock.`);
+    }
   }
 }
 
@@ -218,5 +226,32 @@ export function handleIdeSync(): void {
     } else {
       console.log(`⚠️  [${r.ideId}] ${r.message}`);
     }
+  }
+}
+
+export function handleLoopStatus(): void {
+  showBanner();
+  const loopBreaker = new LoopBreaker();
+  const records = loopBreaker.getAllRecords();
+  console.log('🛡️  Aegis Circuit Breaker (Loop Breaker) Status:');
+  if (records.size === 0) {
+    console.log(' • All tasks clean. Zero failure counters recorded.');
+    return;
+  }
+  for (const [num, r] of records.entries()) {
+    const status = r.blocked ? '🛑 BLOCKED (3/3 failures)' : `🟡 ${r.attempts}/3 attempts`;
+    console.log(` • Issue #${num}: ${status} - Last Error: ${r.lastError || 'None'}`);
+  }
+}
+
+export function handleLoopReset(issueNumArg?: string): void {
+  showBanner();
+  const loopBreaker = new LoopBreaker();
+  const num = issueNumArg ? parseInt(issueNumArg, 10) : undefined;
+  loopBreaker.reset(num);
+  if (num) {
+    console.log(`✅ Circuit Breaker: Reset failure count and unblocked Issue #${num}.`);
+  } else {
+    console.log('✅ Circuit Breaker: Reset failure count and unblocked ALL issues.');
   }
 }

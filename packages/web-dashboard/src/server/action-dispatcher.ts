@@ -1,7 +1,7 @@
 import type { ProjectHub } from './project-hub.js';
 import type { IdeLauncher, UniversalToolchainSync } from '@aegis/orchestrator';
 import { RoleClassifier } from '@aegis/orchestrator';
-import type { OrphanTaskReclaimer } from '@aegis/watchdog';
+import { LoopBreaker, type OrphanTaskReclaimer } from '@aegis/watchdog';
 import type { AegisEngineService } from './engine-service.js';
 import type { SystemIssue } from './realtime-metrics.js';
 
@@ -11,14 +11,14 @@ export interface ActionDispatcherContext {
   toolchainSync: UniversalToolchainSync;
   engineSvc: AegisEngineService;
   orphanReclaimer: OrphanTaskReclaimer;
+  loopBreaker?: LoopBreaker;
   broadcast: (event: string, payload: unknown) => void;
 }
 
 export class ActionDispatcher {
   constructor(private ctx: ActionDispatcherContext) {}
 
-  public async executeAction(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const hubCtx = this.ctx.hub.getActiveContext();
+  private handleProjectAndSync(action: string, payload: Record<string, unknown>): Record<string, unknown> | null {
     if (action === 'switch_project') {
       const res = this.ctx.hub.switchProject(payload.projectId as string);
       this.ctx.broadcast('context_switched', res);
@@ -29,19 +29,42 @@ export class ActionDispatcher {
       if (res.switched) this.ctx.broadcast('context_switched', res);
       return { success: true, ...res };
     }
+    if (action === 'loop_status') {
+      const breaker = this.ctx.loopBreaker ?? new LoopBreaker();
+      const records = Array.from(breaker.getAllRecords().entries()).map(([num, r]) => ({
+        number: num, attempts: r.attempts, blocked: r.blocked, lastError: r.lastError
+      }));
+      return { success: true, records, blocked: breaker.getBlockedIssues() };
+    }
+    if (action === 'loop_reset') {
+      const breaker = this.ctx.loopBreaker ?? new LoopBreaker();
+      const num = payload.issueNumber ? parseInt(String(payload.issueNumber), 10) : undefined;
+      breaker.reset(num);
+      return { success: true, message: num ? `Görev #${num} sıfırlandı.` : 'Tüm devre kesici sayaçları sıfırlandı.' };
+    }
+    return null;
+  }
+
+  private async handleSyncGitHub(hubCtx: ReturnType<ProjectHub['getActiveContext']>): Promise<Record<string, unknown>> {
+    const issues = await hubCtx.metrics.fetchLiveIssues();
+    this.handleReclaimOrphans();
+    return {
+      success: true,
+      issues: hubCtx.metrics.getIssues(),
+      status: hubCtx.metrics.getGitHubStatus(),
+      message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.`
+    };
+  }
+
+  public async executeAction(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const hubRes = this.handleProjectAndSync(action, payload);
+    if (hubRes) return hubRes;
+
+    const hubCtx = this.ctx.hub.getActiveContext();
     if (action === 'auto') return this.handleAutoAction();
     if (action === 'move_task') return this.handleMoveTask(payload);
     if (action === 'reclaim_orphans') return this.handleReclaimOrphans();
-    if (action === 'sync_github') {
-      const issues = await hubCtx.metrics.fetchLiveIssues();
-      this.handleReclaimOrphans();
-      return {
-        success: true,
-        issues: hubCtx.metrics.getIssues(),
-        status: hubCtx.metrics.getGitHubStatus(),
-        message: `GitHub senkronize edildi: ${issues.length} görev güncellendi.`
-      };
-    }
+    if (action === 'sync_github') return this.handleSyncGitHub(hubCtx);
     if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings'].includes(action)) {
       return this.handleIdeAndSync(action, payload);
     }
@@ -66,6 +89,13 @@ export class ActionDispatcher {
     if (!issue) return { success: false, message: `Görev #${num} bulunamadı.` };
 
     if (targetStatus === 'in_progress') {
+      const breaker = this.ctx.loopBreaker ?? new LoopBreaker();
+      if (breaker.isBlocked(num)) {
+        return {
+          success: false,
+          message: `🛑 Görev #${num} 3 başarısız deneme nedeniyle kilitlendi (Circuit Breaker aktif). Önce hatayı çözün veya kilidi kaldırın.`
+        };
+      }
       let agent = payload.agentName as string | undefined;
       if (!agent || agent === 'auto') {
         const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
@@ -89,8 +119,15 @@ export class ActionDispatcher {
 
   private handleAutoAction(): Record<string, unknown> {
     const ctx = this.ctx.hub.getActiveContext();
-    const ready = ctx.metrics.getIssues().filter(i => i.status === 'ready');
-    if (ready.length === 0) return { success: true, message: 'Ready sütununda bekleyen görev yok.' };
+    const breaker = this.ctx.loopBreaker ?? new LoopBreaker();
+    const ready = ctx.metrics.getIssues().filter(i => i.status === 'ready' && !breaker.isBlocked(i.number));
+    if (ready.length === 0) {
+      const blocked = ctx.metrics.getIssues().filter(i => i.status === 'ready' && breaker.isBlocked(i.number));
+      if (blocked.length > 0) {
+        return { success: false, message: `🛑 Ready havuzundaki ${blocked.length} görev 3 başarısız deneme limitine ulaştığı için kilitlendi (Circuit Breaker aktif).` };
+      }
+      return { success: true, message: 'Ready sütununda bekleyen görev yok.' };
+    }
     const sessions = ctx.detector.detectSessions();
     const target = ready[0];
     const inf = new RoleClassifier().classify({ title: target.title, targetFiles: target.targetFiles });
@@ -139,6 +176,8 @@ export class ActionDispatcher {
     else if (t === 'bug_triage') res = this.ctx.engineSvc.runBugTriage(payload.dir as string | undefined);
     else if (t === 'symbol_find') res = this.ctx.engineSvc.runSymbolFind(payload.query as string | undefined);
     else if (t === 'relational_trace') res = this.ctx.engineSvc.runRelationalTrace(payload.target as string | undefined);
+    else if (t === 'memory_query') res = this.ctx.engineSvc.runMemoryQuery(payload.symbol as string | undefined, payload.worktreeId as string | undefined);
+    else if (t === 'memory_stats') res = this.ctx.engineSvc.runMemoryStats(payload.worktreeId as string | undefined);
     else return { success: false, error: 'Bilinmeyen araç: ' + t, message: 'Bilinmeyen araç: ' + t };
     return { success: true, result: res, message: (res.summary as string) || 'Motor aracı çalıştırıldı.' };
   }

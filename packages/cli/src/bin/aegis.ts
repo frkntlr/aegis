@@ -8,7 +8,9 @@ import {
   handleDashboard,
   handleMerge,
   handleIdeList,
-  handleIdeSync
+  handleIdeSync,
+  handleLoopStatus,
+  handleLoopReset
 } from '../commands/core-commands.js';
 import { handlePrompt } from '../commands/prompt-command.js';
 import { handleContribute, handleRfcTriage, handleNlmSync } from '../commands/contribute-command.js';
@@ -60,7 +62,8 @@ import { handleGraphScan } from '../commands/graph-command.js';
 import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.js';
 import { handleRtkCompress } from '../commands/rtk-command.js';
 import { handleContext7Query } from '../commands/context7-command.js';
-import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh } from '../commands/memory-command.js';
+import { startMcpServer } from '../commands/mcp-server-command.js';
+import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh, handleMemoryWatch } from '../commands/memory-command.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 
 const HELP_LINES: readonly string[] = [
@@ -112,7 +115,9 @@ const HELP_LINES: readonly string[] = [
   '  aegis context7:query <lib> <top>       Query official ground-truth library documentation',
   '  aegis memory:query <sym> [wt] [log]    Query 5-Layer Codebase Memory (AST, Graph, Context7, Demir Kafes)',
   '  aegis memory:stats [worktree]          Display Codebase Memory indexing and token savings stats',
-  '  aegis memory:refresh [dir] [wt]        Incrementally refresh Codebase Memory cache'
+  '  aegis memory:refresh [dir] [wt]        Incrementally refresh Codebase Memory cache',
+  '  aegis memory:watch [dir] [wt]          Run live incremental Codebase Memory watcher daemon',
+  '  aegis mcp                              Start native JSON-RPC stdio MCP server'
 ];
 
 function handleHelp(): void {
@@ -178,7 +183,11 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'context7:query': (a) => handleContext7Query(a[1], a[2]),
   'memory:query': (a) => handleMemoryQuery(a[1], a[2], a[3]),
   'memory:stats': (a) => handleMemoryStats(a[1]),
-  'memory:refresh': (a) => handleMemoryRefresh(a[1], a[2])
+  'memory:refresh': (a) => handleMemoryRefresh(a[1], a[2]),
+  'memory:watch': (a) => { handleMemoryWatch(a[1], a[2]); },
+  'loop:status': () => handleLoopStatus(),
+  'loop:reset': (a) => handleLoopReset(a[1]),
+  mcp: () => startMcpServer()
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {
