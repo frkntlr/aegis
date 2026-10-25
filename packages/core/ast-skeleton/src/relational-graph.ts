@@ -155,8 +155,11 @@ export class RelationalGraph {
 
   public saveCache(cachePath: string): void {
     try {
-      fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-      fs.writeFileSync(cachePath, JSON.stringify(this.toJSON(), null, 2), 'utf8');
+      const dir = path.dirname(cachePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const tmpPath = `${cachePath}.tmp.${process.pid}.${Date.now()}`;
+      fs.writeFileSync(tmpPath, JSON.stringify(this.toJSON(), null, 2), 'utf8');
+      fs.renameSync(tmpPath, cachePath);
     } catch { /* ignore non-fatal */ }
   }
 
