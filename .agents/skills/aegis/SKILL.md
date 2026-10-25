@@ -45,6 +45,9 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis ast:replace <p> <r> <f>` | Structural AST replacement via ast-grep | `npm run aegis -- ast:replace <p> <r> <f>` |
 | `/aegis rtk:compress [file]` | Compress terminal/test output via RTK | `npm run aegis -- rtk:compress [file]` |
 | `/aegis context7:query <l> <t>` | Query official library documentation | `npm run aegis -- context7:query <l> <t>` |
+| `/aegis memory:query <sym>` | Query 5-Layer Codebase Memory (AST, Graph, Context7) | `npm run aegis -- memory:query <sym>` |
+| `/aegis memory:stats [wt]` | Codebase Memory diagnostics and token savings | `npm run aegis -- memory:stats [wt]` |
+| `/aegis memory:refresh [d]` | Incrementally refresh Codebase Memory cache | `npm run aegis -- memory:refresh [d]` |
 
 ## Core Principles
 1. **Iron Cage Enforcement**: Maximum 300 lines per file, maximum 40 lines per function.

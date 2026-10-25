@@ -29,6 +29,9 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis ast:replace <p> <r> <f>`: Structural AST replacement via ast-grep.
 - `/aegis rtk:compress [file]`: Compress terminal/test output via RTK Token Killer.
 - `/aegis context7:query <lib> <top>`: Query official ground-truth library documentation.
+- `/aegis memory:query <sym>`: Query 5-Layer Codebase Memory (AST, Graph, Context7, Demir Kafes).
+- `/aegis memory:stats [wt]`: Inspect Codebase Memory diagnostics and token savings.
+- `/aegis memory:refresh [d]`: Incrementally refresh Codebase Memory cache.
 
 ## Headless Git & Remote Execution Safeguards
 To prevent indefinite command hangs during git remote operations:

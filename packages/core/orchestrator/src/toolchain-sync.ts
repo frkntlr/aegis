@@ -209,7 +209,9 @@ export class UniversalToolchainSync {
       cage_check: { desc: 'Audit Demir Kafes compliance', props: { dir: { type: 'string' } }, req: [] },
       triage: { desc: 'Evidence-Based Bug Triage', props: { dir: { type: 'string' } }, req: [] },
       find_symbol: { desc: 'AST symbol lookup & surgical slice', props: { symbol: { type: 'string' } }, req: ['symbol'] },
-      trace_relational: { desc: 'Trace relational callers and signal listeners', props: { target: { type: 'string' } }, req: ['target'] }
+      trace_relational: { desc: 'Trace relational callers and signal listeners', props: { target: { type: 'string' } }, req: ['target'] },
+      memory_query: { desc: 'Query 5-layer codebase memory', props: { symbol: { type: 'string' }, worktreeId: { type: 'string' } }, req: ['symbol'] },
+      memory_stats: { desc: 'Codebase memory diagnostics', props: { worktreeId: { type: 'string' } }, req: [] }
     };
     for (const [name, meta] of Object.entries(tools)) {
       const schema = { name, description: meta.desc, parameters: { properties: meta.props, required: meta.req, type: 'object' } };

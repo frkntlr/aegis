@@ -60,6 +60,7 @@ import { handleGraphScan } from '../commands/graph-command.js';
 import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.js';
 import { handleRtkCompress } from '../commands/rtk-command.js';
 import { handleContext7Query } from '../commands/context7-command.js';
+import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh } from '../commands/memory-command.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 
 const HELP_LINES: readonly string[] = [
@@ -108,7 +109,10 @@ const HELP_LINES: readonly string[] = [
   '  aegis ast:search <pat> [dir]           Structural AST search via ast-grep',
   '  aegis ast:replace <p> <r> <f>          Structural AST replacement via ast-grep',
   '  aegis rtk:compress [file]              Compress terminal/test output via RTK Token Killer',
-  '  aegis context7:query <lib> <top>       Query official ground-truth library documentation'
+  '  aegis context7:query <lib> <top>       Query official ground-truth library documentation',
+  '  aegis memory:query <sym> [wt] [log]    Query 5-Layer Codebase Memory (AST, Graph, Context7, Demir Kafes)',
+  '  aegis memory:stats [worktree]          Display Codebase Memory indexing and token savings stats',
+  '  aegis memory:refresh [dir] [wt]        Incrementally refresh Codebase Memory cache'
 ];
 
 function handleHelp(): void {
@@ -171,7 +175,10 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'ast:search': (a) => handleAstSearch(a[1], a[2]),
   'ast:replace': (a) => handleAstReplace(a[1], a[2], a[3]),
   'rtk:compress': (a) => handleRtkCompress(a[1]),
-  'context7:query': (a) => handleContext7Query(a[1], a[2])
+  'context7:query': (a) => handleContext7Query(a[1], a[2]),
+  'memory:query': (a) => handleMemoryQuery(a[1], a[2], a[3]),
+  'memory:stats': (a) => handleMemoryStats(a[1]),
+  'memory:refresh': (a) => handleMemoryRefresh(a[1], a[2])
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {
