@@ -7,6 +7,10 @@ import {
   RfcTriager
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
+import {
+  generateDiscussionResearchBody,
+  cleanseExistingRfcForWiki
+} from './rfc-templates.js';
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-');
@@ -27,7 +31,7 @@ function generateRfcContent(num: number, title: string, desc: string): string {
   const pad = String(num).padStart(3, '0');
   return [
     `# 🏛️ RFC-${pad}: ${title}`,
-    `### Aegis Autonomous Architecture Blueprint`,
+    '### Aegis Autonomous Architecture Blueprint',
     '',
     `- **RFC ID:** RFC-${pad} | **Durum:** Proposed | **Tarih:** ${new Date().toISOString().split('T')[0]}`,
     '',
@@ -43,9 +47,9 @@ function generateRfcContent(num: number, title: string, desc: string): string {
     '- Azami 300 satır/dosya, azami 40 satır/fonksiyon.',
     '',
     '## 🎯 4. Kabul Kriterleri (Acceptance Criteria)',
-    '- [ ] Çekirdek mantık ve sinyal akışı bağlandı.',
-    '- [ ] QA Hunter Playtest senaryosu hazırlandı.',
-    '- [ ] Demir Kafes AST denetiminden sıfır hatayla geçti.'
+    '- [ ] Çekirdek mantık ve veri modeli tasarımı tamamlandı.',
+    '- [ ] Demir Kafes (300 satır / 40 satır) AST doğrulaması sağlandı.',
+    '- [ ] Birim testler ve mutasyon testi onayından (%100 Kill Score) geçti.'
   ].join('\n');
 }
 
@@ -91,22 +95,6 @@ async function publishDiscussion(auth: { token?: string; owner?: string; repo?: 
   }
 }
 
-async function stageWikiAndDiscussion(slug: string, padNum: string, title: string, desc: string, md: string): Promise<void> {
-  const wiki = new WikiMemoryManager();
-  wiki.setPage(slug, `RFC-${padNum}: ${title}`, ['Proposed living architecture RFC.', 'Demir Kafes defined.', 'Community feedback active.'], md);
-  const sync = wiki.pushAllToRemote();
-  console.log(sync.success ? `✅ GitHub Wiki Updated: ${slug}` : `⚠️  Wiki sync: ${sync.message}`);
-
-  const auth = GitHubTokenResolver.resolve();
-  const discBody = [
-    `## 💡 ${title}\n\n${desc || title}\n\n🔗 **Living Wiki:** [${slug}](${wiki.checkStatus().url}/${slug})\n`,
-    '### Kabul Kriterleri:\n- [ ] Çekirdek veri modeli\n- [ ] Demir Kafes (300/40 satır)\n- [ ] QA Playtest'
-  ].join('\n');
-  console.log('💬 Publishing to GitHub Discussions (Ideas)...');
-  const url = await publishDiscussion(auth, `RFC-${padNum}: ${title}`, discBody);
-  console.log(url ? `✅ Discussion: ${url}` : 'ℹ️  Discussion skipped (disabled or no permission).');
-}
-
 export async function handleRfcCreate(titleArg?: string, descArg?: string): Promise<void> {
   showBanner();
   if (!titleArg) {
@@ -123,7 +111,73 @@ export async function handleRfcCreate(titleArg?: string, descArg?: string): Prom
   fs.writeFileSync(path.join(rfcDir, `${slug}.md`), md, 'utf8');
 
   console.log(`📑 RFC Created Locally: docs/rfc/${slug}.md`);
-  await stageWikiAndDiscussion(slug, padNum, titleArg, descArg || titleArg, md);
+  console.log('💬 Publishing Research & Ideation Discussion to GitHub Discussions (Ideas)...');
+
+  const auth = GitHubTokenResolver.resolve();
+  const discBody = generateDiscussionResearchBody(num, titleArg, descArg || titleArg);
+  const url = await publishDiscussion(auth, `RFC-${padNum}: ${titleArg}`, discBody);
+  console.log(url ? `✅ Discussion: ${url}` : 'ℹ️  Discussion skipped (disabled or no permission).');
+  console.log('ℹ️  Wiki documentation will be synthesized upon approval: aegis rfc:approve ' + padNum);
+}
+
+function findRfcFiles(rfcDir: string, filterArg?: string): string[] {
+  if (!fs.existsSync(rfcDir)) return [];
+  const all = fs.readdirSync(rfcDir).filter(f => f.startsWith('RFC-') && f.endsWith('.md'));
+  if (!filterArg) return all;
+  return all.filter(f => f.toLowerCase().includes(filterArg.toLowerCase()));
+}
+
+export async function handleRfcApprove(rfcArg?: string): Promise<void> {
+  showBanner();
+  if (!rfcArg) {
+    console.error('❌ Usage: aegis rfc:approve <rfcNumberOrSlug>');
+    process.exit(1);
+  }
+  const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
+  const files = findRfcFiles(rfcDir, rfcArg);
+  if (files.length === 0) {
+    console.error(`❌ RFC matching '${rfcArg}' not found in docs/rfc/`);
+    process.exit(1);
+  }
+
+  const filePath = path.join(rfcDir, files[0]);
+  let content = fs.readFileSync(filePath, 'utf8');
+  content = content.replace(/Durum:\s*Proposed/i, 'Durum: Approved (Onaylandı) ✅');
+  fs.writeFileSync(filePath, content, 'utf8');
+
+  const slug = files[0].replace(/\.md$/, '');
+  const cleanDoc = cleanseExistingRfcForWiki(slug, content);
+  const wiki = new WikiMemoryManager();
+  wiki.setPage(slug, cleanDoc.title, cleanDoc.threeBullets, cleanDoc.cleanContent);
+  const sync = wiki.pushAllToRemote();
+
+  console.log(`✅ RFC Approved: ${files[0]}`);
+  console.log(sync.success ? `🏛️ Clean System Architecture pushed to Wiki: ${slug}` : `⚠️ Wiki push: ${sync.message}`);
+}
+
+export async function handleWikiClean(rfcArg?: string): Promise<void> {
+  showBanner();
+  console.log('🧹 Synthesizing Clean-Room Authoritative Architecture for GitHub Wiki...');
+  const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
+  const files = findRfcFiles(rfcDir, rfcArg);
+  if (files.length === 0) {
+    console.log('ℹ️ No RFC files found to cleanse.');
+    return;
+  }
+
+  const wiki = new WikiMemoryManager();
+  let count = 0;
+  for (const f of files) {
+    const content = fs.readFileSync(path.join(rfcDir, f), 'utf8');
+    const slug = f.replace(/\.md$/, '');
+    const cleanDoc = cleanseExistingRfcForWiki(slug, content);
+    wiki.setPage(slug, cleanDoc.title, cleanDoc.threeBullets, cleanDoc.cleanContent);
+    count++;
+  }
+
+  const sync = wiki.pushAllToRemote();
+  console.log(`✨ Cleansed ${count} RFC(s) into living system architecture.`);
+  console.log(sync.success ? '✅ GitHub Wiki fully synchronized with clean architecture!' : `⚠️ Wiki sync: ${sync.message}`);
 }
 
 async function dispatchLiveIssue(
@@ -154,7 +208,7 @@ export async function handleRfcDecompose(rfcArg?: string): Promise<void> {
   }
 
   const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
-  const files = fs.existsSync(rfcDir) ? fs.readdirSync(rfcDir).filter(f => f.includes(rfcArg) && f.endsWith('.md')) : [];
+  const files = findRfcFiles(rfcDir, rfcArg);
   if (files.length === 0) {
     console.error(`❌ RFC matching '${rfcArg}' not found in docs/rfc/`);
     process.exit(1);

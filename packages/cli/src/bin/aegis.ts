@@ -14,7 +14,7 @@ import {
 } from '../commands/core-commands.js';
 import { handlePrompt } from '../commands/prompt-command.js';
 import { handleContribute, handleRfcTriage, handleNlmSync } from '../commands/contribute-command.js';
-import { handleRfcCreate, handleRfcDecompose } from '../commands/rfc-commands.js';
+import { handleRfcCreate, handleRfcDecompose, handleRfcApprove, handleWikiClean } from '../commands/rfc-commands.js';
 import {
   handleEstimate,
   handleVerify,
@@ -74,7 +74,8 @@ const HELP_LINES: readonly string[] = [
   '  aegis prompt [role|id] [id]         Compile surgical AST prompt caching context',
   '  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution',
   '  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria',
-  '  aegis rfc:create "<title>" [desc]      Create architectural RFC, publish Wiki & GitHub Discussion',
+  '  aegis rfc:create "<title>" [desc]      Create architectural RFC & publish Ideation Discussion',
+  '  aegis rfc:approve <rfcId>              Approve RFC and synthesize clean-room Wiki architecture',
   '  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues',
   '  aegis nlm:sync                         Export and synchronize architecture with NotebookLM',
   '  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations',
@@ -84,6 +85,7 @@ const HELP_LINES: readonly string[] = [
   '  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column',
   '  aegis wiki:list                        List living memory pages directly from GitHub Wiki',
   '  aegis wiki:show <slug>                 Display page content directly from GitHub Wiki',
+  '  aegis wiki:clean [rfcId]               Synthesize clean-room authoritative Wiki architecture',
   '  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache',
   '  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo',
   '  aegis wiki:status                      Inspect GitHub Wiki remote git availability',
@@ -133,6 +135,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   contribute: (a) => handleContribute(a[1], a[2]),
   'rfc:triage': (a) => handleRfcTriage(a[1], a[2]),
   'rfc:create': (a) => handleRfcCreate(a[1], a[2]),
+  'rfc:approve': (a) => handleRfcApprove(a[1]),
   rfc: (a) => handleRfcCreate(a[1], a[2]),
   ideate: (a) => handleRfcCreate(a[1], a[2]),
   'rfc:decompose': (a) => handleRfcDecompose(a[1]),
@@ -144,6 +147,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),
   'wiki:list': () => handleWikiList(),
   'wiki:show': (a) => handleWikiShow(a[1]),
+  'wiki:clean': (a) => handleWikiClean(a[1]),
   'wiki:seed': () => handleWikiSeed(),
   'wiki:sync': () => handleWikiSync(),
   'wiki:status': () => handleWikiStatus(),
