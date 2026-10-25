@@ -23,17 +23,18 @@ export class CalleeSignatureExtractor {
   }
 
   private findTargetFunction(sf: ts.SourceFile, symbolName: string): ts.Node | null {
+    const targetName = symbolName.includes('.') ? symbolName.split('.').pop()! : symbolName;
     let target: ts.Node | null = null;
     const walk = (n: ts.Node): void => {
       if (target) return;
       if (
         (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) &&
-        n.name && n.name.getText(sf) === symbolName
+        n.name && n.name.getText(sf) === targetName
       ) {
         target = n;
         return;
       }
-      if (ts.isVariableDeclaration(n) && n.name.getText(sf) === symbolName && n.initializer && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) {
+      if (ts.isVariableDeclaration(n) && n.name.getText(sf) === targetName && n.initializer && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) {
         target = n.initializer;
         return;
       }
