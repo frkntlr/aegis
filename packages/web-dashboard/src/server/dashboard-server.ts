@@ -75,7 +75,16 @@ export class DashboardServer {
   public broadcast(event: string, payload: unknown): void {
     const msg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
     for (const client of this.sseClients) {
-      try { client.write(msg); } catch { this.sseClients.delete(client); }
+      if (client.writableEnded || client.destroyed) {
+        this.sseClients.delete(client);
+        continue;
+      }
+      try {
+        client.write(msg);
+      } catch {
+        this.sseClients.delete(client);
+        try { client.destroy(); } catch { /* ignore */ }
+      }
     }
   }
 
@@ -104,7 +113,12 @@ export class DashboardServer {
     res.write(`event: snapshot\ndata: ${JSON.stringify(this.getStatusPayload())}\n\n`);
     this.sseClients.add(res);
 
-    const cleanup = () => { this.sseClients.delete(res); };
+    const cleanup = () => {
+      this.sseClients.delete(res);
+      try {
+        if (!res.writableEnded) res.end();
+      } catch { /* ignore */ }
+    };
     req.on('close', cleanup);
     res.on('close', cleanup);
     res.on('error', cleanup);
@@ -228,7 +242,10 @@ export class DashboardServer {
   public stop(): Promise<void> {
     return new Promise((resolve) => {
       for (const client of this.sseClients) {
-        try { client.end(); } catch { /* ignore */ }
+        try {
+          if (!client.writableEnded) client.end();
+          client.destroy();
+        } catch { /* ignore */ }
       }
       this.sseClients.clear();
       if (this.server) this.server.close(() => resolve());

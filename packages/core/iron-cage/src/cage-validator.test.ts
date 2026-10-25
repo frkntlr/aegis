@@ -27,6 +27,16 @@ test('IronCageValidator flags files exceeding line limits', () => {
   assert.ok(result.violations.some(v => v.rule === 'MAX_FILE_LINES'));
 });
 
+test('IronCageValidator accurately counts Windows CRLF lines with trailing newline', () => {
+  const validator = new IronCageValidator({ maxFileLines: 5 });
+  // Exactly 5 lines with CRLF and trailing newline
+  const content = 'line1\r\nline2\r\nline3\r\nline4\r\nline5\r\n';
+
+  const result = validator.validateFileContent('src/crlf.ts', content);
+  assert.strictEqual(result.passed, true);
+  assert.strictEqual(result.violations.length, 0);
+});
+
 test('IronCageValidator detects full file rewrites', () => {
   const validator = new IronCageValidator();
   const result = validator.validateDiff('src/Core.ts', 200, 180, 100);

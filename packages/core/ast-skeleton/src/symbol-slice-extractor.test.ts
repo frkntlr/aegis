@@ -55,6 +55,29 @@ test('TransitiveTypeResolver: resolves imported types from relative source file'
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('TransitiveTypeResolver: safely handles cyclic types and resolves transitive types within depth limit', () => {
+  const resolver = new TransitiveTypeResolver();
+  const code = [
+    'export interface NodeA { id: string; next: NodeB; }',
+    'export interface NodeB { id: string; prev: NodeA; extra: NodeC; }',
+    'export interface NodeC { details: string; deep: NodeD; }',
+    'export interface NodeD { depth: number; }',
+    'export function traverse(root: NodeA): void {',
+    '  console.log(root);',
+    '}'
+  ].join('\n');
+
+  const closure = resolver.resolveAmbientClosure('traverse', 'graph.ts', code, 3);
+  assert.ok(closure.typeNames.includes('NodeA'));
+  assert.ok(closure.typeNames.includes('NodeB'));
+  assert.ok(closure.typeNames.includes('NodeC'));
+  // NodeD is depth 4, so with maxDepth 3 it should not be included
+  assert.strictEqual(closure.typeNames.includes('NodeD'), false);
+  assert.ok(closure.formattedBlock.includes('interface NodeA'));
+  assert.ok(closure.formattedBlock.includes('interface NodeB'));
+  assert.ok(closure.formattedBlock.includes('interface NodeC'));
+});
+
 test('SymbolSliceExtractor: prepends ambient type closure block to surgical slice', () => {
   const indexer = new SymbolIndexer();
   const extractor = new SymbolSliceExtractor(indexer);

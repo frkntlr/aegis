@@ -83,3 +83,20 @@ test('LoopBreaker persists failures to disk and reloads across instances', () =>
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('LoopBreaker prunes stale records to prevent unbounded memory growth', () => {
+  const breaker = new LoopBreaker({ persistToDisk: false });
+  // Add 105 failures
+  for (let i = 1; i <= 105; i++) {
+    breaker.recordFailure(i, `error ${i}`);
+  }
+  // Simulate old timestamps for the first 50
+  const eightDaysAgo = Date.now() - (8 * 24 * 60 * 60 * 1000);
+  for (let i = 1; i <= 50; i++) {
+    const rec = breaker.getRecord(i);
+    if (rec) rec.lastFailedAt = eightDaysAgo;
+  }
+  // Trigger prune by adding one more failure
+  breaker.recordFailure(106, 'trigger prune');
+  assert.ok(breaker.getAllRecords().size <= 100);
+});

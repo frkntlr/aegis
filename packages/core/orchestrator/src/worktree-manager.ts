@@ -44,9 +44,17 @@ export class WorktreeManager {
     const lockFile = this.getLockFilePath();
     if (fs.existsSync(lockFile)) {
       try {
-        const data = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+        const raw = fs.readFileSync(lockFile, 'utf8').trim();
+        if (!raw) throw new Error('Empty lock file');
+        const data = JSON.parse(raw);
         this.activeLocks = new Map(Object.entries(data).map(([k, v]) => [normPath(k), String(v)]));
       } catch {
+        try {
+          const corruptBackup = `${lockFile}.corrupt.${Date.now()}`;
+          fs.renameSync(lockFile, corruptBackup);
+        } catch {
+          try { fs.rmSync(lockFile, { force: true }); } catch { /* ignore */ }
+        }
         this.activeLocks = new Map();
       }
     }

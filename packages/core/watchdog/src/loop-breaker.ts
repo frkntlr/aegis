@@ -74,6 +74,23 @@ export class LoopBreaker {
     } catch { /* ignore disk write errors */ }
   }
 
+  private pruneStaleRecords(): void {
+    if (this.failures.size <= 100) return;
+    const now = Date.now();
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    for (const [num, record] of this.failures.entries()) {
+      if (!record.blocked && (now - record.lastFailedAt > SEVEN_DAYS_MS)) {
+        this.failures.delete(num);
+      }
+    }
+    if (this.failures.size > 200) {
+      const sorted = [...this.failures.entries()].sort((a, b) => a[1].lastFailedAt - b[1].lastFailedAt);
+      for (let i = 0; i < sorted.length - 200; i++) {
+        if (!sorted[i][1].blocked) this.failures.delete(sorted[i][0]);
+      }
+    }
+  }
+
   public recordFailure(issueNumber: number, errorMessage: string): FailureEvaluation {
     const existing = this.failures.get(issueNumber) ?? {
       attempts: 0,
@@ -90,6 +107,7 @@ export class LoopBreaker {
     if (existing.attempts >= this.maxFailures) {
       existing.blocked = true;
       this.failures.set(issueNumber, existing);
+      this.pruneStaleRecords();
       this.saveDiskCache();
       return {
         blocked: true,
@@ -100,6 +118,7 @@ export class LoopBreaker {
     }
 
     this.failures.set(issueNumber, existing);
+    this.pruneStaleRecords();
     this.saveDiskCache();
     return {
       blocked: false,

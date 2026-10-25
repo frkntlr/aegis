@@ -227,16 +227,17 @@ export class IronCageValidator {
 
   public validateFileContent(filePath: string, content: string): CageValidationResult {
     const violations: CageViolation[] = [];
-    const lines = content.split('\n');
+    const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalized.endsWith('\n') ? normalized.slice(0, -1).split('\n') : (normalized ? normalized.split('\n') : []);
 
     if (filePath.endsWith('.gd')) {
       const gdViolations = new GDScriptRulesValidator({
         maxFunctionLines: this.maxFunctionLines,
         maxFileLines: this.maxFileLines
-      }).validate(filePath, content);
+      }).validate(filePath, normalized);
       violations.push(...gdViolations);
     } else {
-      this.validateNonGdScript(filePath, content, lines, violations);
+      this.validateNonGdScript(filePath, normalized, lines, violations);
     }
 
     return {

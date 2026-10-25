@@ -97,41 +97,85 @@ export class TransitiveTypeResolver {
     return null;
   }
 
-  private resolveImportedDeclaration(typeName: string, targetPath: string): string | null {
-    const content = this.readTargetFile(targetPath);
-    if (!content) return null;
-    const sf = ts.createSourceFile(targetPath, content, ts.ScriptTarget.Latest, true);
-    return this.findDeclarationInSource(sf, typeName);
+  private resolveTypeDeclaration(
+    typeName: string,
+    currentSf: ts.SourceFile,
+    currentPath: string,
+    fileCache: Map<string, ts.SourceFile>
+  ): { decl: string; sf: ts.SourceFile; path: string } | null {
+    const localDecl = this.findDeclarationInSource(currentSf, typeName);
+    if (localDecl) return { decl: localDecl, sf: currentSf, path: currentPath };
+
+    const imports = TsCallGraphExtractor.collectImports(currentSf, currentPath);
+    const binding = imports.get(typeName);
+    if (binding) {
+      let targetSf = fileCache.get(binding.targetFilePath);
+      if (!targetSf) {
+        const content = this.readTargetFile(binding.targetFilePath);
+        if (content) {
+          targetSf = ts.createSourceFile(binding.targetFilePath, content, ts.ScriptTarget.Latest, true);
+          fileCache.set(binding.targetFilePath, targetSf);
+        }
+      }
+      if (targetSf) {
+        const queryName = binding.importedName === 'default' ? typeName : binding.importedName;
+        const importedDecl = this.findDeclarationInSource(targetSf, queryName);
+        if (importedDecl) return { decl: importedDecl, sf: targetSf, path: binding.targetFilePath };
+      }
+    }
+    return null;
   }
 
-  public resolveAmbientClosure(symbolName: string, filePath: string, sourceCode: string): AmbientTypeClosure {
+  private expandTypeItem(
+    item: { name: string; sf: ts.SourceFile; path: string },
+    fileCache: Map<string, ts.SourceFile>,
+    visited: Set<string>,
+    declarations: string[]
+  ): { name: string; sf: ts.SourceFile; path: string }[] {
+    const resolved = this.resolveTypeDeclaration(item.name, item.sf, item.path, fileCache);
+    if (!resolved) return [];
+    declarations.push(resolved.decl);
+    const next: { name: string; sf: ts.SourceFile; path: string }[] = [];
+    for (const nested of TransitiveTypeResolver.extractTypeIdentifiers(resolved.decl)) {
+      if (!visited.has(nested)) next.push({ name: nested, sf: resolved.sf, path: resolved.path });
+    }
+    return next;
+  }
+
+  public resolveAmbientClosure(
+    symbolName: string,
+    filePath: string,
+    sourceCode: string,
+    maxDepth = 3
+  ): AmbientTypeClosure {
     const sf = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
     const targetNode = this.findTargetNode(sf, symbolName);
-    if (!targetNode) {
-      return { typeNames: [], declarations: [], formattedBlock: '' };
-    }
+    if (!targetNode) return { typeNames: [], declarations: [], formattedBlock: '' };
 
-    const typeNames = this.collectFunctionTypeNames(targetNode, sf);
-    const imports = TsCallGraphExtractor.collectImports(sf, filePath);
+    const fileCache = new Map<string, ts.SourceFile>([[filePath, sf]]);
+    const initialTypes = this.collectFunctionTypeNames(targetNode, sf);
+    const visited = new Set<string>();
     const declarations: string[] = [];
+    const resolvedTypeNames: string[] = [];
 
-    for (const typeName of typeNames) {
-      const localDecl = this.findDeclarationInSource(sf, typeName);
-      if (localDecl) {
-        declarations.push(localDecl);
-        continue;
+    let currentLevel = initialTypes.map(name => ({ name, sf, path: filePath }));
+    let depth = 0;
+
+    while (currentLevel.length > 0 && depth < maxDepth) {
+      const nextLevel: { name: string; sf: ts.SourceFile; path: string }[] = [];
+      for (const item of currentLevel) {
+        if (visited.has(item.name)) continue;
+        visited.add(item.name);
+        resolvedTypeNames.push(item.name);
+        nextLevel.push(...this.expandTypeItem(item, fileCache, visited, declarations));
       }
-      const binding = imports.get(typeName);
-      if (binding) {
-        const importedDecl = this.resolveImportedDeclaration(binding.importedName === 'default' ? typeName : binding.importedName, binding.targetFilePath);
-        if (importedDecl) declarations.push(importedDecl);
-      }
+      currentLevel = nextLevel;
+      depth++;
     }
 
     const formattedBlock = declarations.length > 0
       ? `// 📦 [Ambient Type Closure - Param & Return Types]\n${declarations.join('\n\n')}`
       : '';
-
-    return { typeNames, declarations, formattedBlock };
+    return { typeNames: resolvedTypeNames, declarations, formattedBlock };
   }
 }

@@ -30,6 +30,7 @@ export class WorktreeMutex {
     const stat = fs.statSync(lockDir, { throwIfNoEntry: false });
     if (!stat) return true;
     const age = Date.now() - stat.mtimeMs;
+    if (age > 60000) return true;
 
     try {
       const rawPid = fs.readFileSync(pidFile, 'utf8').trim();
