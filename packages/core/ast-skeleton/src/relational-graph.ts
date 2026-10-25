@@ -30,7 +30,10 @@ export type RelationalEdgeType =
   | 'EMITS_SIGNAL'
   | 'CONNECTS_SIGNAL'
   | 'ATTACHES_SCRIPT'
-  | 'ATTACHED_SCRIPT';
+  | 'ATTACHED_SCRIPT'
+  | 'RE_EXPORTS'
+  | 'DEPENDS_ON'
+  | 'OVERRIDES';
 
 export interface RelationalEdge {
   from: string;
@@ -177,6 +180,13 @@ export class RelationalGraph {
     } catch {
       return false;
     }
+  }
+
+  public getCouplingMetrics(nodeId: string): { fanIn: number; fanOut: number; isHighCoupling: boolean } {
+    const id = nodeId.replace(/\\/g, '/');
+    const fanIn = (this.incoming.get(id) || []).length;
+    const fanOut = (this.outgoing.get(id) || []).length;
+    return { fanIn, fanOut, isHighCoupling: fanIn > 10 };
   }
 
   public clear(): void {

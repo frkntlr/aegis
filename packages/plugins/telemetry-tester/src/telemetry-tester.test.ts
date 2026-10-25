@@ -74,7 +74,6 @@ function add(a: number, b: number): number {
   assert.strictEqual(failReport.passedThreshold, false);
 });
 
-
 test('MutationGate handles consecutive lines matching same pattern without lastIndex drift', () => {
   const gate = new MutationGate();
   const sampleCode = [
@@ -117,4 +116,45 @@ test('MutationGate ignores comment lines during mutant generation', () => {
   const mutants = gate.generateMutants(sampleCode);
   assert.strictEqual(mutants.length, 1);
   assert.strictEqual(mutants[0].line, 4);
+});
+
+test('MutationGate skips TypeScript interfaces and type declarations (#214)', () => {
+  const gate = new MutationGate();
+  const tsCode = [
+    'export interface UserConfig {',
+    '  isAdmin: boolean;',
+    '  timeout: number;',
+    '}',
+    'type Flag = true;',
+    'function isAllowed(user: UserConfig): boolean {',
+    '  return user.timeout >= 10;',
+    '}'
+  ].join('\n');
+
+  const mutants = gate.generateMutants(tsCode);
+  // Mutants should only be generated from the runtime function, not the interface or type
+  for (const m of mutants) {
+    assert.ok(m.line >= 6, `Mutant generated on line ${m.line} which is in a type declaration`);
+  }
+});
+
+test('MutationGate mutates boundaries, logical operators, and returns (#215)', () => {
+  const gate = new MutationGate();
+  const code = [
+    'function check(a: number, b: number): boolean {',
+    '  if (a >= 10 && b < 5) {',
+    '    return true;',
+    '  }',
+    '  return false;',
+    '}'
+  ].join('\n');
+
+  const mutants = gate.generateMutants(code);
+  const boundaryMutants = mutants.filter(m => m.id.includes('>= to <') || m.id.includes('< to >='));
+  const logicalMutants = mutants.filter(m => m.id.includes('&& to ||'));
+  const returnMutants = mutants.filter(m => m.id.includes('return true to return false'));
+
+  assert.ok(boundaryMutants.length >= 2);
+  assert.ok(logicalMutants.length >= 1);
+  assert.ok(returnMutants.length >= 1);
 });

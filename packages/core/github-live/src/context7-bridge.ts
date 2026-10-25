@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { GodotTopicResolver, DeprecationLinter, type DeprecationWarning } from '@aegis/shared';
 import { DependencyMapper, type DiscoveredDependency } from './dependency-mapper.js';
+import { Context7Registry } from './context7-registry.js';
 
 export interface Context7DocEntry {
   library: string;
@@ -29,6 +30,7 @@ export class Context7Bridge {
   private initBuiltinDocs(): void {
     this.initGodotDocs();
     this.initGeneralDocs();
+    Context7Registry.registerAll(doc => this.registerDoc(doc));
   }
 
   private initGodotDocs(): void {

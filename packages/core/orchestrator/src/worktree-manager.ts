@@ -217,6 +217,22 @@ export class WorktreeManager {
     });
   }
 
+  public hasUnmergedConflicts(agentName: string): boolean {
+    const wtPath = this.getWorktreePath(agentName);
+    if (!fs.existsSync(wtPath)) return false;
+    try {
+      const output = execFileSync('git', ['ls-files', '-u'], {
+        cwd: wtPath,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: cleanGitEnv()
+      });
+      return output.trim().length > 0;
+    } catch {
+      return false;
+    }
+  }
+
   public getLockedFiles(): Map<string, string> {
     if (this.persistLocks) this.loadLocks();
     return new Map(this.activeLocks);

@@ -1,16 +1,22 @@
 import type { CageViolation } from '@aegis/shared';
 import { IronCageValidator } from './cage-validator.js';
+import { DiagnosticTriageEnricher, type DiagnosticCategory } from './diagnostic-triage-enricher.js';
 
 export type TriageCategory = 'CRITICAL_DEFECT' | 'ARCHITECTURAL_DEBT' | 'CODE_SMELL';
 
 export interface TriageFinding {
   id: string;
   category: TriageCategory;
+  defectType?: DiagnosticCategory;
   title: string;
   filePath: string;
   line?: number;
+  column?: number;
   evidence: string;
   blocking: boolean;
+  filteredStack?: string;
+  remediation?: string;
+  packageScope?: string;
 }
 
 export interface TriageInput {
@@ -64,6 +70,7 @@ export class EvidenceBasedTriageGate {
       findings.push({
         id: `crit-test-${Date.now()}-1`,
         category: 'CRITICAL_DEFECT',
+        defectType: 'TEST_FAILURE',
         title: `${input.failingTestsCount} Failing Automated Test(s)`,
         filePath: input.targetFiles?.[0] || 'test_suite',
         evidence: `Automated test runner reported ${input.failingTestsCount} failing assertion(s).`,
@@ -72,12 +79,19 @@ export class EvidenceBasedTriageGate {
     }
 
     for (const tf of input.testFailures || []) {
+      const diag = DiagnosticTriageEnricher.classify(tf);
       findings.push({
         id: `crit-tf-${findings.length + 1}`,
         category: 'CRITICAL_DEFECT',
-        title: 'Test Assertion Failure',
-        filePath: input.targetFiles?.[0] || 'test_suite',
-        evidence: tf,
+        defectType: diag.category,
+        title: diag.title,
+        filePath: diag.filePath || input.targetFiles?.[0] || 'test_suite',
+        line: diag.line,
+        column: diag.column,
+        evidence: diag.evidence,
+        filteredStack: diag.filteredStack,
+        remediation: diag.remediation,
+        packageScope: diag.packageScope,
         blocking: true
       });
     }
@@ -85,25 +99,35 @@ export class EvidenceBasedTriageGate {
 
   private collectRuntimeDefects(input: TriageInput, findings: TriageFinding[]): void {
     for (const ee of input.engineErrors || []) {
-      if (/crash|null|exception|assert|fail|error/i.test(ee)) {
+      const diag = DiagnosticTriageEnricher.classify(ee);
+      if (/crash|null|exception|assert|fail|error/i.test(ee) || diag.category !== 'TEST_FAILURE') {
         findings.push({
           id: `crit-eng-${findings.length + 1}`,
           category: 'CRITICAL_DEFECT',
-          title: 'Engine Runtime Crash / Error',
-          filePath: input.targetFiles?.[0] || 'engine_runtime',
-          evidence: ee,
+          defectType: diag.category,
+          title: diag.title !== 'Assertion / Runtime Failure' ? diag.title : 'Engine Runtime Crash / Error',
+          filePath: diag.filePath || input.targetFiles?.[0] || 'engine_runtime',
+          line: diag.line,
+          evidence: diag.evidence,
+          filteredStack: diag.filteredStack,
+          remediation: diag.remediation,
+          packageScope: diag.packageScope,
           blocking: true
         });
       }
     }
 
     for (const se of input.syntaxErrors || []) {
+      const diag = DiagnosticTriageEnricher.classify(se);
       findings.push({
         id: `crit-syn-${findings.length + 1}`,
         category: 'CRITICAL_DEFECT',
-        title: 'Syntax / Compilation Failure',
-        filePath: input.targetFiles?.[0] || 'source',
-        evidence: se,
+        defectType: diag.category,
+        title: diag.title,
+        filePath: diag.filePath || input.targetFiles?.[0] || 'source',
+        line: diag.line,
+        evidence: diag.evidence,
+        remediation: diag.remediation,
         blocking: true
       });
     }

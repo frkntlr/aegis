@@ -80,7 +80,8 @@ export function generateLanguageConstitution(targetFiles: string[]): string {
     '1. Max 300 lines per source file.',
     '2. Max 40 lines per function.',
     '3. Surgical unified diffs only.',
-    '4. Pre-commit test pass mandatory.'
+    '4. Pre-commit test pass mandatory.',
+    '5. Anti-Hallucination: NEVER invent non-existent APIs or imports. Verify symbols via aegis find.'
   ];
 
   const hasGdScript = targetFiles.some(f => /\.(gd|tscn)$/i.test(f));

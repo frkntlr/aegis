@@ -185,3 +185,23 @@ export function handleMemoryWatch(dirPath = 'packages', worktreeId?: string): Co
   console.log('   Watching for file changes... (Press Ctrl+C to terminate)');
   return watcher;
 }
+
+
+export function handleMemoryVerify(worktreeId?: string): void {
+  showBanner();
+  const activeWorktree = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+  const engine = getSharedMemoryEngine();
+  console.log(`🔍 Verifying Memory-to-Disk consistency [Worktree: ${activeWorktree}]...`);
+  const files = engine.getNamespaceFiles(activeWorktree);
+  let missing = 0;
+  for (const f of files) {
+    if (!fs.existsSync(f)) missing++;
+  }
+  if (missing === 0) {
+    console.log(`✅ All ${files.length} indexed files exist on disk.`);
+  } else {
+    console.log(`⚠️  ${missing} of ${files.length} indexed files missing on disk. Run 'aegis memory:prune' to clean.`);
+  }
+}

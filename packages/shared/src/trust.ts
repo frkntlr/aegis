@@ -5,4 +5,7 @@ export interface TrustAuditReport {
   mutationScorePercent: number;
   verdict: 'APPROVED' | 'REJECTED' | 'MANUAL_REVIEW_REQUIRED';
   details: string[];
+  assertionDensity?: number;
+  scopeViolations?: string[];
+  fidelityIssues?: string[];
 }

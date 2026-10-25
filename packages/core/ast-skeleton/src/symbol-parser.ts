@@ -1,8 +1,9 @@
 import ts from 'typescript';
+import { PolyglotParser } from './polyglot-parser.js';
 
 export interface SymbolEntry {
   name: string;
-  kind: 'class' | 'function' | 'method' | 'signal' | 'interface' | 'variable';
+  kind: 'class' | 'function' | 'method' | 'signal' | 'interface' | 'variable' | 'type';
   filePath: string;
   startLine: number;
   endLine: number;
@@ -42,7 +43,7 @@ export class SymbolParser {
 
   private static createTsTypeEntry(node: ts.TypeAliasDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
     const { start, end } = SymbolParser.getLineRange(node, sf);
-    return { name: node.name.text, kind: 'interface', filePath, startLine: start, endLine: end, signature: `type ${node.name.text}` };
+    return { name: node.name.text, kind: 'type', filePath, startLine: start, endLine: end, signature: `type ${node.name.text}` };
   }
 
   private static collectVarFuncs(node: ts.VariableStatement, sf: ts.SourceFile, filePath: string, out: SymbolEntry[]): void {
@@ -111,6 +112,15 @@ export class SymbolParser {
         curClass = cls[1];
         symbols.push({ name: curClass, kind: 'class', filePath: normPath, startLine: i + 1, endLine: lines.length, signature: `class_name ${curClass}` });
       }
+      const innerCls = codeOnly.match(/^class\s+([a-zA-Z_]\w*):/);
+      if (innerCls) {
+        curClass = innerCls[1];
+        symbols.push({ name: curClass, kind: 'class', filePath: normPath, startLine: i + 1, endLine: lines.length, signature: `class ${curClass}:` });
+      }
+      const prop = codeOnly.match(/^(@export(?:[^\s]*)\s+|@onready\s+)var\s+([a-zA-Z_]\w*)(.*)/);
+      if (prop) {
+        symbols.push({ name: prop[2], kind: 'variable', filePath: normPath, startLine: i + 1, endLine: i + 1, signature: codeOnly });
+      }
       const sig = codeOnly.match(/^signal\s+([a-zA-Z_]\w*)(.*)/);
       if (sig) {
         symbols.push({ name: sig[1], kind: 'signal', filePath: normPath, startLine: i + 1, endLine: i + 1, signature: `signal ${sig[1]}${sig[2]}`.trim() });
@@ -162,6 +172,9 @@ export class SymbolParser {
 
   public static parseGeneric(filePath: string, content: string): SymbolEntry[] {
     const normPath = filePath.replace(/\\/g, '/');
+    if (normPath.endsWith('.py')) return PolyglotParser.parsePython(filePath, content);
+    if (normPath.endsWith('.rs')) return PolyglotParser.parseRust(filePath, content);
+    if (normPath.endsWith('.go')) return PolyglotParser.parseGo(filePath, content);
     const symbols: SymbolEntry[] = [];
     const lines = content.split(/\r?\n/);
     const fnPattern = /(?:def|fn|func)\s+([a-zA-Z_]\w*)\s*\(/;

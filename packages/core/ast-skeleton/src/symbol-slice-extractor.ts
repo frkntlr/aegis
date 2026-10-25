@@ -6,6 +6,7 @@ import { SymbolIndexer } from './symbol-indexer.js';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
 import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
 import { TypeScriptSkeletonExtractor } from './ts-extractor.js';
+import { SliceAmbientEnricher } from './slice-ambient-enricher.js';
 import { PreEmptiveDiffBudgeting, type DiffBudgetReport } from '@aegis/shared';
 
 export interface SliceResult {
@@ -219,6 +220,8 @@ export class SymbolSliceExtractor {
       if (fileImports) headerBlocks.push(fileImports);
       const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
       if (ambient.formattedBlock) headerBlocks.push(ambient.formattedBlock);
+      const enrichment = SliceAmbientEnricher.enrichTypeScript(symbolName, filePath, content, this.indexer);
+      if (enrichment.headerLines.length > 0) headerBlocks.push(...enrichment.headerLines);
       const callee = this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content);
       if (callee.formattedBlock) headerBlocks.push(callee.formattedBlock);
       return { headerBlocks, ambientTypes: ambient.typeNames, calleeSignatures: callee.signatures };
@@ -253,7 +256,8 @@ export class SymbolSliceExtractor {
     const lines = content.split(/\r?\n/);
     const from = this.computeDynamicFromLine(lines, startLine, contextLines);
     const to = Math.min(lines.length, endLine + contextLines);
-    const formattedLines = this.formatSliceLines(lines, from, to, startLine, endLine);
+    const sanitized = SliceAmbientEnricher.sanitizeTemplateLiterals(lines, from, to);
+    const formattedLines = this.formatSliceLines(sanitized, from, to, startLine, endLine);
 
     const { prefix, diffBudget, budgetWarning } = this.createSliceBudget(filePath, lines.length, startLine, endLine);
     const { headerBlocks, ambientTypes, calleeSignatures } = this.resolveAmbientBlocks(symbolName, filePath, content);

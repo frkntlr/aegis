@@ -84,6 +84,11 @@ export class CrossReferenceLinker {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       this.parseGdInheritance(filePath, line);
+      const loadMatch = line.match(/(?:preload|load)\s*\(\s*["']([^"']+)["']\s*\)/);
+      if (loadMatch) {
+        const target = loadMatch[1].replace(/^res:\/\//, '');
+        this.graph.addEdge({ from: filePath, to: target, type: 'DEPENDS_ON' });
+      }
     }
 
     const { edges, nodes } = GdSignalExtractor.extract(filePath, content, symbols);
@@ -131,6 +136,16 @@ export class CrossReferenceLinker {
       const extMatch = trimmed.match(/class\s+([a-zA-Z_]\w*)\s+extends\s+([a-zA-Z_]\w*)/);
       if (extMatch) {
         this.graph.addEdge({ from: `${filePath}::${extMatch[1]}`, to: extMatch[2], type: 'EXTENDS' });
+      }
+      const expMatch = trimmed.match(/^export\s+(?:\*|\{.*?\})\s+from\s+['"]([^'"]+)['"]/);
+      if (expMatch) {
+        const target = TsCallGraphExtractor.resolveImportPath(filePath, expMatch[1]);
+        this.graph.addEdge({ from: filePath, to: target, type: 'RE_EXPORTS' });
+      }
+      const dynImpMatch = trimmed.match(/import\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+      if (dynImpMatch) {
+        const target = TsCallGraphExtractor.resolveImportPath(filePath, dynImpMatch[1]);
+        this.graph.addEdge({ from: filePath, to: target, type: 'CALLS' });
       }
       const impMatch = trimmed.match(/import\s+.*from\s+['"]([^'"]+)['"]/);
       if (impMatch) {

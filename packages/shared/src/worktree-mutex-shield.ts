@@ -10,6 +10,25 @@ export interface ActiveLockInfo {
 }
 
 export class WorktreeMutexShield {
+  public static isPidAlive(pid: number): boolean {
+    if (!pid || pid <= 0) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public static normalizeLockPath(filePath: string): string {
+    return filePath
+      .replace(/\\/g, '/')
+      .replace(/^(experimental\/(solver|qa|ui|docs)\/)/, '')
+      .replace(/^\.\//, '')
+      .trim()
+      .toLowerCase();
+  }
+
   public static inspectLock(
     filePath: string,
     currentWorktreeOrAgent = 'default',
@@ -23,11 +42,15 @@ export class WorktreeMutexShield {
       const data = JSON.parse(raw);
       if (!data || typeof data !== 'object') return null;
 
-      const normTarget = filePath.replace(/\\/g, '/').replace(/^\.\//, '').trim().toLowerCase();
+      const normTarget = WorktreeMutexShield.normalizeLockPath(filePath);
 
       for (const [lockPath, lockVal] of Object.entries(data)) {
-        const normKey = lockPath.replace(/\\/g, '/').replace(/^\.\//, '').trim().toLowerCase();
+        const normKey = WorktreeMutexShield.normalizeLockPath(lockPath);
         if (normKey === normTarget || normKey.endsWith('/' + normTarget) || normTarget.endsWith('/' + normKey)) {
+          if (lockVal && typeof lockVal === 'object') {
+            const pid = Number((lockVal as { pid?: number }).pid);
+            if (pid && !WorktreeMutexShield.isPidAlive(pid)) continue;
+          }
           return WorktreeMutexShield.buildLockInfo(filePath, lockVal, currentWorktreeOrAgent);
         }
       }

@@ -9,6 +9,8 @@ export interface TraceResult {
   connectedScenes: string[];
   connectedSignals: string[];
   blastRadiusFiles: string[];
+  productionBlastRadiusFiles?: string[];
+  testBlastRadiusFiles?: string[];
   executionTimeMs: number;
 }
 
@@ -30,6 +32,9 @@ export class GraphQueryEngine {
     const connectedScenes = this.extractScenes([...upstream, ...downstream]);
     const connectedSignals = this.extractSignals([...upstream, ...downstream]);
     const blastRadiusFiles = this.extractBlastRadius(targetId, upstream, downstream);
+    const isTest = (f: string) => /\.(test|spec)\.[a-z]+$/i.test(f) || f.includes('__tests__') || f.includes('/test/');
+    const productionBlastRadiusFiles = blastRadiusFiles.filter(f => !isTest(f));
+    const testBlastRadiusFiles = blastRadiusFiles.filter(f => isTest(f));
 
     const executionTimeMs = parseFloat((performance.now() - t0).toFixed(2));
     return {
@@ -40,6 +45,8 @@ export class GraphQueryEngine {
       connectedScenes,
       connectedSignals,
       blastRadiusFiles,
+      productionBlastRadiusFiles,
+      testBlastRadiusFiles,
       executionTimeMs
     };
   }

@@ -79,6 +79,17 @@ export class MCPSecurityManager {
     return { allowed: true };
   }
 
+  public authorizeFileOperation(agentName: string, filePath: string, worktreeDir?: string): { allowed: boolean; reason?: string } {
+    if (agentName === 'human' || !worktreeDir) return { allowed: true };
+    const normFile = filePath.replace(/\\/g, '/');
+    const normWt = worktreeDir.replace(/\\/g, '/');
+    if (normFile.includes('../') && !normFile.startsWith(normWt)) {
+      this.recordAudit(agentName, 'write_file', false, 'Path traversal detected outside worktree.');
+      return { allowed: false, reason: `Agent "${agentName}" cannot write outside worktree "${worktreeDir}".` };
+    }
+    return { allowed: true };
+  }
+
   private recordAudit(agent: string, tool: string, allowed: boolean, reason?: string): void {
     this.auditLog.push({ timestamp: new Date().toISOString(), agent, tool, allowed, reason });
   }

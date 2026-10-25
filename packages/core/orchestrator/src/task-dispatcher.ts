@@ -58,6 +58,7 @@ export class TaskDispatcher {
       const eligibleAgent = availableAgents.find(a => a === inference.role)
         ?? availableAgents.find(a => isRoleCompatible(a, inference.role));
       if (eligibleAgent) {
+        if (this.worktreeManager.hasUnmergedConflicts(eligibleAgent)) continue;
         const lockAttempt = this.worktreeManager.acquireFileLocks(eligibleAgent, issue.targetFiles);
         if (lockAttempt.success) {
           return { dispatched: true, agentName: eligibleAgent, issue };

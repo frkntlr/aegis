@@ -33,7 +33,7 @@ test('CompoundingErrorChecker alerts on runaway diff growth', () => {
   const checker = new CompoundingErrorChecker();
   checker.recordStep({ step: 1, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 0, timestamp: '' });
   checker.recordStep({ step: 2, changedFilesCount: 2, diffLinesCount: 25, failingTestsCount: 0, timestamp: '' });
-  
+
   // Step 3 diff explodes to 120 lines (> 2.5x of 25)
   const alert = checker.recordStep({ step: 3, changedFilesCount: 6, diffLinesCount: 120, failingTestsCount: 0, timestamp: '' });
   assert.ok(alert);
@@ -45,14 +45,13 @@ test('CompoundingErrorChecker alerts on cascading test regressions', () => {
   const checker = new CompoundingErrorChecker();
   checker.recordStep({ step: 1, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 1, timestamp: '' });
   checker.recordStep({ step: 2, changedFilesCount: 1, diffLinesCount: 15, failingTestsCount: 2, timestamp: '' });
-  
+
   // Step 3 failures climb further
   const alert = checker.recordStep({ step: 3, changedFilesCount: 2, diffLinesCount: 20, failingTestsCount: 5, timestamp: '' });
   assert.ok(alert);
   assert.strictEqual(alert.alert, 'TEST_REGRESSION');
   assert.strictEqual(alert.recommendedRollbackStep, 1);
 });
-
 
 test('CompoundingErrorChecker does not trigger runaway diff when baseline step has 0 diff lines', () => {
   const checker = new CompoundingErrorChecker();
@@ -96,4 +95,23 @@ test('CompoundingErrorChecker alerts on runaway file churn when changed files es
   assert.ok(alert);
   assert.strictEqual(alert.alert, 'RUNAWAY_FILE_CHURN');
   assert.strictEqual(alert.recommendedRollbackStep, 1);
+});
+
+test('CompoundingErrorChecker detects compounding loop when same test fails 3 consecutive times (#201)', () => {
+  const checker = new CompoundingErrorChecker();
+  checker.recordStep({
+    step: 1, changedFilesCount: 1, diffLinesCount: 10, failingTestsCount: 1,
+    failingTestNames: ['test_auth_token_refresh'], timestamp: ''
+  });
+  checker.recordStep({
+    step: 2, changedFilesCount: 2, diffLinesCount: 20, failingTestsCount: 1,
+    failingTestNames: ['test_auth_token_refresh'], timestamp: ''
+  });
+  const alert = checker.recordStep({
+    step: 3, changedFilesCount: 3, diffLinesCount: 30, failingTestsCount: 1,
+    failingTestNames: ['test_auth_token_refresh'], timestamp: ''
+  });
+  assert.ok(alert);
+  assert.strictEqual(alert.alert, 'COMPOUNDING_LOOP');
+  assert.deepStrictEqual(alert.loopingTests, ['test_auth_token_refresh']);
 });

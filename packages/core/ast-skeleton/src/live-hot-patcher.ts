@@ -83,6 +83,10 @@ export class LiveHotPatcher {
     cwd = process.cwd()
   ): HotPatchReport {
     const t0 = performance.now();
+    const currentHead = GitFastSyncEngine.getHeadCommit(cwd);
+    if (ns.lastCommit && currentHead && ns.lastCommit !== currentHead) {
+      engine.clearCache(worktreeId);
+    }
     const patched: string[] = [];
 
     for (const [norm, cachedFp] of ns.mtimeFingerprints.entries()) {
