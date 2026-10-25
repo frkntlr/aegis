@@ -8,7 +8,7 @@ export interface FastSyncEvaluation {
 }
 
 export class GitFastSyncEngine {
-  private static statusCache: { cwd: string; timestamp: number; files: string[] } | null = null;
+  private static statusCache: { cwd: string; head: string; timestamp: number; files: string[] } | null = null;
   private static readonly CACHE_TTL_MS = 1000;
 
   public static clearCache(): void {
@@ -63,8 +63,10 @@ export class GitFastSyncEngine {
 
   public static getPorcelainStatus(cwd = process.cwd(), forceRefresh = false): string[] | null {
     const now = Date.now();
+    const head = GitFastSyncEngine.getHeadCommit(cwd) || '';
     if (!forceRefresh && GitFastSyncEngine.statusCache &&
         GitFastSyncEngine.statusCache.cwd === cwd &&
+        GitFastSyncEngine.statusCache.head === head &&
         now - GitFastSyncEngine.statusCache.timestamp < GitFastSyncEngine.CACHE_TTL_MS) {
       return [...GitFastSyncEngine.statusCache.files];
     }
@@ -81,7 +83,7 @@ export class GitFastSyncEngine {
         const parsed = GitFastSyncEngine.parseStatusLine(line);
         if (parsed) files.push(parsed);
       }
-      GitFastSyncEngine.statusCache = { cwd, timestamp: now, files };
+      GitFastSyncEngine.statusCache = { cwd, head, timestamp: now, files };
       return files;
     } catch {
       return null;

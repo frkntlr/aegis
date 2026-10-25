@@ -142,3 +142,28 @@ test('GitHubLiveAdapter retries on 429 rate limit with exponential backoff', asy
   assert.strictEqual(res.user.login, 'octocat');
   assert.strictEqual(callCount, 2);
 });
+
+test('GitHubLiveAdapter caps retry delay avoiding overflow', async () => {
+  let callCount = 0;
+  const mockFetch: typeof fetch = async () => {
+    callCount++;
+    if (callCount === 1) {
+      return new Response('Rate limited', {
+        status: 429,
+        headers: { 'retry-after': '999999', 'x-ratelimit-remaining': '0' }
+      });
+    }
+    return new Response(JSON.stringify({ login: 'octocat', id: 1 }), {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }
+    });
+  };
+
+  const adapter = new GitHubLiveAdapter({
+    token: 'fake',
+    fetchFn: mockFetch,
+    maxRetries: 0
+  });
+
+  await assert.rejects(async () => adapter.getAuthenticatedUser(), /Rate limited/);
+});

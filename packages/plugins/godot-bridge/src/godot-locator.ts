@@ -98,7 +98,8 @@ export class GodotLocator {
 
   public static inspectBinary(binaryPath: string): GodotInstallation | null {
     try {
-      const out = execSync(`"${binaryPath}" --version`, {
+      const cleanPath = path.normalize(binaryPath).replace(/^["']|["']$/g, '');
+      const out = execSync(`"${cleanPath}" --version`, {
         stdio: ['ignore', 'pipe', 'ignore'],
         timeout: 4000
       })
@@ -107,10 +108,10 @@ export class GodotLocator {
 
       const majorMatch = out.match(/^(\d+)/);
       const majorVersion = majorMatch ? parseInt(majorMatch[1], 10) : 4;
-      const isConsole = binaryPath.toLowerCase().includes('console') || process.platform !== 'win32';
+      const isConsole = cleanPath.toLowerCase().includes('console') || process.platform !== 'win32';
 
       return {
-        binaryPath,
+        binaryPath: cleanPath,
         versionString: out,
         majorVersion,
         isHeadlessCapable: isConsole

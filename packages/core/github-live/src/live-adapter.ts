@@ -80,7 +80,8 @@ export class GitHubLiveAdapter {
       if (this.shouldRetry(response.status, attempt)) {
         attempt++;
         const retryAfter = parseInt(response.headers.get('retry-after') || '0', 10);
-        const delay = retryAfter > 0 ? retryAfter * 1000 : this.retryDelayMs * 2 ** (attempt - 1);
+        const rawDelay = retryAfter > 0 ? retryAfter * 1000 : this.retryDelayMs * 2 ** (attempt - 1);
+        const delay = Math.min(rawDelay, 30_000);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }

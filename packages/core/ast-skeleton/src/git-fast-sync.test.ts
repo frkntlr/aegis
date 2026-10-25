@@ -14,6 +14,12 @@ test('GitFastSyncEngine: retrieves head commit and porcelain status', () => {
   assert.ok(status === null || Array.isArray(status));
 });
 
+test('GitFastSyncEngine: clearCache resets internal cache', () => {
+  GitFastSyncEngine.clearCache();
+  const status = GitFastSyncEngine.getPorcelainStatus();
+  assert.ok(status === null || Array.isArray(status));
+});
+
 test('GitFastSyncEngine: evaluateFastSync handles match and mismatch', () => {
   const head = GitFastSyncEngine.getHeadCommit();
   if (head) {

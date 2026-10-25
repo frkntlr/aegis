@@ -43,9 +43,13 @@ export class GodotBridgeServer {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const res = this.getCommandResult(cmd.id);
-      if (res) return res;
+      if (res) {
+        this.commandResults.delete(cmd.id);
+        return res;
+      }
       await new Promise(r => setTimeout(r, 50));
     }
+    this.commandResults.delete(cmd.id);
     return {
       id: cmd.id,
       success: false,
@@ -142,7 +146,13 @@ export class GodotBridgeServer {
       }
       if (req.url === '/command/result') {
         const resp = data as GodotRpcResponse;
-        if (resp.id) this.commandResults.set(resp.id, resp);
+        if (resp.id) {
+          if (this.commandResults.size >= 200) {
+            const oldestKey = this.commandResults.keys().next().value;
+            if (oldestKey) this.commandResults.delete(oldestKey);
+          }
+          this.commandResults.set(resp.id, resp);
+        }
         this.sendJsonResponse(res, 200, { success: true });
         return;
       }
