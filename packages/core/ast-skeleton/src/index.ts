@@ -23,3 +23,4 @@ export * from './codebase-memory-watcher.js';
 export * from './ts-call-graph-extractor.js';
 export * from './gdscript-signal-extractor.js';
 export * from './memory-adapter-resolver.js';
+export * from './lru-file-buffer.js';

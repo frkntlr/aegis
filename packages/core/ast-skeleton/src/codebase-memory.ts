@@ -7,12 +7,14 @@ import { RelationalGraph } from './relational-graph.js';
 import { GraphQueryEngine, type TraceResult } from './graph-query-engine.js';
 import { CrossReferenceLinker } from './cross-reference-linker.js';
 import { MemoryAdapterResolver } from './memory-adapter-resolver.js';
+import { LruFileBuffer } from './lru-file-buffer.js';
 
 export interface CodebaseMemoryAdapters {
   docProvider?: (library: string, topic: string) => string | null;
   logCompressor?: (rawText: string) => { text: string; tokenSavingsPercent: number };
   constitutionProvider?: (filePath: string) => string[];
   persistToDisk?: boolean;
+  lruCapacity?: number;
 }
 
 export interface MemoryQueryOptions {
@@ -56,7 +58,7 @@ interface MemoryNamespace {
   linker: CrossReferenceLinker;
   queryEngine: GraphQueryEngine;
   fileHashes: Map<string, string>;
-  fileContents: Map<string, string>;
+  fileContents: LruFileBuffer;
 }
 
 export class CodebaseMemoryEngine {
@@ -75,7 +77,8 @@ export class CodebaseMemoryEngine {
       const graph = new RelationalGraph();
       const linker = new CrossReferenceLinker(graph);
       const queryEngine = new GraphQueryEngine(graph);
-      ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), fileContents: new Map() };
+      const fileContents = new LruFileBuffer(this.adapters.lruCapacity ?? 100);
+      ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), fileContents };
       this.loadNamespaceFromDisk(id, ns);
       this.namespaces.set(id, ns);
     }
@@ -178,7 +181,16 @@ export class CodebaseMemoryEngine {
     }
     if (matches.length === 0) return null;
     const target = matches[0];
-    const stored = ns.fileContents.get(target.filePath);
+    let stored = ns.fileContents.get(target.filePath);
+    if (!stored) {
+      const fullPath = path.isAbsolute(target.filePath) ? target.filePath : path.resolve(process.cwd(), target.filePath);
+      if (fs.existsSync(fullPath)) {
+        try {
+          stored = fs.readFileSync(fullPath, 'utf8');
+          ns.fileContents.set(target.filePath, stored);
+        } catch { /* ignore read failure */ }
+      }
+    }
     if (stored) {
       return ns.extractor.sliceContent(target.name, target.filePath, stored, target.startLine, target.endLine, contextLines);
     }
@@ -273,7 +285,13 @@ export class CodebaseMemoryEngine {
   }
 
   public clearCache(worktreeId?: string): void {
-    if (worktreeId) this.namespaces.delete(worktreeId);
-    else this.namespaces.clear();
+    if (worktreeId) {
+      const ns = this.namespaces.get(worktreeId);
+      if (ns) ns.fileContents.clear();
+      this.namespaces.delete(worktreeId);
+    } else {
+      for (const ns of this.namespaces.values()) ns.fileContents.clear();
+      this.namespaces.clear();
+    }
   }
 }
