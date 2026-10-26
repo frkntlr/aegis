@@ -8,6 +8,7 @@ import {
   handleMemoryStats,
   handleMemoryRefresh,
   handleMemoryWatch,
+  handleMemoryColdStart,
   getSharedMemoryEngine
 } from './memory-command.js';
 
@@ -98,6 +99,26 @@ test('handleMemoryQuery: prints worktree header, mutex lock status, and line bud
   } finally {
     console.log = origLog;
     process.chdir(prevCwd);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('handleMemoryColdStart executes cleanly', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cli-cold-'));
+  const srcDir = path.join(tmpDir, 'src');
+  fs.mkdirSync(srcDir, { recursive: true });
+  fs.writeFileSync(path.join(srcDir, 'cold_sample.ts'), 'export const val = 42;');
+
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
+
+  try {
+    await handleMemoryColdStart(tmpDir, 'cold-wt-test');
+    assert.ok(output.includes('Cold-Start Indexing Complete'));
+    assert.ok(output.includes('Scanned Files: 1'));
+  } finally {
+    console.log = origLog;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });

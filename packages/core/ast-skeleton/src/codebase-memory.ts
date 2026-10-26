@@ -1,6 +1,4 @@
 import * as crypto from 'node:crypto';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { SymbolSliceExtractor, type SliceResult } from './symbol-slice-extractor.js';
 import { RelationalGraph } from './relational-graph.js';
@@ -12,6 +10,8 @@ import { MemoryDiskStore } from './memory-disk-store.js';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
 import { LiveHotPatcher } from './live-hot-patcher.js';
+import { ColdStartIndexer, type ColdStartIndexResult } from './cold-start-indexer.js';
+import { MemoryWriteThroughHook } from './memory-write-through-hook.js';
 import { type DiffBudgetReport, WorktreeMutexShield, type ActiveLockInfo } from '@aegis/shared';
 
 export interface CodebaseMemoryAdapters {
@@ -67,16 +67,19 @@ export interface MemoryNamespace {
 export class CodebaseMemoryEngine {
   private namespaces = new Map<string, MemoryNamespace>();
   private adapters: CodebaseMemoryAdapters;
+  private writeThroughHook: MemoryWriteThroughHook;
+  private coldStartIndexer = new ColdStartIndexer();
 
   constructor(adapters: CodebaseMemoryAdapters = {}) {
     this.adapters = adapters;
+    this.writeThroughHook = new MemoryWriteThroughHook(this);
   }
 
   public static resolveWorktreeIdFromCwd(cwd = process.cwd()): string {
     return ActiveHeadResolver.resolveActiveWorktree(cwd);
   }
 
-  private getNamespace(id = 'default'): MemoryNamespace {
+  public getNamespace(id = 'default'): MemoryNamespace {
     let ns = this.namespaces.get(id);
     if (!ns) {
       const indexer = new SymbolIndexer();
@@ -140,56 +143,22 @@ export class CodebaseMemoryEngine {
 
   public indexDirectory(
     dirPath: string,
-    worktreeId?: string,
-    exts = ['.ts', '.tsx', '.gd', '.py', '.tscn', '.tres', '.rs', '.go', '.cpp', '.cs', '.xaml', '.sh', '.bash']
+    worktreeId?: string
   ): { indexed: number; cached: number; fastSynced?: boolean } {
-    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
-    const ns = this.getNamespace(active);
-    if (!fs.existsSync(dirPath)) return { indexed: 0, cached: 0 };
-
-    const fastSync = GitFastSyncEngine.evaluateFastSync(ns.lastCommit);
-    if (fastSync.canSkipScan && ns.fileHashes.size > 0) {
-      return { indexed: 0, cached: ns.fileHashes.size, fastSynced: true };
-    }
-
-    const stats = { indexed: 0, cached: 0 };
-    const scan = (cur: string) => {
-      for (const e of fs.readdirSync(cur, { withFileTypes: true })) {
-        const full = path.join(cur, e.name);
-        if (e.isDirectory() && !['node_modules', '.git', 'dist', '.aegis'].includes(e.name)) {
-          scan(full);
-        } else if (e.isFile()) {
-          this.scanFileEntry(full, full.replace(/\\/g, '/'), exts, ns, active, stats);
-        }
-      }
-    };
-    scan(dirPath);
-    if (stats.indexed > 0 || (fastSync.headCommit && fastSync.headCommit !== ns.lastCommit)) {
-      if (fastSync.headCommit) ns.lastCommit = fastSync.headCommit;
-      this.saveNamespaceToDisk(active);
-    }
-    return { indexed: stats.indexed, cached: stats.cached, fastSynced: false };
+    return this.coldStartIndexer.indexDirectory(this, dirPath, worktreeId);
   }
 
-  private scanFileEntry(
-    full: string,
-    norm: string,
-    exts: string[],
-    ns: MemoryNamespace,
-    worktreeId: string,
-    stats: { indexed: number; cached: number }
-  ): void {
-    if (!exts.some(x => norm.endsWith(x))) return;
-    const fp = GitFastSyncEngine.getFileFingerprint(full);
-    if (fp && ns.mtimeFingerprints.get(norm) === fp && ns.fileHashes.has(norm)) {
-      stats.cached++;
-      return;
-    }
-    try {
-      const content = fs.readFileSync(full, 'utf8');
-      if (this.indexFile(full, content, worktreeId)) stats.indexed++;
-      else stats.cached++;
-    } catch { /* skip read error */ }
+  public ensureColdStartIndexed(repoRoot = process.cwd(), worktreeId?: string): Promise<ColdStartIndexResult> {
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
+    return this.coldStartIndexer.indexProjectRoot(this, { repoRoot, worktreeId: active });
+  }
+
+  public notifyFileChanged(filePath: string, content: string, worktreeId?: string): boolean {
+    return this.writeThroughHook.handleFileWrite(filePath, content, worktreeId);
+  }
+
+  public notifyFileDeleted(filePath: string, worktreeId?: string): boolean {
+    return this.writeThroughHook.handleFileDelete(filePath, worktreeId);
   }
 
   private resolveSlice(ns: MemoryNamespace, symbol: string, contextLines: number, worktreeId = 'default', filePathFilter?: string): { slice: SliceResult | null; ambiguous?: string[] } {

@@ -193,6 +193,8 @@ export class MergePipeline {
     const allSiblings = new Set<string>(siblingAgents);
     for (const d of discovered) allSiblings.add(d.agentName);
 
+    this.fuseMemoryToMasterAndSiblings(mergingAgent, allSiblings);
+
     for (const sibling of allSiblings) {
       if (sibling === mergingAgent) continue;
       const siblingDir = path.resolve(this.repoRoot, this.worktreePrefix, sibling);
@@ -206,6 +208,24 @@ export class MergePipeline {
         });
       }
     }
+  }
+
+  private fuseMemoryToMasterAndSiblings(mergingAgent: string, allSiblings: Set<string>): void {
+    const memDir = path.resolve(this.repoRoot, '.aegis', 'memory');
+    if (!fs.existsSync(memDir)) return;
+    const agentMemDir = path.join(memDir, mergingAgent);
+    const defaultMemDir = path.join(memDir, 'default');
+    try {
+      if (fs.existsSync(agentMemDir)) {
+        fs.cpSync(agentMemDir, defaultMemDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(defaultMemDir)) {
+        for (const sibling of allSiblings) {
+          if (sibling === mergingAgent) continue;
+          fs.cpSync(defaultMemDir, path.join(memDir, sibling), { recursive: true, force: true });
+        }
+      }
+    } catch { /* ignore memory sync error */ }
   }
 
   public async executePipeline(

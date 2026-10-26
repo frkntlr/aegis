@@ -35,3 +35,5 @@ export * from './godot-topic-resolver.js';
 export * from './deprecation-linter.js';
 export * from './active-head-resolver.js';
 export * from './live-hot-patcher.js';
+export * from './cold-start-indexer.js';
+export * from './memory-write-through-hook.js';

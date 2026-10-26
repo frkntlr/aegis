@@ -64,7 +64,15 @@ import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.
 import { handleRtkCompress } from '../commands/rtk-command.js';
 import { handleContext7Query } from '../commands/context7-command.js';
 import { startMcpServer } from '../commands/mcp-server-command.js';
-import { handleMemoryQuery, handleMemoryStats, handleMemoryRefresh, handleMemoryWatch, handleMemoryPrune, handleMemoryVerify } from '../commands/memory-command.js';
+import {
+  handleMemoryQuery,
+  handleMemoryStats,
+  handleMemoryRefresh,
+  handleMemoryWatch,
+  handleMemoryPrune,
+  handleMemoryVerify,
+  handleMemoryColdStart
+} from '../commands/memory-command.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 
 const HELP_LINES: readonly string[] = [
@@ -120,6 +128,7 @@ const HELP_LINES: readonly string[] = [
   '  aegis memory:query <sym> [wt] [log]    Query 5-Layer Codebase Memory (AST, Graph, Context7, Demir Kafes)',
   '  aegis memory:stats [worktree]          Display Codebase Memory indexing and token savings stats',
   '  aegis memory:refresh [dir] [wt]        Incrementally refresh Codebase Memory cache',
+  '  aegis memory:cold-start [dir] [wt]    Run full project cold-start AST indexing',
   '  aegis memory:watch [dir] [wt]          Run live incremental Codebase Memory watcher daemon',
   '  aegis mcp                              Start native JSON-RPC stdio MCP server'
 ];
@@ -190,6 +199,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'context7:query': (a) => handleContext7Query(a[1], a[2]),
   'memory:query': (a) => handleMemoryQuery(a[1], a[2], a[3]),
   'memory:stats': (a) => handleMemoryStats(a[1]),
+  'memory:cold-start': (a) => handleMemoryColdStart(a[1], a[2]),
   'memory:refresh': (a) => handleMemoryRefresh(a[1], a[2]),
   'memory:prune': (a) => handleMemoryPrune(a[1]),
   'memory:verify': (a) => handleMemoryVerify(a[1]),

@@ -205,3 +205,31 @@ export function handleMemoryVerify(worktreeId?: string): void {
     console.log(`⚠️  ${missing} of ${files.length} indexed files missing on disk. Run 'aegis memory:prune' to clean.`);
   }
 }
+
+export async function triggerColdStartIfEmpty(repoRoot = process.cwd(), worktreeId?: string): Promise<boolean> {
+  const engine = getSharedMemoryEngine();
+  const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
+  const s = engine.getMemoryStats(active);
+  if (s.totalFiles === 0) {
+    await engine.ensureColdStartIndexed(repoRoot, active);
+    return true;
+  }
+  return false;
+}
+
+export async function handleMemoryColdStart(repoRoot = process.cwd(), worktreeId?: string): Promise<void> {
+  showBanner();
+  const active = (worktreeId && worktreeId !== 'default')
+    ? worktreeId
+    : ActiveHeadResolver.resolveActiveWorktree();
+  const engine = getSharedMemoryEngine();
+  console.log(`❄️  Running Proactive Cold-Start Indexing for: ${repoRoot} [${active}]...`);
+  const t0 = performance.now();
+  const res = await engine.ensureColdStartIndexed(repoRoot, active);
+  const dur = (performance.now() - t0).toFixed(2);
+  console.log(`✅ Cold-Start Indexing Complete in ${dur}ms:`);
+  console.log(` • Scanned Files: ${res.scannedFiles}`);
+  console.log(` • Newly Indexed: ${res.indexedFiles}`);
+  console.log(` • Fast-Synced:   ${res.skippedFiles}`);
+  console.log(` • Pruned Files:  ${res.prunedFiles}`);
+}
