@@ -4,6 +4,7 @@ import {
   WorktreeManager,
   TaskDispatcher,
   MergePipeline,
+  BranchReconciler,
   IdeAdapterRegistry,
   McpSkillsSyncEngine,
   UniversalToolchainSync
@@ -153,16 +154,15 @@ function getPrimaryBranch(): string {
 export async function handleMerge(agentName?: string, baseBranchArg?: string): Promise<void> {
   showBanner();
   if (!agentName || agentName === '--help' || agentName === '-h') {
-    console.error('❌ Usage: aegis merge <solver|qa|docs|ui> [baseBranch]');
+    console.error('❌ Usage: aegis merge <agentName|branch> [baseBranch]');
     process.exit(1);
   }
 
   const baseBranch = baseBranchArg || getPrimaryBranch();
   const pipeline = new MergePipeline({ baseBranch });
   const wtManager = new WorktreeManager({ persistLocks: true });
-  console.log(`🔀 Running 4-Step Atomic Merge Pipeline for Agent [${agentName}] into [${baseBranch}]...`);
-  const siblings = ['solver', 'qa', 'docs', 'ui'].filter(a => a !== agentName);
-  const res = await pipeline.executePipeline(agentName, siblings, true);
+  console.log(`🔀 Running Multi-Tier Atomic Merge for [${agentName}] into [${baseBranch}]...`);
+  const res = await pipeline.executePipeline(agentName, [], true);
 
   for (const s of res.steps) {
     const icon = s.passed ? '✅' : '❌';
@@ -171,10 +171,32 @@ export async function handleMerge(agentName?: string, baseBranchArg?: string): P
 
   if (res.success) {
     wtManager.releaseFileLocks(agentName);
-    console.log(`🎉 4-Step Merge Complete: ${agentName} merged into ${baseBranch}.`);
+    console.log(`🎉 Atomic Merge Complete: ${agentName} merged into ${baseBranch}.`);
   } else {
     console.error(`💥 Merge pipeline aborted: ${res.error || 'Unknown error'}`);
     process.exit(1);
+  }
+}
+
+export async function handleBranchSync(agentArg?: string, baseBranchArg?: string): Promise<void> {
+  showBanner();
+  const baseBranch = baseBranchArg || getPrimaryBranch();
+  const reconciler = new BranchReconciler(process.cwd());
+  console.log(`🔄 Synchronizing Worktree Branches with [${baseBranch}]...`);
+  if (!agentArg || agentArg === '--all' || agentArg === 'all') {
+    const reports = reconciler.syncAll(baseBranch);
+    if (reports.length === 0) {
+      console.log('ℹ️  No active worktrees found to synchronize.');
+    }
+    for (const r of reports) {
+      const icon = r.passed ? '✅' : '❌';
+      console.log(` ${icon} [Agent: ${r.agentName}] ${r.message}`);
+    }
+  } else {
+    const agentDir = path.resolve(process.cwd(), 'experimental', agentArg);
+    const r = reconciler.syncWorktree(agentArg, agentDir, baseBranch);
+    const icon = r.passed ? '✅' : '❌';
+    console.log(` ${icon} [Agent: ${r.agentName}] ${r.message}`);
   }
 }
 
