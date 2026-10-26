@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { GodotTopicResolver, DeprecationLinter, type DeprecationWarning } from '@aegis/shared';
 import { DependencyMapper, type DiscoveredDependency } from './dependency-mapper.js';
 import { Context7Registry } from './context7-registry.js';
+import { JitDocSynthesizer } from './jit-doc-synthesizer.js';
 
 export interface Context7DocEntry {
   library: string;
@@ -17,7 +18,7 @@ export interface Context7DocEntry {
 export interface Context7QueryResult {
   matched: boolean;
   doc?: Context7DocEntry;
-  source: 'builtin' | 'cache' | 'miss';
+  source: 'builtin' | 'cache' | 'miss' | 'jit';
 }
 
 export class Context7Bridge {
@@ -189,6 +190,12 @@ export class Context7Bridge {
     if (diskDoc) {
       this.registerDoc(diskDoc);
       return { matched: true, doc: diskDoc, source: 'cache' };
+    }
+
+    const jitDoc = JitDocSynthesizer.synthesizeFromNodeModules(library, topic, undefined, cacheDir);
+    if (jitDoc) {
+      this.registerDoc(jitDoc);
+      return { matched: true, doc: jitDoc, source: 'jit' };
     }
 
     return { matched: false, source: 'miss' };
