@@ -4,3 +4,5 @@ export * from './classifier.js';
 export * from './prescription-builder.js';
 export * from './dialogue-engine.js';
 export * from './stack-trace-parser.js';
+export * from './ast-triangulator.js';
+export * from './hypothesis-generator.js';

@@ -10,6 +10,8 @@ import {
 import { DialogueStateMachine } from './state-machine.js';
 import { SymptomClassifier } from './classifier.js';
 import { PrescriptionBuilder } from './prescription-builder.js';
+import { AstTriangulator, TriangulatedContext } from './ast-triangulator.js';
+import { DynamicHypothesisGenerator } from './hypothesis-generator.js';
 
 export class DialogueEngine {
   private sessions: Map<string, DialogueSession> = new Map();
@@ -58,13 +60,21 @@ export class DialogueEngine {
     }
 
     let memorySlice: MemorySymbolSlice | undefined;
-    if (this.ports.memoryResolver && evidence?.filePath) {
-      const slice = await this.ports.memoryResolver.resolveSlice(
-        evidence.filePath,
-        evidence.lineNumber,
-        evidence.symbolName
+    let triangulated: TriangulatedContext | undefined;
+    if (evidence?.filePath && evidence.lineNumber) {
+      const triangulator = new AstTriangulator();
+      triangulated = await triangulator.triangulate(
+        {
+          filePath: evidence.filePath,
+          lineNumber: evidence.lineNumber,
+          columnNumber: evidence.columnNumber || 1,
+          symbolName: evidence.symbolName,
+          format: 'generic_posix',
+          confidence: evidence.confidenceScore
+        },
+        this.ports.memoryResolver
       );
-      if (slice) memorySlice = slice;
+      if (triangulated.slice) memorySlice = triangulated.slice;
     }
 
     let budgetReport: LineBudgetReport | undefined;
@@ -72,7 +82,7 @@ export class DialogueEngine {
       budgetReport = await this.ports.budgetInspector.inspectBudget(evidence.filePath);
     }
 
-    const session = this.buildEvidenceSession(sessionId, rawLogOrError, evidence, memorySlice, budgetReport);
+    const session = this.buildEvidenceSession(sessionId, rawLogOrError, evidence, memorySlice, budgetReport, triangulated);
     this.sessions.set(sessionId, session);
     return session;
   }
@@ -82,10 +92,11 @@ export class DialogueEngine {
     rawInput: string,
     evidence?: ParsedEvidence,
     memorySlice?: MemorySymbolSlice,
-    budgetReport?: LineBudgetReport
+    budgetReport?: LineBudgetReport,
+    triangulated?: TriangulatedContext
   ): DialogueSession {
     const category = SymptomClassifier.classify(rawInput);
-    const options = SymptomClassifier.getClarificationOptions(category);
+    const options = DynamicHypothesisGenerator.generate(category, triangulated, budgetReport);
     const initialRecord: DialogueTurnRecord = {
       turn: 1,
       phase: TurnPhase.TURN_1_SYMPTOM,
