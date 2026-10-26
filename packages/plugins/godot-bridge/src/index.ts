@@ -9,3 +9,4 @@ export * from './classdboracle/doctool-runner.js';
 export * from './classdboracle/classdboracle.js';
 export * from './godot-adapter.js';
 export * from './godot-scene-validator.js';
+export * from './gdextension-metadata-extractor.js';
