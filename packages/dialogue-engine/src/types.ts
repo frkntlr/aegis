@@ -1,3 +1,15 @@
+import {
+  ParsedEvidence,
+  MemorySymbolSlice,
+  LineBudgetReport,
+  IEvidenceProvider,
+  IMemorySliceResolver,
+  ILineBudgetInspector,
+  ITaskDispatcher
+} from './ports/index.js';
+
+export * from './ports/index.js';
+
 export enum TurnPhase {
   IDLE = 'IDLE',
   TURN_1_SYMPTOM = 'TURN_1_SYMPTOM',
@@ -20,6 +32,8 @@ export interface ClarificationOption {
   id: string;
   label: string;
   hypothesisKey: string;
+  microProbeCommand?: string;
+  confidenceScore?: number;
 }
 
 export interface PrescriptionPlan {
@@ -29,6 +43,8 @@ export interface PrescriptionPlan {
   acceptanceCriteria: string[];
   targetWorktree: string;
   lockLabels: string[];
+  mustDecompose?: boolean;
+  microProbeCommand?: string;
 }
 
 export interface DialogueTurnRecord {
@@ -49,4 +65,14 @@ export interface DialogueSession {
   prescription?: PrescriptionPlan;
   history: DialogueTurnRecord[];
   isResolved: boolean;
+  evidence?: ParsedEvidence;
+  memorySlice?: MemorySymbolSlice;
+  budgetReport?: LineBudgetReport;
+}
+
+export interface DialogueEnginePorts {
+  evidenceProvider?: IEvidenceProvider;
+  memoryResolver?: IMemorySliceResolver;
+  budgetInspector?: ILineBudgetInspector;
+  taskDispatcher?: ITaskDispatcher;
 }

@@ -1,10 +1,27 @@
-import { TurnPhase, DialogueSession, DialogueTurnRecord } from './types.js';
+import {
+  TurnPhase,
+  DialogueSession,
+  DialogueTurnRecord,
+  DialogueEnginePorts,
+  ParsedEvidence,
+  MemorySymbolSlice,
+  LineBudgetReport
+} from './types.js';
 import { DialogueStateMachine } from './state-machine.js';
 import { SymptomClassifier } from './classifier.js';
 import { PrescriptionBuilder } from './prescription-builder.js';
 
 export class DialogueEngine {
   private sessions: Map<string, DialogueSession> = new Map();
+  private ports: DialogueEnginePorts;
+
+  constructor(ports?: DialogueEnginePorts) {
+    this.ports = ports || {};
+  }
+
+  public getPorts(): DialogueEnginePorts {
+    return this.ports;
+  }
 
   public startSession(symptomText: string, customId?: string): DialogueSession {
     const sessionId = customId || `dlg-${Date.now().toString(36)}`;
@@ -31,6 +48,63 @@ export class DialogueEngine {
 
     this.sessions.set(sessionId, session);
     return session;
+  }
+
+  public async startSessionWithEvidence(rawLogOrError: string, customId?: string): Promise<DialogueSession> {
+    const sessionId = customId || `dlg-${Date.now().toString(36)}`;
+    let evidence: ParsedEvidence | undefined;
+    if (this.ports.evidenceProvider) {
+      evidence = await this.ports.evidenceProvider.parseEvidence(rawLogOrError);
+    }
+
+    let memorySlice: MemorySymbolSlice | undefined;
+    if (this.ports.memoryResolver && evidence?.filePath) {
+      const slice = await this.ports.memoryResolver.resolveSlice(
+        evidence.filePath,
+        evidence.lineNumber,
+        evidence.symbolName
+      );
+      if (slice) memorySlice = slice;
+    }
+
+    let budgetReport: LineBudgetReport | undefined;
+    if (this.ports.budgetInspector && evidence?.filePath) {
+      budgetReport = await this.ports.budgetInspector.inspectBudget(evidence.filePath);
+    }
+
+    const session = this.buildEvidenceSession(sessionId, rawLogOrError, evidence, memorySlice, budgetReport);
+    this.sessions.set(sessionId, session);
+    return session;
+  }
+
+  private buildEvidenceSession(
+    sessionId: string,
+    rawInput: string,
+    evidence?: ParsedEvidence,
+    memorySlice?: MemorySymbolSlice,
+    budgetReport?: LineBudgetReport
+  ): DialogueSession {
+    const category = SymptomClassifier.classify(rawInput);
+    const options = SymptomClassifier.getClarificationOptions(category);
+    const initialRecord: DialogueTurnRecord = {
+      turn: 1,
+      phase: TurnPhase.TURN_1_SYMPTOM,
+      userInput: rawInput,
+      systemResponse: `Identified category: ${category}. Evidence analyzed.`,
+      timestamp: new Date().toISOString()
+    };
+    return {
+      sessionId,
+      phase: TurnPhase.TURN_1_SYMPTOM,
+      turnCount: 1,
+      category,
+      availableOptions: options,
+      history: [initialRecord],
+      isResolved: false,
+      evidence,
+      memorySlice,
+      budgetReport
+    };
   }
 
   public chooseClarification(sessionId: string, optionId: string): DialogueSession {
