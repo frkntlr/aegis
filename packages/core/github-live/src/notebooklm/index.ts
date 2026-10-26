@@ -10,3 +10,4 @@ export * from './notebooklm-native-client.js';
 export * from './http-rotate-engine.js';
 export * from './system-browser-detector.js';
 export * from './native-browser-cdp-attacher.js';
+export * from './unified-knowledge-oracle.js';

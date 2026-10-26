@@ -60,6 +60,9 @@ export class NotebookLmNativeClient {
     if (res.status === 401 || res.status === 403) {
       throw new Error(`NotebookLM Authentication Rejected (HTTP ${res.status}). Session cookies may have expired.`);
     }
+    if (res.status !== 200) {
+      throw new Error(`NotebookLM request failed (HTTP ${res.status}).`);
+    }
 
     const raw = await res.text();
     return NotebookLmNativeClient.parseQueryResponse(raw);
