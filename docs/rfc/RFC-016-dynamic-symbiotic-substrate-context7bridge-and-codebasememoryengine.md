@@ -115,12 +115,11 @@ flowchart TD
 
 ---
 
-## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
+## 🎯 6. Kabul Kriterleri & Issue Dağılımı (Acceptance Criteria & Task Breakdown)
 
-- [ ] **Aşama 1 (AST Extraction):** `ExternalDependencyExtractor` ile `.ts`, `.gd` ve `.cs` dosyalarındaki harici import/extends ilişkileri AST'den çıkarıldı.
-- [ ] **Aşama 2 (DOG Storage & Virtual Nodes):** `RelationalGraph` `graph.json` ve `external-graph.cache` katmanlı mimarisine uyarlandı; sanal düğümler (`EXTERNAL_DOC`) ve çağrı kenarları (`CALLS_EXTERNAL`) desteklendi.
-- [ ] **Aşama 3 (TSS JIT Synthesis):** `JitDocSynthesizer` bayt aralığı dilimleme (TSS) ile yerel `node_modules` `.d.ts` dosyalarından token-tasarruflu Context7 JSON önbelleği üretti.
-- [ ] **Aşama 4 (GDExtension & NuGet Companion):** `.gdextension` manifest ve .NET `project.assets.json` + XML companion ayrıştırıcıları tamamlandı.
-- [ ] **Aşama 5 (Memory Query Entegrasyonu):** `queryMemory` çağrısı yerel AST dilimiyle birlikte çağırdığı harici fonksiyonların Context7 zemin gerçeği imzalarını birleşik döndürdü.
-- [ ] **Aşama 6 (Socratic Diagnostic Triangulation):** `socratic_diagnose` kütüphane sınırındaki çökmeleri yerel kod ve harici imza ile çaprazlayarak doğruladı.
-- [ ] **Aşama 7 (Kalite Kapısı):** Demir Kafes (%100 Clean) ve Mutasyon Testi (%100 Kill Score) başarıyla tamamlandı.
+- [ ] **Aşama 1 (AST Extraction - [#239](https://github.com/frkntlr/aegis/issues/239)):** `ExternalDependencyExtractor` ile `.ts`, `.gd` ve `.cs` dosyalarındaki harici import/extends ilişkileri AST'den çıkarıldı.
+- [ ] **Aşama 2 (DOG Storage & Virtual Nodes - [#240](https://github.com/frkntlr/aegis/issues/240)):** `RelationalGraph` `graph.json` ve `external-graph.cache` katmanlı mimarisine uyarlandı; sanal düğümler (`EXTERNAL_DOC`) ve çağrı kenarları (`CALLS_EXTERNAL`) desteklendi.
+- [ ] **Aşama 3 (TSS JIT Synthesis - [#241](https://github.com/frkntlr/aegis/issues/241)):** `JitDocSynthesizer` bayt aralığı dilimleme (TSS) ile yerel `node_modules` `.d.ts` dosyalarından token-tasarruflu Context7 JSON önbelleği üretti.
+- [ ] **Aşama 4 (GDExtension & NuGet Companion - [#242](https://github.com/frkntlr/aegis/issues/242)):** `.gdextension` manifest ve .NET `project.assets.json` + XML companion ayrıştırıcıları tamamlandı.
+- [ ] **Aşama 5 (Memory Query & Socratic Diagnosis - [#243](https://github.com/frkntlr/aegis/issues/243)):** `queryMemory` çağrısı yerel AST dilimiyle birlikte çağırdığı harici fonksiyonların Context7 zemin gerçeği imzalarını birleşik döndürdü; `socratic_diagnose` kütüphane sınırındaki çökmeleri yerel kod ve harici imza ile çaprazlayarak doğruladı.
+- [ ] **Aşama 6 (Kalite Kapısı & Doğrulama - [#244](https://github.com/frkntlr/aegis/issues/244)):** Demir Kafes (%100 Clean) ve Mutasyon Testi (%100 Kill Score) başarıyla tamamlandı.
