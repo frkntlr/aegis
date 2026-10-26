@@ -4,6 +4,7 @@ import { AstGrepBridge } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import { IronCageValidator, EvidenceBasedTriageGate } from '@aegis/iron-cage';
+import { PolyglotStackTraceParser, SymptomClassifier } from '@aegis/dialogue-engine';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
 
@@ -24,7 +25,8 @@ const MCP_TOOLS = [
   { name: 'cage_check', description: 'Audit Demir Kafes compliance', inputSchema: { type: 'object', properties: { dir: { type: 'string' } } } },
   { name: 'triage', description: 'Evidence-Based Bug Triage', inputSchema: { type: 'object', properties: { dir: { type: 'string' } } } },
   { name: 'find_symbol', description: 'AST symbol lookup and surgical slice', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
-  { name: 'trace_relational', description: 'Trace callers, signals and blast radius', inputSchema: { type: 'object', properties: { target: { type: 'string' } }, required: ['target'] } }
+  { name: 'trace_relational', description: 'Trace callers, signals and blast radius', inputSchema: { type: 'object', properties: { target: { type: 'string' } }, required: ['target'] } },
+  { name: 'socratic_diagnose', description: 'Instant Socratic evidence parsing & diagnostic hypothesis generation', inputSchema: { type: 'object', properties: { rawLog: { type: 'string' } }, required: ['rawLog'] } }
 ];
 
 function ensureIndexed(engine: ReturnType<typeof getSharedMemoryEngine>, wt = 'default'): void {
@@ -75,6 +77,28 @@ export function executeMcpTool(name: string, args: Record<string, unknown> = {})
   }
 }
 
+function executeTriage(dir = 'packages'): string {
+  const files = collectSourceFiles(dir);
+  const validator = new IronCageValidator();
+  const violations = files.flatMap(f => {
+    try {
+      return validator.validateFileContent(f, fs.readFileSync(f, 'utf8')).violations;
+    } catch {
+      return [];
+    }
+  });
+  const report = new EvidenceBasedTriageGate(validator).evaluate({ targetFiles: files, violations });
+  return JSON.stringify(report, null, 2);
+}
+
+function executeDiagnostic(rawLog: string): string {
+  const parser = new PolyglotStackTraceParser();
+  const parsed = parser.parse(rawLog);
+  const category = SymptomClassifier.classify(rawLog);
+  const options = SymptomClassifier.getClarificationOptions(category);
+  return JSON.stringify({ category, evidence: parsed, clarificationOptions: options }, null, 2);
+}
+
 function executeSecondaryTool(name: string, args: Record<string, unknown>): string {
   const engine = getSharedMemoryEngine();
   if (name === 'find_symbol') {
@@ -95,19 +119,9 @@ function executeSecondaryTool(name: string, args: Record<string, unknown>): stri
     const res = AstGrepBridge.replaceInFile(String(args.file || ''), String(args.pattern || ''), String(args.rewrite || ''));
     return JSON.stringify(res, null, 2);
   }
-  if (name === 'triage') {
-    const files = collectSourceFiles(String(args.dir || 'packages'));
-    const validator = new IronCageValidator();
-    const violations = files.flatMap(f => {
-      try {
-        return validator.validateFileContent(f, fs.readFileSync(f, 'utf8')).violations;
-      } catch {
-        return [];
-      }
-    });
-    const report = new EvidenceBasedTriageGate(validator).evaluate({ targetFiles: files, violations });
-    return JSON.stringify(report, null, 2);
-  }
+  if (name === 'triage') return executeTriage(String(args.dir || 'packages'));
+  if (name === 'socratic_diagnose') return executeDiagnostic(String(args.rawLog || ''));
+
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }
 

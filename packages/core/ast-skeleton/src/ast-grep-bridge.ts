@@ -42,15 +42,19 @@ export class AstGrepBridge {
       return '\\' + m;
     });
 
-    p = p.replace(/\$\$\$([a-zA-Z_]\w*)/g, (_, name) => {
-      varNames.push(name);
-      return `(?<${name}>[\\s\\S]*?)`;
+    p = p.replace(/\$\$\$(?:([a-zA-Z_]\w*))?/g, (_, name) => {
+      if (name) {
+        varNames.push(name);
+        return `(?<${name}>[\\s\\S]*?)`;
+      }
+      return `[\\s\\S]*?`;
     });
 
     p = p.replace(/\$([a-zA-Z_]\w*)/g, (_, name) => {
       varNames.push(name);
       return `(?<${name}>(?:"[^"]*"|'[^']*'|\`[^\`]*\`|[^,();\n]+?))`;
     });
+    p = p.replace(/\$(?![a-zA-Z_])/g, '(?:"[^"]*"|\'[^\']*\'|`[^\`]*`|[^,();\\n]+?)');
 
     const normalized = p.replace(/\s+/g, '\\s+');
     return { regex: new RegExp(normalized, 'g'), varNames };

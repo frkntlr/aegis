@@ -25,6 +25,22 @@ function multiply(a, b) {
   assert.strictEqual(matches[1].metavars['NAME'], 'multiply');
 });
 
+test('AstGrepBridge matches anonymous $$$ and $ wildcards without variable names', () => {
+  const code = `
+class CodebaseMemoryEngine {
+  private cache = new Map();
+  public query() { return true; }
+}
+`.trim();
+
+  const matches = AstGrepBridge.find(code, 'class CodebaseMemoryEngine { $$$ }');
+  assert.strictEqual(matches.length, 1);
+  assert.ok(matches[0].matchedText.includes('private cache'));
+
+  const singleMatches = AstGrepBridge.find(code, 'private $ = new Map();');
+  assert.strictEqual(singleMatches.length, 1);
+});
+
 test('AstGrepBridge replaces structural patterns cleanly', () => {
   const gdCode = `
 func old_init(param):

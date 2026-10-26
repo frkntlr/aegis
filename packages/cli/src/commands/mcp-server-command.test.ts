@@ -15,12 +15,13 @@ test('handleJsonRpc handles tools/list request', () => {
   const res = handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.ok(result.tools.length >= 10);
+  assert.ok(result.tools.length >= 11);
   const names = result.tools.map(t => t.name);
   assert.ok(names.includes('memory_query'));
   assert.ok(names.includes('memory_stats'));
   assert.ok(names.includes('context7_query'));
   assert.ok(names.includes('rtk_compress'));
+  assert.ok(names.includes('socratic_diagnose'));
 });
 
 test('handleJsonRpc handles tools/call and executes tools', () => {
@@ -76,4 +77,25 @@ test('handleJsonRpc executes find_symbol and trace_relational tools', () => {
   assert.ok(traceRes);
   const traceContent = (traceRes.result as { content: Array<{ type: string; text: string }> }).content[0].text;
   assert.ok(traceContent.includes('callers'));
+});
+
+test('handleJsonRpc executes socratic_diagnose tool', () => {
+  const res = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 8,
+    method: 'tools/call',
+    params: {
+      name: 'socratic_diagnose',
+      arguments: {
+        rawLog: 'TypeError: Cannot read property "id" of undefined\n  at run (packages/cli/src/index.ts:25:5)'
+      }
+    }
+  });
+  assert.ok(res);
+  const result = res.result as { content: Array<{ type: string; text: string }> };
+  assert.strictEqual(result.content[0].type, 'text');
+  const diag = JSON.parse(result.content[0].text);
+  assert.ok(diag.category);
+  assert.ok(diag.evidence);
+  assert.ok(diag.clarificationOptions.length > 0);
 });

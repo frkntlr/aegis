@@ -3,8 +3,15 @@ import * as path from 'node:path';
 import { AstGrepBridge } from '@aegis/ast-skeleton';
 import { showBanner } from './banner.js';
 
-export function handleAstSearch(pattern: string, targetPath = '.'): void {
+export function handleAstSearch(patternArg?: string, targetPathArg = '.', extraArg?: string): void {
   showBanner();
+  let pattern = patternArg || '';
+  let targetPath = targetPathArg;
+  if (pattern === '-p' || pattern === '--pattern') {
+    pattern = targetPathArg || '';
+    targetPath = extraArg || '.';
+  }
+
   const resolved = path.resolve(process.cwd(), targetPath);
   console.log(`🔍 ast-grep Pattern Search: "${pattern}" on ${targetPath}...\n`);
 
