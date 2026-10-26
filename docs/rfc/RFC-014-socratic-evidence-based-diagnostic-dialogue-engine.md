@@ -1,7 +1,7 @@
 # 🏛️ RFC-014: Socratic Evidence-Based Diagnostic Engine: Zero-Hallucination AST Triangulation & Surgical Context Synthesis
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-014 | **Durum:** Proposed | **Tarih:** 2026-10-26
+- **RFC ID:** RFC-014 | **Durum:** Approved (Onaylandı) ✅ | **Tarih:** 2026-10-26
 - **Hedef Paket:** `@aegis/dialogue-engine` (ve bağlı `@aegis/ast-skeleton`, `@aegis/watchdog`, `@aegis/iron-cage`, `@aegis/orchestrator`)
 - **İlgili Tartışma:** [GitHub Discussion #230](https://github.com/frkntlr/aegis/discussions/230)
 
