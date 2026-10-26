@@ -8,7 +8,8 @@ export type RelationalNodeType =
   | 'scene'
   | 'scene_node'
   | 'resource'
-  | 'signal';
+  | 'signal'
+  | 'external_doc';
 
 export interface RelationalNode {
   id: string;
@@ -22,6 +23,8 @@ export interface RelationalNode {
 export type RelationalEdgeType =
   | 'CALLS'
   | 'CALLS_SYMBOL'
+  | 'CALLS_EXTERNAL'
+  | 'EXTENDS_FRAMEWORK'
   | 'INSTANTIATES'
   | 'EXTENDS'
   | 'IMPLEMENTS'
