@@ -15,13 +15,16 @@ test('handleJsonRpc handles tools/list request', () => {
   const res = handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.ok(result.tools.length >= 11);
+  assert.strictEqual(result.tools.length, 14);
   const names = result.tools.map(t => t.name);
   assert.ok(names.includes('memory_query'));
   assert.ok(names.includes('memory_stats'));
   assert.ok(names.includes('context7_query'));
   assert.ok(names.includes('rtk_compress'));
   assert.ok(names.includes('socratic_diagnose'));
+  assert.ok(names.includes('skeleton_extract'));
+  assert.ok(names.includes('budget_inspect'));
+  assert.ok(names.includes('worktree_status'));
 });
 
 test('handleJsonRpc handles tools/call and executes tools', () => {
@@ -98,4 +101,60 @@ test('handleJsonRpc executes socratic_diagnose tool', () => {
   assert.ok(diag.category);
   assert.ok(diag.evidence);
   assert.ok(diag.clarificationOptions.length > 0);
+});
+
+test('handleJsonRpc executes skeleton_extract tool', () => {
+  const res = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 9,
+    method: 'tools/call',
+    params: {
+      name: 'skeleton_extract',
+      arguments: { filePath: 'packages/cli/src/commands/mcp-server-command.ts' }
+    }
+  });
+  assert.ok(res);
+  const result = res.result as { content: Array<{ type: string; text: string }> };
+  assert.strictEqual(result.content[0].type, 'text');
+  const parsed = JSON.parse(result.content[0].text);
+  assert.strictEqual(typeof parsed.tokenSavingsPercent, 'number');
+  assert.ok(parsed.skeleton.length > 0);
+});
+
+test('handleJsonRpc executes budget_inspect tool', () => {
+  const res = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 10,
+    method: 'tools/call',
+    params: {
+      name: 'budget_inspect',
+      arguments: { filePath: 'packages/cli/src/commands/mcp-server-command.ts' }
+    }
+  });
+  assert.ok(res);
+  const result = res.result as { content: Array<{ type: string; text: string }> };
+  assert.strictEqual(result.content[0].type, 'text');
+  const parsed = JSON.parse(result.content[0].text);
+  assert.strictEqual(parsed.maxFileLines, 300);
+  assert.strictEqual(typeof parsed.fileQuotaRemaining, 'number');
+  assert.ok(parsed.status);
+});
+
+test('handleJsonRpc executes worktree_status tool', () => {
+  const res = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 11,
+    method: 'tools/call',
+    params: {
+      name: 'worktree_status',
+      arguments: {}
+    }
+  });
+  assert.ok(res);
+  const result = res.result as { content: Array<{ type: string; text: string }> };
+  assert.strictEqual(result.content[0].type, 'text');
+  const parsed = JSON.parse(result.content[0].text);
+  assert.ok(Array.isArray(parsed.worktrees));
+  assert.strictEqual(typeof parsed.activeCount, 'number');
+  assert.strictEqual(typeof parsed.lockedFiles, 'object');
 });
