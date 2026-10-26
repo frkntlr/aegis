@@ -29,7 +29,8 @@
     "@aegis/trust-verifier": "*",
     "@aegis/web-dashboard": "*",
     "@aegis/telemetry-tester": "*",
-    "@aegis/godot-bridge": "*"
+    "@aegis/godot-bridge": "*",
+    "@aegis/dialogue-engine": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

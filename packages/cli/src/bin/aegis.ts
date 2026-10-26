@@ -63,6 +63,7 @@ import { handleGraphScan } from '../commands/graph-command.js';
 import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.js';
 import { handleRtkCompress } from '../commands/rtk-command.js';
 import { handleContext7Query } from '../commands/context7-command.js';
+import { handleDebugCommand } from '../commands/debug-command.js';
 import { startMcpServer } from '../commands/mcp-server-command.js';
 import {
   handleMemoryQuery,
@@ -130,6 +131,7 @@ const HELP_LINES: readonly string[] = [
   '  aegis memory:refresh [dir] [wt]        Incrementally refresh Codebase Memory cache',
   '  aegis memory:cold-start [dir] [wt]    Run full project cold-start AST indexing',
   '  aegis memory:watch [dir] [wt]          Run live incremental Codebase Memory watcher daemon',
+  '  aegis debug [error|file]               Socratic evidence-based interactive debugging',
   '  aegis mcp                              Start native JSON-RPC stdio MCP server'
 ];
 
@@ -206,6 +208,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'memory:watch': (a) => { handleMemoryWatch(a[1], a[2]); },
   'loop:status': () => handleLoopStatus(),
   'loop:reset': (a) => handleLoopReset(a[1]),
+  debug: async (a) => { await handleDebugCommand(a.slice(1).join(' ')); },
   mcp: () => startMcpServer()
 };
 
