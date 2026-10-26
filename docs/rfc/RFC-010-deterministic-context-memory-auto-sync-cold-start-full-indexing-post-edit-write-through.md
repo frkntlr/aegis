@@ -1,7 +1,7 @@
 # 🏛️ RFC-010: Deterministic Context Memory Auto-Sync (Cold-Start Full Indexing & Post-Edit Write-Through)
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-010 | **Durum:** Proposed | **Tarih:** 2026-10-25 | **Yazar:** Aegis Autonomous Engine
+- **RFC ID:** RFC-010 | **Durum:** Approved (Onaylandı) ✅ | **Tarih:** 2026-10-25 | **Yazar:** Aegis Autonomous Engine
 - **GitHub Discussion:** [#219 (Ideas)](https://github.com/frkntlr/aegis/discussions/219)
 
 ---

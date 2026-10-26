@@ -1,7 +1,7 @@
 # 🏛️ RFC-013: Autonomous Resilient Branch Reconciliation & Multi-Strategy Master Merge Engine
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-013 | **Durum:** Proposed | **Tarih:** 2026-10-26 | **Yazar:** Aegis Autonomous Engine
+- **RFC ID:** RFC-013 | **Durum:** Approved (Onaylandı) ✅ | **Tarih:** 2026-10-26 | **Yazar:** Aegis Autonomous Engine
 - **GitHub Discussion:** [#223 (Ideas)](https://github.com/frkntlr/aegis/discussions/223)
 - **Originating Prompt:** `/aegis düzgün biçimde sorun çıkmadan masterda branchları aktarmalı sistem şuanki sistemimiz çok geride kalmış olabilir`
 

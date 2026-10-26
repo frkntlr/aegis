@@ -16,6 +16,18 @@ function slugify(text: string): string {
   return text.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-');
 }
 
+function resolveRfcDir(): string {
+  let cur = process.cwd();
+  for (let i = 0; i < 4; i++) {
+    const candidate = path.join(cur, 'docs', 'rfc');
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return path.resolve(process.cwd(), 'docs', 'rfc');
+}
+
 function resolveNextRfcNumber(rfcDir: string): number {
   if (!fs.existsSync(rfcDir)) return 1;
   const files = fs.readdirSync(rfcDir).filter(f => f.startsWith('RFC-') && f.endsWith('.md'));
@@ -102,7 +114,7 @@ export async function handleRfcCreate(titleArg?: string, descArg?: string): Prom
     process.exit(1);
   }
 
-  const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
+  const rfcDir = resolveRfcDir();
   fs.mkdirSync(rfcDir, { recursive: true });
   const num = resolveNextRfcNumber(rfcDir);
   const padNum = String(num).padStart(3, '0');
@@ -133,7 +145,7 @@ export async function handleRfcApprove(rfcArg?: string): Promise<void> {
     console.error('❌ Usage: aegis rfc:approve <rfcNumberOrSlug>');
     process.exit(1);
   }
-  const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
+  const rfcDir = resolveRfcDir();
   const files = findRfcFiles(rfcDir, rfcArg);
   if (files.length === 0) {
     console.error(`❌ RFC matching '${rfcArg}' not found in docs/rfc/`);
@@ -142,7 +154,7 @@ export async function handleRfcApprove(rfcArg?: string): Promise<void> {
 
   const filePath = path.join(rfcDir, files[0]);
   let content = fs.readFileSync(filePath, 'utf8');
-  content = content.replace(/Durum:\s*Proposed/i, 'Durum: Approved (Onaylandı) ✅');
+  content = content.replace(/(\*{0,2}Durum:\*{0,2}\s*)Proposed/i, '$1Approved (Onaylandı) ✅');
   fs.writeFileSync(filePath, content, 'utf8');
 
   const slug = files[0].replace(/\.md$/, '');
@@ -158,7 +170,7 @@ export async function handleRfcApprove(rfcArg?: string): Promise<void> {
 export async function handleWikiClean(rfcArg?: string): Promise<void> {
   showBanner();
   console.log('🧹 Synthesizing Clean-Room Authoritative Architecture for GitHub Wiki...');
-  const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
+  const rfcDir = resolveRfcDir();
   const files = findRfcFiles(rfcDir, rfcArg);
   if (files.length === 0) {
     console.log('ℹ️ No RFC files found to cleanse.');
@@ -207,7 +219,7 @@ export async function handleRfcDecompose(rfcArg?: string): Promise<void> {
     process.exit(1);
   }
 
-  const rfcDir = path.resolve(process.cwd(), 'docs', 'rfc');
+  const rfcDir = resolveRfcDir();
   const files = findRfcFiles(rfcDir, rfcArg);
   if (files.length === 0) {
     console.error(`❌ RFC matching '${rfcArg}' not found in docs/rfc/`);

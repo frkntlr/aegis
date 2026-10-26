@@ -1,7 +1,7 @@
 # 🏛️ RFC-012: Demir Kafes Autonomous Architectural Decomposition & Anti-Degradation Engine
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-012 | **Durum:** Proposed | **Tarih:** 2026-10-25 | **Yazar:** Aegis Autonomous Engine
+- **RFC ID:** RFC-012 | **Durum:** Approved (Onaylandı) ✅ | **Tarih:** 2026-10-25 | **Yazar:** Aegis Autonomous Engine
 - **GitHub Discussion:** [#221 (Ideas)](https://github.com/frkntlr/aegis/discussions/221)
 
 ---
