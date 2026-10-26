@@ -14,3 +14,4 @@ export * from './context7-bridge.js';
 export * from './dependency-mapper.js';
 export * from './jit-doc-synthesizer.js';
 export * from './nuget-metadata-extractor.js';
+export * from './notebooklm/index.js';
