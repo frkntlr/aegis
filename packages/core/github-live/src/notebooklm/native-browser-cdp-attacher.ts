@@ -1,0 +1,149 @@
+/**
+ * @file native-browser-cdp-attacher.ts
+ * Lightweight Chrome DevTools Protocol (CDP) attacher for system browsers.
+ * Queries active browser session cookies via CDP Network.getCookies with zero Playwright dependency.
+ * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
+ */
+
+export interface CdpCookieItem {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+}
+
+export type CdpCommandSender = (
+  method: string,
+  params?: Record<string, unknown>
+) => Promise<Record<string, unknown>>;
+
+export interface CdpAttacherOptions {
+  port?: number;
+  host?: string;
+  timeoutMs?: number;
+  sender?: CdpCommandSender;
+}
+
+export class NativeBrowserCdpAttacher {
+  public static async isCdpActive(port = 9222, host = '127.0.0.1', timeoutMs = 1000): Promise<boolean> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`http://${host}:${port}/json/version`, { signal: controller.signal });
+      return res.status === 200;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  public static async queryCookies(options: CdpAttacherOptions = {}): Promise<string | null> {
+    const port = options.port ?? 9222;
+    const host = options.host ?? '127.0.0.1';
+    const timeoutMs = options.timeoutMs ?? 3000;
+
+    if (options.sender) {
+      return NativeBrowserCdpAttacher.executeWithSender(options.sender);
+    }
+
+    const active = await NativeBrowserCdpAttacher.isCdpActive(port, host, timeoutMs);
+    if (!active) return null;
+
+    try {
+      const versionUrl = `http://${host}:${port}/json/version`;
+      const res = await fetch(versionUrl);
+      const json = (await res.json()) as Record<string, unknown>;
+      const wsUrl = typeof json.webSocketDebuggerUrl === 'string' ? json.webSocketDebuggerUrl : null;
+      if (!wsUrl) return null;
+
+      return await NativeBrowserCdpAttacher.fetchViaWebSocket(wsUrl, timeoutMs);
+    } catch {
+      return null;
+    }
+  }
+
+  public static formatCookies(rawCookies: unknown[]): string {
+    const map = new Map<string, string>();
+    for (const item of rawCookies) {
+      if (typeof item === 'object' && item !== null) {
+        const c = item as Record<string, unknown>;
+        if (typeof c.name === 'string' && typeof c.value === 'string' && c.name && c.value) {
+          map.set(c.name, c.value);
+        }
+      }
+    }
+    return Array.from(map.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+  }
+
+  private static async executeWithSender(sender: CdpCommandSender): Promise<string | null> {
+    try {
+      const res = await sender('Network.getCookies', {
+        urls: ['https://notebooklm.google.com', 'https://accounts.google.com']
+      });
+      const cookies = Array.isArray(res.cookies) ? res.cookies : [];
+      const formatted = NativeBrowserCdpAttacher.formatCookies(cookies);
+      return formatted.length > 0 ? formatted : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private static parseCdpMessage(data: string): string | null {
+    try {
+      const parsed = JSON.parse(data) as Record<string, unknown>;
+      const result = parsed.result as Record<string, unknown> | undefined;
+      const cookies = Array.isArray(result?.cookies) ? result.cookies : [];
+      return NativeBrowserCdpAttacher.formatCookies(cookies) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private static bindWsEvents(
+    ws: { onopen: (() => void) | null; onmessage: ((ev: { data: string }) => void) | null; onerror: (() => void) | null; send: (d: string) => void; close: () => void },
+    resolve: (v: string | null) => void,
+    timer: NodeJS.Timeout
+  ): void {
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        id: 1,
+        method: 'Network.getCookies',
+        params: { urls: ['https://notebooklm.google.com', 'https://accounts.google.com'] }
+      }));
+    };
+    ws.onmessage = (ev) => {
+      clearTimeout(timer);
+      ws.close();
+      resolve(NativeBrowserCdpAttacher.parseCdpMessage(ev.data));
+    };
+    ws.onerror = () => {
+      clearTimeout(timer);
+      resolve(null);
+    };
+  }
+
+  private static async fetchViaWebSocket(wsUrl: string, timeoutMs: number): Promise<string | null> {
+    const WebSocketCtor = (globalThis as unknown as Record<string, unknown>)['WebSocket'];
+    if (typeof WebSocketCtor !== 'function') return null;
+
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), timeoutMs);
+      try {
+        const ws = new (WebSocketCtor as new (url: string) => {
+          onopen: (() => void) | null;
+          onmessage: ((ev: { data: string }) => void) | null;
+          onerror: (() => void) | null;
+          send: (d: string) => void;
+          close: () => void;
+        })(wsUrl);
+        NativeBrowserCdpAttacher.bindWsEvents(ws, resolve, timer);
+      } catch {
+        clearTimeout(timer);
+        resolve(null);
+      }
+    });
+  }
+}
