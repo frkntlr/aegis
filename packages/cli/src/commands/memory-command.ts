@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { CodebaseMemoryEngine, CodebaseMemoryWatcher, ActiveHeadResolver, type MemoryQueryResult } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
+import type { ActiveLockInfo } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { generateLanguageConstitution } from './prompt-command.js';
 
@@ -41,6 +42,13 @@ function formatEdgeEndpoint(endpoint: string): string {
   return path.basename(endpoint);
 }
 
+function printLockStatus(activeLock: ActiveLockInfo): void {
+  const lockMsg = activeLock.isLockedByOther
+    ? `LOCKED by '${activeLock.lockedBy}'${activeLock.lockId ? ` (${activeLock.lockId})` : ''} ⚠️`
+    : `OWNED by current agent (${activeLock.lockedBy}) ✅`;
+  console.log(`\n🔒 Mutex Status:   ${lockMsg}`);
+}
+
 function printMemoryQueryResult(res: MemoryQueryResult, worktreeId?: string): void {
   console.log(`🧠 Codebase Memory: '${res.symbol}' [${res.filePath || 'virtual'}] (Worktree: ${worktreeId || 'default'})`);
   console.log(` • Sliced Tokens:  ~${res.tokenSavingsPercent}% Token Savings`);
@@ -48,12 +56,7 @@ function printMemoryQueryResult(res: MemoryQueryResult, worktreeId?: string): vo
   console.log(` • Downstream:     ${res.callees.length > 0 ? res.callees.map(formatEdgeEndpoint).join(', ') : 'None'}`);
   console.log(` • Blast Radius:   ${res.blastRadius.length} file(s)`);
 
-  if (res.activeLock) {
-    const lockMsg = res.activeLock.isLockedByOther
-      ? `LOCKED by '${res.activeLock.lockedBy}'${res.activeLock.lockId ? ` (${res.activeLock.lockId})` : ''} ⚠️`
-      : `OWNED by current agent (${res.activeLock.lockedBy}) ✅`;
-    console.log(`\n🔒 Mutex Status:   ${lockMsg}`);
-  }
+  if (res.activeLock) printLockStatus(res.activeLock);
 
   if (res.diffBudget) {
     console.log('\n📏 Demir Kafes Line Budget:');
@@ -66,6 +69,11 @@ function printMemoryQueryResult(res: MemoryQueryResult, worktreeId?: string): vo
   if (res.groundTruthDocs.length > 0) {
     console.log('\n📚 Ground-Truth Engine Documentation (Context7):');
     for (const d of res.groundTruthDocs) console.log(`   ${d}`);
+  }
+
+  if (res.externalContracts && res.externalContracts.length > 0) {
+    console.log('\n🌐 Ground-Truth External Contracts (Context7):');
+    for (const c of res.externalContracts) console.log(`   ${c}`);
   }
 
   if (res.constitutionRules.length > 0) {

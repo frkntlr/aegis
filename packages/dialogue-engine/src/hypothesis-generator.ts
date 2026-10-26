@@ -7,23 +7,27 @@ export class DynamicHypothesisGenerator {
   public static generate(
     category: DiagnosticCategory,
     triangulated?: TriangulatedContext,
-    budget?: LineBudgetReport
+    budget?: LineBudgetReport,
+    boundaryOption?: ClarificationOption
   ): ClarificationOption[] {
-    if (!triangulated) {
+    if (!triangulated && !boundaryOption) {
       return SymptomClassifier.getClarificationOptions(category);
     }
 
-    const sym = triangulated.slice?.symbolName || triangulated.location.symbolName || 'function';
-    const file = triangulated.location.filePath;
-    const line = triangulated.location.lineNumber;
+    const options: ClarificationOption[] = [];
+    if (boundaryOption) options.push(boundaryOption);
 
-    const options: ClarificationOption[] = [
-      createDirectOption(sym, file, line),
-      createAsyncOption(sym, file)
-    ];
+    if (triangulated) {
+      const sym = triangulated.slice?.symbolName || triangulated.location.symbolName || 'function';
+      const file = triangulated.location.filePath;
+      const line = triangulated.location.lineNumber;
 
-    if (budget && budget.remainingLines < 20) {
-      options.push(createBudgetOption(file, budget.remainingLines));
+      options.push(createDirectOption(sym, file, line));
+      options.push(createAsyncOption(sym, file));
+
+      if (budget && budget.remainingLines < 20) {
+        options.push(createBudgetOption(file, budget.remainingLines));
+      }
     }
 
     return options;

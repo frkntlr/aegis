@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { DeltaOverlayGraph } from './delta-overlay-graph.js';
+import { CodebaseMemoryEngine } from './codebase-memory.js';
 
 test('DeltaOverlayGraph adds external nodes and cross-boundary edges', () => {
   const dog = new DeltaOverlayGraph();
@@ -60,4 +61,37 @@ test('CompositeGraphView deduplicates outgoing edges and handles missing nodes',
   const view = dog.getCompositeView();
   assert.strictEqual(view.getNode('non_existent'), undefined);
   assert.strictEqual(view.getOutgoing('non_existent').length, 0);
+});
+
+test('CompositeGraphView synthesizes virtual node for missing external callee targets', () => {
+  const dog = new DeltaOverlayGraph();
+  dog.localGraph.addNode({ id: 'app.ts::run', name: 'run', kind: 'symbol', filePath: 'app.ts' });
+  dog.addCrossBoundaryEdge('app.ts::run', 'context7::zod::z.object', 'CALLS_EXTERNAL', { signature: 'z.object(shape: ZodRawShape)' });
+
+  const view = dog.getCompositeView();
+  const callees = view.getExternalCallees('app.ts::run');
+  assert.strictEqual(callees.length, 1);
+  assert.strictEqual(callees[0].name, 'z.object');
+  assert.strictEqual(callees[0].metadata?.library, 'zod');
+  assert.strictEqual(callees[0].metadata?.signature, 'z.object(shape: ZodRawShape)');
+});
+
+test('CodebaseMemoryEngine: queryMemory resolves externalContracts and groundTruthDocs from deltaOverlay', () => {
+  const engine = new CodebaseMemoryEngine({
+    persistToDisk: false,
+    docProvider: (lib, sym) => `Docs for ${lib}::${sym}`
+  });
+  const wt = 'test-symbiosis';
+  engine.indexFile('src/auth.ts', 'export function login() { return true; }', wt);
+  const ns = engine.getNamespace(wt);
+  const ext = ns.deltaOverlay?.addExternalNode('zod', 'z.string', { signature: 'z.string(): ZodString' });
+  if (ext) {
+    ns.deltaOverlay?.addCrossBoundaryEdge('src/auth.ts::login', ext.id, 'CALLS_EXTERNAL');
+  }
+
+  const res = engine.queryMemory('login', { worktreeId: wt });
+  assert.strictEqual(res.found, true);
+  assert.ok(res.externalContracts !== undefined);
+  assert.ok(res.externalContracts.some(c => c.includes('[zod] z.string: z.string(): ZodString')));
+  assert.ok(res.groundTruthDocs.some(d => d.includes('Docs for zod::z.string')));
 });

@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { SymbolSliceExtractor, type SliceResult } from './symbol-slice-extractor.js';
 import { RelationalGraph } from './relational-graph.js';
+import { DeltaOverlayGraph, CompositeGraphView } from './delta-overlay-graph.js';
 import { GraphQueryEngine } from './graph-query-engine.js';
 import { CrossReferenceLinker } from './cross-reference-linker.js';
 import { MemoryAdapterResolver } from './memory-adapter-resolver.js';
@@ -49,6 +50,7 @@ export interface MemoryQueryResult {
   compressedLogs?: string;
   diffBudget?: DiffBudgetReport;
   activeLock?: ActiveLockInfo;
+  externalContracts?: string[];
 }
 
 export interface MemoryStats {
@@ -61,7 +63,7 @@ export interface MemoryNamespace {
   graph: RelationalGraph; linker: CrossReferenceLinker;
   queryEngine: GraphQueryEngine; fileHashes: Map<string, string>;
   mtimeFingerprints: Map<string, string>; fileContents: LruFileBuffer;
-  lastCommit?: string;
+  lastCommit?: string; deltaOverlay?: DeltaOverlayGraph;
 }
 
 export class CodebaseMemoryEngine {
@@ -88,7 +90,9 @@ export class CodebaseMemoryEngine {
       const linker = new CrossReferenceLinker(graph);
       const queryEngine = new GraphQueryEngine(graph);
       const fileContents = new LruFileBuffer(this.adapters.lruCapacity ?? 100);
-      ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), mtimeFingerprints: new Map(), fileContents };
+      const deltaOverlay = new DeltaOverlayGraph({ localGraph: graph });
+      deltaOverlay.loadExternal();
+      ns = { indexer, extractor, graph, linker, queryEngine, fileHashes: new Map(), mtimeFingerprints: new Map(), fileContents, deltaOverlay };
       MemoryDiskStore.load(id, ns, this.adapters.persistToDisk);
 
       if (ns.fileHashes.size === 0 && id !== 'default') {
@@ -218,6 +222,11 @@ export class CodebaseMemoryEngine {
     const activeLock = targetFile ? WorktreeMutexShield.inspectLock(targetFile, worktreeId) : null;
     const slice = this.formatLockDecoratedSlice(sliceResult?.codeSlice, targetFile, activeLock);
 
+    const cIds = [symbol, traceResult.foundNode?.id, targetFile ? `${targetFile}::${symbol}` : undefined].filter((id): id is string => Boolean(id));
+    const composite = ns.deltaOverlay?.getCompositeView() || new CompositeGraphView(ns.graph, new RelationalGraph());
+    const ext = MemoryAdapterResolver.resolveExternalContracts(composite, cIds, this.adapters);
+    const docs = [...new Set([...MemoryAdapterResolver.resolveGroundTruth(slice || symbol, this.adapters, targetFile), ...ext.docs])];
+
     return {
       symbol, found: Boolean(sliceResult || traceResult.foundNode),
       filePath: targetFile, ambiguousMatches, slice,
@@ -227,10 +236,11 @@ export class CodebaseMemoryEngine {
       blastRadius: traceResult.blastRadiusFiles,
       connectedSignals: traceResult.connectedSignals,
       connectedScenes: traceResult.connectedScenes,
-      groundTruthDocs: MemoryAdapterResolver.resolveGroundTruth(slice || symbol, this.adapters, targetFile),
+      groundTruthDocs: docs,
       constitutionRules: MemoryAdapterResolver.resolveConstitution(this.adapters, targetFile),
       compressedLogs: MemoryAdapterResolver.compressLogs(options.rawLogs, this.adapters),
-      diffBudget: sliceResult?.diffBudget, activeLock: activeLock || undefined
+      diffBudget: sliceResult?.diffBudget, activeLock: activeLock || undefined,
+      externalContracts: ext.externalContracts
     };
   }
 

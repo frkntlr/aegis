@@ -5,7 +5,7 @@ import { AstGrepBridge, SkeletonGenerator } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import { IronCageValidator, EvidenceBasedTriageGate, LineBudgetRadar } from '@aegis/iron-cage';
-import { PolyglotStackTraceParser, SymptomClassifier } from '@aegis/dialogue-engine';
+import { PolyglotStackTraceParser, SymptomClassifier, SymbioticDiagnosticTriangulator, DynamicHypothesisGenerator } from '@aegis/dialogue-engine';
 import { WorktreeManager } from '@aegis/orchestrator';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
@@ -146,7 +146,22 @@ function executeUtilityTool(name: string, args: Record<string, unknown>): string
     const parser = new PolyglotStackTraceParser();
     const parsed = parser.parse(rawLog);
     const category = SymptomClassifier.classify(rawLog);
-    const options = SymptomClassifier.getClarificationOptions(category);
+    let boundaryOpt;
+    if (args.callSiteCode && args.library && args.symbol) {
+      const diag = SymbioticDiagnosticTriangulator.triangulate({
+        callSiteCode: String(args.callSiteCode),
+        contract: {
+          library: String(args.library),
+          symbol: String(args.symbol),
+          expectedSignature: args.expectedSignature ? String(args.expectedSignature) : undefined,
+          isDeprecated: Boolean(args.isDeprecated),
+          deprecationNotice: args.deprecationNotice ? String(args.deprecationNotice) : undefined
+        },
+        runtimeError: rawLog
+      });
+      boundaryOpt = SymbioticDiagnosticTriangulator.toClarificationOption(diag);
+    }
+    const options = DynamicHypothesisGenerator.generate(category, undefined, undefined, boundaryOpt);
     return JSON.stringify({ category, evidence: parsed, clarificationOptions: options }, null, 2);
   }
   if (name === 'context7_query') {

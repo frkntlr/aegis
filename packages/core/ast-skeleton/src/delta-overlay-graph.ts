@@ -18,6 +18,8 @@ import {
 export interface DeltaOverlayGraphOptions {
   localGraphPath?: string;
   externalCachePath?: string;
+  localGraph?: RelationalGraph;
+  externalOverlay?: RelationalGraph;
 }
 
 export class CompositeGraphView {
@@ -60,7 +62,19 @@ export class CompositeGraphView {
     const externalNodes: RelationalNode[] = [];
     for (const e of edges) {
       if (e.type === 'CALLS_EXTERNAL' || e.type === 'EXTENDS_FRAMEWORK') {
-        const target = this.getNode(e.to);
+        let target = this.getNode(e.to);
+        if (!target && (e.to.includes('::') || e.to.includes(':'))) {
+          const parts = e.to.split(/::|:/);
+          const lib = parts.length > 2 ? parts[1] : 'external';
+          const sym = parts[parts.length - 1];
+          target = {
+            id: e.to,
+            name: sym,
+            kind: 'external_doc',
+            filePath: `external://${lib}`,
+            metadata: { library: lib, ...(e.metadata || {}) }
+          };
+        }
         if (target && target.kind === 'external_doc') {
           externalNodes.push(target);
         }
@@ -91,8 +105,8 @@ export class DeltaOverlayGraph {
   private readonly packageVersions = new Map<string, string>();
 
   constructor(options: DeltaOverlayGraphOptions = {}) {
-    this.localGraph = new RelationalGraph();
-    this.externalOverlay = new RelationalGraph();
+    this.localGraph = options.localGraph || new RelationalGraph();
+    this.externalOverlay = options.externalOverlay || new RelationalGraph();
     this.localPath = options.localGraphPath || path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
     this.externalPath = options.externalCachePath || path.resolve(process.cwd(), '.aegis', 'cache', 'context7', 'external-graph.cache');
   }

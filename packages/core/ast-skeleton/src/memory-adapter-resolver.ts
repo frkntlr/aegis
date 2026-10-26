@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import type { RelationalGraph } from './relational-graph.js';
+import type { CompositeGraphView } from './delta-overlay-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
 import { LanguageBarrierGate } from './language-barrier-gate.js';
 import { GodotTopicResolver } from './godot-topic-resolver.js';
@@ -38,6 +39,39 @@ export class MemoryAdapterResolver {
       }
     }
     return docs;
+  }
+
+  public static resolveExternalContracts(
+    composite: CompositeGraphView,
+    candidateIds: string[],
+    adapters: MemoryResolverAdapters
+  ): { externalContracts: string[]; docs: string[] } {
+    const contracts: string[] = [];
+    const docs: string[] = [];
+    const seenExt = new Set<string>();
+
+    for (const cid of candidateIds) {
+      const extNodes = composite.getExternalCallees(cid);
+      for (const ext of extNodes) {
+        if (seenExt.has(ext.id)) continue;
+        seenExt.add(ext.id);
+
+        const lib = ext.metadata?.library || 'external';
+        const sig = ext.metadata?.signature ? `: ${ext.metadata.signature}` : '';
+        const dep = ext.metadata?.deprecation ? ` [⚠️ DEPRECATED: ${ext.metadata.deprecation}]` : '';
+        contracts.push(`[${lib}] ${ext.name}${sig}${dep}`);
+
+        if (ext.metadata?.doc) {
+          docs.push(ext.metadata.doc);
+        } else if (adapters.docProvider) {
+          const doc = adapters.docProvider(lib, ext.name);
+          if (doc && !docs.includes(doc)) {
+            docs.push(doc);
+          }
+        }
+      }
+    }
+    return { externalContracts: contracts, docs };
   }
 
   public static resolveConstitution(adapters: MemoryResolverAdapters, filePath?: string): string[] {
