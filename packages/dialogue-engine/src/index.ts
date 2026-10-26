@@ -6,3 +6,4 @@ export * from './dialogue-engine.js';
 export * from './stack-trace-parser.js';
 export * from './ast-triangulator.js';
 export * from './hypothesis-generator.js';
+export * from './armored-prescription-builder.js';

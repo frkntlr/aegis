@@ -1,4 +1,5 @@
-import { DiagnosticCategory, PrescriptionPlan, ClarificationOption } from './types.js';
+import { DiagnosticCategory, PrescriptionPlan, ClarificationOption, DialogueSession } from './types.js';
+import { ArmoredPrescriptionBuilder } from './armored-prescription-builder.js';
 
 const DEFAULT_PLANS: Record<string, PrescriptionPlan> = {
   STAGNATION: {
@@ -92,34 +93,65 @@ const DEFAULT_PLANS: Record<string, PrescriptionPlan> = {
 };
 
 export class PrescriptionBuilder {
-  public static buildPlan(category: DiagnosticCategory, option: ClarificationOption): PrescriptionPlan {
-    return DEFAULT_PLANS[option.hypothesisKey] || {
-      title: 'Remediate ' + category + ' Issue',
-      rootCause: 'Diagnosed ' + option.label + ' in 3-turn interactive triage.',
-      steps: ['Apply surgical patch.', 'Execute local pre-commit verification.'],
-      acceptanceCriteria: ['All tests pass.', 'Demir Kafes 100% compliant.'],
-      targetWorktree: 'experimental/solver',
-      lockLabels: ['src/index.ts']
-    };
+  public static buildPlan(
+    category: DiagnosticCategory,
+    option: ClarificationOption,
+    session?: DialogueSession
+  ): PrescriptionPlan {
+    if (session && (session.evidence || session.budgetReport || option.microProbeCommand)) {
+      return buildArmoredSync(session, option);
+    }
+    return DEFAULT_PLANS[option.hypothesisKey] || buildFallbackPlan(category, option);
   }
 
   public static formatAegisTask(plan: PrescriptionPlan, sessionId: string): string {
-    const lines = [
-      `# 🎯 Task: ${plan.title}`,
-      `Session: ${sessionId}`,
-      `Target Worktree: ${plan.targetWorktree}`,
-      `Locks: ${plan.lockLabels.join(', ')}`,
-      '',
-      '## Root Cause',
-      plan.rootCause,
-      '',
-      '## Remediation Steps',
-      ...plan.steps.map(s => `1. ${s}`),
-      '',
-      '## Acceptance Criteria',
-      ...plan.acceptanceCriteria.map(a => `- [ ] ${a}`),
-      '- [ ] Strict compliance with Demir Kafes (max 40 lines/fn, max 300 lines/file).'
-    ];
-    return lines.join('\n');
+    return ArmoredPrescriptionBuilder.formatTask(plan, sessionId);
   }
+}
+
+function buildArmoredSync(session: DialogueSession, option: ClarificationOption): PrescriptionPlan {
+  const file = session.evidence?.filePath || 'src/index.ts';
+  const remaining = session.budgetReport ? session.budgetReport.remainingLines : 50;
+  const mustDecompose = session.budgetReport?.mustDecompose || remaining < 15;
+  const targetWorktree = session.category === DiagnosticCategory.GODOT_ENGINE ? 'experimental/qa' : 'experimental/solver';
+  const steps: string[] = [];
+
+  if (mustDecompose) {
+    steps.push(
+      `Decompose subroutine in ${file} to sibling helper module to free up Demir Kafes line budget.`,
+      `Apply surgical fix for ${option.hypothesisKey} in the extracted subroutine.`
+    );
+  } else {
+    steps.push(`Apply surgical unified patch for ${option.hypothesisKey} in ${file}.`);
+  }
+
+  if (option.microProbeCommand) {
+    steps.push(`Execute micro-probe verification: '${option.microProbeCommand}'.`);
+  }
+  steps.push('Run cage:check and verify 100% Iron Cage compliance.');
+
+  return {
+    title: `Remediate ${option.hypothesisKey}: ${option.label}`,
+    rootCause: `Diagnosed ${option.label}.`,
+    steps,
+    acceptanceCriteria: [
+      `Root defect for ${option.hypothesisKey} is resolved cleanly.`,
+      `Compliance with Demir Kafes (max 40 lines/fn, max 300 lines/file).`
+    ],
+    targetWorktree,
+    lockLabels: [file],
+    mustDecompose,
+    microProbeCommand: option.microProbeCommand
+  };
+}
+
+function buildFallbackPlan(category: DiagnosticCategory, option: ClarificationOption): PrescriptionPlan {
+  return {
+    title: 'Remediate ' + category + ' Issue',
+    rootCause: 'Diagnosed ' + option.label + ' in 3-turn interactive triage.',
+    steps: ['Apply surgical patch.', 'Execute local pre-commit verification.'],
+    acceptanceCriteria: ['All tests pass.', 'Demir Kafes 100% compliant.'],
+    targetWorktree: 'experimental/solver',
+    lockLabels: ['src/index.ts']
+  };
 }

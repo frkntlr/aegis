@@ -10,6 +10,7 @@ import {
 import { DialogueStateMachine } from './state-machine.js';
 import { SymptomClassifier } from './classifier.js';
 import { PrescriptionBuilder } from './prescription-builder.js';
+import { ArmoredPrescriptionBuilder } from './armored-prescription-builder.js';
 import { AstTriangulator, TriangulatedContext } from './ast-triangulator.js';
 import { DynamicHypothesisGenerator } from './hypothesis-generator.js';
 
@@ -130,7 +131,7 @@ export class DialogueEngine {
     session.selectedOption = option;
     session.phase = TurnPhase.TURN_2_CLARIFICATION;
     session.turnCount = 2;
-    session.prescription = PrescriptionBuilder.buildPlan(session.category, option);
+    session.prescription = PrescriptionBuilder.buildPlan(session.category, option, session);
 
     const record: DialogueTurnRecord = {
       turn: 2,
@@ -169,7 +170,7 @@ export class DialogueEngine {
     if (!session.prescription) {
       throw new Error(`Cannot export task: session ${sessionId} has no prescription.`);
     }
-    return PrescriptionBuilder.formatAegisTask(session.prescription, sessionId);
+    return ArmoredPrescriptionBuilder.formatTask(session.prescription, sessionId, session.memorySlice);
   }
 
   public getSession(sessionId: string): DialogueSession | undefined {
