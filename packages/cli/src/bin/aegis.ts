@@ -153,7 +153,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   ideate: (a) => handleRfcCreate(a[1], a[2]),
   'rfc:decompose': (a) => handleRfcDecompose(a[1]),
   'nlm:sync': () => handleNlmSync(),
-  'nlm:query': (a) => handleNlmQuery(a[1], a[2]),
+  'nlm:query': (a) => handleNlmQuery(...a.slice(1)),
   'nlm:research': (a) => handleNlmResearch(a[1], a[2], a[3]),
   'gh:locate': (a) => handleGhLocate(a[1]),
   'project:list': (a) => handleProjectList(a[1]),

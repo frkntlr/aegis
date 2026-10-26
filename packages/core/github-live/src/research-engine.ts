@@ -1,65 +1,58 @@
-import { pathToFileURL } from 'node:url';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+/**
+ * @file research-engine.ts
+ * Self-contained Research Engine using UnifiedKnowledgeOracle and NotebookLmNativeClient.
+ * Fully decoupled from external filesystem paths and Chromium dependencies.
+ * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
+ */
+
 import type { ResearchReport } from './types.js';
 import type { GitHubWikiLiveAdapter } from './wiki-adapter.js';
-
-interface NotebookLMClientInstance {
-  startResearch?: (nbId: string, topic: string, source: string, mode: string) => Promise<{ task_id?: string }>;
-  query: (nbId: string, prompt: string) => Promise<string | { answer?: string; citations?: Array<{ title?: string; sourceId?: string }> }>;
-}
+import { NotebookLmNativeClient } from './notebooklm/notebooklm-native-client.js';
+import { UnifiedKnowledgeOracle } from './notebooklm/unified-knowledge-oracle.js';
 
 export class NotebookLmResearchEngine {
   private defaultNotebookId: string;
+  private oracle: UnifiedKnowledgeOracle;
+  private nativeClient: NotebookLmNativeClient;
 
-  constructor(defaultNotebookId = '3767b1fc-5759-416d-b938-495b8138ccd7') {
+  constructor(
+    defaultNotebookId = '3767b1fc-5759-416d-b938-495b8138ccd7',
+    oracle?: UnifiedKnowledgeOracle,
+    nativeClient?: NotebookLmNativeClient
+  ) {
     this.defaultNotebookId = defaultNotebookId;
+    this.nativeClient = nativeClient || new NotebookLmNativeClient();
+    this.oracle = oracle || new UnifiedKnowledgeOracle({ nativeClient: this.nativeClient });
   }
 
-  private resolveClientPath(): string {
-    const local = path.resolve(process.cwd(), '..', 'notebooklm', 'notebooklm-mcp-server', 'dist', 'client.js');
-    if (fs.existsSync(local)) return local;
-    const appData = process.env.APPDATA || '';
-    return path.resolve(appData, 'npm', 'node_modules', 'notebooklm-mcp-server', 'dist', 'client.js');
-  }
-
-  public async getClientInstance(): Promise<NotebookLMClientInstance> {
-    const modPath = this.resolveClientPath();
-    if (!fs.existsSync(modPath)) {
-      throw new Error(`NotebookLM client module not found at: ${modPath}`);
-    }
-    const { NotebookLMClient } = await import(pathToFileURL(modPath).href);
-    return new NotebookLMClient();
-  }
-
-  public async conductResearch(topic: string, mode: 'fast' | 'deep' = 'fast', customNotebookId?: string): Promise<ResearchReport> {
-    const client = await this.getClientInstance();
+  public async conductResearch(
+    topic: string,
+    mode: 'fast' | 'deep' = 'fast',
+    customNotebookId?: string
+  ): Promise<ResearchReport> {
     const nbId = customNotebookId || this.defaultNotebookId;
-
     let taskId: string | undefined;
-    let sourcesCount = 0;
+
     try {
-      const res = client.startResearch ? await client.startResearch(nbId, topic, 'web', mode) : undefined;
+      const res = await this.nativeClient.startResearch(nbId, topic, 'web', mode);
       taskId = res?.task_id;
     } catch {
-      // Fallback directly to synthesized query if startResearch RPC is busy
+      // Graceful fallback: continue with synthesized query
     }
 
     const queryPrompt = `Synthesize a rigorous, objective architectural research report on: "${topic}". Identify core patterns, key trade-offs, and 3-5 concrete acceptance criteria.`;
-    const queryRes = await client.query(nbId, queryPrompt);
+    const oracleRes = await this.oracle.query(queryPrompt, { notebookId: nbId });
 
-    const synthesis = typeof queryRes === 'string' ? queryRes : queryRes.answer || 'Research complete.';
-    const rawCitations = typeof queryRes === 'object' && queryRes && Array.isArray(queryRes.citations) ? queryRes.citations : [];
-    const citations = rawCitations.map((c: { title?: string; sourceId?: string }) => c.title || c.sourceId || 'Source');
-    sourcesCount = citations.length || 3;
+    const citations = oracleRes.citations.map(c => c.title || c.sourceId || 'Source');
+    const sourcesCount = citations.length || 3;
 
     return {
       topic,
       mode,
       taskId,
       sourcesCount,
-      sources: citations.map((c: string) => ({ title: c })),
-      synthesis,
+      sources: citations.map(c => ({ title: c })),
+      synthesis: oracleRes.answer,
       citations,
       recommendedCriteria: [
         `Implement core patterns identified in ${topic} research.`,
@@ -74,7 +67,7 @@ export class NotebookLmResearchEngine {
     const slug = 'research-' + report.topic.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     const title = `Research: ${report.topic}`;
     const bullets: [string, string, string] = [
-      `Grounded in ${report.sourcesCount} architectural sources via NotebookLM.`,
+      `Grounded in ${report.sourcesCount} architectural sources via ${report.topic}.`,
       `Mode: ${report.mode.toUpperCase()} research with full citations.`,
       'Ready for autonomous task dispatch and issue generation.'
     ];

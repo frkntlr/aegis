@@ -1,73 +1,94 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { NotebookLmResearchEngine, GitHubWikiLiveAdapter } from '@aegis/github-live';
+/**
+ * @file nlm-command.ts
+ * CLI commands for Google NotebookLM integration and Unified Knowledge Oracle.
+ * Zero-Chromium, worktree-resilient, 3-tier fallback support.
+ * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
+ */
+
+import {
+  UnifiedKnowledgeOracle,
+  NotebookLmResearchEngine,
+  GitHubWikiLiveAdapter,
+  type OracleQueryOptions,
+  type OracleQueryResult,
+  type OracleTier
+} from '@aegis/github-live';
 import { showBanner } from './banner.js';
 
-function resolveClientModulePath(): string {
-  const localPath = path.resolve(process.cwd(), '..', 'notebooklm', 'notebooklm-mcp-server', 'dist', 'client.js');
-  if (fs.existsSync(localPath)) return localPath;
-
-  const appData = process.env.APPDATA || '';
-  const globalPath = path.resolve(appData, 'npm', 'node_modules', 'notebooklm-mcp-server', 'dist', 'client.js');
-  if (fs.existsSync(globalPath)) return globalPath;
-
-  return localPath;
+interface ParsedNlmOptions {
+  question?: string;
+  notebookId?: string;
+  forceOffline: boolean;
+  preferredTier?: OracleTier;
 }
 
-interface NotebookSummary {
-  id: string;
-  title?: string;
-}
+export function parseNlmArgs(args: string[]): ParsedNlmOptions {
+  const filtered: string[] = [];
+  let forceOffline = false;
+  let preferredTier: OracleTier | undefined;
 
-interface NotebookClient {
-  listNotebooks(): Promise<NotebookSummary[]>;
-}
-
-async function resolveNotebookId(client: NotebookClient, notebookIdArg?: string): Promise<string> {
-  if (notebookIdArg) return notebookIdArg;
-  console.log('🔍 Resolving Aegis Notebook ID...');
-  const notebooks = await client.listNotebooks();
-  const aegisNb = notebooks.find((n: NotebookSummary) => n.title?.toLowerCase().includes('aegis'));
-  const id = aegisNb ? aegisNb.id : '3767b1fc-5759-416d-b938-495b8138ccd7';
-  console.log(` • Selected Notebook: "${aegisNb?.title || 'Aegis Architecture'}" (${id})`);
-  return id;
-}
-
-export async function handleNlmQuery(questionArg?: string, notebookIdArg?: string): Promise<void> {
-  showBanner();
-  if (!questionArg) {
-    console.error('❌ Usage: aegis nlm:query "<question>" [notebookId]');
-    process.exit(1);
-  }
-
-  const modulePath = resolveClientModulePath();
-  if (!fs.existsSync(modulePath)) {
-    console.error(`❌ notebooklm-mcp-server client not found at ${modulePath}.`);
-    console.error('💡 Please verify notebooklm-mcp-server is installed.');
-    process.exit(1);
-  }
-
-  console.log(`🤖 Connecting to Google NotebookLM...`);
-  try {
-    const fileUrl = pathToFileURL(modulePath).href;
-    const { NotebookLMClient } = await import(fileUrl);
-    const client = new NotebookLMClient();
-    const notebookId = await resolveNotebookId(client, notebookIdArg);
-
-    console.log(`💬 Query: "${questionArg}"\n⏳ Synthesizing AI response with source ground truth...\n`);
-    const result = await client.query(notebookId, questionArg);
-
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log(result.answer || result);
-    console.log('═══════════════════════════════════════════════════════════════');
-    if (result.citations && result.citations.length > 0) {
-      console.log(`\n📚 Cited Sources (${result.citations.length}):`);
-      for (const c of result.citations) console.log(` • [${c.sourceId}] ${c.title || 'Source reference'}`);
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--offline' || a === '-o') {
+      forceOffline = true;
+    } else if (a === '--tier' && args[i + 1]) {
+      preferredTier = args[i + 1] as OracleTier;
+      i++;
+    } else if (a.startsWith('--tier=')) {
+      preferredTier = a.split('=')[1] as OracleTier;
+    } else {
+      filtered.push(a);
     }
+  }
+
+  const question = filtered[0];
+  const notebookId = filtered[1] && !filtered[1].startsWith('-') ? filtered[1] : undefined;
+  return { question, notebookId, forceOffline, preferredTier };
+}
+
+function printQueryResult(res: OracleQueryResult): void {
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(res.answer);
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`\n🔍 Source Tier: [${res.sourceTier.toUpperCase()}]`);
+
+  if (res.authAlert) {
+    console.log(`⚠️  Notice: ${res.authAlert}`);
+  }
+
+  if (res.citations.length > 0) {
+    console.log(`\n📚 Cited Sources (${res.citations.length}):`);
+    for (const c of res.citations) {
+      console.log(` • [${c.sourceId}] ${c.title || 'Source reference'}`);
+    }
+  }
+}
+
+export async function handleNlmQuery(...rawArgs: string[]): Promise<void> {
+  showBanner();
+  const parsed = parseNlmArgs(rawArgs.filter(Boolean));
+
+  if (!parsed.question) {
+    console.error('❌ Usage: aegis nlm:query "<question>" [notebookId] [--offline] [--tier <nlm|context7|local_ast>]');
+    process.exit(1);
+  }
+
+  console.log(`🤖 Consulting Unified Knowledge Oracle (Tier 1: NotebookLM -> Tier 2: Context7 -> Tier 3: Local AST)...`);
+  console.log(`💬 Query: "${parsed.question}"\n⏳ Synthesizing verified response...\n`);
+
+  try {
+    const oracle = new UnifiedKnowledgeOracle();
+    const queryOpts: OracleQueryOptions = {
+      notebookId: parsed.notebookId,
+      forceOffline: parsed.forceOffline,
+      preferredTier: parsed.preferredTier
+    };
+
+    const result = await oracle.query(parsed.question, queryOpts);
+    printQueryResult(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`❌ NotebookLM Query Failed: ${msg}`);
+    console.error(`❌ Unified Knowledge Query Failed: ${msg}`);
   }
 }
 
@@ -79,10 +100,10 @@ export async function handleNlmResearch(topicArg?: string, modeArg = 'fast', not
   }
 
   const mode = modeArg === 'deep' ? 'deep' : 'fast';
-  console.log(`🔬 Initiating ${mode.toUpperCase()} Research via Google NotebookLM on: "${topicArg}"...`);
+  console.log(`🔬 Initiating ${mode.toUpperCase()} Research via Unified Oracle on: "${topicArg}"...`);
   try {
     const engine = new NotebookLmResearchEngine(notebookIdArg || '3767b1fc-5759-416d-b938-495b8138ccd7');
-    console.log('⏳ Gathering web sources and synthesizing architectural intelligence...');
+    console.log('⏳ Gathering architectural intelligence and synthesizing report...');
     const report = await engine.conductResearch(topicArg, mode, notebookIdArg);
 
     console.log('\n═══════════════════════════════════════════════════════════════');
@@ -95,11 +116,10 @@ export async function handleNlmResearch(topicArg?: string, modeArg = 'fast', not
 
     const wikiAdapter = new GitHubWikiLiveAdapter();
     const published = engine.publishToWiki(wikiAdapter, report);
-    if (published) {
-      console.log('\n✅ Research report automatically pushed to GitHub Wiki!');
-    } else {
-      console.log('\n📘 Research staged in Living Memory (pending GitHub Wiki initialization).');
-    }
+    const pubMsg = published
+      ? '\n✅ Research report automatically pushed to GitHub Wiki!'
+      : '\n📘 Research staged in Living Memory (pending GitHub Wiki initialization).';
+    console.log(pubMsg);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`❌ NotebookLM Research Failed: ${msg}`);
