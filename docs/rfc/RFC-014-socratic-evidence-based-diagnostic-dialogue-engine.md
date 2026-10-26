@@ -2,7 +2,7 @@
 ### Aegis Autonomous Architecture Blueprint
 
 - **RFC ID:** RFC-014 | **Durum:** Proposed | **Tarih:** 2026-10-26
-- **Hedef Paket:** `@aegis/dialogue-engine` (ve bağlı `@aegis/ast-skeleton`, `@aegis/watchdog`, `@aegis/iron-cage`)
+- **Hedef Paket:** `@aegis/dialogue-engine` (ve bağlı `@aegis/ast-skeleton`, `@aegis/watchdog`, `@aegis/iron-cage`, `@aegis/orchestrator`)
 - **İlgili Tartışma:** [GitHub Discussion #230](https://github.com/frkntlr/aegis/discussions/230)
 
 ---
@@ -99,7 +99,30 @@ flowchart TD
 
 ---
 
-## 🔒 4. Demir Kafes ve Mimari Standartlar
+## ⚠️ 4. Riskler, Kırılma Noktaları ve Azaltma Stratejileri (Risk & Mitigation Matrix)
+
+```mermaid
+flowchart LR
+    R1["1. Monorepo Dairesel Bağımlılık"] --> M1["Ports & Adapters (Tersine Çevirme)"]
+    R2["2. Yığın İzi Format Sapması"] --> M2["Polyglot Heuristic & Fallback"]
+    R3["3. Senkron AST Gecikmesi"] --> M3["L1/L2 Önbellek & 50ms SLA"]
+    R4["4. Sahte Pozitif Hipotez"] --> M4["Falsifiye Edici Mikro-Kanıt Testi"]
+    R5["5. Demir Kafes Kota Kilitlenmesi"] --> M5["Decomposition-First Reçete"]
+    R6["6. Eşzamanlı Worktree Çakışması"] --> M6["WorktreeMutex Kalkanı & Sıra"]
+```
+
+| # | Teşhis Edilen Risk | Olasılık | Etki | Mühendislik Çözümü & Azaltma Stratejisi |
+| :-: | :--- | :-: | :-: | :--- |
+| **R1** | **Dairesel Paket Bağımlılığı:** `dialogue-engine`'in çekirdek paketlere doğrudan bağlanıp çevrimsel bağımlılık yaratması. | Orta | Yüksek | **Ports & Adapters (Hexagonal Mimari):** Paket içinde yalnızca arayüzler (`IEvidenceProvider`, `IMemorySliceResolver`) tanımlanır. Somut sınıflar CLI bootstrap katmanında enjekte edilir. |
+| **R2** | **Yığın İzi Format Kırılganlığı:** Node.js, Godot `res://`, Vitest veya Python stack formatlarının ayrıştırılamaması. | Yüksek | Orta | **Çoklu Strateji Ayrıştırıcı & Güven Eşiği:** Çoklu regex stratejisi uygulanır. Güven skoru <%80 ise AST sembol aramasına ve 1-turluk kullanıcı onayına geçilir (Graceful Fallback). |
+| **R3** | **AST Sorgu Gecikmesi:** Büyük depolarda AST ve çağıran ağacının taranmasının CLI yanıtını yavaşlatması (>500ms). | Düşük | Yüksek | **Katmanlı Önbellek & Sınırlandırılmış Derinlik:** `.aegis/memory/` disk ve L1 RAM önbelleği kullanılır. İlişkisel derinlik 1 ile sınırlandırılır. 50ms aşımında özet veri döndürülür. |
+| **R4** | **Yanıltıcı Hipotez ve Model Önyargısı:** Hipotezlerin yetersiz kanıta dayanıp yanlış tamir planı üretmesi. | Orta | Yüksek | **Yanlışlanabilir Hipotezler & Mikro-Test:** Hipotezler izole test komutuyla ilişkilendirilir. Tur 2'de reçete yazılmadan önce tek bir mikro-test çalıştırılarak kök neden kanıtlanır. |
+| **R5** | **Demir Kafes Bütçe Kilitlenmesi:** Hatalı dosyanın zaten 290+ satırda olması durumunda yamanın derleme hatası vermesi. | Orta | Kritik | **Önce-Ayrıştır-Sonra-Onar (Decomposition-First):** `LineBudgetRadar` bütçeyi <15 satır görürse reçete doğrudan fonksiyonu kardeş modüle taşıyıp ardından onarma moduna geçer. |
+| **R6** | **Çoklu Ajan Worktree Çakışması:** Aynı dosyanın başka bir ajan (`solver`/`qa`) tarafından kilitli olması. | Düşük | Yüksek | **WorktreeMutex Ön Denetimi:** `.aegis/locks.json` taranır; dosya kilitliyse kullanıcı uyarılır ve reçete izole bir scratch çalışma alanına atanır. |
+
+---
+
+## 🔒 5. Demir Kafes ve Mimari Standartlar
 
 1. **Katı Dosya ve Fonksiyon Sınırları:**
    - Yeni eklenecek/refactor edilecek hiçbir dosya 300 satırı aşamaz.
@@ -113,11 +136,11 @@ flowchart TD
 
 ---
 
-## 🎯 5. Kabul Kriterleri (Acceptance Criteria)
+## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
 
-- [ ] **Aşama 1 (Evidence Ingestion):** `EvidenceCollector` ve `RTKTokenKiller` entegre edilerek yığın izlerinden temiz kullanıcı kodu konumu çıkarma desteği sağlandı.
+- [ ] **Aşama 1 (Evidence Ingestion & Ports):** `ports/` arayüzleri ve `PolyglotStackTraceParser` entegre edilerek temiz kullanıcı kodu konumu çıkarma desteği sağlandı.
 - [ ] **Aşama 2 (AST Triangulation):** `AstTriangulator` ile dosya/satır numarasından `CodebaseMemoryEngine` cerrahi dilimi, `<ambient_types>` ve çağrı grafı çıkarıldı.
-- [ ] **Aşama 3 (Dynamic Hypotheses):** `DynamicHypothesisGenerator` statik dizileri terk ederek gerçek AST ve mtime farklarına dayalı hipotezler üretti.
-- [ ] **Aşama 4 (Armored Prescription):** `ArmoredPrescriptionBuilder` hedef worktree, `WorktreeMutex` kilitleri ve Demir Kafes satır bütçesini içeren çalıştırılabilir görevler üretti.
+- [ ] **Aşama 3 (Dynamic Hypotheses & Micro-Probe):** `DynamicHypothesisGenerator` statik dizileri terk ederek gerçek AST ve mikro-kanıt testlerine dayalı hipotezler üretti.
+- [ ] **Aşama 4 (Armored Prescription & LineBudget):** `ArmoredPrescriptionBuilder` hedef worktree, `WorktreeMutex` kilitleri ve `LineBudgetRadar` bütçesine göre doğrudan ya da ayrıştırmalı görevler üretti.
 - [ ] **Aşama 5 (CLI Entegrasyonu):** `aegis debug [error-or-file]` alt komutu eklenerek interaktif terminal teşhisi sağlandı.
 - [ ] **Aşama 6 (Kalite Kapısı):** Demir Kafes (%100 Clean) ve Mutasyon Testi (%100 Kill Score) başarıyla tamamlandı.
