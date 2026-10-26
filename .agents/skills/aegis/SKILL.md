@@ -19,6 +19,8 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | :--- | :--- | :--- |
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `npm run aegis -- status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `npm run aegis -- auto` |
+| `/aegis merge <agent> [base]` | Multi-tier atomic merge (FF -> Rebase -> Merge Commit) | `npm run aegis -- merge <agent> [base]` |
+| `/aegis branch:sync [agent|all]` | Safely synchronize worktree branches with master | `npm run aegis -- branch:sync [agent]` |
 | `/aegis dashboard [port]` | Launch Aegis Web Command Center | `npm run aegis -- dashboard [port]` (with IsDaemon: true) |
 | `/aegis cage:check [dir]` | Audit codebase against Deterministik Demir Kafes | `npm run aegis -- cage:check [dir]` |
 | `/aegis skeleton:scan [dir]` | Compute global AST skeleton map & token savings | `npm run aegis -- skeleton:scan [dir]` |

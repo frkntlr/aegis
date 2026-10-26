@@ -33,6 +33,8 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis memory:stats [wt]`: Inspect Codebase Memory diagnostics and token savings.
 - `/aegis memory:refresh [d]`: Incrementally refresh Codebase Memory cache.
 - `/aegis memory:watch [dir] [wt]`: Real-time incremental file watcher for codebase memory.
+- `/aegis merge <agent> [base]`: Multi-tier atomic merge (FF -> Rebase-FF -> Merge Commit) & dynamic sibling synchronization.
+- `/aegis branch:sync [agent|--all]`: Safely synchronize worktree branches with master with zero data loss stash protection.
 - `/aegis loop:status`: Inspect Circuit Breaker failure counters and blocked tasks.
 - `/aegis loop:reset [num]`: Reset failure counters and unblock tasks.
 
