@@ -19,8 +19,9 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | :--- | :--- | :--- |
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `npm run aegis -- status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `npm run aegis -- auto` |
+| `/aegis debug [err\|file]` | Socratic evidence-based interactive debugging session | `npm run aegis -- debug [err]` |
 | `/aegis merge <agent> [base]` | Multi-tier atomic merge (FF -> Rebase -> Merge Commit) | `npm run aegis -- merge <agent> [base]` |
-| `/aegis branch:sync [agent|all]` | Safely synchronize worktree branches with master | `npm run aegis -- branch:sync [agent]` |
+| `/aegis branch:sync [agent\|all]` | Safely synchronize worktree branches with master | `npm run aegis -- branch:sync [agent]` |
 | `/aegis dashboard [port]` | Launch Aegis Web Command Center | `npm run aegis -- dashboard [port]` (with IsDaemon: true) |
 | `/aegis cage:check [dir]` | Audit codebase against Deterministik Demir Kafes | `npm run aegis -- cage:check [dir]` |
 | `/aegis skeleton:scan [dir]` | Compute global AST skeleton map & token savings | `npm run aegis -- skeleton:scan [dir]` |
@@ -43,13 +44,17 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis godot <subcmd>` | Godot Bridge: status, inspect, validate, query, run | `npm run aegis -- godot <subcmd>` |
 | `/aegis diff <diff>` | Validate surgical unified diff compliance | `npm run aegis -- diff <diff>` |
 | `/aegis audit <files>` | Run Immutable Oracle trust verification | `npm run aegis -- audit <files>` |
-| `/aegis ast:search <pat> [dir]` | Structural AST search via ast-grep | `npm run aegis -- ast:search <pat> [dir]` |
+| `/aegis ast:search <pat> [dir]` | Structural AST search via Aegis internal ast-grep | `npm run aegis -- ast:search <pat> [dir]` |
 | `/aegis ast:replace <p> <r> <f>` | Structural AST replacement via ast-grep | `npm run aegis -- ast:replace <p> <r> <f>` |
 | `/aegis rtk:compress [file]` | Compress terminal/test output via RTK | `npm run aegis -- rtk:compress [file]` |
 | `/aegis context7:query <l> <t>` | Query official library documentation | `npm run aegis -- context7:query <l> <t>` |
 | `/aegis memory:query <sym>` | Query 5-Layer Codebase Memory (AST, Graph, Context7) | `npm run aegis -- memory:query <sym>` |
 | `/aegis memory:stats [wt]` | Codebase Memory diagnostics and token savings | `npm run aegis -- memory:stats [wt]` |
 | `/aegis memory:refresh [d]` | Incrementally refresh Codebase Memory cache | `npm run aegis -- memory:refresh [d]` |
+| `/aegis memory:cold-start [d]` | Run full project cold-start AST indexing | `npm run aegis -- memory:cold-start [d]` |
+| `/aegis memory:watch [d] [wt]` | Real-time incremental file watcher daemon | `npm run aegis -- memory:watch [d]` |
+| `/aegis loop:status` | Inspect Circuit Breaker failure counters & blocked tasks | `npm run aegis -- loop:status` |
+| `/aegis loop:reset [num]` | Reset failure counters and unblock tasks | `npm run aegis -- loop:reset [num]` |
 
 ## Core Principles
 1. **Iron Cage Enforcement**: Maximum 300 lines per file, maximum 40 lines per function.
@@ -58,3 +63,5 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 4. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
 5. **Immutable Verification**: Pre-commit quality gate strictly enforces that zero commits can land without 100% test pass.
 6. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.
+7. **Anti-Hang Guard (Never use npx ast-grep)**: Unscoped `ast-grep` on npm is an obsolete 2018 package that hangs waiting on STDIN. Always use `/aegis ast:search` or `npm run aegis -- ast:search` (or `aegis ast-grep` / `aegis sg`).
+8. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.

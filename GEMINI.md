@@ -5,6 +5,7 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 
 - `/aegis` or `/aegis status`: Run `npm run aegis -- status` and display worktrees and file locks.
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.
+- `/aegis debug [error|file]`: Run Socratic evidence-based interactive debugging session.
 - `/aegis dashboard [port]`: Run `npm run aegis -- dashboard [port]` as daemon and provide web link.
 - `/aegis skeleton:scan`: Run `npm run aegis -- skeleton:scan` and show token savings.
 - `/aegis cage:check`: Run `npm run aegis -- cage:check` and report Demir Kafes compliance.
@@ -32,6 +33,7 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis memory:query <sym>`: Query 5-Layer Codebase Memory (AST, Graph, Context7, Demir Kafes).
 - `/aegis memory:stats [wt]`: Inspect Codebase Memory diagnostics and token savings.
 - `/aegis memory:refresh [d]`: Incrementally refresh Codebase Memory cache.
+- `/aegis memory:cold-start [dir] [wt]`: Run full project cold-start AST indexing.
 - `/aegis memory:watch [dir] [wt]`: Real-time incremental file watcher for codebase memory.
 - `/aegis merge <agent> [base]`: Multi-tier atomic merge (FF -> Rebase-FF -> Merge Commit) & dynamic sibling synchronization.
 - `/aegis branch:sync [agent|--all]`: Safely synchronize worktree branches with master with zero data loss stash protection.
@@ -43,6 +45,7 @@ To prevent indefinite command hangs during git remote operations:
 1. **Non-Interactive Flag**: Always prefix git network calls with `$env:GIT_TERMINAL_PROMPT=0` (or set in session). Git must fail fast rather than hanging on credential/passphrase prompts.
 2. **No Background Remote Hangs**: Remote operations (`git push`, `git fetch`, `git clone`) must NEVER run as indefinite background daemons. Use finite timeout (e.g. `WaitMsBeforeAsync: 10000`).
 3. **No Direct Master Push Without Auth Pre-check**: Verify `gh auth status` or remote connectivity before pushing. Direct pushes to `master`/`main` without verification or user consent are strictly forbidden.
+4. **Anti-Hang & STDIN Safeguard**: NEVER run `npx ast-grep` (outdated 2018 package that hangs waiting on STDIN). Always use `npm run aegis -- ast:search <pat> [dir]` or `aegis ast:search`. Headless background commands must never wait on STDIN.
 
 ## Phase Boundary Gate (Zero Premature Coding)
 Whenever the user requests planning, research, architectural analysis, or issue creation:
