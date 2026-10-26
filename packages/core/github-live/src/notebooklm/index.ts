@@ -7,3 +7,4 @@
 export * from './types.js';
 export * from './multi-root-token-resolver.js';
 export * from './notebooklm-native-client.js';
+export * from './http-rotate-engine.js';
