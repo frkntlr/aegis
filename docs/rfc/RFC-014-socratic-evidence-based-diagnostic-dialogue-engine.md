@@ -136,11 +136,11 @@ flowchart LR
 
 ---
 
-## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
+## 🎯 6. Kabul Kriterleri ve Atomik Görev Planı (Acceptance Criteria & GitHub Issues)
 
-- [ ] **Aşama 1 (Evidence Ingestion & Ports):** `ports/` arayüzleri ve `PolyglotStackTraceParser` entegre edilerek temiz kullanıcı kodu konumu çıkarma desteği sağlandı.
-- [ ] **Aşama 2 (AST Triangulation):** `AstTriangulator` ile dosya/satır numarasından `CodebaseMemoryEngine` cerrahi dilimi, `<ambient_types>` ve çağrı grafı çıkarıldı.
-- [ ] **Aşama 3 (Dynamic Hypotheses & Micro-Probe):** `DynamicHypothesisGenerator` statik dizileri terk ederek gerçek AST ve mikro-kanıt testlerine dayalı hipotezler üretti.
-- [ ] **Aşama 4 (Armored Prescription & LineBudget):** `ArmoredPrescriptionBuilder` hedef worktree, `WorktreeMutex` kilitleri ve `LineBudgetRadar` bütçesine göre doğrudan ya da ayrıştırmalı görevler üretti.
-- [ ] **Aşama 5 (CLI Entegrasyonu):** `aegis debug [error-or-file]` alt komutu eklenerek interaktif terminal teşhisi sağlandı.
-- [ ] **Aşama 6 (Kalite Kapısı):** Demir Kafes (%100 Clean) ve Mutasyon Testi (%100 Kill Score) başarıyla tamamlandı.
+- [ ] **Task 1 ([#231](https://github.com/frkntlr/aegis/issues/231)):** `feat(dialogue-engine): implement hexagonal ports and adapters for evidence, memory, and line budget` (R1 Kalkanı).
+- [ ] **Task 2 ([#232](https://github.com/frkntlr/aegis/issues/232)):** `feat(dialogue-engine): implement PolyglotStackTraceParser with multi-format heuristics and confidence scoring` (R2 Kalkanı).
+- [ ] **Task 3 ([#233](https://github.com/frkntlr/aegis/issues/233)):** `feat(dialogue-engine): implement AstTriangulator and dynamic falsifiable hypothesis generation` (R3 & R4 Kalkanı).
+- [ ] **Task 4 ([#234](https://github.com/frkntlr/aegis/issues/234)):** `feat(dialogue-engine): implement ArmoredPrescriptionBuilder with decomposition-first line budgeting and mutex shield` (R5 & R6 Kalkanı).
+- [ ] **Task 5 ([#235](https://github.com/frkntlr/aegis/issues/235)):** `feat(cli): integrate Socratic diagnostic engine with aegis debug command and concrete monorepo adapters` (CLI Entegrasyonu).
+- [ ] **Task 6 ([#236](https://github.com/frkntlr/aegis/issues/236)):** `test(dialogue-engine): comprehensive mutation testing gate and Demir Kafes compliance audit` (Kalite Mührü).
