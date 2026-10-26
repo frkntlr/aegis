@@ -75,3 +75,9 @@ export function collectSourceFiles(dir: string, includeScenes = false): string[]
   }
   return results;
 }
+
+export function printRadarAlerts(alerts: Array<{ file: string; lines: number; msg: string }>): void {
+  if (alerts.length === 0) return;
+  console.log(` ⚠️  Proaktif Kota Radarı (${alerts.length} dosya sınıra yaklaştı):`);
+  for (const a of alerts) console.log(`   - ${a.file} (${a.lines}/300 satır) -> Öneri: ${a.msg}`);
+}

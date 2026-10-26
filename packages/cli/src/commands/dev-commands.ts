@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { PreExecutionEstimator } from '@aegis/watchdog';
-import { IronCageValidator } from '@aegis/iron-cage';
+import { IronCageValidator, LineBudgetRadar } from '@aegis/iron-cage';
 import { SkeletonGenerator, DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
@@ -11,7 +11,8 @@ import {
   verifyFile,
   getChangedSourceFiles,
   runMutationGateOnFile,
-  collectSourceFiles
+  collectSourceFiles,
+  printRadarAlerts
 } from './dev-helpers.js';
 
 export function handleEstimate(args: string[]): void {
@@ -182,6 +183,7 @@ export function handleCageCheck(targetDir?: string): void {
   const validator = new IronCageValidator();
   let passedCount = 0;
   const violations: { file: string; rule: string; msg: string }[] = [];
+  const radarAlerts: { file: string; lines: number; msg: string }[] = [];
 
   for (const file of files) {
     const rel = path.relative(process.cwd(), file).replace(/\\/g, '/');
@@ -189,24 +191,23 @@ export function handleCageCheck(targetDir?: string): void {
     const res = validator.validateFileContent(rel, content);
     if (res.passed) {
       passedCount++;
+      const r = LineBudgetRadar.analyze(rel, content);
+      if (r.status === 'CRITICAL_QUOTA') radarAlerts.push({ file: rel, lines: r.fileLines, msg: r.advice?.title || 'Kritik kota' });
     } else {
-      for (const v of res.violations) {
-        violations.push({ file: rel, rule: v.rule, msg: v.message });
-      }
+      for (const v of res.violations) violations.push({ file: rel, rule: v.rule, msg: v.message });
     }
   }
 
   console.log(` • Files Scanned: ${files.length}`);
   console.log(` • Compliant:     ${passedCount} / ${files.length} (${Math.round((passedCount / files.length) * 100)}%)`);
+  printRadarAlerts(radarAlerts);
   if (violations.length === 0) {
     console.log('✅ Demir Kafes (Iron Cage): 100% CLEAN - No violations found!');
-  } else {
-    console.log(`⚠️  Violations Found (${violations.length}):`);
-    for (const v of violations) {
-      console.log(`   - [${v.rule}] ${v.file}: ${v.msg}`);
-    }
-    process.exit(1);
+    return;
   }
+  console.log(`⚠️  Violations Found (${violations.length}):`);
+  for (const v of violations) console.log(`   - [${v.rule}] ${v.file}: ${v.msg}`);
+  process.exit(1);
 }
 
 export function handleSkeletonScan(targetDir?: string): void {
