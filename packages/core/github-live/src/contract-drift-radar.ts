@@ -8,7 +8,22 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+
+export class CrlfNormalizerStream extends Transform {
+  override _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null, data?: Buffer) => void
+  ): void {
+    if (!chunk.includes(0x0d)) {
+      callback(null, chunk);
+      return;
+    }
+    callback(null, Buffer.from(chunk.filter(b => b !== 0x0d)));
+  }
+}
 
 export interface LockfileMetadata {
   path: string;
@@ -53,7 +68,8 @@ export class ContractDriftRadar {
   public static async computeFileHashStream(filePath: string): Promise<string> {
     const hash = crypto.createHash('sha256');
     const stream = fs.createReadStream(filePath, { highWaterMark: 64 * 1024 });
-    await pipeline(stream, hash);
+    const normalizer = new CrlfNormalizerStream();
+    await pipeline(stream, normalizer, hash);
     return hash.digest('hex');
   }
 
@@ -74,9 +90,15 @@ export class ContractDriftRadar {
   public resolveLockfiles(custom?: string[]): string[] {
     const candidates = custom ?? [
       'package-lock.json',
+      'yarn.lock',
       'pnpm-lock.yaml',
+      'bun.lock',
+      'bun.lockb',
       'packages.lock.json',
-      'project.godot'
+      'Directory.Packages.props',
+      'project.godot',
+      'export_presets.cfg',
+      'Cargo.lock'
     ];
     return candidates
       .map(rel => (path.isAbsolute(rel) ? rel : path.join(this.projectRoot, rel)))

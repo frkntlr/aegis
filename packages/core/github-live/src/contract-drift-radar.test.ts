@@ -27,6 +27,40 @@ test('computeFileHashStream produces consistent sha256 hash', async () => {
   }
 });
 
+test('computeFileHashStream produces identical hash across CRLF and LF line endings', async () => {
+  const tempDir = path.join(os.tmpdir(), `aegis-crlf-test-${Date.now()}`);
+  fs.mkdirSync(tempDir, { recursive: true });
+  const crlfFile = path.join(tempDir, 'crlf.json');
+  const lfFile = path.join(tempDir, 'lf.json');
+
+  fs.writeFileSync(crlfFile, 'line1\r\nline2\r\nline3\r\n');
+  fs.writeFileSync(lfFile, 'line1\nline2\nline3\n');
+
+  try {
+    const crlfHash = await ContractDriftRadar.computeFileHashStream(crlfFile);
+    const lfHash = await ContractDriftRadar.computeFileHashStream(lfFile);
+    assert.strictEqual(crlfHash, lfHash);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('resolveLockfiles discovers extended lockfile ecosystems', () => {
+  const tempDir = path.join(os.tmpdir(), `aegis-lock-res-${Date.now()}`);
+  fs.mkdirSync(tempDir, { recursive: true });
+  fs.writeFileSync(path.join(tempDir, 'yarn.lock'), '# yarn lockfile');
+  fs.writeFileSync(path.join(tempDir, 'Cargo.lock'), '# cargo lockfile');
+
+  const radar = new ContractDriftRadar({ projectRoot: tempDir });
+  try {
+    const resolved = radar.resolveLockfiles();
+    assert.ok(resolved.some(p => p.endsWith('yarn.lock')));
+    assert.ok(resolved.some(p => p.endsWith('Cargo.lock')));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('compareSignatures detects removed methods and arity breaking changes', () => {
   const oldSigs: ContractSignature[] = [
     { library: 'zod', symbol: 'string', parameters: [] },
