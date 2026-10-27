@@ -98,6 +98,21 @@ test('SymbolSliceExtractor: prepends ambient type closure block to surgical slic
   assert.ok(slice.ambientTypes?.includes('OrderReceipt'));
 });
 
+test('SymbolSliceExtractor: injects bounded opaque stubs for nested 2nd-degree types', () => {
+  const indexer = new SymbolIndexer();
+  const extractor = new SymbolSliceExtractor(indexer);
+
+  const code = [
+    'export interface ServiceConfig { options: RemoteDriverOptions; }',
+    'export function initService(cfg: ServiceConfig): void {}'
+  ].join('\n');
+
+  const slice = extractor.sliceContent('initService', 'service.ts', code, 2, 2, 1);
+  assert.ok(slice.codeSlice.includes('interface ServiceConfig'));
+  assert.ok(slice.codeSlice.includes('RemoteDriverOptions'));
+  assert.ok(slice.codeSlice.includes('__opaque'));
+});
+
 test('CalleeSignatureExtractor: extracts 1st-degree method signatures within class and functions', () => {
   const extractor = new CalleeSignatureExtractor();
   const code = [

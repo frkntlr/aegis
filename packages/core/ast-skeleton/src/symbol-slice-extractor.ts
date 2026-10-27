@@ -4,6 +4,7 @@ import ts from 'typescript';
 import type { SymbolDatabase, SymbolEntry } from './symbol-indexer.js';
 import { SymbolIndexer } from './symbol-indexer.js';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
+import { TransitiveTypeClosure } from './transitive-type-closure.js';
 import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
 import { TypeScriptSkeletonExtractor } from './ts-extractor.js';
 import { SliceAmbientEnricher } from './slice-ambient-enricher.js';
@@ -26,11 +27,13 @@ export interface SliceResult {
 export class SymbolSliceExtractor {
   private indexer: SymbolIndexer;
   private typeResolver: TransitiveTypeResolver;
+  private typeClosure: TransitiveTypeClosure;
   private calleeExtractor: CalleeSignatureExtractor;
 
-  constructor(indexer?: SymbolIndexer) {
+  constructor(indexer?: SymbolIndexer, typeClosure?: TransitiveTypeClosure) {
     this.indexer = indexer || new SymbolIndexer();
     this.typeResolver = new TransitiveTypeResolver({ indexer: this.indexer });
+    this.typeClosure = typeClosure || new TransitiveTypeClosure({ maxDepth: 1, lineBudget: 50 });
     this.calleeExtractor = new CalleeSignatureExtractor({ indexer: this.indexer });
   }
 
@@ -89,12 +92,14 @@ export class SymbolSliceExtractor {
     if (!targetClass) return null;
 
     const classSkeleton = TypeScriptSkeletonExtractor.formatClassSkeleton(targetClass, sf);
+    const closure = this.typeClosure.resolveClosure(symbolName, filePath, content);
     const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
+    const ambientBlock = closure.formattedBlock || ambient.formattedBlock;
     const totalLines = content.split(/\r?\n/).length;
     const diffBudget = PreEmptiveDiffBudgeting.calculateBudget(totalLines);
     const budgetWarning = PreEmptiveDiffBudgeting.formatWarningForSlice(totalLines, undefined, '//');
     const sliceHeader = this.buildSliceHeader(
-      symbolName, filePath, startLine, endLine, ambient.formattedBlock,
+      symbolName, filePath, startLine, endLine, ambientBlock,
       '// 🧩 [Adaptive ClassSkeleton - Folded Method Bodies]', budgetWarning
     );
     const codeSlice = [...sliceHeader, classSkeleton, '// --- End Slice ---'].join('\n');
@@ -218,8 +223,10 @@ export class SymbolSliceExtractor {
     if (isTs) {
       const fileImports = SymbolSliceExtractor.extractFileImports(content);
       if (fileImports) headerBlocks.push(fileImports);
+      const closure = this.typeClosure.resolveClosure(symbolName, filePath, content);
       const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
-      if (ambient.formattedBlock) headerBlocks.push(ambient.formattedBlock);
+      const block = closure.formattedBlock || ambient.formattedBlock;
+      if (block) headerBlocks.push(block);
       const enrichment = SliceAmbientEnricher.enrichTypeScript(symbolName, filePath, content, this.indexer);
       if (enrichment.headerLines.length > 0) headerBlocks.push(...enrichment.headerLines);
       const callee = this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content);

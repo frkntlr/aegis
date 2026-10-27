@@ -260,7 +260,7 @@ export class TransitiveTypeClosure {
   ): BoundedTypeClosureResult {
     const lines: string[] = [];
     if (fullDecls.length > 0) {
-      lines.push('// 📦 [1st-Degree Concrete Type Surface]', ...fullDecls);
+      lines.push('// 📦 [Ambient Type Closure - Param & Return Types]', ...fullDecls);
     }
     if (stubs.length > 0) {
       lines.push('// 🛡️ [Transitive Opaque Stubs - Zero Context Bloat]', ...stubs);
