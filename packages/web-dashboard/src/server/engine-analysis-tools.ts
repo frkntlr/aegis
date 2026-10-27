@@ -8,7 +8,13 @@ import type { CageViolation } from '@aegis/shared';
 import { collectSourceFiles } from './metrics-helpers.js';
 
 function resolveTargetDir(targetDir?: string): string {
-  if (targetDir) return path.resolve(process.cwd(), targetDir);
+  if (targetDir) {
+    const direct = path.resolve(process.cwd(), targetDir);
+    if (fs.existsSync(direct)) return direct;
+    const rootRel = path.resolve(process.cwd(), '..', '..', targetDir);
+    if (fs.existsSync(rootRel)) return rootRel;
+    return direct;
+  }
   const localPkg = path.resolve(process.cwd(), 'packages');
   if (fs.existsSync(localPkg)) return localPkg;
   const rootPkg = path.resolve(process.cwd(), '..', '..', 'packages');
