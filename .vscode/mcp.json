@@ -1,5 +1,5 @@
 {
-  "mcpServers": {
+  "servers": {
     "notebooklm": {
       "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
@@ -11,10 +11,13 @@
       "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
         "C:\\Users\\Lenovo\\AppData\\Roaming\\npm\\node_modules\\godot-mcp-runtime\\dist\\index.js"
-      ],
-      "env": {
-        "GODOT_MCP_DISABLE_ELICITATION": "true"
-      }
+      ]
+    },
+    "aegis-engine": {
+      "command": "node",
+      "args": [
+        "packages/cli/dist/bin/aegis.js"
+      ]
     }
   }
 }

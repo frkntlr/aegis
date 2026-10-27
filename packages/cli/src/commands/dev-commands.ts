@@ -242,7 +242,7 @@ function scanCageFiles(files: string[], noCache = false): CageScanAcc {
 export function handleCageCheck(rawArgs?: string | string[]): void {
   const opts = parseCageCheckArgs(rawArgs);
   if (!opts.jsonOutput) showBanner();
-  const base = opts.targetDir ? path.resolve(process.cwd(), opts.targetDir) : path.resolve(process.cwd(), 'packages');
+  const base = opts.targetDir ? path.resolve(process.cwd(), opts.targetDir) : (fs.existsSync(path.resolve(process.cwd(), 'packages')) ? path.resolve(process.cwd(), 'packages') : process.cwd());
   if (!opts.jsonOutput) console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(process.cwd(), base) || '.'}...`);
   const files = collectSourceFiles(base);
   const { passedCount, violations, radarAlerts, cachedCount } = scanCageFiles(files, opts.noCache);
@@ -267,7 +267,7 @@ export function handleCageCheck(rawArgs?: string | string[]): void {
 
 export function handleSkeletonScan(targetDir?: string): void {
   showBanner();
-  const base = targetDir ? path.resolve(process.cwd(), targetDir) : path.resolve(process.cwd(), 'packages');
+  const base = targetDir ? path.resolve(process.cwd(), targetDir) : (fs.existsSync(path.resolve(process.cwd(), 'packages')) ? path.resolve(process.cwd(), 'packages') : process.cwd());
   console.log(`🗺️  Generating Global AST Skeleton Map for: ${path.relative(process.cwd(), base) || '.'}...`);
   const files = collectSourceFiles(base);
   const generator = new SkeletonGenerator();

@@ -86,7 +86,7 @@ export function collectSourceFiles(dir: string, includeScenes = false): string[]
     : /\.(ts|tsx|py|gd|cs|rs|go|cpp|c|h|hpp|sh|bash)$/;
 
   for (const entry of entries) {
-    if (['node_modules', 'dist', '.git', 'experimental', '.mcp', '.aegis', '.godot'].includes(entry.name)) continue;
+    if (['node_modules', 'dist', '.git', 'experimental', '.mcp', '.aegis', '.godot', 'addons'].includes(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...collectSourceFiles(full, includeScenes));

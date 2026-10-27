@@ -242,6 +242,7 @@ export function handleIdeSync(): void {
   });
 
   const results = engine.syncAll(registry.listAdapters(), process.cwd());
+  new UniversalToolchainSync(process.cwd()).syncAll();
   for (const r of results) {
     if (r.supported) {
       console.log(`✅ [${r.ideId}] ${r.message}`);

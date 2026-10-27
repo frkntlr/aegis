@@ -9,6 +9,7 @@ import { PolyglotStackTraceParser, SymptomClassifier, SymbioticDiagnosticTriangu
 import { WorktreeManager } from '@aegis/orchestrator';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
+import { mcpTaskList, mcpTaskClaim, mcpTaskRelease, mcpTaskInboxPull, mcpLockStatus } from './task-commands.js';
 
 interface JsonRpcRequest {
   jsonrpc: string;
@@ -31,7 +32,12 @@ export const MCP_TOOLS = [
   { name: 'socratic_diagnose', description: 'Instant Socratic evidence parsing & diagnostic hypothesis generation', inputSchema: { type: 'object', properties: { rawLog: { type: 'string' } }, required: ['rawLog'] } },
   { name: 'context7_query', description: 'Query official library ground-truth documentation', inputSchema: { type: 'object', properties: { library: { type: 'string' }, topic: { type: 'string' } }, required: ['library', 'topic'] } },
   { name: 'rtk_compress', description: 'Compress terminal logs via RTK Token Killer', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
-  { name: 'worktree_status', description: 'Inspect active worktrees and active file mutex locks', inputSchema: { type: 'object', properties: {} } }
+  { name: 'worktree_status', description: 'Inspect active worktrees and active file mutex locks', inputSchema: { type: 'object', properties: {} } },
+  { name: 'task_list', description: 'List ready, in_progress, or blocked tasks in TIP queue', inputSchema: { type: 'object', properties: { status: { type: 'string' } } } },
+  { name: 'task_claim', description: 'Claim a task for an agent role and acquire file locks', inputSchema: { type: 'object', properties: { issueNumber: { type: 'number' }, agentRole: { type: 'string' } }, required: ['issueNumber'] } },
+  { name: 'task_release', description: 'Release or complete a task and release file locks', inputSchema: { type: 'object', properties: { issueNumber: { type: 'number' }, status: { type: 'string' }, agentRole: { type: 'string' } }, required: ['issueNumber'] } },
+  { name: 'task_inbox_pull', description: 'Pull the next staged autonomous task payload from .aegis/task-inbox.json', inputSchema: { type: 'object', properties: { agentRole: { type: 'string' } } } },
+  { name: 'lock_status', description: 'Inspect active file mutex locks across worktrees', inputSchema: { type: 'object', properties: {} } }
 ];
 
 function resolveFilePath(fp: string): string {
@@ -147,7 +153,7 @@ function executeUtilityTool(name: string, args: Record<string, unknown>): string
     const parser = new PolyglotStackTraceParser();
     const parsed = parser.parse(rawLog);
     const category = SymptomClassifier.classify(rawLog);
-    let boundaryOpt;
+    let boundaryOpt: ReturnType<typeof SymbioticDiagnosticTriangulator.toClarificationOption> | undefined;
     if (args.callSiteCode && args.library && args.symbol) {
       const diag = SymbioticDiagnosticTriangulator.triangulate({
         callSiteCode: String(args.callSiteCode),
@@ -192,6 +198,11 @@ export function executeMcpTool(name: string, args: Record<string, unknown> = {})
   if (name === 'budget_inspect' || name === 'cage_check' || name === 'triage') {
     return executeQualityTool(name, args);
   }
+  if (name === 'task_list') return mcpTaskList(args);
+  if (name === 'task_claim') return mcpTaskClaim(args);
+  if (name === 'task_release') return mcpTaskRelease(args);
+  if (name === 'task_inbox_pull') return mcpTaskInboxPull(args);
+  if (name === 'lock_status') return mcpLockStatus();
   return executeUtilityTool(name, args);
 }
 

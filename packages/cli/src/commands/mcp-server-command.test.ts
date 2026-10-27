@@ -15,7 +15,7 @@ test('handleJsonRpc handles tools/list request', () => {
   const res = handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 14);
+  assert.strictEqual(result.tools.length, 19);
   const names = result.tools.map(t => t.name);
   assert.ok(names.includes('memory_query'));
   assert.ok(names.includes('memory_stats'));
@@ -25,6 +25,11 @@ test('handleJsonRpc handles tools/list request', () => {
   assert.ok(names.includes('skeleton_extract'));
   assert.ok(names.includes('budget_inspect'));
   assert.ok(names.includes('worktree_status'));
+  assert.ok(names.includes('task_list'));
+  assert.ok(names.includes('task_claim'));
+  assert.ok(names.includes('task_release'));
+  assert.ok(names.includes('task_inbox_pull'));
+  assert.ok(names.includes('lock_status'));
 });
 
 test('handleJsonRpc handles tools/call and executes tools', () => {
@@ -157,4 +162,36 @@ test('handleJsonRpc executes worktree_status tool', () => {
   assert.ok(Array.isArray(parsed.worktrees));
   assert.strictEqual(typeof parsed.activeCount, 'number');
   assert.strictEqual(typeof parsed.lockedFiles, 'object');
+});
+
+test('handleJsonRpc executes task suite tools (task_list, task_claim, lock_status)', () => {
+  const listRes = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 12,
+    method: 'tools/call',
+    params: { name: 'task_list', arguments: {} }
+  });
+  assert.ok(listRes);
+  const listParsed = JSON.parse((listRes.result as { content: Array<{ text: string }> }).content[0].text);
+  assert.ok(typeof listParsed.count === 'number');
+
+  const claimRes = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 13,
+    method: 'tools/call',
+    params: { name: 'task_claim', arguments: { issueNumber: 501, agentRole: 'qa-hunter' } }
+  });
+  assert.ok(claimRes);
+  const claimParsed = JSON.parse((claimRes.result as { content: Array<{ text: string }> }).content[0].text);
+  assert.strictEqual(claimParsed.success, true);
+
+  const lockRes = handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 14,
+    method: 'tools/call',
+    params: { name: 'lock_status', arguments: {} }
+  });
+  assert.ok(lockRes);
+  const lockParsed = JSON.parse((lockRes.result as { content: Array<{ text: string }> }).content[0].text);
+  assert.ok(typeof lockParsed.lockedFiles === 'object');
 });

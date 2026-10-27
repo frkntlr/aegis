@@ -85,6 +85,15 @@ import {
   handleMemoryVerify,
   handleMemoryColdStart
 } from '../commands/memory-command.js';
+import {
+  handleTaskList,
+  handleTaskClaim,
+  handleTaskRelease,
+  handleTaskInject,
+  handleTaskPull,
+  handleLockStatus,
+  handleTaskVerify
+} from '../commands/task-commands.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 import { ConversationalIntentDetector } from '@aegis/github-live';
 import { HELP_LINES } from './help-text.js';
@@ -174,7 +183,15 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'loop:status': () => handleLoopStatus(),
   'loop:reset': (a) => handleLoopReset(a[1]),
   debug: async (a) => { await handleDebugCommand(a.slice(1).join(' ')); },
-  mcp: () => startMcpServer()
+  mcp: () => startMcpServer(),
+  'task:list': (a) => handleTaskList(a[1]),
+  'task:claim': (a) => handleTaskClaim(a[1], a[2]),
+  'task:release': (a) => handleTaskRelease(a[1], a[2], a[3]),
+  'task:inject': (a) => handleTaskInject(a[1], a[2], a[3]),
+  'task:pull': (a) => handleTaskPull(a[1]),
+  'task:verify': (a) => handleTaskVerify(a[1]),
+  'verify:task': (a) => handleTaskVerify(a[1]),
+  'lock:status': () => handleLockStatus()
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {
