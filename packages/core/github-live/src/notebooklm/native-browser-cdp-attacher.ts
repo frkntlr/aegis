@@ -74,17 +74,10 @@ export class NativeBrowserCdpAttacher {
     const active = await NativeBrowserCdpAttacher.isCdpActive(port, host, timeoutMs);
     if (!active) return null;
 
-    try {
-      const versionUrl = `http://${host}:${port}/json/version`;
-      const res = await fetch(versionUrl);
-      const json = (await res.json()) as Record<string, unknown>;
-      const wsUrl = typeof json.webSocketDebuggerUrl === 'string' ? json.webSocketDebuggerUrl : null;
-      if (!wsUrl) return null;
+    const wsUrl = await NativeBrowserCdpAttacher.resolveWebSocketUrl(port, host);
+    if (!wsUrl) return null;
 
-      return await NativeBrowserCdpAttacher.fetchViaWebSocket(wsUrl, timeoutMs);
-    } catch {
-      return null;
-    }
+    return await NativeBrowserCdpAttacher.fetchViaWebSocket(wsUrl, timeoutMs);
   }
 
   public static async harvestSessionCookies(options: CdpHarvestOptions = {}): Promise<CdpHarvestResult> {
@@ -151,10 +144,29 @@ export class NativeBrowserCdpAttacher {
       .join('; ');
   }
 
+  private static async resolveWebSocketUrl(port: number, host: string): Promise<string | null> {
+    try {
+      const listRes = await fetch(`http://${host}:${port}/json/list`);
+      const listJson = (await listRes.json()) as Array<Record<string, unknown>>;
+      const page = listJson.find(p => p.type === 'page' && typeof p.webSocketDebuggerUrl === 'string');
+      if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl as string;
+    } catch {
+      // Fallback to version endpoint
+    }
+
+    try {
+      const versionRes = await fetch(`http://${host}:${port}/json/version`);
+      const json = (await versionRes.json()) as Record<string, unknown>;
+      return typeof json.webSocketDebuggerUrl === 'string' ? json.webSocketDebuggerUrl : null;
+    } catch {
+      return null;
+    }
+  }
+
   private static async executeWithSender(sender: CdpCommandSender): Promise<string | null> {
     try {
       const res = await sender('Network.getCookies', {
-        urls: ['https://notebooklm.google.com', 'https://accounts.google.com']
+        urls: ['https://notebooklm.google.com', 'https://notebook.google.com', 'https://accounts.google.com']
       });
       const cookies = Array.isArray(res.cookies) ? res.cookies : [];
       const formatted = NativeBrowserCdpAttacher.formatCookies(cookies);
@@ -184,7 +196,7 @@ export class NativeBrowserCdpAttacher {
       ws.send(JSON.stringify({
         id: 1,
         method: 'Network.getCookies',
-        params: { urls: ['https://notebooklm.google.com', 'https://accounts.google.com'] }
+        params: { urls: ['https://notebooklm.google.com', 'https://notebook.google.com', 'https://accounts.google.com'] }
       }));
     };
     ws.onmessage = (ev) => {

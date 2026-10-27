@@ -29,7 +29,9 @@ export async function handleNlmAuth(...args: string[]): Promise<void> {
     const browserIdx = args.findIndex(a => a === '--browser' || a === '-b');
     const browserArg = args[browserIdx + 1];
     const preferredName = browserArg && !browserArg.startsWith('-') ? browserArg : undefined;
-    await runBrowserAuth(preferredName);
+    const portIdx = args.indexOf('--port');
+    const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1], 10) : 9222;
+    await runBrowserAuth(preferredName, port);
     return;
   }
 
@@ -99,7 +101,7 @@ async function executeHarvestWorkflow(port: number): Promise<boolean> {
   console.log('🔑 Waiting for Google NotebookLM session (sign in if prompted in browser)...');
   const harvest = await NativeBrowserCdpAttacher.harvestSessionCookies({
     port,
-    maxWaitMs: 90000,
+    maxWaitMs: 180000,
     pollIntervalMs: 1500,
     autoClose: true
   });
