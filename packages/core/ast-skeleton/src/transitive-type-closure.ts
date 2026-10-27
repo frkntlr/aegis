@@ -27,13 +27,14 @@ export interface BoundedTypeClosureResult {
   totalLines: number;
 }
 
-const BUILTIN_TYPES = new Set([
-  'string', 'number', 'boolean', 'void', 'any', 'unknown', 'never', 'null', 'undefined',
-  'Promise', 'Record', 'Array', 'Map', 'Set', 'Error', 'Date', 'RegExp', 'Partial',
-  'Required', 'Readonly', 'Omit', 'Pick', 'Exclude', 'Extract', 'NonNullable',
-  'ReturnType', 'InstanceType', 'Parameters', 'ConstructorParameters', 'object',
-  'Function', 'symbol', 'bigint', 'true', 'false', 'T', 'K', 'V', 'R'
-]);
+const BUILTIN_TYPES = new Set(
+  ('string number boolean void any unknown never null undefined Promise Record Array Map Set Error Date RegExp ' +
+  'Partial Required Readonly Omit Pick Exclude Extract NonNullable ReturnType InstanceType Parameters ' +
+  'ConstructorParameters object Function symbol bigint true false T K V R Buffer ArrayBuffer Uint8Array ' +
+  'ReadableStream WritableStream URL URLSearchParams Headers Request Response AbortSignal Blob File FormData ' +
+  'Iterable AsyncIterable Iterator AsyncIterator ReadonlyArray ReadonlyMap ReadonlySet ChildProcess NodeJS Event'
+  ).split(' ')
+);
 
 export class TransitiveTypeClosure {
   private readonly options: Required<TypeClosureOptions>;
@@ -91,6 +92,32 @@ export class TransitiveTypeClosure {
     return null;
   }
 
+  private resolveReExport(
+    sf: ts.SourceFile,
+    typeName: string,
+    curPath: string,
+    fileCache: Map<string, ts.SourceFile>
+  ): { decl: string; sf: ts.SourceFile; path: string } | null {
+    for (const stmt of sf.statements) {
+      if (!ts.isExportDeclaration(stmt) || !stmt.moduleSpecifier || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+      const named = stmt.exportClause && ts.isNamedExports(stmt.exportClause);
+      const isMatch = (named && stmt.exportClause.elements.some(e => e.name.text === typeName)) || !stmt.exportClause;
+      if (!isMatch) continue;
+      const targetPath = TsCallGraphExtractor.resolveImportPath(curPath, stmt.moduleSpecifier.text);
+      if (!targetPath) continue;
+      let targetSf = fileCache.get(targetPath);
+      if (!targetSf) {
+        const code = this.readTargetFile(targetPath);
+        if (!code) continue;
+        targetSf = ts.createSourceFile(targetPath, code, ts.ScriptTarget.Latest, true);
+        fileCache.set(targetPath, targetSf);
+      }
+      const decl = this.findDeclInSource(targetSf, typeName);
+      if (decl) return { decl, sf: targetSf, path: targetPath };
+    }
+    return null;
+  }
+
   private resolveFirstDegree(
     typeName: string,
     currentSf: ts.SourceFile,
@@ -102,7 +129,7 @@ export class TransitiveTypeClosure {
 
     const imports = TsCallGraphExtractor.collectImports(currentSf, currentPath);
     const binding = imports.get(typeName);
-    if (!binding) return null;
+    if (!binding) return this.resolveReExport(currentSf, typeName, currentPath, fileCache);
 
     let targetSf = fileCache.get(binding.targetFilePath);
     if (!targetSf) {
@@ -117,6 +144,8 @@ export class TransitiveTypeClosure {
       const q = binding.importedName === 'default' ? typeName : binding.importedName;
       const decl = this.findDeclInSource(targetSf, q);
       if (decl) return { decl, sf: targetSf, path: binding.targetFilePath };
+      const reExported = this.resolveReExport(targetSf, q, binding.targetFilePath, fileCache);
+      if (reExported) return reExported;
     }
     return null;
   }
@@ -219,12 +248,8 @@ export class TransitiveTypeClosure {
 
   private emptyResult(): BoundedTypeClosureResult {
     return {
-      fullDeclarations: [],
-      opaqueStubs: [],
-      monomorphizedTypes: [],
-      formattedBlock: '',
-      exceededBudget: false,
-      totalLines: 0
+      fullDeclarations: [], opaqueStubs: [], monomorphizedTypes: [],
+      formattedBlock: '', exceededBudget: false, totalLines: 0
     };
   }
 

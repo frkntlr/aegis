@@ -86,3 +86,30 @@ test('extractTypeIdentifiers and generateOpaqueStub work accurately', () => {
   const stub = TransitiveTypeClosure.generateOpaqueStub('OrderBatch');
   assert.strictEqual(stub, "export type OrderBatch = { readonly __opaque: 'OrderBatch' };");
 });
+
+test('TransitiveTypeClosure resolves barrel re-exports accurately', () => {
+  const barrelCode = "export { Account } from './models.js';";
+  const modelsCode = 'export interface Account { id: string; balance: number; }';
+  const callerCode = "import { Account } from './barrel.js';\nexport function audit(acc: Account): void {}";
+
+  const closure = new TransitiveTypeClosure({
+    maxDepth: 1,
+    sourceFileProvider: (targetPath: string) => {
+      if (targetPath.endsWith('barrel.js') || targetPath.endsWith('barrel.ts')) return barrelCode;
+      if (targetPath.endsWith('models.js') || targetPath.endsWith('models.ts')) return modelsCode;
+      return null;
+    }
+  });
+
+  const res = closure.resolveClosure('audit', 'audit.ts', callerCode);
+  assert.strictEqual(res.fullDeclarations.length, 1);
+  assert.ok(res.fullDeclarations[0]?.includes('interface Account'));
+});
+
+test('TransitiveTypeClosure shields global runtime types from opaque stubbing', () => {
+  const code = 'export function streamData(buf: Buffer, url: URL, sig: AbortSignal): ReadableStream { return null!; }';
+  const closure = new TransitiveTypeClosure();
+  const res = closure.resolveClosure('streamData', 'stream.ts', code);
+  assert.strictEqual(res.opaqueStubs.length, 0);
+  assert.strictEqual(res.fullDeclarations.length, 0);
+});
