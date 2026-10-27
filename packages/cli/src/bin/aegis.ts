@@ -155,7 +155,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   diff: (a) => handleDiff(a.length > 2 ? a.slice(1).join(' ') : a[1]),
   audit: (a) => handleAudit(a[1]),
   find: (a) => handleFind(a[1]),
-  triage: (a) => handleTriage(a[1]),
+  triage: (a) => handleTriage(a.slice(1)),
   trace: (a) => handleTrace(a[1]),
   'graph:scan': (a) => handleGraphScan(a[1]),
   'ast:search': (a) => handleAstSearch(a[1], a[2], a[3]),

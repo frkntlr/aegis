@@ -55,7 +55,7 @@ export const HELP_LINES: readonly string[] = [
   '  aegis audit <files>                    Run Immutable Oracle trust verification',
   '  aegis estimate <files> <tests>         Pre-execution adaptive timeout estimation',
   '  aegis find <symbol>                    Fast AST symbol lookup and precision surgical slice',
-  '  aegis triage [dir]                     Evidence-Based Bug Triage (zero false alarms)',
+  '  aegis triage [dir] [flags]             Evidence-Based Bug Triage (--with-tests, --with-godot, --auto-dispatch)',
   '  aegis trace <target>                   Trace relational callers, signal listeners & scenes',
   '  aegis graph:scan [dir]                 Build cross-reference relational knowledge graph',
   '  aegis ast:search <pat> [dir]           Structural AST search via ast-grep',

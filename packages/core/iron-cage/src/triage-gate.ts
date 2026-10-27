@@ -66,7 +66,7 @@ export class EvidenceBasedTriageGate {
   }
 
   private collectTestDefects(input: TriageInput, findings: TriageFinding[]): void {
-    if (input.failingTestsCount && input.failingTestsCount > 0) {
+    if (input.failingTestsCount && input.failingTestsCount > 0 && (!input.testFailures || input.testFailures.length === 0)) {
       findings.push({
         id: `crit-test-${Date.now()}-1`,
         category: 'CRITICAL_DEFECT',
