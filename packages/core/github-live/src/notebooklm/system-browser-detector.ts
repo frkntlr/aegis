@@ -24,10 +24,10 @@ export class SystemBrowserDetector {
     const installed = SystemBrowserDetector.listInstalledBrowsers(customPaths, platform);
     if (installed.length === 0) return null;
 
-    if (preferredName) {
+    if (preferredName && preferredName !== 'auto') {
       const normalized = preferredName.toLowerCase();
       const match = installed.find(b => b.name === normalized || b.executablePath.toLowerCase().includes(normalized));
-      if (match) return match;
+      return match || null;
     }
 
     return installed[0] || null;
