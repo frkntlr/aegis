@@ -8,6 +8,7 @@
 import { MultiRootTokenResolver } from './multi-root-token-resolver.js';
 import { NotebookLmNativeClient } from './notebooklm-native-client.js';
 import { HttpRotateEngine } from './http-rotate-engine.js';
+import { NotebookLmAuthError, type AuthChallengeHandler } from './auth-challenge.js';
 import type { NotebookCitation } from './types.js';
 
 export type OracleTier = 'nlm' | 'context7' | 'local_ast';
@@ -20,6 +21,7 @@ export interface OracleQueryOptions {
   topicHint?: string;
   requireLatestActive?: boolean;
   groundingDirective?: string;
+  onAuthChallenge?: AuthChallengeHandler;
 }
 
 export interface OracleQueryResult {
@@ -60,7 +62,24 @@ export class UnifiedKnowledgeOracle {
 
     try {
       return await this.tryNotebookLmTier(question, options);
-    } catch {
+    } catch (err: unknown) {
+      if (options.onAuthChallenge) {
+        const action = await options.onAuthChallenge({
+          operation: 'query',
+          notebookId: options.notebookId,
+          errorDetails: err instanceof Error ? err.message : String(err)
+        });
+        if (action === 'REAUTH') {
+          return await this.tryNotebookLmTier(question, options);
+        }
+        if (action === 'ABORT') {
+          throw new NotebookLmAuthError('Query aborted on auth challenge by user directive.', {
+            operation: 'query',
+            notebookId: options.notebookId,
+            errorDetails: 'ABORT_BY_USER'
+          });
+        }
+      }
       return this.degradeToSecondaryTiers(question, options);
     }
   }
