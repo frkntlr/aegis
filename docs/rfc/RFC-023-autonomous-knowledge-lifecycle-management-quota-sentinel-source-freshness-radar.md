@@ -9,71 +9,76 @@
 
 ## 🔍 1. Fikir ve Problem Tanımı (Research & Grounding)
 
-Google NotebookLM (Gemini Notebook) üzerinde derin arama ve analiz yaparken kaynakların nasıl yönetildiği, güncellendiği, tasfiye edildiği ve güncellik durumlarının nasıl ayarlandığı incelenmiş; otonom ajan ekosistemi için 3 temel mimari gerçeklik ve risk saptanmıştır:
+Google NotebookLM (Gemini Notebook) üzerinde derin arama ve analiz yaparken kaynakların yönetimi, tasfiyesi ve güncelliği incelenmiş; kullanıcının belirlediği iki stratejik yönelim doğrultusunda kapsamlı bir risk ve çözüm mimarisi oluşturulmuştur:
+1. **Curated Modunun Varsayılan Olması:** Derin araştırmada keşfedilen en yüksek alaka düzeyli top-$K$ (3–5) web kaynağının filtrelenerek doğrudan notebook'a gerçek kaynak olarak eklenmesi.
+2. **Yapay Zeka Kararlı Otonom Tasfiye:** Manuel `--force` ve dry-run engelleri yerine, yapay zekanın (AI) eskimiş/gereksiz kaynakları otonom olarak belirleyip doğrudan silebilecek zekaya kavuşturulması.
 
-### 1.1. Derin Arama ve Analizde Kaynak Genişletme Davranışı
-- **Google NotebookLM Mekanizması:** `mode: 'deep'` (RPC `QA9ei` / `START_DEEP_RESEARCH`) ile web üzerinde çok aşamalı arama yapıldığında bulunan ~40 kaynak **defterin kaynak listesine otomatik olarak eklenmez**. Sonuçlar arama görevinin geçici havuzunda (`e3bVqc` / `POLL_RESEARCH`) bekletilir. Deftere eklenmesi için `LBwxtb` (`IMPORT_RESEARCH` / `research_import`) çağrısının açıkça yapılması şarttır.
-- **Problem:** Eğer bir ajan arama sonuçlarını doğrudan deftere kontrolsüzce aktarırsa, her derin aramada 30-40 web kaynağı defteri doldurarak hızla gürültüye (noise bloat) ve kota tükenmesine neden olur.
-- **Aegis Çözümü:** Aegis `NotebookLmDeepResearchWorkflow` ile çift mod sunar:
-  1. `digest` (Varsayılan): 40 ham link yerine tüm araştırmayı sentezleyen tek bir *"Research Digest: <topic>"* dokümanı eklenir (tam olarak 1 kaynak harcanır).
-  2. `curated`: Yalnızca en yüksek alaka düzeyine sahip top-$K$ (varsayılan 5) kaynak filtrelenerek içe aktarılır.
+### 1.1. Kapsamlı Risk Analizi (Deep Risk Analysis)
 
-### 1.2. Gereksiz / Eskiyen Kaynakların Tasfiyesi (Garbage Collection & Pruning)
-- **Google NotebookLM Mekanizması:** Google platformunda **otomatik kaynak silme veya çöp toplama (GC) mekanizması YOKTUR**. Bir kaynak (URL, Drive belgesi veya metin) manuel olarak silinene kadar sonsuza dek defterde kalır.
-- **Kritik Sınır (50-Kaynak Tavanı):** NotebookLM defter başına azami **50 kaynak** sınırına sahiptir. 50 kaynak aşıldığında sistem yeni kaynak eklenmesini engeller (`RESOURCE_EXHAUSTED`).
-- **Aegis Çözümü:** Aegis `SourceFreshnessAuditor` ve `SourceTombstonePruner` ile dokunulmaz belgeleri (`PinnedSourceConfig`: Anayasa, Demir Kafes, Core Architecture vb.) koruma altına alır. Yalnızca `Status: Superseded` işaretli RFC'leri ve `[obsolete]` etiketli kaynakları tespit ederek güvenli dry-run sonrası `--force` ile tasfiye eder.
-
-### 1.3. Kaynak Güncelliği ve Tazelik Tespiti (Freshness & Auto-Sync)
-- **Google NotebookLM Mekanizması:** Kaynaklar eklendikleri anın **statik görüntüsü (snapshot)** olarak saklanır. Dış dünyada orijinal web sayfası değiştiğinde defter otomatik olarak güncellenmez.
-- **Drive Senkronizasyonu:** Google Drive dokümanları (Docs, Sheets, Slides) için Google API `yR9Yof` (`CHECK_FRESHNESS`) ile tazelik sorgulamayı ve `FLmJqe` (`SYNC_DRIVE_SOURCE`) ile en son içeriği çekmeyi destekler. Ancak harici web URL'lerinde otomatik güncelleme bulunmaz; silinip yeniden eklenmesi gerekir.
-- **Aegis İhtiyacı:** Sürekli çalışan bir Tazelik Radarı (Freshness Radar) ile Drive kaynaklarının otomatik eşitlenmesi, dış web linklerinin ise HTTP HEAD/ETag ile taranarak kırılan (404/410) veya değişen linklerin tespit edilmesi gereklidir.
+| Risk | Tehdit & Mekanizma | Şiddet | Aegis Güvenlik Bariyeri |
+| :--- | :--- | :---: | :--- |
+| **R1: AI Hafıza Kaybı (Amnesia)** | AI'ın Anayasa, Demir Kafes veya kurucu RFC'leri "eski tarihli" diye yanlışlıkla silmesi. | **Kritik** | **Dokunulmazlık Kalkanı (Hard Veto):** Anayasal anahtar kelimeleri taşıyan kaynaklar için Score = 0 (Asla Silinemez). |
+| **R2: Geri Döndürülemez Kayıp** | NotebookLM'in `DELETE_SOURCE` işleminin kalıcı olması ve çöp kutusunun bulunmaması. | **Kritik** | **Yerel Mezar Taşı Kasası (`.aegis/vault/tombstones/`):** Silinmeden önce tam içerik yerelde arşivlenir; `aegis nlm:restore` ile <1 saniyede geri yüklenir. |
+| **R3: 50-Kaynak Tavanı Kilitlenmesi** | Curated modda her aramada 3-5 kaynak eklenmesiyle kotanın hızla dolup kilitlenmesi. | **Yüksek** | **Kota Nöbetçisi & Transactional Swap:** $N \ge 40$ olduğunda yeni kaynak eklenmeden önce eski kaynaklar rezerve edilir ve yer açılır. |
+| **R4: Düşük Kaliteli / Çöp Web Linkleri** | SEO spamı, 404/410 dönen kırık sayfalar veya boş giriş ekranlarının eklenmesi. | **Orta** | **Akıllı Curated Filtresi:** URL normalizasyonu, deduplication ve HTTP HEAD canlılık testi. |
+| **R5: Yarış Durumu & Net Bilgi Kaybı** | Kaynak silindikten sonra yeni kaynak aktarımının ağ hatasıyla çökmesi. | **Yüksek** | **İki Aşamalı İşlem (Two-Phase Commit):** Yeni kaynaklar başarıyla eklenmeden eski kaynaklar NotebookLM'den fiziksel olarak silinmez (Rollback koruması). |
 
 ---
 
-## 🏗️ 2. Düğüm & Bileşen Mimarisi (AKLM-Substrate)
+## 🏗️ 2. Düğüm & Bileşen Mimarisi (The 4-Pillar AKG Substrate)
 
 ```mermaid
 flowchart TD
-    subgraph Pipeline ["1. Otonom Kaynak Genişletme & Filtreleme"]
-        RESEARCH["Deep Research (QA9ei)"] --> POLL["Poll Results (e3bVqc)"]
-        POLL --> FILTER{"İçe Aktarma Modu"}
-        FILTER -- Digest --> DIGEST["Tekil Konsolide Sentez (1 Slot)"]
-        FILTER -- Curated --> DEDUP["URL Deduplication & Top-K Seçimi"]
+    subgraph P1 ["Sütun 1: Çok Faktörlü Güven Skorlama Matrisi (MFCS)"]
+        SOURCE["İncelenen Kaynak"] --> SHIELD{"Anayasa / Pinned mi?"}
+        SHIELD -- Evet --> IMMUTABLE["Skor = 0 (Asla Silinemez Veto)"]
+        SHIELD -- Hayır --> ORACLE["Supersession Oracle (+40 Puan)"]
+        ORACLE --> DRIFT["HTTP HEAD / 404 Radar (+35 Puan)"]
+        DRIFT --> CITATION["Son 30 Turda 0 Atıf (+25 Puan)"]
+        CITATION --> EVAL{"Toplam Skor >= 60?"}
+        EVAL -- Evet --> AUTO_APPROVED["AUTONOMOUS_PRUNE_APPROVED (AI Otonom Silebilir)"]
+        EVAL -- Hayır --> KEEP["Kaynak Korunur (Güvenli)"]
     end
 
-    subgraph Sentinel ["2. 50-Kaynak Kota Nöbetçisi (Quota Sentinel)"]
-        COUNT{"Aktif Kaynak >= 40?"}
-        COUNT -- Evet --> AUTO_PRUNE["Proaktif Tasfiye (Superseded/Obsolete Temizliği)"]
-        COUNT -- Hayır --> PROCEED["Doğrudan İçe Aktar"]
-        AUTO_PRUNE --> PROCEED
+    subgraph P2 ["Sütun 2: İki Aşamalı İşlem & Yerel Kasa (Tombstone Vault)"]
+        AUTO_APPROVED --> BACKUP["Yerel Kasaya Yedekle (.aegis/vault/tombstones/)"]
+        BACKUP --> IMPORT["Curated Kaynakları İçe Aktar (IMPORT_RESEARCH)"]
+        IMPORT -- Başarılı --> PURGE["NotebookLM'den Fiziksel Tasfiye Et"]
+        IMPORT -- Başarısız --> ROLLBACK["Geri Al (Hiçbir Kaynak Silinmez)"]
     end
 
-    subgraph Radar ["3. Sürekli Tazelik Radarı (Freshness Radar)"]
-        SWEEP["Periyodik / Manuel Tazelik Taraması"]
-        SWEEP --> DRIVE{"Kaynak Türü?"}
-        DRIVE -- Google Drive --> CHK["CHECK_FRESHNESS (yR9Yof)"]
-        CHK -- Değişiklik Var --> SYNC["SYNC_DRIVE_SOURCE (FLmJqe)"]
-        DRIVE -- Web URL --> HEAD["HTTP HEAD / ETag Doğrulama"]
-        HEAD -- 404/Stale --> MARK["[Stale: Drift] Olarak Bayrakla"]
+    subgraph P3 ["Sütun 3: Akıllı Curated Seçici (Deduplication & Quality Filter)"]
+        DISCOVERED["Keşfedilen Web Kaynakları (~40)"] --> DEDUP["URL Normalizasyonu & Tekil Kontrolü"]
+        DEDUP --> HEALTH["HTTP HEAD / Canlılık & Statü Denetimi"]
+        HEALTH --> RANK["Top-K Seçimi (K=3-5, En Yüksek Alaka)"]
+        RANK --> IMPORT
     end
 
-    Pipeline --> Sentinel
-    Sentinel --> Radar
+    subgraph P4 ["Sütun 4: Geri Yükleme Garantisi (One-Click Restore)"]
+        PURGE --> RESTORE_READY["aegis nlm:restore <sourceId> ile <1 Saniyede Geri Yükleme"]
+    end
 ```
 
-### 2.1. Temel Bileşenler
+### 2.1. Temel Bileşenler ve Görevleri
 
-1. **`QuotaSentinel` (`@aegis/github-live`):**
-   - Derin araştırma veya kaynak ekleme öncesi defter kaynak sayısını denetler ($N / 50$).
-   - $N \ge 40$ durumunda alarm üretir ve `SourceTombstonePruner` aracılığıyla korumasız eski kaynakları temizlemek üzere proaktif plan çıkarır.
+1. **`AutonomousPruningEngine` (`@aegis/github-live`):**
+   - Çok Faktörlü Güven Skorlama Matrisini (MFCS) işletir.
+   - Puanı $\ge 60$ olan adayları insan onayı veya `--force` beklemeden otonom tasfiye için onaylar.
+   - Dokunulmazlık Kalkanı ile kurucu dosyaları mutlak korur.
 
-2. **`SourceFreshnessRadar` (`@aegis/github-live`):**
-   - `CHECK_FRESHNESS` (`yR9Yof`) RPC'si ile Drive kaynaklarını denetler.
-   - Değişiklik saptandığında `SYNC_DRIVE_SOURCE` (`FLmJqe`) ile içeriği yeniler.
-   - Web URL'leri için hafif HTTP HEAD istekleriyle erişilebilirlik ve ETag denetimi yapar.
+2. **`TombstoneVaultManager` (`@aegis/github-live`):**
+   - Tasfiye edilecek tüm kaynakların içerik, URL ve metadata'sını `.aegis/vault/tombstones/<sourceId>.json` dizinine arşivler.
+   - İki aşamalı takas (Transactional Swap) mantığıyla yeni kaynaklar başarıyla yüklenene kadar fiziksel silmeyi bloke eder.
+   - `restore(sourceId)` metoduyla arşivdeki kaynağı anında NotebookLM'e geri yükler.
 
-3. **`NotebookLmNativeClient` Protokol Eşitlemesi:**
-   - Empirik Google Labs Tailwind batchexecute RPC haritası (`wXbhsf`, `yR9Yof`, `FLmJqe`, `tGMBJ`, `QA9ei`, `e3bVqc`, `LBwxtb`) ve `https://notebook.google.com` baz URL'i ile yerel MCP sunucusu arasında tam uyum sağlanır.
+3. **`CuratedIngestionPipeline` (`@aegis/github-live`):**
+   - Derin araştırmada varsayılan olarak çalışır.
+   - URL temizleme (tracking param strip) ve notebook içi tekillik denetimi yapar.
+   - HTTP HEAD ile 404/ölü siteleri eler, kalanlardan en yüksek puanlı top-$K$ (3–5) kaynağı ekler.
+
+4. **`SourceFreshnessRadar` & Wire Protocol Alignment:**
+   - Google Drive kaynaklarını `CHECK_FRESHNESS` (`yR9Yof`) ve `SYNC_DRIVE_SOURCE` (`FLmJqe`) ile otomatik günceller.
+   - `NotebookLmNativeClient` RPC ID'lerini (`wXbhsf`, `yR9Yof`, `FLmJqe`, `tGMBJ`, `QA9ei`, `e3bVqc`, `LBwxtb`) doğrudan `https://notebook.google.com` ile eşitler.
 
 ---
 
@@ -81,26 +86,27 @@ flowchart TD
 
 | Komut | Açıklama |
 | :--- | :--- |
-| `aegis nlm:freshness [notebookId] [--sync-drive]` | Tüm kaynakların güncelliğini denetler ve değişen Drive dokümanlarını senkronize eder. |
-| `aegis nlm:prune [notebookId] [--force]` | Superseded/Obsolete durumdaki sahipsiz kaynakları güvenle tasfiye eder. |
-| `aegis nlm:research "<t>" --deep [--auto-prune]` | Kota nöbetçisi korumalı derin araştırma yapar, gerektiğinde yer açarak sonuçları damıtır. |
-| `aegis nlm:sources [notebookId]` | Kaynakları tazelik, koruma (pinned) ve kota doluluk durumlarıyla listeler. |
+| `aegis nlm:research "<t>" --deep` | Varsayılan olarak Akıllı Curated Mod ve Otonom Kota Takası (Swap) ile çalışır. |
+| `aegis nlm:prune [notebookId]` | Varsayılan olarak AI karar motoruyla $\ge 60$ skorlu kaynakları yerel kasaya yedekleyip otonom tasfiye eder. |
+| `aegis nlm:restore <sourceId>` | Yerel Mezar Taşı Kasasından silinmiş bir kaynağı NotebookLM'e anında geri yükler. |
+| `aegis nlm:freshness [notebookId]` | Drive dokümanlarını otomatik eşitler ve harici linklerdeki drift/404 durumunu raporlar. |
+| `aegis nlm:sources [notebookId]` | Defter kaynaklarını güven skoru, kota doluluk ve yedeklilik durumuyla listeler. |
 
 ---
 
 ## 🔒 4. Demir Kafes Standartları & Güvenlik
 
 - **Kota ve Satır Limitleri:** Azami 300 satır/dosya, azami 40 satır/fonksiyon, 0 `any` tip kullanımı.
-- **Korumalı Beyaz Liste (Pinned Whitelist):** Anayasa, Demir Kafes ve ana mimari kaynakları asla otonom silinemez.
-- **Dry-Run İlkesi:** Kaynak tasfiyesi varsayılan olarak dry-run çalışır; fiziksel silme açık `--force` parametresi gerektirir.
-- **Headless Git & Ağ Güvenliği:** Git ağ çağrıları ve HTTP RPC istekleri zaman aşımı korumalıdır (hang engeli).
+- **Sıfır Veri Kaybı Garantisi:** Fiziksel silme öncesi yerel JSON arşivleme zorunludur.
+- **İki Aşamalı Atomik Takas:** İçe aktarım doğrulanmadan silme kesinleştirilmez.
 
 ---
 
 ## 🎯 5. Kabul Kriterleri (Acceptance Criteria)
 
-- [ ] `QuotaSentinel` entegrasyonu ile 40+ kaynak doluluğunda proaktif uyarı ve tasfiye tetiklendi.
-- [ ] `SourceFreshnessRadar` ile Drive dokümanlarında `CHECK_FRESHNESS` ve `SYNC_DRIVE_SOURCE` döngüsü tamamlandı.
-- [ ] Dış web kaynakları için URL deduplication ve HTTP HEAD erişilebilirlik doğrulaması eklendi.
-- [ ] `NotebookLmNativeClient` Google Labs Tailwind batchexecute RPC kodlarıyla (`yR9Yof`, `FLmJqe`, `tGMBJ`) eşitlendi.
-- [ ] Tüm yeni modüller Deterministik Demir Kafes (300/40) ve %100 test onayından geçti.
+- [ ] `CuratedIngestionPipeline` ile derin aramada top 3–5 tekil ve canlı web kaynağının varsayılan eklenmesi sağlandı.
+- [ ] `AutonomousPruningEngine` ile Çok Faktörlü Güven Skorlama Matrisi (MFCS, Eşik: 60) uygulandı.
+- [ ] `TombstoneVaultManager` ile `.aegis/vault/tombstones/` yerel yedekleme ve `aegis nlm:restore` komutu tamamlandı.
+- [ ] İki Aşamalı Atomik Takas (Two-Phase Commit) ile içe aktarım başarısızlığında silmenin geri alınması doğrulandı.
+- [ ] Drive `source_check_freshness` ve `source_sync` otomatik döngüsü entegre edildi.
+- [ ] Tüm modüller Deterministik Demir Kafes (300/40) ve %100 birim/mutasyon test onayından geçti.
