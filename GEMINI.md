@@ -17,6 +17,7 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis wiki:sync`: Automatically synchronize and push living memory to `<repo>.wiki.git`.
 - `/aegis nlm:query "<q>"`: Query project knowledge base via Google NotebookLM.
 - `/aegis nlm:research "<topic>"`: Conduct deep architectural research via NotebookLM and stage Wiki.
+- `/aegis nlm:auth [args]`: Inspect and authenticate Google NotebookLM session (--browser, --paste, --status).
 - `/aegis find <symbol>`: Fast AST symbol lookup and precision surgical slice.
 - `/aegis triage [dir]`: Evidence-Based Bug Triage (zero false alarms).
 - `/aegis trace <target>`: Trace relational callers, signal listeners & scenes.
@@ -39,6 +40,17 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis branch:sync [agent|--all]`: Safely synchronize worktree branches with master with zero data loss stash protection.
 - `/aegis loop:status`: Inspect Circuit Breaker failure counters and blocked tasks.
 - `/aegis loop:reset [num]`: Reset failure counters and unblock tasks.
+
+## NotebookLM Interactive Auth Resolution & Tri-State Protocol
+Whenever any `/aegis nlm:*` command or NotebookLM tool call encounters an authentication failure, expired session, or connection issue (`AUTH_REQUIRED_INTERACTIVE` or HTTP 401/403/400):
+1. **Zero Silent Fallback**: The agent must NEVER silently downgrade to offline mode or guess without developer consent.
+2. **Mandatory Antigravity Modal**: The agent MUST immediately invoke the `ask_question` tool with:
+   - Question: `"NotebookLM'e bağlanılamadı. Ne yapmak istersiniz?"`
+   - Options:
+     1. `"(Recommended) NotebookLM'e tekrar giriş yap / oturumu yenile"` (Triggers `aegis nlm:auth --browser` or guides token paste, then retries original operation)
+     2. `"NotebookLM olmadan (Yerel AST ve Context7 ile) devam et"` (Executes with `--offline` / graceful fallback)
+     3. `"Görevi iptal et"` (Halts operation cleanly, releasing locks with status 0)
+3. **Execution Fidelity**: Strictly respect the user's chosen option.
 
 ## Headless Git & Remote Execution Safeguards
 To prevent indefinite command hangs during git remote operations:
