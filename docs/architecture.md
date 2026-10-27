@@ -57,5 +57,5 @@ Aegis mimarisi, yapay zeka ajanlarının sözlü kurallarla disipline edilemeyec
 | **Demir Kafes Denetimi** | `aegis cage:check [dir]` / `npm run aegis -- cage:check` | `node scripts/validate-compliance.js` | `.githooks/pre-commit` (1/3) & `.githooks/pre-push` (1/2) |
 | **Atomik 4-Adımlı Merge** | `aegis merge <agent> [branch]` / `npm run aegis -- merge` | `node scripts/iron-cage-merge.js` | Otonom Dispatcher & PR Onayı |
 | **Mutasyon Testi Kapısı** | `aegis mutate [file]` / `npm run aegis -- mutate` | - | `.githooks/pre-commit` (3/3, dinamik staged dosyalar) |
-| **Monorepo Birim Testleri**| `npm run test --workspaces` / `npm test` | - | `.githooks/pre-commit` (2/3) & `.githooks/pre-push` (2/2) |
+| **Monorepo Birim Testleri**| `npm test` (`turbo run test`) | - | `.githooks/pre-commit` (2/3) & `.githooks/pre-push` (2/2) |
 | **Tekil Dosya Doğrulama** | `aegis verify <file>` | - | CI `Iron Cage Verification` |

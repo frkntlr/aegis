@@ -1,8 +1,15 @@
 #!/bin/sh
-# Aegis Pre-Push Hook (Deterministic Iron Cage & Test Suite)
+# Aegis Pre-Push Hook (Deterministic Iron Cage & Turbo Acceleration)
 echo "🛡️  [Aegis] Pre-push Quality Shield running..."
 
-export PATH="$PATH:/c/Users/user/AppData/Roaming/Antigravity/bin:/c/Program Files/nodejs"
+# Resilient environment PATH resolution across Windows (Git Bash) and POSIX
+if [ -n "$APPDATA" ]; then
+  export PATH="$PATH:$APPDATA/npm:/c/Program Files/nodejs"
+fi
+if [ -n "$LOCALAPPDATA" ]; then
+  export PATH="$PATH:$LOCALAPPDATA/Programs/nodejs"
+fi
+export PATH="$PATH:/c/Program Files/nodejs:/usr/local/bin:/usr/bin"
 
 NPM_CMD="npm"
 if command -v npm.cmd >/dev/null 2>&1; then
@@ -15,8 +22,8 @@ $NPM_CMD run aegis -- cage:check || {
   exit 1
 }
 
-echo "🧪 [2/2] Running Monorepo Unit Test Suite..."
-$NPM_CMD run test --workspaces || {
+echo "🧪 [2/2] Running Monorepo Unit Test Suite (Turbo Parallel & Cached)..."
+$NPM_CMD test || {
   echo "❌ [Aegis] Pre-push rejected: One or more unit tests failed."
   exit 1
 }

@@ -29,8 +29,8 @@ jobs:
       - name: Build Monorepo
         run: npm run build
 
-      - name: Run Test Verification
-        run: npm run test --workspaces
+      - name: Run Test Verification (Turbo Parallel & Cached)
+        run: npm test
 
       - name: Publish Aegis CLI to npm
         run: |
