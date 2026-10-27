@@ -77,7 +77,7 @@ export class RpcParsers {
 
   public static parseSourceList(rawText: string): NotebookSourceSummary[] {
     const sources: NotebookSourceSummary[] = [];
-    const itemRegex = /\["([a-zA-Z0-9_-]{12,40})",\s*"([^"]+)"/g;
+    const itemRegex = /\["([a-zA-Z0-9_-]{6,50})",\s*"([^"]+)"/g;
     const seen = new Set<string>();
 
     let m = itemRegex.exec(rawText);
