@@ -2,7 +2,7 @@
 ### Aegis Autonomous Architecture Blueprint
 
 - **RFC ID:** RFC-024
-- **Durum:** Proposed (Önerildi) ⏳
+- **Durum:** Approved (Onaylandı) ✅ (Önerildi) ⏳
 - **Tarih:** 2026-10-27
 - **Yazar:** Aegis Autonomous Core Fleet
 - **GitHub Tartışması:** [#294](https://github.com/frkntlr/aegis/discussions/294)
