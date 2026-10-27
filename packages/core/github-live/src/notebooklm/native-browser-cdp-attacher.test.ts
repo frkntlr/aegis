@@ -52,8 +52,30 @@ test('NativeBrowserCdpAttacher handles empty or failing CDP sender gracefully', 
   assert.strictEqual(failingRes, null);
 });
 
-test('NativeBrowserCdpAttacher isCdpActive returns false when port is unreachable', async () => {
-  // Port 64999 is typically unused, test timeout aborts quickly
+test('NativeBrowserCdpAttacher isCdpActive and waitForCdp handle unreachable ports', async () => {
   const active = await NativeBrowserCdpAttacher.isCdpActive(64999, '127.0.0.1', 50);
   assert.strictEqual(active, false);
+
+  const waited = await NativeBrowserCdpAttacher.waitForCdp(64999, '127.0.0.1', 100, 50);
+  assert.strictEqual(waited, false);
+});
+
+test('NativeBrowserCdpAttacher harvestSessionCookies detects authenticated session via mock sender', async () => {
+  const mockSender = async () => ({
+    cookies: [
+      { name: 'SID', value: 'testSid' },
+      { name: '__Secure-1PSIDTS', value: 'testPsidts' }
+    ]
+  });
+
+  const res = await NativeBrowserCdpAttacher.harvestSessionCookies({
+    sender: mockSender,
+    maxWaitMs: 1000,
+    pollIntervalMs: 50
+  });
+
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.hasSid, true);
+  assert.strictEqual(res.hasPsidts, true);
+  assert.ok(res.cookies?.includes('SID=testSid'));
 });

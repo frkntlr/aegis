@@ -24,6 +24,20 @@ export interface CdpAttacherOptions {
   sender?: CdpCommandSender;
 }
 
+export interface CdpHarvestOptions extends CdpAttacherOptions {
+  pollIntervalMs?: number;
+  maxWaitMs?: number;
+  autoClose?: boolean;
+}
+
+export interface CdpHarvestResult {
+  success: boolean;
+  cookies?: string;
+  hasSid: boolean;
+  hasPsidts: boolean;
+  error?: string;
+}
+
 export class NativeBrowserCdpAttacher {
   public static async isCdpActive(port = 9222, host = '127.0.0.1', timeoutMs = 1000): Promise<boolean> {
     const controller = new AbortController();
@@ -36,6 +50,16 @@ export class NativeBrowserCdpAttacher {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  public static async waitForCdp(port = 9222, host = '127.0.0.1', timeoutMs = 15000, intervalMs = 500): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const active = await NativeBrowserCdpAttacher.isCdpActive(port, host, Math.min(intervalMs, 1000));
+      if (active) return true;
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return false;
   }
 
   public static async queryCookies(options: CdpAttacherOptions = {}): Promise<string | null> {
@@ -60,6 +84,55 @@ export class NativeBrowserCdpAttacher {
       return await NativeBrowserCdpAttacher.fetchViaWebSocket(wsUrl, timeoutMs);
     } catch {
       return null;
+    }
+  }
+
+  public static async harvestSessionCookies(options: CdpHarvestOptions = {}): Promise<CdpHarvestResult> {
+    const port = options.port ?? 9222;
+    const maxWaitMs = options.maxWaitMs ?? 60000;
+    const intervalMs = options.pollIntervalMs ?? 1500;
+    const deadline = Date.now() + maxWaitMs;
+
+    while (Date.now() < deadline) {
+      const cookies = await NativeBrowserCdpAttacher.queryCookies(options);
+      if (cookies) {
+        const hasSid = cookies.includes('SID=') || cookies.includes('__Secure-1PSID=') || cookies.includes('__Secure-3PSID=');
+        const hasPsidts = cookies.includes('__Secure-1PSIDTS=') || cookies.includes('__Secure-3PSIDTS=');
+        if (hasSid) {
+          if (options.autoClose) await NativeBrowserCdpAttacher.closeBrowser(port);
+          return { success: true, cookies, hasSid, hasPsidts };
+        }
+      }
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+
+    return { success: false, hasSid: false, hasPsidts: false, error: 'Harvest timed out waiting for Google login.' };
+  }
+
+  public static async closeBrowser(port = 9222, host = '127.0.0.1'): Promise<boolean> {
+    try {
+      const res = await fetch(`http://${host}:${port}/json/version`);
+      const json = (await res.json()) as Record<string, unknown>;
+      const wsUrl = typeof json.webSocketDebuggerUrl === 'string' ? json.webSocketDebuggerUrl : null;
+      if (!wsUrl) return false;
+
+      return await new Promise<boolean>((resolve) => {
+        const WebSocketCtor = (globalThis as unknown as Record<string, unknown>)['WebSocket'];
+        if (typeof WebSocketCtor !== 'function') return resolve(false);
+
+        const ws = new (WebSocketCtor as new (url: string) => {
+          onopen: (() => void) | null;
+          send: (d: string) => void;
+          close: () => void;
+        })(wsUrl);
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ id: 999, method: 'Browser.close' }));
+          setTimeout(() => { ws.close(); resolve(true); }, 200);
+        };
+      });
+    } catch {
+      return false;
     }
   }
 
