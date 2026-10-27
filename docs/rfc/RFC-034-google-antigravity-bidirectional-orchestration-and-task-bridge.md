@@ -7,6 +7,7 @@
 - **Yazar:** Aegis Autonomous Fleet & Antigravity Pair Developers
 - **Kategori:** Ideas (Fikirler & Mimari İnovasyon)
 - **GitHub Tartışması:** [#317](https://github.com/frkntlr/aegis/discussions/317)
+- **Topluluk İnceleme Yorumu:** [Comment #19212610](https://github.com/frkntlr/aegis/discussions/317#discussioncomment-19212610)
 
 ---
 
@@ -77,29 +78,46 @@ flowchart TD
 
 ---
 
-## 📦 3. Somut Çözüm Protokolü ve Katmanları
+## 🚨 3. Kritik Analiz: Eksik, Sorunlu Taraflar ve Mühendislik Çözümleri
 
-### Katman 1: Universal CLI & Akıllı Çalışma Alanı Çözümleyici (`aegis-cli`)
-- `aegis` CLI'ı sistem genelinde bir global komut (PATH binary shim veya `npm link`) olarak yapılandırılacaktır.
-- `SKILL.md` içindeki `npm run aegis --` yönergeleri doğrudan evrensel `aegis <cmd>` veya akıllı `node <aegis-bin> <cmd>` çağrısına dönüştürülecektir.
-- **Akıllı Dizin Çözümleme:** `aegis` komutu hangi alt klasörden (örn: `Hake Game`, `HakeApi`, `experimental/solver`) çalıştırılırsa çalıştırılsın, ortam değişkeni (`AEGIS_HOME`), üst dizin taraması veya kayıtlı profil dosyasından Aegis motorunu bularak hedef proje bağlamına odaklanacaktır.
+### 1. Darboğaz: Görev Enjeksiyonunun (Task Ingestion) Antigravity Reaktif Modeliyle Uyuşmaması
+* **Sorun:** Antigravity dışarıdan kontrolsüz webhook veya soket ile sohbete yazı yazılmasına izin vermez. Ajan, dışarıdan zorla push edilerek değil; kullanıcının mesajı, `schedule` zamanlayıcısı veya subagent mesajı ile tetiklenen **Reaktif Uyanma (Reactive Wakeup)** modeliyle çalışır.
+* **Mühendislik Çözümü (Pull-Based Autonomous Task Ingestion Protocol):**
+  - **Atomik Görev Kutusu (`.aegis/task-inbox.json`):** Dağıtıcı görevi atadığında disk üzerinde atomik bir manifest yazar.
+  - **Yerel MCP Çekme Aracı (`mcp_aegis_pull_task`):** Ajan `/aegis next` dediğinde veya zamanlayıcı tetiklendiğinde aracı çağırır.
+  - **Alt Ajan Delegasyonu (`invoke_subagent`):** Görev ana sohbet geçmişini şişirmeden, Antigravity'nin yerleşik `invoke_subagent` yeteneğiyle izole bir alt ajana (`issue-solver` veya `qa-hunter`) devredilir.
 
-### Katman 2: Antigravity MCP Server & Yerel Araç Köprüsü
-Kabuk (`powershell`) üzerinden kırılgan komut satırı çalıştırmak yerine, Antigravity'nin MCP entegrasyonu güçlendirilecektir:
-- `mcp_aegis_status`: Aktif kilitleri, asılı görevleri ve worktree durumunu sıfır token ile Antigravity'ye döner.
-- `mcp_aegis_task_claim`: Verilen görevi Kanban'da `in_progress` durumuna alır ve dosya kilitlerini rezerve eder.
-- `mcp_aegis_verify`: Değiştirilen dosyaları Demir Kafes, AST iskelet ve mutasyon testlerinden geçirerek anında doğrulama raporu üretir.
-- `mcp_aegis_playtest_report`: Playtest ekran görüntülerini ve loglarını doğrudan Aegis kalite kalkanına iliştirir.
+### 2. Darboğaz: Çalışma Alanı (Workspace) ve Çoklu Worktree Yönlendirme Belirsizliği
+* **Sorun:** Motor `work/aegis`, hedef depo `work/Hake Game`, aktif worktree'ler ise `HakeGame-solver`, `HakeGame-qa` dizinlerindedir. Tek bir `process.cwd()` varsayımı hem araçların motoru bulamamasına hem de kilitlerin yanlış yerde aranmasına yol açar.
+* **Mühendislik Çözümü (Two-Tier Workspace Context Anchor):**
+  - **EngineRoot vs TargetProjectRoot:** `EngineRoot` (Aegis motoru) ile `TargetProjectRoot` (o an kod yazılan ve kilitlenen hedef proje) ayrılır.
+  - **Otomatik Bağlanma (`.aegis.json`):** Hedef proje köküne manifest yerleştirilir (`{ "projectId": "hake-game", "worktrees": ["../HakeGame-solver"], "engine": "godot4" }`).
 
-### Katman 3: Otonom Görev Enjeksiyon Protokolü (Task Injection Protocol - TIP)
-- `aegis task:inject <issueNumber>` veya `/aegis task <issueNumber>` komutu tetiklendiğinde:
-  1. Görevin tüm kabul kriterleri, hedef dosyaları ve bağımlılıkları tek bir cerrahi prompt bloğuna derlenir.
-  2. Antigravity oturumu için hazır görev direktifi formatına getirilir (`/goal` veya subagent promptu).
-  3. Çakışma önleyici kilitler (`WorktreeManager.acquireFileLocks`) otomatik devreye alınır.
+### 3. Darboğaz: Rol Dağılımı ve Ajan Anayasası (`AGENTS.md`) Kimlik Çatışması
+* **Sorun:** Projede `AGENTS.md` Anayasası bağlayıcıdır (`qa-hunter`, `issue-solver`, `ui-specialist`, `doc-architect`). `/aegis` yazıldığında yapay zeka bu rollerden hangisine bürüneceğini bilemez ve yetki sınırlarını ihlal edebilir.
+* **Mühendislik Çözümü (Unified Aegis Constitutional Gateway):**
+  - `/aegis` üst orkestratör olarak çalışır ve parametreye göre doğru rolü devreye alır:
+    - `/aegis qa` -> `🎯 [QA HUNTER] AKTİF` (Read-only, UI tarama, bug tespiti)
+    - `/aegis solve <issue>` -> `🛠️ [ISSUE SOLVER] AKTİF` (İzole worktree, kilit kontrolü, kod düzeltme)
+    - `/aegis ui` -> `🎨 [UI SPECIALIST] AKTİF` (Container, shader, UI sahneleri)
+    - `/aegis docs` -> `📚 [DOC ARCHITECT] AKTİF` (Dokümantasyon ve mimari)
 
-### Katman 4: Çift Yönlü Canlı Oturum ve Kalp Atışı İzleyicisi (Session & Heartbeat Watcher)
-- Antigravity'nin aktif oturumları (`.antigravity/` ve transcript dosyaları) Aegis `SessionDetector` tarafından gerçek zamanlı taranır.
-- Aktif konuşmanın donması, çökmesi veya model hatası vermesi durumunda Aegis `OrphanTaskReclaimer` devreye girerek kilitleri serbest bırakır ve görevi `ready` sütununa devreder.
+### 4. Darboğaz: MCP Sunucusunda Görev & Kilit Şemasının Bulunmaması
+* **Sorun:** Mevcut Aegis MCP sunucusu yalnızca AST arama ve hafıza araçlarına sahiptir. Görev alma, kilit rezerve etme ve durum güncelleme araçları şemada yer almadığı için ajan kırılgan PowerShell kabuk komutlarına zorlanmaktadır.
+* **Mühendislik Çözümü (Aegis Task & Concurrency MCP Suite):**
+  - `aegis` MCP sunucusuna 4 yerel araç eklenir:
+    - `aegis_task_list(filter)`: Sıfır token ile bekleyen/devam eden görevleri listeler.
+    - `aegis_task_claim(issueNumber, agentRole)`: Görevi rezerve eder, çakışmasız dosya kilitlerini alır.
+    - `aegis_task_release(issueNumber, status)`: Görev bittiğinde kilitleri atomik serbest bırakır.
+    - `aegis_lock_status(files)`: Dosyaların kilit durumunu sorgular.
+
+### 5. Darboğaz: Çok Modlu Doğrulama Eksikliği (Godot & Playtest-Before-PR Entegrasyonu)
+* **Sorun:** Sadece `npm test` ile oyun projeleri doğrulanamaz. `AGENTS.md` Madde 5 gereği oyunu bizzat açıp tıklayarak (`simulate_input`, `take_screenshot`, `game_get_errors`) test etmek zorunludur.
+* **Mühendislik Çözümü (Pluggable Multimodal Quality Gate):**
+  - `aegis verify:task` motoru çok modlu sürücüler (drivers) çalıştırır:
+    - **TypeScript Sürücüsü:** Demir Kafes + Biome + Vitest + Mutasyon testi.
+    - **Godot 4.7 Sürücüsü:** GDScript Demir Kafes + `godot-runtime` başlatma + UI elemanı taraması + ekran görüntüsü logu.
+    - **API Sürücüsü:** Smoke test matrisi (`npm run smoke:all`).
 
 ---
 
@@ -118,8 +136,8 @@ Kabuk (`powershell`) üzerinden kırılgan komut satırı çalıştırmak yerine
 
 - [ ] Global `aegis` CLI launcher/shim mekanizması tanımlandı ve herhangi bir dizinden (`Hake Game` dahil) çalıştırılabildiği doğrulandı.
 - [ ] `~/.gemini/config/skills/aegis/SKILL.md` güncellenerek kırılgan `npm run aegis` yerine bağımsız ve akıllı komut formatı yerleştirildi.
-- [ ] Antigravity MCP sunucusuna görev talep etme (`task_claim`), kilit sorgulama (`lock_query`) ve doğrulama (`task_verify`) araçları eklendi.
-- [ ] `aegis task:inject <num>` komutu ile GitHub görevlerinin Antigravity ajan oturumlarına cerrahi prompt olarak aktarılması sağlandı.
-- [ ] Antigravity'nin Playtest-Before-PR kanıtlarının (log ve ekran görüntüleri) doğrudan Aegis kalite raporuna kaydedilmesi doğrulandı.
+- [ ] Antigravity MCP sunucusuna görev listeleme (`aegis_task_list`), görev talep etme (`aegis_task_claim`), kilit sorgulama (`aegis_lock_status`) ve serbest bırakma (`aegis_task_release`) araçları eklendi.
+- [ ] `pull-based` görev çekme protokolü (`.aegis/task-inbox.json`) ve Antigravity `invoke_subagent` delegasyon kalıbı dokümante edilip bağlandı.
+- [ ] Antigravity'nin Godot 4.7 Playtest-Before-PR kanıtlarının (log ve ekran görüntüleri) doğrudan Aegis kalite raporuna kaydedilmesi doğrulandı.
 - [ ] Tüm yeni modüller Demir Kafes kurallarına (max 40 satır/fonksiyon, max 300 satır/dosya) %100 uyumlu yazıldı.
 - [ ] Monorepo testleri (%100 yeşil) ve pre-commit mutasyon kapısından tam puanla geçti.
