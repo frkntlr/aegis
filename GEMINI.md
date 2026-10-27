@@ -18,6 +18,7 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis nlm:query "<q>"`: Query project knowledge base via Google NotebookLM.
 - `/aegis nlm:research "<topic>"`: Conduct deep architectural research via NotebookLM and stage Wiki.
 - `/aegis nlm:auth [args]`: Inspect and authenticate Google NotebookLM session (--browser, --paste, --status).
+- `/aegis nlm:switch [args]`: Switch active NotebookLM Google account, backing up existing session and prompting zero-click ambient scan or browser login.
 - `/aegis find <symbol>`: Fast AST symbol lookup and precision surgical slice.
 - `/aegis triage [dir]`: Evidence-Based Bug Triage (zero false alarms).
 - `/aegis trace <target>`: Trace relational callers, signal listeners & scenes.
@@ -51,6 +52,10 @@ Whenever any `/aegis nlm:*` command or NotebookLM tool call encounters an authen
      2. `"NotebookLM olmadan (Yerel AST ve Context7 ile) devam et"` (Executes with `--offline` / graceful fallback)
      3. `"Görevi iptal et"` (Halts operation cleanly, releasing locks with status 0)
 3. **Execution Fidelity**: Strictly respect the user's chosen option.
+
+## Ambient Session Harvesting & Conversational Account Switch
+1. **Zero-Click Ambient Discovery**: NotebookLM authentication automatically probes active CDP debug ports (9222–9229) and Chromium cookie vaults (Chrome, Edge, Brave) before prompting manual input.
+2. **Conversational Account Switch Detection**: Whenever the user expresses intent to change accounts (e.g., "başka hesaba geç", "farklı bir hesapla giriş yap", "switch account"), the agent must proactively invoke `npm run aegis -- nlm:switch`. Existing sessions are safely archived to `.notebooklm-mcp/auth.backup-<ts>.json` before the switch.
 
 ## Headless Git & Remote Execution Safeguards
 To prevent indefinite command hangs during git remote operations:

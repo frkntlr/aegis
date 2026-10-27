@@ -35,6 +35,7 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis nlm:query "<q>"` | Query ground-truth knowledge via NotebookLM | `npm run aegis -- nlm:query "<q>"` |
 | `/aegis nlm:research "<t>"` | Deep architectural research & stage Wiki via NotebookLM | `npm run aegis -- nlm:research "<t>"` |
 | `/aegis nlm:auth [args]` | Authenticate Google NotebookLM session (--browser, --paste) | `npm run aegis -- nlm:auth [args]` |
+| `/aegis nlm:switch [args]` | Switch Google account, backup session & zero-click harvest | `npm run aegis -- nlm:switch [args]` |
 | `/aegis inspect` | Zero-token bounding box layout inspection | `npm run aegis -- inspect` |
 | `/aegis mutate <file>` | Run mutation testing gate | `npm run aegis -- mutate <file>` |
 | `/aegis estimate <files> <tests>` | Pre-execution adaptive timeout estimation | `npm run aegis -- estimate <files> <tests>` |
@@ -67,3 +68,4 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 7. **Anti-Hang Guard (Never use npx ast-grep)**: Unscoped `ast-grep` on npm is an obsolete 2018 package that hangs waiting on STDIN. Always use `/aegis ast:search` or `npm run aegis -- ast:search` (or `aegis ast-grep` / `aegis sg`).
 8. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.
 9. **NotebookLM Tri-State Resolution**: When NotebookLM auth fails or returns `AUTH_REQUIRED_INTERACTIVE`, the agent MUST invoke Antigravity's `ask_question` tool with the 3 canonical choices ('(Recommended) NotebookLM tekrar giriş yap', 'notebooklmsiz devam et', 'Görevi iptal et') instead of silently guessing or aborting.
+10. **Zero-Click Ambient Auth & Conversational Switch**: NotebookLM authentication automatically probes active CDP debug ports and Chromium cookie vaults (Chrome, Edge, Brave). Conversational triggers to switch accounts automatically trigger `aegis nlm:switch` with session backups.
