@@ -40,3 +40,4 @@ export * from './memory-write-through-hook.js';
 export * from './external-dependency-extractor.js';
 export * from './delta-overlay-graph.js';
 export * from './transitive-type-closure.js';
+export * from './multi-language-metadata-manager.js';

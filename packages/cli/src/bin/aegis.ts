@@ -72,6 +72,7 @@ import { handleGraphScan } from '../commands/graph-command.js';
 import { handleAstSearch, handleAstReplace } from '../commands/ast-grep-command.js';
 import { handleRtkCompress } from '../commands/rtk-command.js';
 import { handleContext7Query } from '../commands/context7-command.js';
+import { handleDepsDrift } from '../commands/deps-commands.js';
 import { handleDebugCommand } from '../commands/debug-command.js';
 import { startMcpServer } from '../commands/mcp-server-command.js';
 import {
@@ -125,6 +126,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'wiki:status': () => handleWikiStatus(),
   merge: (a) => handleMerge(a[1], a[2]),
   'branch:sync': (a) => handleBranchSync(a[1], a[2]),
+  'deps:drift': () => handleDepsDrift(),
   dashboard: (a) => handleDashboard(a[1]),
   'ide:list': () => handleIdeList(),
   'ide:sync': () => handleIdeSync(),
