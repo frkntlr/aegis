@@ -44,3 +44,23 @@ export type HttpPostFunction = (
   body: string,
   options?: HttpTransportOptions
 ) => Promise<HttpResponse>;
+
+export interface DiscoveredSource {
+  title: string;
+  url?: string;
+  snippet?: string;
+}
+
+export interface ResearchPollResult {
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  taskId: string;
+  sources: DiscoveredSource[];
+  synthesis?: string;
+}
+
+export interface NotebookSourceSummary {
+  id: string;
+  title: string;
+  type?: string;
+  updatedAt?: string;
+}
