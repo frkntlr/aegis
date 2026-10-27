@@ -1,16 +1,23 @@
+/**
+ * @file rfc-triager.ts
+ * Parses RFC architectural discussions into structured issues and acceptance criteria.
+ * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
+ */
+
 import type { GitHubIssue } from './types.js';
 
 export interface ParsedRfc {
   discussionNumber?: number;
   title: string;
-  category: 'language' | 'ide' | 'tool';
+  category: 'language' | 'ide' | 'tool' | 'feature';
   targetName: string;
   rationale: string;
   proposedFiles: string[];
+  extractedCriteria?: string[];
 }
 
 export class RfcTriager {
-  private detectCategory(text: string): 'language' | 'ide' | 'tool' {
+  private detectCategory(text: string): 'language' | 'ide' | 'tool' | 'feature' {
     const lower = text.toLowerCase();
     if (lower.includes('ide') || lower.includes('editor') || lower.includes('workspace')) {
       return 'ide';
@@ -18,10 +25,13 @@ export class RfcTriager {
     if (lower.includes('security') || lower.includes('gate') || lower.includes('tool')) {
       return 'tool';
     }
+    if (lower.includes('notebooklm') || lower.includes('radar') || lower.includes('sentinel') || lower.includes('vault')) {
+      return 'feature';
+    }
     return 'language';
   }
 
-  private deriveTargetFiles(category: 'language' | 'ide' | 'tool', targetName: string): string[] {
+  private deriveTargetFiles(category: 'language' | 'ide' | 'tool' | 'feature', targetName: string): string[] {
     const rawSlug = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
     const slug = rawSlug || 'extension';
     if (category === 'language') {
@@ -40,34 +50,59 @@ export class RfcTriager {
   }
 
   private extractTargetName(title: string): string {
-    const clean = title.replace(/^RFC:\s*(\[[^\]]+\]\s*)?/i, '').trim();
+    const clean = title.replace(/^RFC:\s*(\[[^\]]+\]\s*)?/i, '').replace(/^RFC-\d+:\s*/i, '').trim();
     const m = clean.match(/^(?:Add|Implement|Support|Integrate|Create|Feature|New)?\s*([A-Za-z0-9#+.-]+(?:\s+[A-Za-z0-9#+.-]+)?)/i);
     if (!m?.[1]) return 'Extension';
     const stripped = m[1].replace(/\b(support|ast|skeleton|extractor|adapter|integration)\b/gi, '').trim();
     return stripped || m[1].trim();
   }
 
+  private extractChecklistCriteria(body: string): string[] {
+    const lines = body.split('\n');
+    const criteria: string[] = [];
+    for (const line of lines) {
+      const match = line.match(/^-\s*\[\s*\]\s+(.+)$/);
+      if (match && match[1]) {
+        criteria.push(match[1].trim());
+      }
+    }
+    return criteria;
+  }
+
+  private extractCleanRationale(body: string): string {
+    if (!body || !body.trim()) return '';
+    const sectionMatch = body.match(/##\s*🔍?\s*1\.\s*Fikir ve Problem Tanımı[^\n]*\n([\s\S]*?)(?=\n##\s|\n---\s*|\n🎯|$)/i);
+    if (sectionMatch && sectionMatch[1].trim()) {
+      return sectionMatch[1].trim();
+    }
+    return body.length > 1500 ? `${body.slice(0, 1497)}...` : body.trim();
+  }
+
   public parseRfc(title: string, body?: string, discussionNumber?: number): ParsedRfc {
     const safeBody = body ?? '';
     const category = this.detectCategory(`${title}\n${safeBody}`);
     const targetName = this.extractTargetName(title);
-
     const fileMatches = safeBody.match(/packages\/[a-zA-Z0-9_\-\/.]+\.ts/g);
     const proposedFiles = fileMatches && fileMatches.length > 0
       ? Array.from(new Set(fileMatches))
       : this.deriveTargetFiles(category, targetName);
+    const extractedCriteria = this.extractChecklistCriteria(safeBody);
 
     return {
       discussionNumber,
       title,
       category,
       targetName,
-      rationale: safeBody.slice(0, 500).trim(),
-      proposedFiles
+      rationale: this.extractCleanRationale(safeBody),
+      proposedFiles,
+      extractedCriteria: extractedCriteria.length > 0 ? extractedCriteria : undefined
     };
   }
 
   public generateAcceptanceCriteria(rfc: ParsedRfc): string[] {
+    if (rfc.extractedCriteria && rfc.extractedCriteria.length > 0) {
+      return rfc.extractedCriteria;
+    }
     const criteria: string[] = [];
     if (rfc.category === 'language') {
       criteria.push(`Implement LanguageExtractor interface for ${rfc.targetName}`);
@@ -93,11 +128,16 @@ export class RfcTriager {
       return label.length > 50 ? label.slice(0, 50) : label;
     });
 
+    const isFeature = rfc.category === 'feature';
+    const issueTitle = isFeature
+      ? `[RFC #${rfc.discussionNumber || issueNumber}] ${rfc.title.replace(/^#+\s*/, '')}`
+      : `[RFC #${rfc.discussionNumber || issueNumber}] Add ${rfc.targetName} ${rfc.category.toUpperCase()} Support`;
+
     return {
       id: issueNumber,
       number: issueNumber,
-      title: `[RFC #${rfc.discussionNumber || issueNumber}] Add ${rfc.targetName} ${rfc.category.toUpperCase()} Support`,
-      body: `Automated issue generated from RFC Discussion:\n\n${rfc.rationale}\n\nTarget: ${rfc.targetName}`,
+      title: issueTitle,
+      body: `### RFC Specification\n\n${rfc.rationale}\n\n**Target:** ${rfc.targetName}\n\n### Acceptance Criteria\n${acceptanceCriteria.map(c => `- [ ] ${c}`).join('\n')}`,
       labels: ['status:ready', 'rfc:approved', ...lockLabels],
       status: 'ready',
       targetFiles: rfc.proposedFiles,
