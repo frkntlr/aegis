@@ -1,13 +1,17 @@
 /**
  * @file nlm-command.ts
- * CLI commands for Google NotebookLM integration and Unified Knowledge Oracle.
- * Zero-Chromium, worktree-resilient, 3-tier fallback support.
+ * CLI commands for Google NotebookLM integration, Deep Research, Sources & Pruning.
+ * Zero-Chromium, worktree-resilient, 5-shield protected.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
 import {
   UnifiedKnowledgeOracle,
   NotebookLmResearchEngine,
+  NotebookLmNativeClient,
+  NotebookLmDeepResearchWorkflow,
+  SourceFreshnessAuditor,
+  SourceTombstonePruner,
   GitHubWikiLiveAdapter,
   type OracleQueryOptions,
   type OracleQueryResult,
@@ -15,14 +19,14 @@ import {
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
 
-interface ParsedNlmOptions {
+const DEFAULT_NOTEBOOK_ID = '3767b1fc-5759-416d-b938-495b8138ccd7';
+
+export function parseNlmArgs(args: string[]): {
   question?: string;
   notebookId?: string;
   forceOffline: boolean;
   preferredTier?: OracleTier;
-}
-
-export function parseNlmArgs(args: string[]): ParsedNlmOptions {
+} {
   const filtered: string[] = [];
   let forceOffline = false;
   let preferredTier: OracleTier | undefined;
@@ -32,8 +36,7 @@ export function parseNlmArgs(args: string[]): ParsedNlmOptions {
     if (a === '--offline' || a === '-o') {
       forceOffline = true;
     } else if (a === '--tier' && args[i + 1]) {
-      preferredTier = args[i + 1] as OracleTier;
-      i++;
+      preferredTier = args[++i] as OracleTier;
     } else if (a.startsWith('--tier=')) {
       preferredTier = a.split('=')[1] as OracleTier;
     } else {
@@ -52,10 +55,7 @@ function printQueryResult(res: OracleQueryResult): void {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`\n🔍 Source Tier: [${res.sourceTier.toUpperCase()}]`);
 
-  if (res.authAlert) {
-    console.log(`⚠️  Notice: ${res.authAlert}`);
-  }
-
+  if (res.authAlert) console.log(`⚠️  Notice: ${res.authAlert}`);
   if (res.citations.length > 0) {
     console.log(`\n📚 Cited Sources (${res.citations.length}):`);
     for (const c of res.citations) {
@@ -67,15 +67,12 @@ function printQueryResult(res: OracleQueryResult): void {
 export async function handleNlmQuery(...rawArgs: string[]): Promise<void> {
   showBanner();
   const parsed = parseNlmArgs(rawArgs.filter(Boolean));
-
   if (!parsed.question) {
     console.error('❌ Usage: aegis nlm:query "<question>" [notebookId] [--offline] [--tier <nlm|context7|local_ast>]');
     process.exit(1);
   }
 
   console.log(`🤖 Consulting Unified Knowledge Oracle (Tier 1: NotebookLM -> Tier 2: Context7 -> Tier 3: Local AST)...`);
-  console.log(`💬 Query: "${parsed.question}"\n⏳ Synthesizing verified response...\n`);
-
   try {
     const oracle = new UnifiedKnowledgeOracle();
     const queryOpts: OracleQueryOptions = {
@@ -83,7 +80,6 @@ export async function handleNlmQuery(...rawArgs: string[]): Promise<void> {
       forceOffline: parsed.forceOffline,
       preferredTier: parsed.preferredTier
     };
-
     const result = await oracle.query(parsed.question, queryOpts);
     printQueryResult(result);
   } catch (err: unknown) {
@@ -92,36 +88,140 @@ export async function handleNlmQuery(...rawArgs: string[]): Promise<void> {
   }
 }
 
-export async function handleNlmResearch(topicArg?: string, modeArg = 'fast', notebookIdArg?: string): Promise<void> {
+export async function handleNlmResearch(...args: string[]): Promise<void> {
   showBanner();
-  if (!topicArg) {
-    console.error('❌ Usage: aegis nlm:research "<topic>" [fast|deep] [notebookId]');
+  const filtered = args.filter(a => a && !a.startsWith('-'));
+  const topic = filtered[0];
+  if (!topic) {
+    console.error('❌ Usage: aegis nlm:research "<topic>" [--deep] [--detach] [--import] [notebookId]');
     process.exit(1);
   }
 
-  const mode = modeArg === 'deep' ? 'deep' : 'fast';
-  console.log(`🔬 Initiating ${mode.toUpperCase()} Research via Unified Oracle on: "${topicArg}"...`);
+  const isDeep = args.includes('--deep') || filtered[1] === 'deep';
+  const isDetach = args.includes('--detach');
+  const doImport = args.includes('--import') || args.includes('--ingest');
+  const notebookId = filtered.find(a => a !== topic && a !== 'deep' && a !== 'fast') || DEFAULT_NOTEBOOK_ID;
+
+  if (isDeep) {
+    await runDeepResearch(notebookId, topic, isDetach, doImport);
+  } else {
+    await runFastResearch(notebookId, topic);
+  }
+}
+
+async function runDeepResearch(nbId: string, topic: string, detach: boolean, doImport: boolean): Promise<void> {
+  console.log(`🔬 Initiating DEEP Research via Google NotebookLM on: "${topic}"...`);
   try {
-    const engine = new NotebookLmResearchEngine(notebookIdArg || '3767b1fc-5759-416d-b938-495b8138ccd7');
-    console.log('⏳ Gathering architectural intelligence and synthesizing report...');
-    const report = await engine.conductResearch(topicArg, mode, notebookIdArg);
+    const workflow = new NotebookLmDeepResearchWorkflow();
+    const res = await workflow.execute(nbId, topic, {
+      detach,
+      ingestMode: doImport ? 'digest' : 'none'
+    });
 
-    console.log('\n═══════════════════════════════════════════════════════════════');
-    console.log(`📑 RESEARCH REPORT: ${report.topic}`);
-    console.log(` • Mode: ${report.mode.toUpperCase()} | Sources: ${report.sourcesCount}`);
-    console.log('═══════════════════════════════════════════════════════════════\n');
-    console.log(report.synthesis);
-    console.log('\n🎯 Recommended Acceptance Criteria:');
-    for (const c of report.recommendedCriteria) console.log(` - [ ] ${c}`);
+    if (detach) {
+      console.log(`🚀 Deep Research running in background!\n • Task ID: ${res.taskId}`);
+      console.log(`💡 Check status: aegis nlm:poll ${res.taskId}\n💡 Ingest when ready: aegis nlm:import ${res.taskId}`);
+      return;
+    }
 
-    const wikiAdapter = new GitHubWikiLiveAdapter();
-    const published = engine.publishToWiki(wikiAdapter, report);
-    const pubMsg = published
-      ? '\n✅ Research report automatically pushed to GitHub Wiki!'
-      : '\n📘 Research staged in Living Memory (pending GitHub Wiki initialization).';
-    console.log(pubMsg);
+    console.log(`\n═══════════════════════════════════════════════════════════════\n${res.synthesis}\n═══════════════════════════════════════════════════════════════`);
+    if (res.ingestedSourceId) console.log(`\n✅ Research Digest ingested into Notebook (Source ID: ${res.ingestedSourceId})`);
+    if (res.quotaWarning) console.log(`\n⚠️  Quota Warning: Notebook has ${res.sourceCount}/50 sources. Consider running: aegis nlm:prune`);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`❌ NotebookLM Research Failed: ${msg}`);
+    console.error(`❌ Deep Research Failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function runFastResearch(nbId: string, topic: string): Promise<void> {
+  console.log(`🔬 Initiating FAST Research via Unified Oracle on: "${topic}"...`);
+  try {
+    const engine = new NotebookLmResearchEngine(nbId);
+    const report = await engine.conductResearch(topic, 'fast', nbId);
+    console.log(`\n═══════════════════════════════════════════════════════════════\n📑 RESEARCH REPORT: ${report.topic} (${report.sourcesCount} sources)\n═══════════════════════════════════════════════════════════════\n${report.synthesis}`);
+    if (report.recommendedCriteria && report.recommendedCriteria.length > 0) {
+      console.log('\n🎯 Recommended Acceptance Criteria:');
+      for (const c of report.recommendedCriteria) console.log(` • ${c}`);
+    }
+    const wikiAdapter = new GitHubWikiLiveAdapter();
+    const pub = engine.publishToWiki(wikiAdapter, report);
+    console.log(pub ? '\n✅ Report pushed to GitHub Wiki!' : '\n📘 Report staged in Living Memory.');
+  } catch (err: unknown) {
+    console.error(`❌ Research Failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+export async function handleNlmSources(notebookIdArg?: string): Promise<void> {
+  showBanner();
+  const nbId = notebookIdArg || DEFAULT_NOTEBOOK_ID;
+  console.log(`📚 Inspecting sources in Notebook [${nbId}]...`);
+  try {
+    const client = new NotebookLmNativeClient();
+    const auditor = new SourceFreshnessAuditor();
+    const sources = await client.listSources(nbId);
+    const audited = auditor.auditSources(sources);
+
+    console.log(`\n📋 Total Sources: ${sources.length} / 50`);
+    for (const s of audited) {
+      const tag = s.isPinned ? '[PINNED]' : (s.isStale ? `[STALE: ${s.reason}]` : '[ACTIVE]');
+      console.log(` • ${tag} [${s.sourceId}] ${s.title}`);
+    }
+  } catch (err: unknown) {
+    console.error(`❌ Failed to list sources: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+export async function handleNlmPoll(taskIdArg?: string, notebookIdArg?: string): Promise<void> {
+  showBanner();
+  if (!taskIdArg) {
+    console.error('❌ Usage: aegis nlm:poll <taskId> [notebookId]');
+    process.exit(1);
+  }
+  const nbId = notebookIdArg || DEFAULT_NOTEBOOK_ID;
+  try {
+    const workflow = new NotebookLmDeepResearchWorkflow();
+    const poll = await workflow.poll(nbId, taskIdArg);
+    console.log(`📊 Research Task: ${taskIdArg} | Status: [${poll.status}] | Discovered: ${poll.sources.length} sources`);
+    if (poll.synthesis) console.log(`\nSynthesis preview:\n${poll.synthesis.slice(0, 300)}...`);
+  } catch (err: unknown) {
+    console.error(`❌ Poll Failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+export async function handleNlmImport(taskIdArg?: string, notebookIdArg?: string): Promise<void> {
+  showBanner();
+  if (!taskIdArg) {
+    console.error('❌ Usage: aegis nlm:import <taskId> [notebookId]');
+    process.exit(1);
+  }
+  const nbId = notebookIdArg || DEFAULT_NOTEBOOK_ID;
+  try {
+    const workflow = new NotebookLmDeepResearchWorkflow();
+    const poll = await workflow.poll(nbId, taskIdArg);
+    const client = new NotebookLmNativeClient();
+    const digest = NotebookLmDeepResearchWorkflow.formatDigest(taskIdArg, poll);
+    const added = await client.addTextSource(nbId, `Research Digest: ${taskIdArg}`, digest);
+    console.log(`✅ Ingested Synthesized Digest (Source ID: ${added.sourceId})`);
+  } catch (err: unknown) {
+    console.error(`❌ Import Failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+export async function handleNlmPrune(...args: string[]): Promise<void> {
+  showBanner();
+  const force = args.includes('--force') || args.includes('-f');
+  const nbId = args.find(a => !a.startsWith('-')) || DEFAULT_NOTEBOOK_ID;
+
+  console.log(`🧹 Running Tombstone Pruner on Notebook [${nbId}] (${force ? 'PHYSICAL DELETE' : 'DRY-RUN'})...`);
+  try {
+    const pruner = new SourceTombstonePruner();
+    const res = await pruner.prune(nbId, { force });
+    if (res.dryRun) {
+      console.log(`\n🔍 [DRY-RUN] Found ${res.candidates.length} candidate(s) for pruning (run with --force to delete):`);
+      for (const c of res.candidates) console.log(` • [${c.sourceId}] ${c.title} (Reason: ${c.reason})`);
+    } else {
+      console.log(`\n✅ Pruning Complete: ${res.pruned.length} stale source(s) deleted permanently.`);
+    }
+  } catch (err: unknown) {
+    console.error(`❌ Prune Failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

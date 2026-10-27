@@ -43,7 +43,14 @@ import {
   handleWikiSeed,
   handleGhLocate
 } from '../commands/project-commands.js';
-import { handleNlmQuery, handleNlmResearch } from '../commands/nlm-command.js';
+import {
+  handleNlmQuery,
+  handleNlmResearch,
+  handleNlmSources,
+  handleNlmPoll,
+  handleNlmImport,
+  handleNlmPrune
+} from '../commands/nlm-command.js';
 import {
   handleGodot,
   handleGodotInit,
@@ -89,7 +96,11 @@ const HELP_LINES: readonly string[] = [
   '  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues',
   '  aegis nlm:sync                         Export and synchronize architecture with NotebookLM',
   '  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations',
-  '  aegis nlm:research "<topic>" [mode]    Run automated NotebookLM research and stage in Wiki',
+  '  aegis nlm:research "<topic>" [--deep]  Run fast or deep research and stage in Wiki/Notebook',
+  '  aegis nlm:sources [notebookId]         List and audit Notebook sources for freshness',
+  '  aegis nlm:poll <taskId> [notebookId]   Poll background deep research progress',
+  '  aegis nlm:import <taskId> [notebookId] Ingest completed research as Synthesized Digest',
+  '  aegis nlm:prune [--dry-run|--force]    Safely prune obsolete or superseded sources',
   '  aegis gh:locate [domain]               Resolve authoritative GitHub & Research locations',
   '  aegis project:list [owner]             List GitHub Projects v2 boards',
   '  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column',
@@ -154,7 +165,11 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'rfc:decompose': (a) => handleRfcDecompose(a[1]),
   'nlm:sync': () => handleNlmSync(),
   'nlm:query': (a) => handleNlmQuery(...a.slice(1)),
-  'nlm:research': (a) => handleNlmResearch(a[1], a[2], a[3]),
+  'nlm:research': (a) => handleNlmResearch(...a.slice(1)),
+  'nlm:sources': (a) => handleNlmSources(a[1]),
+  'nlm:poll': (a) => handleNlmPoll(a[1], a[2]),
+  'nlm:import': (a) => handleNlmImport(a[1], a[2]),
+  'nlm:prune': (a) => handleNlmPrune(...a.slice(1)),
   'gh:locate': (a) => handleGhLocate(a[1]),
   'project:list': (a) => handleProjectList(a[1]),
   'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),

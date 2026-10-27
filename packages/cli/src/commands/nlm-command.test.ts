@@ -6,7 +6,15 @@
 
 import test from 'node:test';
 import * as assert from 'node:assert';
-import { parseNlmArgs, handleNlmQuery, handleNlmResearch } from './nlm-command.js';
+import {
+  parseNlmArgs,
+  handleNlmQuery,
+  handleNlmResearch,
+  handleNlmSources,
+  handleNlmPoll,
+  handleNlmImport,
+  handleNlmPrune
+} from './nlm-command.js';
 
 test('parseNlmArgs parses question and notebook id correctly', () => {
   const parsed = parseNlmArgs(['What is Aegis?', 'nb-123']);
@@ -61,5 +69,89 @@ test('handleNlmResearch executes fast research flow cleanly', async () => {
     assert.ok(captured.some(line => line.includes('Recommended Acceptance Criteria')));
   } finally {
     console.log = originalLog;
+  }
+});
+
+test('handleNlmResearch deep mode handles detach flag gracefully', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await handleNlmResearch('Distributed consensus', '--deep', '--detach', 'nb-mock-123');
+    assert.ok(captured.some(line => line.includes('Initiating DEEP Research') || line.includes('Deep Research')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('handleNlmSources runs gracefully and formats source list', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await handleNlmSources('nb-test-456');
+    assert.ok(captured.some(line => line.includes('Inspecting sources in Notebook')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('handleNlmPoll handles polling execution safely', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await handleNlmPoll('task-poll-789', 'nb-test-456');
+    assert.ok(captured.some(line => line.includes('Poll') || line.includes('Research Task')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('handleNlmImport handles ingestion safely', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await handleNlmImport('task-import-101', 'nb-test-456');
+    assert.ok(captured.some(line => line.includes('Import') || line.includes('Ingested Synthesized Digest')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('handleNlmPrune executes dry-run and force modes safely', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await handleNlmPrune('nb-test-prune');
+    assert.ok(captured.some(line => line.includes('Tombstone Pruner') && line.includes('DRY-RUN')));
+
+    captured.length = 0;
+    await handleNlmPrune('nb-test-prune', '--force');
+    assert.ok(captured.some(line => line.includes('Tombstone Pruner') && line.includes('PHYSICAL DELETE')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
   }
 });
