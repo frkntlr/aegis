@@ -1,25 +1,47 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
+  "files": [],
+  "references": [
+    {
+      "path": "packages/cli"
+    },
+    {
+      "path": "packages/core/ast-skeleton"
+    },
+    {
+      "path": "packages/core/compound-checker"
+    },
+    {
+      "path": "packages/core/github-live"
+    },
+    {
+      "path": "packages/core/iron-cage"
+    },
+    {
+      "path": "packages/core/mcp-security"
+    },
+    {
+      "path": "packages/core/orchestrator"
+    },
+    {
+      "path": "packages/core/trust-verifier"
+    },
+    {
+      "path": "packages/core/watchdog"
+    },
+    {
+      "path": "packages/dialogue-engine"
+    },
+    {
+      "path": "packages/plugins/godot-bridge"
+    },
+    {
+      "path": "packages/plugins/telemetry-tester"
+    },
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "packages/web-dashboard"
+    }
+  ]
 }

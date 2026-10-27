@@ -17,3 +17,4 @@ export * from './jit-doc-synthesizer.js';
 export * from './nuget-metadata-extractor.js';
 export * from './contract-drift-radar.js';
 export * from './notebooklm/index.js';
+export * from './project-references-radar.js';

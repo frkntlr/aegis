@@ -13,7 +13,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "biome lint packages/",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "tsc --build",
     "aegis": "node packages/cli/dist/bin/aegis.js",
     "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .githooks', {stdio: 'ignore'}) } catch {}\""
   },

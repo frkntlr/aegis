@@ -5,8 +5,22 @@
  */
 
 import { MultiLanguageMetadataManager } from '@aegis/ast-skeleton';
-import { ContractDriftRadar } from '@aegis/github-live';
+import { ContractDriftRadar, ProjectReferencesRadar } from '@aegis/github-live';
 import { showBanner } from './banner.js';
+
+function reportProjectReferences(): void {
+  const radar = new ProjectReferencesRadar();
+  const report = radar.scan();
+  console.log('\n📐 TypeScript Project References Status:');
+  console.log(` • Packages Scanned:      ${report.totalPackages}`);
+  const statusIcon = report.valid ? '✅ 100% SYNCED' : '⚠️  DESYNCHRONIZED';
+  console.log(` • References Integrity:  ${statusIcon}`);
+  if (!report.valid) {
+    for (const err of report.errors) {
+      console.warn(`   - ${err}`);
+    }
+  }
+}
 
 export async function handleDepsDrift(): Promise<void> {
   showBanner();
@@ -45,4 +59,6 @@ export async function handleDepsDrift(): Promise<void> {
   } else {
     console.log('\n✅ No breaking upstream contract changes detected.');
   }
+
+  reportProjectReferences();
 }
