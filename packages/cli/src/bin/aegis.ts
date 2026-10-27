@@ -49,7 +49,8 @@ import {
   handleNlmSources,
   handleNlmPoll,
   handleNlmImport,
-  handleNlmPrune
+  handleNlmPrune,
+  handleNlmAuth
 } from '../commands/nlm-command.js';
 import {
   handleGodot,
@@ -170,6 +171,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'nlm:poll': (a) => handleNlmPoll(a[1], a[2]),
   'nlm:import': (a) => handleNlmImport(a[1], a[2]),
   'nlm:prune': (a) => handleNlmPrune(...a.slice(1)),
+  'nlm:auth': (a) => handleNlmAuth(...a.slice(1)),
   'gh:locate': (a) => handleGhLocate(a[1]),
   'project:list': (a) => handleProjectList(a[1]),
   'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),

@@ -49,6 +49,6 @@ test('SystemBrowserDetector detects custom provided path when file exists', () =
 });
 
 test('SystemBrowserDetector returns null gracefully when no candidates exist', () => {
-  const res = SystemBrowserDetector.detectInstalledBrowser(['/nonexistent/path/browser.exe']);
+  const res = SystemBrowserDetector.detectInstalledBrowser(['/nonexistent/path/browser.exe'], 'darwin');
   assert.strictEqual(res, null);
 });

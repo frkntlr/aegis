@@ -18,6 +18,9 @@ import {
   type OracleTier
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
+import { handleNlmAuth, promptInteractiveAuthResolution } from './nlm-auth-helper.js';
+
+export { handleNlmAuth };
 
 const DEFAULT_NOTEBOOK_ID = '3767b1fc-5759-416d-b938-495b8138ccd7';
 
@@ -78,7 +81,8 @@ export async function handleNlmQuery(...rawArgs: string[]): Promise<void> {
     const queryOpts: OracleQueryOptions = {
       notebookId: parsed.notebookId,
       forceOffline: parsed.forceOffline,
-      preferredTier: parsed.preferredTier
+      preferredTier: parsed.preferredTier,
+      onAuthChallenge: promptInteractiveAuthResolution
     };
     const result = await oracle.query(parsed.question, queryOpts);
     printQueryResult(result);
