@@ -73,7 +73,7 @@ flowchart TD
 
 ### 1. İçerik Özeti Tabanlı Artımlı Önbellek (`TriageCacheRadar`)
 - Konum: `.aegis/cache/triage-cache.json`
-- Dosyaların `mtimeMs`, `size` ve hafif FNV/SHA hash'i saklanır.
+- Dosyaların `mtimeMs`, `size` ve hafif FNV-1a hash'i saklanır.
 - Stat denetimi ile değişmeyen 350+ dosya 0ms içinde önbellekten yüklenir.
 - **Hedef:** 360 dosyalık tarama süresi **3.500ms'den 30ms'nin altına** iner (%99 performans artışı).
 
@@ -91,7 +91,39 @@ flowchart TD
 
 ---
 
-## 🔒 4. Demir Kafes Standartları & Kısıtlar
+## ⚠️ 4. Risk Matrisi ve Mimari Çözümler (Risk Matrix & Invariant Solutions)
+
+Yeni nesil otonom hata ayıklama motoruna geçişte oluşabilecek 5 temel operasyonel/mimari risk ve bunların deterministik çözümleri aşağıda tanımlanmıştır:
+
+| # | Risk / Tehdit | Olasılık | Etki | Önleyici Mimari Çözüm (Invariant) |
+| :- | :--- | :-: | :-: | :--- |
+| **R1** | **Önbellek Sapması & Sahte Temiz Raporu** (Cache Drift / False Clean) | Orta | Kritik | **Çift Kademeli Doğrulama (Rule Version Salt + FNV-1a Hash):** Yalnızca `mtime` değil, kural seti hash'i (`engineHash`) ve dosya parmak izi doğrulanır. Kural veya içerik değiştiğinde otomatik geçersiz kılınır. |
+| **R2** | **Dinamik Test Koşusunda Kilitlenme & Sonsuz Döngü** (Test Runner Hangs) | Orta | Yüksek | **Pasif Telemetri Önceliği & Adaptif Zaman Aşımı:** `--with-tests` öncelikle son test telemetrisini (`last-test-run.json`) okur; aktif koşuda ise `PreExecutionEstimator` ile max 15s tavan konur ve `$env:GIT_TERMINAL_PROMPT=0` zorunlu tutulur. |
+| **R3** | **İlişkisel Graf Dairesel Bağımlılık & Bellek Patlaması** (Graph Recursion Blow-up) | Düşük | Yüksek | **Derinlik Sınırı & Ziyaretçi Kümesi:** Patlama yarıçapı araması max $D \le 3$ derinlikte tutulur ve `visited: Set<string>` kümesiyle döngüsel bağlılıklarda $O(V+E)$ lineer karmaşıklık garanti edilir. |
+| **R4** | **Otonom Sevk Kaçak Döngüsü** (Runaway Auto-Dispatch Loop) | Düşük | Yüksek | **Devre Kesici (Circuit Breaker) & Görev Kilidi:** Aynı kusur 3 kez üst üste çözülemezse `DISPATCH_BLOCKED_CIRCUIT_BREAKER` devreye girer. `.aegis/locks/` üzerinde aktif görev varken mükerrer görev üretilmez. |
+| **R5** | **Çok Dilli (Polyglot) Yol ve Ayrıştırma Uyuşmazlığı** (Windows/POSIX Path Drift) | Orta | Orta | **Kanonik POSIX Yolu:** Tüm dosya yolları küçük harfli ve `/` formatında normalize edilir (`normalizePath`). TS, GDScript ve C# için bağımsız hata şablonu matrisi işletilir. |
+
+### Detaylı Risk Analizi ve Çözüm Açıklamaları:
+
+#### 1. Önbellek Sapması (Cache Drift / False Clean):
+- **Sorun:** Git checkout veya dosya sistemi zaman sapmaları (`mtime` çarpışması), hatalı bir dosyanın temiz gibi önbellekten okunmasına yol açabilir. Bu durum hataların CI/CD'ye sızmasına sebep olur.
+- **Çözüm:** `TriageCacheRadar` başlığında `engineHash: sha256(IronCageRules + ValidatorCode)` saklanır. Kod kuralları güncellendiği an tüm önbellek otomatik düşer. Ayrıca dosya kontrolünde `mtimeMs + size + FNV1a(content)` üçlüsü eşleşmeden hiçbir dosya "temiz" kabul edilmez.
+
+#### 2. Dinamik Test Koşularında Kilitlenme (Test Runner Hangs):
+- **Sorun:** Kod tabanında `while(true)` veya çözülmeyen `await` varsa `--with-tests` komutu terminali sonsuza kadar kilitler.
+- **Çözüm:** Asla sınırsız bekleme yapılmaz. Pasif telemetri okuması önceliklidir. Aktif çalıştırma gerekirse `PreExecutionEstimator` tarafından hesaplanan dinamik süre (ör. 15 saniye) sonrasında SIGKILL gönderilir ve `TEST_EXECUTION_TIMEOUT` kritik kusur olarak raporlanır.
+
+#### 3. Dairesel Bağımlılık ve Bellek Patlaması (Blast Radius Recursion):
+- **Sorun:** `index.ts` dosyaları veya döngüsel modüller `getUpstreamCallers` sorgularında sonsuz özyinelemeye (stack overflow) girebilir.
+- **Çözüm:** DFS/BFS graf geziniminde `visitedSet` kullanılır. Ziyaret edilen düğümler tekrar ziyaret edilmez. Maksimum arama derinliği $D=3$ olarak sabitlenir; 3 seviye derinlikteki çağıran sayısı bir hatanın "Çekirdek Felaket (Tier 1)" olduğunu belirlemek için fazlasıyla yeterlidir.
+
+#### 4. Otonom Sevk Döngüleri (Runaway Auto-Dispatch):
+- **Sorun:** Triage kritik hata bulup solver'a atar, solver kodu bozar, triage tekrar solver'a atar (sonsuz döngü).
+- **Çözüm:** `CircuitBreaker` (Aegis Watchdog modülü) devrededir. Aynı hata imzası 3 iterasyon boyunca çözülemezse otomatik sevk durdurulur ve geliştirici uyarılır.
+
+---
+
+## 🔒 5. Demir Kafes Standartları & Kısıtlar
 - Her yeni dosya azami **300 satır**.
 - Her fonksiyon azami **40 satır**.
 - **0 `any`** ve %100 TypeScript tip güvenliği.
@@ -99,10 +131,11 @@ flowchart TD
 
 ---
 
-## 🎯 5. Kabul Kriterleri (Acceptance Criteria)
+## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
 - [ ] `TriageCacheRadar` önbellek yöneticisi geliştirildi; değişmeyen dosyalarda tarama süresi <50ms'ye indirildi.
+- [ ] Kural sürüm tuzu (`engineHash`) ve FNV-1a içerik kontrolü ile sahte temiz (False Clean) riski sıfırlandı.
 - [ ] `handleTriage` asenkron yığınlama (batch chunking) ile çoklu dosya okumasını optimize etti.
-- [ ] `--with-tests` ve `--with-godot` bayrakları dinamik çalışma zamanı kanıtlarını ayrıştırıp kritik hatalara dönüştürebilir hale getirildi.
-- [ ] `BlastRadiusStratifier` entegre edilerek bulunan kusurlar patlama yarıçapına göre Tier 1–Tier 4 olarak sıralandı.
-- [ ] `--auto-dispatch` bayrağı ile kritik hataların `aegis debug` Sokratik diyalog motoruna aktarılması sağlandı.
+- [ ] `--with-tests` ve `--with-godot` bayrakları dinamik çalışma zamanı kanıtlarını ayrıştırıp kritik hatalara dönüştürebilir hale getirildi (zaman aşımı korumalı).
+- [ ] `BlastRadiusStratifier` entegre edilerek bulunan kusurlar derinlik sınırlı ($D \le 3$) patlama yarıçapına göre Tier 1–Tier 4 olarak sıralandı.
+- [ ] `--auto-dispatch` bayrağı ile kritik hataların `CircuitBreaker` korumalı olarak `aegis debug` Sokratik diyalog motoruna aktarılması sağlandı.
 - [ ] Monorepo birim testleri ve %100 mutasyon test kapısı onayından geçti.
