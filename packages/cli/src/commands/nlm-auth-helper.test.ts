@@ -1,12 +1,12 @@
 /**
  * @file nlm-auth-helper.test.ts
- * Tests for nlm:auth command handler and interactive prompt helper.
+ * Tests for nlm:auth command handler, clipboard extraction, and interactive prompt helper.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
 import test from 'node:test';
 import * as assert from 'node:assert';
-import { handleNlmAuth, promptInteractiveAuthResolution } from './nlm-auth-helper.js';
+import { handleNlmAuth, promptInteractiveAuthResolution, runClipboardAuth, runRotateAuth } from './nlm-auth-helper.js';
 
 test('handleNlmAuth outputs status check when no arguments given', async () => {
   const originalLog = console.log;
@@ -39,7 +39,7 @@ test('handleNlmAuth --paste saves valid cookie string', async () => {
   }
 });
 
-test('handleNlmAuth --browser inspects CDP port safely', async () => {
+test('handleNlmAuth --browser with --force inspects CDP port safely', async () => {
   const originalLog = console.log;
   const originalError = console.error;
   const captured: string[] = [];
@@ -47,8 +47,41 @@ test('handleNlmAuth --browser inspects CDP port safely', async () => {
   console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
   try {
-    await handleNlmAuth('--browser', 'nonexistent-browser-xyz', '--port', '64888');
+    await handleNlmAuth('--browser', 'nonexistent-browser-xyz', '--port', '64888', '--force');
     assert.ok(captured.some(l => l.includes('Checking system browser CDP interface') || l.includes('Spawning Chromium-family browser')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('runClipboardAuth fails cleanly when clipboard is empty', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    const res = await runClipboardAuth();
+    assert.strictEqual(typeof res, 'boolean');
+    assert.ok(captured.some(l => l.includes('clipboard')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('runRotateAuth handles rotation attempt gracefully', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await runRotateAuth();
+    assert.ok(captured.some(l => l.includes('rotation')));
   } finally {
     console.log = originalLog;
     console.error = originalError;

@@ -26,6 +26,33 @@ test('sanitizeCookieInput cleans prefix and enclosing quotes', () => {
   );
 });
 
+test('sanitizeCookieInput extracts cookies from cURL commands and JSON objects', () => {
+  const curlCmd = `curl 'https://notebooklm.google.com' -H 'Cookie: SID=curlSid12345; __Secure-1PSIDTS=curlTs' --compressed`;
+  assert.strictEqual(
+    SessionCredentialsManager.sanitizeCookieInput(curlCmd),
+    'SID=curlSid12345; __Secure-1PSIDTS=curlTs'
+  );
+
+  const jsonStr = JSON.stringify({ cookies: 'SID=jsonSid12345; HSID=jsonHsid' });
+  assert.strictEqual(
+    SessionCredentialsManager.sanitizeCookieInput(jsonStr),
+    'SID=jsonSid12345; HSID=jsonHsid'
+  );
+});
+
+test('readSystemClipboard utilizes mock runner gracefully', () => {
+  const mockRunner = () => 'SID=clipboardSid12345_very_long_mock_token_string_exceeding_fifty_chars; __Secure-1PSIDTS=clipTs';
+  const res = SessionCredentialsManager.readSystemClipboard(mockRunner);
+  assert.ok(res?.includes('SID=clipboardSid12345'));
+
+  const extractValid = SessionCredentialsManager.tryExtractFromClipboard(mockRunner);
+  assert.strictEqual(extractValid.found, true);
+  assert.ok(extractValid.cookies?.includes('SID=clipboardSid12345'));
+
+  const extractEmpty = SessionCredentialsManager.tryExtractFromClipboard(() => '');
+  assert.strictEqual(extractEmpty.found, false);
+});
+
 test('validateCookieString validates required Google auth tokens', () => {
   const validCookie = 'SID=valid-sid-token-1234567890; HSID=valid-hsid; __Secure-1PSIDTS=valid-psidts-token-abcdef';
   const resValid = SessionCredentialsManager.validateCookieString(validCookie);

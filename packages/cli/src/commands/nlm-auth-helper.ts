@@ -1,6 +1,7 @@
 /**
  * @file nlm-auth-helper.ts
- * Interactive Auth Resolution & TTY Prompt Helper for NotebookLM.
+ * Interactive Auth Resolution & Multi-Browser Session Manager for NotebookLM.
+ * Handles active session pre-flight, headless rotation, and clipboard instant-import.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
@@ -9,6 +10,8 @@ import {
   SessionCredentialsManager,
   NativeBrowserCdpAttacher,
   NativeBrowserSpawner,
+  HttpRotateEngine,
+  MultiRootTokenResolver,
   type AuthChallengeContext,
   type AuthResolutionAction
 } from '@aegis/github-live';
@@ -16,26 +19,111 @@ import { showBanner } from './banner.js';
 
 export async function handleNlmAuth(...args: string[]): Promise<void> {
   showBanner();
+  const isClipboard = args.includes('--clipboard') || args.includes('-c');
+  const isRotate = args.includes('--rotate') || args.includes('-r');
   const isPaste = args.includes('--paste') || args.includes('-p');
   const isBrowser = args.includes('--browser') || args.includes('-b');
+  const isForce = args.includes('--force') || args.includes('-f');
 
+  if (isClipboard) {
+    await runClipboardAuth();
+    return;
+  }
+  if (isRotate) {
+    await runRotateAuth();
+    return;
+  }
   if (isPaste) {
     const rawVal = args.find(a => !a.startsWith('-') && a !== 'auth');
     await runPasteAuth(rawVal);
     return;
   }
-
   if (isBrowser) {
-    const browserIdx = args.findIndex(a => a === '--browser' || a === '-b');
-    const browserArg = args[browserIdx + 1];
-    const preferredName = browserArg && !browserArg.startsWith('-') ? browserArg : undefined;
-    const portIdx = args.indexOf('--port');
-    const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1], 10) : 9222;
-    await runBrowserAuth(preferredName, port);
+    await handleBrowserCommand(args, isForce);
+    return;
+  }
+  runStatusCheck();
+}
+
+async function handleBrowserCommand(args: string[], isForce: boolean): Promise<void> {
+  const inspect = SessionCredentialsManager.inspectCredentials();
+  if (inspect.active && !isForce) {
+    console.log('✅ Google NotebookLM session is already active and valid!');
+    console.log(` • Source: [${inspect.source.toUpperCase()}] (${inspect.path || 'in-memory'})`);
+    console.log(` • Binding Token (SID): ${inspect.hasSid ? '✅' : '❌'}`);
+    console.log(` • Session Token (__Secure-1PSIDTS): ${inspect.hasPsidts ? '✅' : '❌'}`);
+    console.log('\n💡 Session is ready to use without launching a browser.');
+    console.log('   To re-authenticate or switch accounts, run:\n   aegis nlm:auth --browser --force');
     return;
   }
 
-  runStatusCheck();
+  if (inspect.hasSid && !inspect.hasPsidts && !isForce) {
+    console.log('🔄 Expired or partial session detected. Attempting headless HTTP rotation...');
+    const rotated = await runSilentRotate();
+    if (rotated) return;
+  }
+
+  const clip = SessionCredentialsManager.tryExtractFromClipboard();
+  if (clip.found && clip.cookies && !isForce) {
+    console.log('📋 Valid Google cookies detected in clipboard! Importing automatically...');
+    const save = SessionCredentialsManager.saveCredentials(clip.cookies);
+    if (save.success) {
+      console.log(`✅ Session credentials imported from clipboard and saved to: ${save.path}`);
+      return;
+    }
+  }
+
+  await launchBrowserFlow(args);
+}
+
+async function launchBrowserFlow(args: string[]): Promise<boolean> {
+  const browserIdx = args.findIndex(a => a === '--browser' || a === '-b');
+  const browserArg = args[browserIdx + 1];
+  const preferredName = browserArg && !browserArg.startsWith('-') ? browserArg : undefined;
+  const portIdx = args.indexOf('--port');
+  const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1], 10) : 9222;
+  return await runBrowserAuth(preferredName, port);
+}
+
+export async function runClipboardAuth(): Promise<boolean> {
+  console.log('📋 Inspecting system clipboard for Google NotebookLM session cookies...');
+  const clip = SessionCredentialsManager.tryExtractFromClipboard();
+  if (!clip.found || !clip.cookies) {
+    console.error('❌ No valid Google NotebookLM cookies or cURL command found in clipboard.');
+    console.log('\n💡 If already logged into NotebookLM in Chrome/Edge/Brave:');
+    console.log('   1. In F12 DevTools Console, type: copy(document.cookie) and hit Enter');
+    console.log('   2. OR Network tab -> Right click request -> Copy -> Copy as cURL');
+    console.log('   3. Run "aegis nlm:auth --clipboard" again.');
+    return false;
+  }
+
+  const saveRes = SessionCredentialsManager.saveCredentials(clip.cookies);
+  if (saveRes.success) {
+    console.log(`✅ Session credentials extracted from clipboard and saved to: ${saveRes.path}`);
+    return true;
+  }
+  console.error(`❌ Failed to save credentials: ${saveRes.error}`);
+  return false;
+}
+
+export async function runSilentRotate(): Promise<boolean> {
+  const resolver = MultiRootTokenResolver.resolve();
+  if (!resolver.cookies) return false;
+  const res = await HttpRotateEngine.rotate(resolver.cookies, { saveOnSuccess: true });
+  if (res.success) {
+    console.log('✅ Session rotated successfully via headless HTTP! New __Secure-1PSIDTS acquired.');
+    return true;
+  }
+  return false;
+}
+
+export async function runRotateAuth(): Promise<void> {
+  console.log('🔄 Attempting headless HTTP session rotation with Google accounts...');
+  const success = await runSilentRotate();
+  if (!success) {
+    console.error('❌ Headless rotation failed or binding token (SID) is expired.');
+    console.log('💡 Run "aegis nlm:auth --browser" or "aegis nlm:auth --clipboard" to re-authenticate.');
+  }
 }
 
 function runStatusCheck(): void {
@@ -49,14 +137,21 @@ function runStatusCheck(): void {
   if (res.path) console.log(` • Storage Path: ${res.path}`);
 
   if (!res.active) {
-    console.log('\n💡 To authenticate, run:\n   aegis nlm:auth --browser [chrome|edge|brave]\n   or paste cookie directly: aegis nlm:auth --paste "<cookie>"');
+    console.log('\n💡 Authentication Options:');
+    console.log('   • Account already open in browser? Copy cURL or cookie and run: aegis nlm:auth --clipboard');
+    console.log('   • Launch browser: aegis nlm:auth --browser [chrome|edge|brave]');
+    console.log('   • Paste cookie directly: aegis nlm:auth --paste "<cookie>"');
+  } else {
+    console.log('\n💡 Maintenance:');
+    console.log('   • Refresh session token: aegis nlm:auth --rotate');
+    console.log('   • Force re-login / switch accounts: aegis nlm:auth --browser --force');
   }
 }
 
 async function runPasteAuth(providedCookie?: string): Promise<void> {
   let cookieToSave = providedCookie;
   if (!cookieToSave) {
-    cookieToSave = await promptUser('Paste raw Cookie header: ');
+    cookieToSave = await promptUser('Paste raw Cookie header or cURL command: ');
   }
 
   if (!cookieToSave || cookieToSave.trim().length === 0) {
@@ -127,29 +222,48 @@ export async function promptInteractiveAuthResolution(ctx: AuthChallengeContext)
     return 'OFFLINE_FALLBACK';
   }
 
+  const clip = SessionCredentialsManager.tryExtractFromClipboard();
   console.log('\n⚠️  NotebookLM oturumu bulunamadı veya süresi dolmuş.');
   console.log(` • İşlem: ${ctx.operation}`);
   console.log(` • Detay: ${ctx.errorDetails}`);
   console.log('\n? Ne yapmak istersiniz?');
-  console.log('  1) (Önerilen) Tarayıcıyı açarak NotebookLM\'e giriş yap');
-  console.log('  2) Cookie dizesini elle yapıştır');
-  console.log('  3) NotebookLM olmadan devam et (Yerel AST & Context7 ile)');
-  console.log('  4) Görevi iptal et');
 
-  const answer = (await promptUser('Seçiminiz [1/2/3/4]: ')).trim();
-  if (answer === '1') {
+  if (clip.found && clip.cookies) {
+    console.log('  1) (Önerilen) Panodaki (Clipboard) hazır oturumu kullan');
+  } else {
+    console.log('  1) (Önerilen) Tarayıcıyı açarak NotebookLM\'e giriş yap');
+  }
+  console.log('  2) Panodan (Clipboard) çerez aktar (--clipboard)');
+  console.log('  3) Cookie / cURL komutunu konsola elle yapıştır');
+  console.log('  4) NotebookLM olmadan devam et (Yerel AST & Context7 ile)');
+  console.log('  5) Görevi iptal et');
+
+  const answer = (await promptUser('Seçiminiz [1/2/3/4/5]: ')).trim();
+  return await handlePromptChoice(answer, clip.found && clip.cookies ? clip.cookies : undefined);
+}
+
+async function handlePromptChoice(choice: string, clipCookie?: string): Promise<AuthResolutionAction> {
+  if (choice === '1') {
+    if (clipCookie) {
+      SessionCredentialsManager.saveCredentials(clipCookie);
+      return 'REAUTH';
+    }
     const ok = await runBrowserAuth();
     return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
   }
-  if (answer === '2') {
-    const raw = await promptUser('Lütfen güncel Cookie dizesini yapıştırın: ');
+  if (choice === '2') {
+    const ok = await runClipboardAuth();
+    return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
+  }
+  if (choice === '3') {
+    const raw = await promptUser('Lütfen Cookie dizesini veya cURL komutunu yapıştırın: ');
     if (raw && raw.trim().length > 0) {
       SessionCredentialsManager.saveCredentials(raw);
       return 'REAUTH';
     }
     return 'OFFLINE_FALLBACK';
   }
-  if (answer === '4') return 'ABORT';
+  if (choice === '5') return 'ABORT';
   return 'OFFLINE_FALLBACK';
 }
 
