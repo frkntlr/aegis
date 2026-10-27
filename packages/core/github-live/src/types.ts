@@ -35,6 +35,33 @@ export interface WikiSyncStatus {
   message?: string;
 }
 
+export interface WikiFastSyncResult {
+  success: boolean;
+  message: string;
+  pulled: boolean;
+  pushed: boolean;
+  cached: boolean;
+  durationMs: number;
+  divergence?: {
+    ahead: number;
+    behind: number;
+  };
+}
+
+export interface WikiSyncStateManifest {
+  lastSyncTimestamp: number;
+  remoteRepo: string;
+  headSha: string;
+  remoteSha?: string;
+  lastStatus: 'clean' | 'ahead' | 'behind' | 'diverged';
+}
+
+export interface WikiSyncOptions {
+  force?: boolean;
+  ttlMs?: number;
+  commitMessage?: string;
+}
+
 export interface DiscussionItem {
   id: string;
   title: string;

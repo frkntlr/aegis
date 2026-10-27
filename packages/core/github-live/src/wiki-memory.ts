@@ -1,5 +1,5 @@
 import { GitHubWikiLiveAdapter } from './wiki-adapter.js';
-import type { WikiPage, WikiSyncStatus } from './types.js';
+import type { WikiFastSyncResult, WikiPage, WikiSyncOptions, WikiSyncStatus } from './types.js';
 
 export class WikiMemoryManager {
   private adapter: GitHubWikiLiveAdapter;
@@ -62,6 +62,12 @@ export class WikiMemoryManager {
 
   public checkStatus(): WikiSyncStatus {
     return this.adapter.checkRemoteAvailability();
+  }
+
+  public fastSync(options?: WikiSyncOptions): WikiFastSyncResult {
+    const res = this.adapter.fastSync(options);
+    this.refreshPages();
+    return res;
   }
 
   public syncLive(): boolean {

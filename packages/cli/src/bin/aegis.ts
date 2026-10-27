@@ -124,7 +124,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'wiki:show': (a) => handleWikiShow(a[1]),
   'wiki:clean': (a) => handleWikiClean(a[1]),
   'wiki:seed': () => handleWikiSeed(),
-  'wiki:sync': () => handleWikiSync(),
+  'wiki:sync': (a) => handleWikiSync(a.includes('--force') || a.includes('-f')),
   'wiki:status': () => handleWikiStatus(),
   merge: (a) => handleMerge(a[1], a[2]),
   'branch:sync': (a) => handleBranchSync(a[1], a[2]),

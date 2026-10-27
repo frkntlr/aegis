@@ -89,16 +89,16 @@ export function handleWikiShow(slug: string): void {
   console.log('\n--- Content ---\n' + page.content);
 }
 
-export function handleWikiSync(): void {
+export function handleWikiSync(force = false): void {
   showBanner();
   console.log('🔄 Synchronizing directly with GitHub Wiki remote repository...');
   const manager = new WikiMemoryManager();
-  const pulled = manager.syncLive();
-  const pushed = manager.pushAllToRemote();
-  if (pulled || pushed.success) {
-    console.log(`✅ GitHub Wiki synchronized! Pages: ${manager.listPages().length}`);
+  const res = manager.fastSync({ force });
+  if (res.success) {
+    const badge = res.cached ? '⚡ cached' : `${res.durationMs}ms`;
+    console.log(`✅ GitHub Wiki synchronized! Pages: ${manager.listPages().length} [${badge}] - ${res.message}`);
   } else {
-    console.log(`⚠️  Sync status: ${pushed.message}`);
+    console.log(`⚠️  Sync status: ${res.message}`);
   }
 }
 

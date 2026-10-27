@@ -2,9 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { GitHubTokenResolver } from './token-resolver.js';
-import type { WikiPage, WikiSyncStatus } from './types.js';
+import type { WikiFastSyncResult, WikiPage, WikiSyncOptions, WikiSyncStatus } from './types.js';
 import { DEFAULT_WIKI_SUITE } from './wiki-suite.js';
 import { cleanGitEnv, formatWikiMarkdown, parseWikiMarkdown } from './wiki-helpers.js';
+import { executeFastReconcile, WikiSyncRadar } from './wiki-sync-radar.js';
 
 export interface WikiAdapterOptions {
   token?: string;
@@ -18,6 +19,8 @@ export class GitHubWikiLiveAdapter {
   private owner: string;
   private repo: string;
   private cloneDir: string;
+  private cachedAvailability?: WikiSyncStatus;
+  private cachedAvailabilityTime = 0;
 
   constructor(options: WikiAdapterOptions = {}) {
     const auth = GitHubTokenResolver.resolve(options.token);
@@ -39,21 +42,20 @@ export class GitHubWikiLiveAdapter {
   }
 
   public checkRemoteAvailability(): WikiSyncStatus {
+    if (this.cachedAvailability && Date.now() - this.cachedAvailabilityTime < 120_000) {
+      return this.cachedAvailability;
+    }
     const url = this.getWikiRemoteUrl();
     try {
-      execFileSync('git', ['ls-remote', url], {
-        stdio: 'pipe',
-        timeout: 8000,
-        env: cleanGitEnv()
-      });
-      return {
+      execFileSync('git', ['ls-remote', url], { stdio: 'pipe', timeout: 8000, env: cleanGitEnv() });
+      this.cachedAvailability = {
         available: true,
         url: this.getWikiWebUrl(),
         remoteRepo: `${this.owner}/${this.repo}.wiki.git`,
         pageCount: this.listPages().length
       };
     } catch {
-      return {
+      this.cachedAvailability = {
         available: true,
         url: this.getWikiWebUrl(),
         remoteRepo: `${this.owner}/${this.repo}.wiki.git`,
@@ -62,15 +64,23 @@ export class GitHubWikiLiveAdapter {
         message: 'GitHub Wiki repository ready for first automated push.'
       };
     }
+    this.cachedAvailabilityTime = Date.now();
+    return this.cachedAvailability;
+  }
+
+  public fastSync(options: WikiSyncOptions = {}): WikiFastSyncResult {
+    this.ensureGitInitialized();
+    return executeFastReconcile({
+      cloneDir: this.cloneDir,
+      remoteUrl: this.getWikiRemoteUrl(),
+      remoteRepo: `${this.owner}/${this.repo}.wiki.git`,
+      options
+    });
   }
 
   public syncFromRemote(): boolean {
-    const status = this.checkRemoteAvailability();
-    if (!status.available) return false;
-
     fs.mkdirSync(path.dirname(this.cloneDir), { recursive: true });
     const url = this.getWikiRemoteUrl();
-
     if (!fs.existsSync(path.join(this.cloneDir, '.git'))) {
       return this.cloneWikiRemote(url);
     }
@@ -103,11 +113,7 @@ export class GitHubWikiLiveAdapter {
         this.backupConflictingWiki();
         fs.rmSync(this.cloneDir, { recursive: true, force: true });
       }
-      execFileSync('git', ['clone', url, this.cloneDir], {
-        stdio: 'pipe',
-        timeout: 20000,
-        env: cleanGitEnv()
-      });
+      execFileSync('git', ['clone', url, this.cloneDir], { stdio: 'pipe', timeout: 20000, env: cleanGitEnv() });
       return true;
     } catch {
       return false;
@@ -115,9 +121,7 @@ export class GitHubWikiLiveAdapter {
   }
 
   public listPages(): WikiPage[] {
-    if (!fs.existsSync(this.cloneDir)) {
-      return this.getFallbackPages();
-    }
+    if (!fs.existsSync(this.cloneDir)) return this.getFallbackPages();
     const files = fs.readdirSync(this.cloneDir).filter(f => f.endsWith('.md') && !f.startsWith('.'));
     if (files.length === 0) return this.getFallbackPages();
 
@@ -139,28 +143,31 @@ export class GitHubWikiLiveAdapter {
     return this.getFallbackPages().find(p => p.slug === cleanSlug);
   }
 
-  public publishPage(slug: string, title: string, bullets: [string, string, string], content = ''): boolean {
+  public publishPage(
+    slug: string,
+    title: string,
+    bullets: [string, string, string],
+    content = '',
+    pushImmediate = false
+  ): boolean {
     const cleanSlug = path.basename(slug).replace(/\.md$/, '') || 'wiki-page';
     fs.mkdirSync(this.cloneDir, { recursive: true });
     const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
     if (!filePath.startsWith(path.resolve(this.cloneDir))) return false;
-    const md = formatWikiMarkdown(title, bullets, content);
-    fs.writeFileSync(filePath, md, 'utf8');
+    fs.writeFileSync(filePath, formatWikiMarkdown(title, bullets, content), 'utf8');
 
-    const status = this.checkRemoteAvailability();
-    const hasGit = fs.existsSync(path.join(this.cloneDir, '.git'));
-    if (status.available && hasGit) {
-      try {
-        const env = cleanGitEnv();
-        execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
-        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
+    if (!fs.existsSync(path.join(this.cloneDir, '.git'))) return true;
+    try {
+      const env = cleanGitEnv();
+      execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
+      execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
+      if (pushImmediate) {
         execFileSync('git', ['-C', this.cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
-        return true;
-      } catch {
-        return false;
       }
+      return true;
+    } catch {
+      return false;
     }
-    return false;
   }
 
   public seedComprehensiveWikiSuite(): { created: number; pages: string[] } {
@@ -190,9 +197,9 @@ export class GitHubWikiLiveAdapter {
       try {
         const env = cleanGitEnv();
         execFileSync('git', ['-C', this.cloneDir, 'add', '.'], { stdio: 'pipe', env });
-        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 8-page living architecture suite'], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 13-page living architecture suite'], { stdio: 'pipe', env });
       } catch {
-        // workspace already committed or clean
+        // workspace clean
       }
     }
     return { created: createdSlugs.length, pages: createdSlugs };
@@ -200,6 +207,13 @@ export class GitHubWikiLiveAdapter {
 
   public pushAllToRemote(): { success: boolean; message: string } {
     this.ensureGitInitialized();
+    if (WikiSyncRadar.isLocalDirty(this.cloneDir)) {
+      WikiSyncRadar.stageAndCommitDirty(this.cloneDir);
+    }
+    const div = WikiSyncRadar.getCommitDivergence(this.cloneDir);
+    if (div.ahead === 0) {
+      return { success: true, message: 'Remote already up-to-date with local wiki memory.' };
+    }
     const env = cleanGitEnv();
     try {
       execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
