@@ -1,15 +1,14 @@
 import { FuzzyMatcher, type CageViolation } from '@aegis/shared';
+import {
+  type GDScriptFuncBlock,
+  GDSCRIPT_REF_COUNTED_TYPES,
+  GDSCRIPT_ENGINE_SIGNALS
+} from './gdscript-constants.js';
 
 export interface GDScriptRulesOptions {
   maxFunctionLines?: number;
   maxFileLines?: number;
   maxComplexity?: number;
-}
-
-interface FuncBlock {
-  name: string;
-  startLine: number;
-  lines: string[];
 }
 
 export class GDScriptRulesValidator {
@@ -56,7 +55,7 @@ export class GDScriptRulesValidator {
     }
   }
 
-  private checkFunctionLength(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
+  private checkFunctionLength(filePath: string, fn: GDScriptFuncBlock, violations: CageViolation[]): void {
     if (fn.lines.length > this.maxFunctionLines) {
       violations.push({
         rule: 'GD_001_FUNC_LENGTH',
@@ -68,7 +67,7 @@ export class GDScriptRulesValidator {
     }
   }
 
-  private checkComplexity(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
+  private checkComplexity(filePath: string, fn: GDScriptFuncBlock, violations: CageViolation[]): void {
     let score = 1;
     const branchKeywords = /\b(if|elif|for|while|match|and|or)\b/;
     for (const l of fn.lines) {
@@ -87,26 +86,11 @@ export class GDScriptRulesValidator {
     }
   }
 
-  private static readonly REF_COUNTED_TYPES = new Set([
-    'RegEx', 'ConfigFile', 'InputEventKey', 'InputEventMouseButton',
-    'InputEventScreenTouch', 'InputEventScreenDrag', 'InputEventAction',
-    'RandomNumberGenerator', 'Image', 'Resource', 'AegisUiVerifier',
-    'RefCounted', 'JSON', 'WordData', 'AegisCompatBridge', 'TCP_Server',
-    'StreamPeerTCP', 'FileAccess', 'DirAccess', 'ImageTexture', 'AudioStream'
-  ]);
-
-  private static readonly ENGINE_SIGNALS = new Set([
-    'pressed', 'released', 'button_up', 'button_down', 'toggled', 'timeout',
-    'ready', 'tree_entered', 'tree_exited', 'visibility_changed', 'draw',
-    'resized', 'focus_entered', 'focus_exited', 'mouse_entered', 'mouse_exited',
-    'item_selected', 'text_changed', 'text_submitted', 'request_completed', 'finished'
-  ]);
-
   private hasNodeInstantiation(text: string): boolean {
     if (text.includes('.instantiate()')) return true;
     const newMatches = text.matchAll(/([A-Z]\w+)\.new\(\)/g);
     for (const match of newMatches) {
-      if (!GDScriptRulesValidator.REF_COUNTED_TYPES.has(match[1])) {
+      if (!GDSCRIPT_REF_COUNTED_TYPES.has(match[1])) {
         return true;
       }
     }
@@ -118,7 +102,7 @@ export class GDScriptRulesValidator {
     return patterns.some(p => text.includes(p)) || /_\w+\s*=/.test(text) || /\w+\[.*\]\s*=/.test(text);
   }
 
-  private checkResourceLeaks(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
+  private checkResourceLeaks(filePath: string, fn: GDScriptFuncBlock, violations: CageViolation[]): void {
     const text = fn.lines.join('\n');
     if (this.hasNodeInstantiation(text) && !this.hasRetentionOrCleanup(text)) {
       violations.push({
@@ -142,7 +126,7 @@ export class GDScriptRulesValidator {
 
   private checkSignalUsage(
     filePath: string,
-    fn: FuncBlock,
+    fn: GDScriptFuncBlock,
     signals: Set<string>,
     violations: CageViolation[]
   ): void {
@@ -158,8 +142,8 @@ export class GDScriptRulesValidator {
           sig = modernMatch[1];
         }
       }
-      if (sig && !signals.has(sig) && !GDScriptRulesValidator.ENGINE_SIGNALS.has(sig)) {
-        const allKnown = [...Array.from(signals), ...Array.from(GDScriptRulesValidator.ENGINE_SIGNALS)];
+      if (sig && !signals.has(sig) && !GDSCRIPT_ENGINE_SIGNALS.has(sig)) {
+        const allKnown = [...Array.from(signals), ...Array.from(GDSCRIPT_ENGINE_SIGNALS)];
         const suggestion = FuzzyMatcher.suggest(sig, allKnown, 2);
         const msg = suggestion
           ? `Emitted signal '${sig}' is not declared in this script or known base classes. Did you mean '${suggestion}'?`
@@ -222,7 +206,7 @@ export class GDScriptRulesValidator {
     }
   }
 
-  private checkTypedGDScript(filePath: string, fn: FuncBlock, violations: CageViolation[]): void {
+  private checkTypedGDScript(filePath: string, fn: GDScriptFuncBlock, violations: CageViolation[]): void {
     let header = '';
     for (const line of fn.lines) {
       const stripped = line.replace(/#.*$/, '').trim();
@@ -260,9 +244,9 @@ export class GDScriptRulesValidator {
     }
   }
 
-  private extractFunctions(lines: string[]): FuncBlock[] {
-    const blocks: FuncBlock[] = [];
-    let current: FuncBlock | null = null;
+  private extractFunctions(lines: string[]): GDScriptFuncBlock[] {
+    const blocks: GDScriptFuncBlock[] = [];
+    let current: GDScriptFuncBlock | null = null;
     let baseIndent = 0;
 
     for (let i = 0; i < lines.length; i++) {

@@ -9,32 +9,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
 import { TsCallGraphExtractor } from './ts-call-graph-extractor.js';
+import {
+  type TypeClosureOptions,
+  type BoundedTypeClosureResult,
+  TransitiveTypeUtils
+} from './transitive-type-utils.js';
 
-export interface TypeClosureOptions {
-  maxDepth?: number;
-  lineBudget?: number;
-  enableOpaqueStubbing?: boolean;
-  baseDir?: string;
-  sourceFileProvider?: (filePath: string) => string | null;
-}
-
-export interface BoundedTypeClosureResult {
-  fullDeclarations: string[];
-  opaqueStubs: string[];
-  monomorphizedTypes: string[];
-  formattedBlock: string;
-  exceededBudget: boolean;
-  totalLines: number;
-}
-
-const BUILTIN_TYPES = new Set(
-  ('string number boolean void any unknown never null undefined Promise Record Array Map Set Error Date RegExp ' +
-  'Partial Required Readonly Omit Pick Exclude Extract NonNullable ReturnType InstanceType Parameters ' +
-  'ConstructorParameters object Function symbol bigint true false T K V R Buffer ArrayBuffer Uint8Array ' +
-  'ReadableStream WritableStream URL URLSearchParams Headers Request Response AbortSignal Blob File FormData ' +
-  'Iterable AsyncIterable Iterator AsyncIterator ReadonlyArray ReadonlyMap ReadonlySet ChildProcess NodeJS Event'
-  ).split(' ')
-);
+export { type TypeClosureOptions, type BoundedTypeClosureResult };
 
 export class TransitiveTypeClosure {
   private readonly options: Required<TypeClosureOptions>;
@@ -50,18 +31,15 @@ export class TransitiveTypeClosure {
   }
 
   public static extractTypeIdentifiers(typeText: string): string[] {
-    const rawMatches = typeText.match(/\b[A-Z]\w*\b/g) || [];
-    return [...new Set(rawMatches.filter(name => !BUILTIN_TYPES.has(name)))];
+    return TransitiveTypeUtils.extractTypeIdentifiers(typeText);
   }
 
   public static generateOpaqueStub(typeName: string): string {
-    return `export type ${typeName} = { readonly __opaque: '${typeName}' };`;
+    return TransitiveTypeUtils.generateOpaqueStub(typeName);
   }
 
   public static monomorphizeGeneric(typeName: string, genericArgs: string[]): string {
-    if (genericArgs.length === 0) return typeName;
-    const cleanArgs = genericArgs.map(a => a.replace(/[^a-zA-Z0-9_]/g, '')).join('_');
-    return `${typeName}_${cleanArgs}`;
+    return TransitiveTypeUtils.monomorphizeGeneric(typeName, genericArgs);
   }
 
   private readTargetFile(targetPath: string): string | null {
@@ -151,7 +129,7 @@ export class TransitiveTypeClosure {
   }
 
   private findTargetNode(sf: ts.SourceFile, symbolName: string): ts.Node | null {
-    const target = symbolName.includes('.') ? symbolName.split('.').pop()! : symbolName;
+    const target = symbolName.includes('.') ? (symbolName.split('.').pop() ?? symbolName) : symbolName;
     let found: ts.Node | null = null;
     const walk = (n: ts.Node): void => {
       if (found) return;
@@ -238,7 +216,8 @@ export class TransitiveTypeClosure {
       if (visited.has(t)) continue;
       visited.add(t);
       if (t.includes('<') && t.includes('>')) {
-        const mono = TransitiveTypeClosure.monomorphizeGeneric(t.split('<')[0]!, ['T']);
+        const baseName = t.split('<')[0] ?? t;
+        const mono = TransitiveTypeClosure.monomorphizeGeneric(baseName, ['T']);
         monomorphizedTypes.push(`export type ${mono} = { readonly __monomorphized: true };`);
       } else if (this.options.enableOpaqueStubbing) {
         opaqueStubs.push(TransitiveTypeClosure.generateOpaqueStub(t));

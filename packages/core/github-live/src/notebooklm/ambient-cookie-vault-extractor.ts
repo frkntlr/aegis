@@ -11,6 +11,9 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as child_process from 'node:child_process';
 import { SessionCredentialsManager } from './session-credentials-manager.js';
+import { AmbientFirefoxVaultExtractor, type FirefoxProfile } from './ambient-firefox-vault-extractor.js';
+
+export { type FirefoxProfile };
 
 export interface BrowserVaultProfile {
   browserName: string;
@@ -25,11 +28,6 @@ export interface VaultExtractionResult {
   browser?: string;
   profilePath?: string;
   error?: string;
-}
-
-export interface FirefoxProfile {
-  profileName: string;
-  cookiesDbPath: string;
 }
 
 export interface VaultExtractorOptions {
@@ -70,24 +68,14 @@ export class AmbientCookieVaultExtractor {
   }
 
   public static resolveFirefoxProfiles(appData = process.env.APPDATA || ''): FirefoxProfile[] {
-    const profiles: FirefoxProfile[] = [];
-    if (!appData) return profiles;
-    const baseDir = path.join(appData, 'Mozilla', 'Firefox', 'Profiles');
-    if (!fs.existsSync(baseDir)) return profiles;
+    return AmbientFirefoxVaultExtractor.resolveFirefoxProfiles(appData);
+  }
 
-    try {
-      const entries = fs.readdirSync(baseDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const dbPath = path.join(baseDir, entry.name, 'cookies.sqlite');
-        if (fs.existsSync(dbPath)) {
-          profiles.push({ profileName: entry.name, cookiesDbPath: dbPath });
-        }
-      }
-    } catch {
-      // return empty on error
-    }
-    return profiles;
+  public static readFirefoxCookiesFromDb(
+    cookiesDbPath: string,
+    dbOpener?: (path: string) => Array<{ host: string; name: string; value: string }>
+  ): string | null {
+    return AmbientFirefoxVaultExtractor.readFirefoxCookiesFromDb(cookiesDbPath, dbOpener);
   }
 
   public static unprotectMasterKey(
@@ -192,61 +180,6 @@ export class AmbientCookieVaultExtractor {
         return rows
           .filter(r => typeof r.name === 'string' && Buffer.isBuffer(r.encrypted_value))
           .map(r => ({ name: r.name as string, encrypted_value: r.encrypted_value as Buffer }));
-      } finally {
-        db.close();
-      }
-    } catch {
-      return [];
-    }
-  }
-
-  public static readFirefoxCookiesFromDb(
-    cookiesDbPath: string,
-    dbOpener?: (path: string) => Array<{ host: string; name: string; value: string }>
-  ): string | null {
-    const tempDir = path.join(os.tmpdir(), `aegis-ff-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    try {
-      fs.mkdirSync(tempDir, { recursive: true });
-      const tempDbPath = path.join(tempDir, 'cookies.sqlite');
-      fs.copyFileSync(cookiesDbPath, tempDbPath);
-      if (fs.existsSync(cookiesDbPath + '-wal')) fs.copyFileSync(cookiesDbPath + '-wal', tempDbPath + '-wal');
-
-      const rows = dbOpener ? dbOpener(tempDbPath) : AmbientCookieVaultExtractor.queryFirefoxSqlite(tempDbPath);
-      if (!rows || rows.length === 0) return null;
-
-      const cookieMap = new Map<string, string>();
-      for (const r of rows) {
-        if (!cookieMap.has(r.name) || r.host.includes('notebook')) {
-          cookieMap.set(r.name, r.value);
-        }
-      }
-
-      const merged = Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
-      const valRes = SessionCredentialsManager.validateCookieString(merged);
-      return valRes.valid ? merged : null;
-    } catch {
-      return null;
-    } finally {
-      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  }
-
-  private static queryFirefoxSqlite(dbPath: string): Array<{ host: string; name: string; value: string }> {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const sqlite = require('node:sqlite') as {
-        DatabaseSync: new (p: string, opts?: { readOnly?: boolean }) => {
-          prepare: (q: string) => { all: () => Array<Record<string, unknown>> };
-          close: () => void;
-        };
-      };
-      const db = new sqlite.DatabaseSync(dbPath, { readOnly: true });
-      try {
-        const stmt = db.prepare("SELECT host, name, value FROM moz_cookies WHERE host LIKE '%google.com%'");
-        const rows = stmt.all();
-        return rows
-          .filter(r => typeof r.host === 'string' && typeof r.name === 'string' && typeof r.value === 'string')
-          .map(r => ({ host: r.host as string, name: r.name as string, value: r.value as string }));
       } finally {
         db.close();
       }

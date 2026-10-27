@@ -12,21 +12,21 @@ export class ActiveHeadResolver {
   public static resolveActiveWorktree(cwd = process.cwd(), repoRoot?: string): string {
     const norm = cwd.replace(/\\/g, '/');
 
+    const root = repoRoot || ActiveHeadResolver.findRepoRoot(cwd);
+    if (root) {
+      const fromJson = ActiveHeadResolver.lookupFromWorktreesJson(norm, root);
+      if (fromJson) return fromJson;
+    }
+
     const segmentMatch = norm.match(/(?:experimental|worktrees|\.worktrees)\/([^/]+)/);
     if (segmentMatch) return segmentMatch[1];
 
     const parts = norm.split('/');
     for (const part of parts) {
-      if (part.includes('-solver') || part.endsWith('-solver')) return 'solver';
-      if (part.includes('-qa') || part.endsWith('-qa')) return 'qa';
-      if (part.includes('-docs') || part.endsWith('-docs')) return 'docs';
-      if (part.includes('-ui') || part.endsWith('-ui')) return 'ui';
-    }
-
-    const root = repoRoot || ActiveHeadResolver.findRepoRoot(cwd);
-    if (root) {
-      const fromJson = ActiveHeadResolver.lookupFromWorktreesJson(norm, root);
-      if (fromJson) return fromJson;
+      if (part.endsWith('-solver') || part === 'solver') return 'solver';
+      if (part.endsWith('-qa') || part === 'qa') return 'qa';
+      if (part.endsWith('-docs') || part === 'docs') return 'docs';
+      if (part.endsWith('-ui') || part === 'ui') return 'ui';
     }
 
     return 'default';

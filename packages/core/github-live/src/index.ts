@@ -12,6 +12,7 @@ export * from './projects-adapter.js';
 export * from './context-router.js';
 export * from './research-engine.js';
 export * from './context7-bridge.js';
+export * from './context7-builtin-docs.js';
 export * from './dependency-mapper.js';
 export * from './jit-doc-synthesizer.js';
 export * from './nuget-metadata-extractor.js';

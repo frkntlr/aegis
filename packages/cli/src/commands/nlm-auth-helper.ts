@@ -5,7 +5,6 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import * as readline from 'node:readline';
 import {
   SessionCredentialsManager,
   NativeBrowserCdpAttacher,
@@ -17,6 +16,10 @@ import {
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
 import { runZeroClickSessionImport } from './nlm-switch-helper.js';
+import {
+  promptUser,
+  promptInteractiveAuthResolution as runInteractivePrompt
+} from './nlm-auth-interactive.js';
 
 export async function handleNlmAuth(...args: string[]): Promise<void> {
   showBanner();
@@ -223,65 +226,5 @@ async function executeHarvestWorkflow(port: number): Promise<boolean> {
 }
 
 export async function promptInteractiveAuthResolution(ctx: AuthChallengeContext): Promise<AuthResolutionAction> {
-  if (!process.stdin.isTTY || process.env.CI) {
-    console.log(`⚠️  Non-interactive environment: defaulting to OFFLINE_FALLBACK for ${ctx.operation}`);
-    return 'OFFLINE_FALLBACK';
-  }
-
-  const clip = SessionCredentialsManager.tryExtractFromClipboard();
-  console.log('\n⚠️  NotebookLM oturumu bulunamadı veya süresi dolmuş.');
-  console.log(` • İşlem: ${ctx.operation}`);
-  console.log(` • Detay: ${ctx.errorDetails}`);
-  console.log('\n? Ne yapmak istersiniz?');
-
-  if (clip.found && clip.cookies) {
-    console.log('  1) (Önerilen) Panodaki (Clipboard) hazır oturumu kullan');
-  } else {
-    console.log('  1) (Önerilen) Tarayıcıyı açarak NotebookLM\'e giriş yap');
-  }
-  console.log('  2) Panodan (Clipboard) çerez aktar (--clipboard)');
-  console.log('  3) Cookie / cURL komutunu konsola elle yapıştır');
-  console.log('  4) NotebookLM olmadan devam et (Yerel AST & Context7 ile)');
-  console.log('  5) Görevi iptal et');
-
-  const answer = (await promptUser('Seçiminiz [1/2/3/4/5]: ')).trim();
-  return await handlePromptChoice(answer, clip.found && clip.cookies ? clip.cookies : undefined);
-}
-
-async function handlePromptChoice(choice: string, clipCookie?: string): Promise<AuthResolutionAction> {
-  if (choice === '1') {
-    if (clipCookie) {
-      SessionCredentialsManager.saveCredentials(clipCookie);
-      return 'REAUTH';
-    }
-    const ok = await runBrowserAuth();
-    return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
-  }
-  if (choice === '2') {
-    const ok = await runClipboardAuth();
-    return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
-  }
-  if (choice === '3') {
-    const raw = await promptUser('Lütfen Cookie dizesini veya cURL komutunu yapıştırın: ');
-    if (raw && raw.trim().length > 0) {
-      SessionCredentialsManager.saveCredentials(raw);
-      return 'REAUTH';
-    }
-    return 'OFFLINE_FALLBACK';
-  }
-  if (choice === '5') return 'ABORT';
-  return 'OFFLINE_FALLBACK';
-}
-
-function promptUser(query: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  return new Promise(resolve => {
-    rl.question(query, answer => {
-      rl.close();
-      resolve(answer);
-    });
-  });
+  return await runInteractivePrompt(ctx, () => runBrowserAuth(), () => runClipboardAuth());
 }
