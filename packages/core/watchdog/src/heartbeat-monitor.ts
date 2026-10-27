@@ -1,10 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { ProcessRunMetrics } from '@aegis/shared';
 
+export type ProcessTerminatorHook = (child: ChildProcess, signal: NodeJS.Signals) => void;
+
 export interface HeartbeatOptions {
   stagnationThresholdMs?: number;
   extensionStepMs?: number;
   checkIntervalMs?: number;
+  terminator?: ProcessTerminatorHook;
 }
 
 interface MonitorState {
@@ -18,11 +21,13 @@ export class HeartbeatMonitor {
   private stagnationThresholdMs: number;
   private extensionStepMs: number;
   private checkIntervalMs?: number;
+  private customTerminator?: ProcessTerminatorHook;
 
   constructor(options: HeartbeatOptions = {}) {
     this.stagnationThresholdMs = options.stagnationThresholdMs ?? 60_000;
     this.extensionStepMs = options.extensionStepMs ?? 30_000;
     this.checkIntervalMs = options.checkIntervalMs;
+    this.customTerminator = options.terminator;
   }
 
   private isProcessAlive(pid: number): boolean {
@@ -35,6 +40,15 @@ export class HeartbeatMonitor {
   }
 
   private terminateProcess(child: ChildProcess, signal: NodeJS.Signals): void {
+    if (this.customTerminator) {
+      try {
+        this.customTerminator(child, signal);
+      } catch {
+        // Ignore custom terminator errors
+      }
+      return;
+    }
+
     if (process.platform === 'win32' && child.pid) {
       if (this.isProcessAlive(child.pid)) {
         try {
@@ -47,7 +61,14 @@ export class HeartbeatMonitor {
           // Ignore taskkill errors if already terminated
         }
       }
+    } else if (child.pid && process.platform !== 'win32') {
+      try {
+        process.kill(-child.pid, signal);
+      } catch {
+        // Fallback to regular kill if not a process group leader
+      }
     }
+
     try {
       child.kill(signal);
     } catch {

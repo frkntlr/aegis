@@ -93,3 +93,24 @@ test('HeartbeatMonitor handles non-existent pid without throwing or delaying', a
   assert.strictEqual(metrics.stagnated, true);
   assert.ok(elapsed < 200, `Expected elapsed < 200ms, got ${elapsed}ms`);
 });
+
+test('HeartbeatMonitor uses custom terminator hook when provided', async () => {
+  let customTerminatorCalled = false;
+  let receivedSignal: string | null = null;
+
+  const monitor = new HeartbeatMonitor({
+    stagnationThresholdMs: 40,
+    checkIntervalMs: 10,
+    terminator: (c, sig) => {
+      customTerminatorCalled = true;
+      receivedSignal = sig;
+      c.kill(sig);
+    }
+  });
+
+  const child = new MockChildProcess() as unknown as ChildProcess;
+  const metrics = await monitor.monitor(child, 10);
+  assert.strictEqual(metrics.stagnated, true);
+  assert.strictEqual(customTerminatorCalled, true);
+  assert.strictEqual(receivedSignal, 'SIGTERM');
+});
