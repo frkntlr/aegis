@@ -69,3 +69,27 @@ test('HeartbeatMonitor triggers dynamic timeout when deadline exceeded', async (
   assert.strictEqual((child as unknown as MockChildProcess).killedSignal, 'SIGKILL');
   assert.ok(progressLogs.some(log => log.includes('Dynamic timeout limit reached')));
 });
+
+test('HeartbeatMonitor respects custom checkIntervalMs option', async () => {
+  const monitor = new HeartbeatMonitor({
+    stagnationThresholdMs: 40,
+    checkIntervalMs: 10
+  });
+  const child = new MockChildProcess() as unknown as ChildProcess;
+  const metrics = await monitor.monitor(child, 10);
+  assert.strictEqual(metrics.stagnated, true);
+});
+
+test('HeartbeatMonitor handles non-existent pid without throwing or delaying', async () => {
+  const monitor = new HeartbeatMonitor({
+    stagnationThresholdMs: 30,
+    checkIntervalMs: 10
+  });
+  const child = new MockChildProcess() as unknown as ChildProcess;
+  (child as unknown as MockChildProcess).pid = 123456789;
+  const start = Date.now();
+  const metrics = await monitor.monitor(child, 10);
+  const elapsed = Date.now() - start;
+  assert.strictEqual(metrics.stagnated, true);
+  assert.ok(elapsed < 200, `Expected elapsed < 200ms, got ${elapsed}ms`);
+});

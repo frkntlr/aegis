@@ -4,6 +4,7 @@ import type { ProcessRunMetrics } from '@aegis/shared';
 export interface HeartbeatOptions {
   stagnationThresholdMs?: number;
   extensionStepMs?: number;
+  checkIntervalMs?: number;
 }
 
 interface MonitorState {
@@ -16,18 +17,35 @@ interface MonitorState {
 export class HeartbeatMonitor {
   private stagnationThresholdMs: number;
   private extensionStepMs: number;
+  private checkIntervalMs?: number;
 
   constructor(options: HeartbeatOptions = {}) {
     this.stagnationThresholdMs = options.stagnationThresholdMs ?? 60_000;
     this.extensionStepMs = options.extensionStepMs ?? 30_000;
+    this.checkIntervalMs = options.checkIntervalMs;
+  }
+
+  private isProcessAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private terminateProcess(child: ChildProcess, signal: NodeJS.Signals): void {
     if (process.platform === 'win32' && child.pid) {
-      try {
-        spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-      } catch {
-        // Ignore taskkill errors if already terminated
+      if (this.isProcessAlive(child.pid)) {
+        try {
+          const killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+            stdio: 'ignore',
+            windowsHide: true
+          });
+          killer.unref();
+        } catch {
+          // Ignore taskkill errors if already terminated
+        }
       }
     }
     try {
@@ -35,6 +53,18 @@ export class HeartbeatMonitor {
     } catch {
       // Ignore if process already closed
     }
+  }
+
+  private resolveIntervalMs(timeoutSeconds: number): number {
+    if (this.checkIntervalMs && this.checkIntervalMs > 0) {
+      return this.checkIntervalMs;
+    }
+    const timeoutMs = timeoutSeconds * 1000;
+    const minThreshold = Math.min(this.stagnationThresholdMs, timeoutMs);
+    if (minThreshold < 1000) {
+      return Math.max(10, Math.floor(minThreshold / 2));
+    }
+    return 1000;
   }
 
   private checkWatchdogTimer(
@@ -97,12 +127,13 @@ export class HeartbeatMonitor {
       stderrLinesCount: 0
     };
     const flags = { timedOut: false, stagnated: false };
+    const intervalMs = this.resolveIntervalMs(timeoutSeconds);
 
     return new Promise((resolve) => {
       this.setupDataListeners(child, state, onProgress);
       const interval = setInterval(() => {
         this.checkWatchdogTimer(child, state, timeoutSeconds, interval, flags, onProgress);
-      }, 1000);
+      }, intervalMs);
 
       child.on('close', (exitCode) => {
         clearInterval(interval);
