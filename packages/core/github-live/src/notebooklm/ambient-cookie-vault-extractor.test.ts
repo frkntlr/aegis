@@ -132,3 +132,57 @@ test('extractFromAllVaults returns successfully with matching profile', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('resolveFirefoxProfiles handles empty appData gracefully', () => {
+  const res = AmbientCookieVaultExtractor.resolveFirefoxProfiles('');
+  assert.strictEqual(res.length, 0);
+});
+
+test('readFirefoxCookiesFromDb parses and validates Google cookies from Firefox', () => {
+  const tempDir = path.join(os.tmpdir(), `aegis-ff-test-${Date.now()}`);
+  fs.mkdirSync(tempDir, { recursive: true });
+  const dummyDbPath = path.join(tempDir, 'cookies.sqlite');
+  fs.writeFileSync(dummyDbPath, 'dummy sqlite');
+
+  const mockDbOpener = () => [
+    { host: '.google.com', name: 'SID', value: 'valid-sid-token-123456789012345678901234567890' },
+    { host: '.google.com', name: '__Secure-1PSIDTS', value: 'valid-psidts-token-abcdef123456' },
+    { host: 'notebook.google.com', name: 'OSID', value: 'valid-osid-token-123456' }
+  ];
+
+  try {
+    const cookies = AmbientCookieVaultExtractor.readFirefoxCookiesFromDb(dummyDbPath, mockDbOpener);
+    assert.ok(cookies);
+    assert.ok(cookies.includes('SID=valid-sid-token'));
+    assert.ok(cookies.includes('__Secure-1PSIDTS=valid-psidts-token'));
+    assert.ok(cookies.includes('OSID=valid-osid-token'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('extractFromAllVaults extracts from Firefox profile successfully', () => {
+  const tempDir = path.join(os.tmpdir(), `aegis-ff-vault-test-${Date.now()}`);
+  fs.mkdirSync(tempDir, { recursive: true });
+  const dummyDbPath = path.join(tempDir, 'cookies.sqlite');
+  fs.writeFileSync(dummyDbPath, 'dummy');
+
+  const mockFfProfiles = [{ profileName: 'default-release', cookiesDbPath: dummyDbPath }];
+  const mockDbOpener = () => [
+    { host: '.google.com', name: 'SID', value: 'valid-sid-token-123456789012345678901234567890' },
+    { host: '.google.com', name: '__Secure-1PSIDTS', value: 'valid-psidts-token-abcdef123456' }
+  ];
+
+  try {
+    const res = AmbientCookieVaultExtractor.extractFromAllVaults({
+      customFirefoxProfiles: mockFfProfiles,
+      firefoxDbOpener: mockDbOpener
+    });
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.browser, 'firefox');
+
+    assert.ok(res.cookies?.includes('SID=valid-sid-token'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
