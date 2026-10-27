@@ -47,8 +47,8 @@ test('handleNlmAuth --browser inspects CDP port safely', async () => {
   console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
   try {
-    await handleNlmAuth('--browser');
-    assert.ok(captured.some(l => l.includes('Connecting to system browser via Chrome DevTools Protocol')));
+    await handleNlmAuth('--browser', 'nonexistent-browser-xyz');
+    assert.ok(captured.some(l => l.includes('Checking system browser CDP interface') || l.includes('Spawning Chromium-family browser')));
   } finally {
     console.log = originalLog;
     console.error = originalError;

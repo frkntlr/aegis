@@ -8,6 +8,7 @@ import * as readline from 'node:readline';
 import {
   SessionCredentialsManager,
   NativeBrowserCdpAttacher,
+  NativeBrowserSpawner,
   type AuthChallengeContext,
   type AuthResolutionAction
 } from '@aegis/github-live';
@@ -25,7 +26,10 @@ export async function handleNlmAuth(...args: string[]): Promise<void> {
   }
 
   if (isBrowser) {
-    await runBrowserAuth();
+    const browserIdx = args.findIndex(a => a === '--browser' || a === '-b');
+    const browserArg = args[browserIdx + 1];
+    const preferredName = browserArg && !browserArg.startsWith('-') ? browserArg : undefined;
+    await runBrowserAuth(preferredName);
     return;
   }
 
@@ -43,7 +47,7 @@ function runStatusCheck(): void {
   if (res.path) console.log(` • Storage Path: ${res.path}`);
 
   if (!res.active) {
-    console.log('\n💡 To authenticate, run:\n   aegis nlm:auth --paste "<cookie>"\n   or launch Chrome/Edge with: --remote-debugging-port=9222 and run: aegis nlm:auth --browser');
+    console.log('\n💡 To authenticate, run:\n   aegis nlm:auth --browser [chrome|edge|brave]\n   or paste cookie directly: aegis nlm:auth --paste "<cookie>"');
   }
 }
 
@@ -66,30 +70,53 @@ async function runPasteAuth(providedCookie?: string): Promise<void> {
   }
 }
 
-async function runBrowserAuth(): Promise<void> {
-  console.log('🌐 Connecting to system browser via Chrome DevTools Protocol (CDP port 9222)...');
-  const active = await NativeBrowserCdpAttacher.isCdpActive(9222);
-  if (!active) {
-    console.error('❌ No browser detected on port 9222.');
-    console.log('💡 Start Chrome or Edge with:\n   msedge.exe --remote-debugging-port=9222\n   or chrome.exe --remote-debugging-port=9222\n   then log into https://notebooklm.google.com and retry: aegis nlm:auth --browser');
-    return;
+export async function runBrowserAuth(preferredName?: string, port = 9222): Promise<boolean> {
+  console.log('🌐 Checking system browser CDP interface on port ' + port + '...');
+  const isRunning = await NativeBrowserCdpAttacher.isCdpActive(port);
+
+  if (!isRunning) {
+    console.log('🚀 Spawning Chromium-family browser with isolated user-data-dir...');
+    const spawnRes = NativeBrowserSpawner.spawn({ browserName: preferredName, port });
+    if (!spawnRes.success) {
+      console.error(`❌ ${spawnRes.error || 'Failed to spawn browser.'}`);
+      return false;
+    }
+    console.log(` • Browser: ${spawnRes.browser?.name.toUpperCase()} (PID: ${spawnRes.pid || 'attached'})`);
+    console.log(` • Isolated Profile: ${spawnRes.userDataDir}`);
+    console.log('⏳ Waiting for browser CDP debugging interface to bind...');
+
+    const ready = await NativeBrowserCdpAttacher.waitForCdp(port, '127.0.0.1', 20000);
+    if (!ready) {
+      console.error('❌ Browser process started but CDP port ' + port + ' timed out.');
+      return false;
+    }
   }
 
-  try {
-    const cookies = await NativeBrowserCdpAttacher.queryCookies({ port: 9222 });
-    if (!cookies) {
-      console.error('❌ Could not retrieve cookies from browser on port 9222.');
-      return;
-    }
-    const res = SessionCredentialsManager.saveCredentials(cookies);
-    if (res.success) {
-      console.log(`✅ Captured and saved browser session credentials to: ${res.path}`);
-    } else {
-      console.error(`❌ Invalid session extracted from browser: ${res.error}`);
-    }
-  } catch (err: unknown) {
-    console.error(`❌ Browser CDP connection failed: ${err instanceof Error ? err.message : String(err)}`);
+  return await executeHarvestWorkflow(port);
+}
+
+async function executeHarvestWorkflow(port: number): Promise<boolean> {
+  console.log('🔑 Waiting for Google NotebookLM session (sign in if prompted in browser)...');
+  const harvest = await NativeBrowserCdpAttacher.harvestSessionCookies({
+    port,
+    maxWaitMs: 90000,
+    pollIntervalMs: 1500,
+    autoClose: true
+  });
+
+  if (!harvest.success || !harvest.cookies) {
+    console.error(`❌ Authentication capture failed: ${harvest.error || 'No cookies received.'}`);
+    return false;
   }
+
+  const saveRes = SessionCredentialsManager.saveCredentials(harvest.cookies);
+  if (saveRes.success) {
+    console.log(`✅ NotebookLM session captured and saved successfully to: ${saveRes.path}`);
+    return true;
+  }
+
+  console.error(`❌ Failed to persist captured session credentials: ${saveRes.error}`);
+  return false;
 }
 
 export async function promptInteractiveAuthResolution(ctx: AuthChallengeContext): Promise<AuthResolutionAction> {
@@ -102,12 +129,17 @@ export async function promptInteractiveAuthResolution(ctx: AuthChallengeContext)
   console.log(` • İşlem: ${ctx.operation}`);
   console.log(` • Detay: ${ctx.errorDetails}`);
   console.log('\n? Ne yapmak istersiniz?');
-  console.log('  1) (Önerilen) NotebookLM\'e tekrar giriş yap / oturumu yenile');
-  console.log('  2) NotebookLM olmadan devam et (Yerel AST & Context7 ile)');
-  console.log('  3) Görevi iptal et');
+  console.log('  1) (Önerilen) Tarayıcıyı açarak NotebookLM\'e giriş yap');
+  console.log('  2) Cookie dizesini elle yapıştır');
+  console.log('  3) NotebookLM olmadan devam et (Yerel AST & Context7 ile)');
+  console.log('  4) Görevi iptal et');
 
-  const answer = (await promptUser('Seçiminiz [1/2/3]: ')).trim();
+  const answer = (await promptUser('Seçiminiz [1/2/3/4]: ')).trim();
   if (answer === '1') {
+    const ok = await runBrowserAuth();
+    return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
+  }
+  if (answer === '2') {
     const raw = await promptUser('Lütfen güncel Cookie dizesini yapıştırın: ');
     if (raw && raw.trim().length > 0) {
       SessionCredentialsManager.saveCredentials(raw);
@@ -115,7 +147,7 @@ export async function promptInteractiveAuthResolution(ctx: AuthChallengeContext)
     }
     return 'OFFLINE_FALLBACK';
   }
-  if (answer === '3') return 'ABORT';
+  if (answer === '4') return 'ABORT';
   return 'OFFLINE_FALLBACK';
 }
 
