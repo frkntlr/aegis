@@ -25,6 +25,18 @@ test('UnifiedKnowledgeOracle serves Tier 1 NotebookLM response when available', 
   assert.strictEqual(res.citations.length, 1);
 });
 
+test('UnifiedKnowledgeOracle injects freshness constraint by default', () => {
+  const constrained = UnifiedKnowledgeOracle.applyFreshnessConstraint('Query text', {});
+  assert.ok(constrained.includes('Query text'));
+  assert.ok(constrained.includes('Prioritize the latest active architecture'));
+
+  const raw = UnifiedKnowledgeOracle.applyFreshnessConstraint('Query text', { requireLatestActive: false });
+  assert.strictEqual(raw, 'Query text');
+
+  const custom = UnifiedKnowledgeOracle.applyFreshnessConstraint('Query text', { groundingDirective: 'Custom' });
+  assert.ok(custom.includes('Custom'));
+});
+
 test('UnifiedKnowledgeOracle gracefully degrades to Tier 2 Context7 on NLM failure', async () => {
   const mockHttp = async () => ({
     status: 401,

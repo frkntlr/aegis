@@ -1,6 +1,6 @@
 /**
  * @file unified-knowledge-oracle.ts
- * Unified Knowledge Oracle with Resilient Cascading 3-Tier Fallback.
+ * Unified Knowledge Oracle with Resilient Cascading 3-Tier Fallback & Freshness Grounding.
  * Tier 1: NotebookLM Ground-Truth -> Tier 2: Context7 Substrate -> Tier 3: Local Living Memory.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
@@ -18,6 +18,8 @@ export interface OracleQueryOptions {
   forceOffline?: boolean;
   libraryHint?: string;
   topicHint?: string;
+  requireLatestActive?: boolean;
+  groundingDirective?: string;
 }
 
 export interface OracleQueryResult {
@@ -68,20 +70,18 @@ export class UnifiedKnowledgeOracle {
     if (!activeCookies) throw new Error('No NotebookLM credentials available.');
 
     const nbId = opt.notebookId || '3767b1fc-5759-416d-b938-495b8138ccd7';
+    const effectivePrompt = UnifiedKnowledgeOracle.applyFreshnessConstraint(q, opt);
+
     try {
-      const res = await this.client.query(nbId, q);
-      return {
-        answer: res.answer,
-        sourceTier: 'nlm',
-        citations: res.citations
-      };
+      const res = await this.client.query(nbId, effectivePrompt);
+      return { answer: res.answer, sourceTier: 'nlm', citations: res.citations };
     } catch (err: unknown) {
       const resolved = MultiRootTokenResolver.resolve();
       if (resolved.hasSid) {
         const rot = await HttpRotateEngine.rotate(resolved.cookies);
         if (rot.success && rot.refreshedCookies) {
           this.client.updateCookies(rot.refreshedCookies);
-          const retryRes = await this.client.query(nbId, q);
+          const retryRes = await this.client.query(nbId, effectivePrompt);
           return { answer: retryRes.answer, sourceTier: 'nlm', citations: retryRes.citations };
         }
       }
@@ -146,6 +146,13 @@ export class UnifiedKnowledgeOracle {
       sourceTier: 'local_ast',
       citations: [{ title: 'Living Memory Wiki', sourceId: 'local://wiki/spec' }]
     };
+  }
+
+  public static applyFreshnessConstraint(prompt: string, opt: OracleQueryOptions): string {
+    if (opt.requireLatestActive === false) return prompt;
+    const directive = opt.groundingDirective ||
+      '[Grounding Constraint: Prioritize the latest active architecture and most recent RFCs. Strictly discard obsolete or superseded precedents.]';
+    return `${prompt}\n\n${directive}`;
   }
 
   private static inferLibrary(q: string): string {
