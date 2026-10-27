@@ -441,6 +441,8 @@ Aegis komut satırı arayüzü `npm run aegis -- <komut>` veya `npx aegis <komut
 | `aegis nlm:switch [args]` | Aktif Google hesabını güvenle yedekleyip ortam/tarayıcı üzerinden değiştirir. |
 | `aegis nlm:query "<q>"` | Proje bilgi tabanını Google NotebookLM üzerinden alıntılarla sorgular. |
 | `aegis nlm:research "<t>"` | NotebookLM ile derin mimari araştırma yapar ve Wiki'ye aktarır. |
+| `aegis nlm:prune [id]` | Eski/geçersiz kaynakları MFCS güven skoruyla otonom budar ve mezar taşı mahzenine arşivler (`--dry-run` destekli). |
+| `aegis nlm:restore <id>` | Arşivlenmiş bir kaynağı yerel mahzenden NotebookLM'e geri yükler. |
 
 ### 7. Model Context Protocol Sunucusu
 | Komut | Açıklama |

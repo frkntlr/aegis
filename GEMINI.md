@@ -19,6 +19,8 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis nlm:research "<topic>"`: Conduct deep architectural research via NotebookLM and stage Wiki.
 - `/aegis nlm:auth [args]`: Inspect and authenticate Google NotebookLM session (--browser, --paste, --status).
 - `/aegis nlm:switch [args]`: Switch active NotebookLM Google account, backing up existing session and prompting zero-click ambient scan or browser login.
+- `/aegis nlm:prune [args]`: Autonomous MFCS pruning with local tombstone vault archiving.
+- `/aegis nlm:restore <id>`: Restore archived source from tombstone vault.
 - `/aegis deps:drift`: Symbiotic Substrate 2.0 Contract Drift Radar and lockfile integrity verification.
 - `/aegis find <symbol>`: Fast AST symbol lookup and precision surgical slice.
 - `/aegis triage [dir]`: Evidence-Based Bug Triage (zero false alarms).

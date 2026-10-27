@@ -36,6 +36,8 @@ When the user enters `/aegis` commands, immediately execute the corresponding CL
 | `/aegis nlm:research "<t>"` | Deep architectural research & stage Wiki via NotebookLM | `npm run aegis -- nlm:research "<t>"` |
 | `/aegis nlm:auth [args]` | Authenticate Google NotebookLM session (--browser, --paste) | `npm run aegis -- nlm:auth [args]` |
 | `/aegis nlm:switch [args]` | Switch Google account, backup session & zero-click harvest | `npm run aegis -- nlm:switch [args]` |
+| `/aegis nlm:prune [id]` | Autonomous MFCS pruning with local tombstone vault archiving | `npm run aegis -- nlm:prune [id]` |
+| `/aegis nlm:restore <id>` | Restore archived source from tombstone vault | `npm run aegis -- nlm:restore <id>` |
 | `/aegis deps:drift` | Symbiotic Substrate 2.0 Contract Drift Radar & lockfile verify | `npm run aegis -- deps:drift` |
 | `/aegis inspect` | Zero-token bounding box layout inspection | `npm run aegis -- inspect` |
 | `/aegis mutate <file>` | Run mutation testing gate | `npm run aegis -- mutate <file>` |
