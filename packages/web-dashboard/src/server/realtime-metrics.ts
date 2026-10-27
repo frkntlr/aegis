@@ -69,8 +69,16 @@ export class RealtimeMetricsService {
   private resolveSourceDir(): string {
     const packagesPath = path.resolve(this.repoRoot, 'packages');
     if (fs.existsSync(packagesPath)) return packagesPath;
-    const parentPackages = path.resolve(this.repoRoot, '..', '..', 'packages');
-    if (fs.existsSync(parentPackages)) return parentPackages;
+    const rootPkgJson = path.resolve(this.repoRoot, '..', '..', 'package.json');
+    if (fs.existsSync(rootPkgJson)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(rootPkgJson, 'utf8'));
+        if (pkg.name === 'aegis' && fs.existsSync(path.resolve(this.repoRoot, '..', '..', 'packages'))) {
+          return path.resolve(this.repoRoot, '..', '..', 'packages');
+        }
+      } catch { /* ignore */ }
+    }
+
     const srcPath = path.resolve(this.repoRoot, 'src');
     if (fs.existsSync(srcPath)) return srcPath;
     return this.repoRoot;

@@ -84,9 +84,18 @@ export class CodebaseMemoryWatcher {
     }, this.debounceMs);
   }
 
+  private isForeignWorktree(normPath: string): boolean {
+    const prefixes = ['/experimental/', '/worktrees/', '/.worktrees/'];
+    const matched = prefixes.find(p => normPath.includes(p));
+    if (!matched) return false;
+    if (this.worktreeId === 'default') return true;
+    return !normPath.includes(matched + this.worktreeId + '/');
+  }
+
   private shouldIgnore(normPath: string): boolean {
     const ignoredDirs = ['/node_modules/', '/.git/', '/dist/', '/.aegis/', '/build/'];
     if (ignoredDirs.some(d => normPath.includes(d))) return true;
+    if (this.isForeignWorktree(normPath)) return true;
     const ext = path.extname(normPath).toLowerCase();
     return !this.exts.includes(ext);
   }

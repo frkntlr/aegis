@@ -150,7 +150,7 @@ export class AstGrepBridge {
       for (const e of entries) {
         const full = path.join(cur, e.name);
         if (e.isDirectory()) {
-          if (!['node_modules', '.git', 'dist', '.aegis'].includes(e.name)) {
+          if (!['node_modules', '.git', 'dist', '.aegis', 'experimental', 'worktrees', '.worktrees'].includes(e.name)) {
             scan(full);
           }
         } else if (e.isFile() && ext.some(x => e.name.endsWith(x))) {

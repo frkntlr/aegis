@@ -39,6 +39,8 @@ test('CodebaseMemoryWatcher: filters ignored files and flushes pending changes',
   watcher.handleRawEvent(tmpDir, 'service.ts');
   watcher.handleRawEvent(tmpDir, 'node_modules/bad.ts');
   watcher.handleRawEvent(tmpDir, 'image.png');
+  watcher.handleRawEvent(tmpDir, 'experimental/solver/exp.ts');
+  watcher.handleRawEvent(tmpDir, 'worktrees/qa/qa.ts');
 
   const res = watcher.flushPendingFiles();
   assert.strictEqual(res.processed, 1, 'Only valid service.ts should be processed');

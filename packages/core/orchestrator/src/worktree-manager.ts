@@ -15,6 +15,8 @@ export class WorktreeManager {
   private worktreePrefix: string;
   private persistLocks: boolean;
   private activeLocks: Map<string, string> = new Map(); // filePath -> agentName
+  private cachedWorktrees: { timestamp: number; result: WorktreeListResult } | null = null;
+  private readonly WT_CACHE_TTL_MS = 2000;
 
   constructor(options: WorktreeManagerOptions = {}) {
     this.repoRoot = options.repoRoot ?? process.cwd();
@@ -96,6 +98,7 @@ export class WorktreeManager {
   }
 
   public ensureWorktree(agentName: string, baseBranchArg?: string): AgentWorktree {
+    this.invalidateWorktreeCache();
     const targetDir = this.getWorktreePath(agentName);
     const branchName = `aegis/${agentName}`;
     const baseBranch = baseBranchArg || this.detectCurrentBranch();
@@ -135,6 +138,7 @@ export class WorktreeManager {
   }
 
   public removeWorktree(agentName: string): boolean {
+    this.invalidateWorktreeCache();
     const targetDir = this.getWorktreePath(agentName);
     try {
       execFileSync('git', ['worktree', 'remove', targetDir, '--force'], {
@@ -181,7 +185,15 @@ export class WorktreeManager {
     };
   }
 
-  public listWorktrees(): WorktreeListResult {
+  public invalidateWorktreeCache(): void {
+    this.cachedWorktrees = null;
+  }
+
+  public listWorktrees(forceRefresh = false): WorktreeListResult {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedWorktrees && (now - this.cachedWorktrees.timestamp < this.WT_CACHE_TTL_MS)) {
+      return this.cachedWorktrees.result;
+    }
     try {
       if (!fs.existsSync(path.join(this.repoRoot, '.git'))) {
         return { worktrees: [], activeCount: 0 };
@@ -197,7 +209,9 @@ export class WorktreeManager {
         .map(b => this.parseWorktreeBlock(b))
         .filter((wt): wt is AgentWorktree => Boolean(wt));
 
-      return { worktrees, activeCount: worktrees.length };
+      const res = { worktrees, activeCount: worktrees.length };
+      this.cachedWorktrees = { timestamp: now, result: res };
+      return res;
     } catch {
       return { worktrees: [], activeCount: 0 };
     }

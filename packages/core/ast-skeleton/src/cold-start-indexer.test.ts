@@ -12,12 +12,18 @@ test('ColdStartIndexer: collects candidate files and respects blacklist and exte
     fs.mkdirSync(path.join(tempDir, 'src'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'node_modules', 'pkg'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'experimental', 'solver'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'worktrees', 'qa'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.worktrees', 'docs'), { recursive: true });
 
     fs.writeFileSync(path.join(tempDir, 'src', 'main.ts'), 'export const x = 1;');
     fs.writeFileSync(path.join(tempDir, 'src', 'player.gd'), 'extends Node\nsignal jumped');
     fs.writeFileSync(path.join(tempDir, 'src', 'notes.txt'), 'plain text');
     fs.writeFileSync(path.join(tempDir, 'node_modules', 'pkg', 'dep.ts'), 'export const y = 2;');
     fs.writeFileSync(path.join(tempDir, 'dist', 'bundle.js'), 'console.log();');
+    fs.writeFileSync(path.join(tempDir, 'experimental', 'solver', 'exp.ts'), 'export const s = 10;');
+    fs.writeFileSync(path.join(tempDir, 'worktrees', 'qa', 'qa.ts'), 'export const q = 20;');
+    fs.writeFileSync(path.join(tempDir, '.worktrees', 'docs', 'doc.ts'), 'export const d = 30;');
 
     const indexer = new ColdStartIndexer();
     const files = indexer.collectCandidateFiles(tempDir);

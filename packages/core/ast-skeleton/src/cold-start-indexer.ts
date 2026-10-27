@@ -23,7 +23,8 @@ export interface ColdStartIndexResult {
 
 export const DEFAULT_COLD_START_BLACKLIST = [
   'node_modules', '.git', 'dist', 'build', '.aegis',
-  '.turbo', 'coverage', '.godot', 'tmp', '.cache'
+  '.turbo', 'coverage', '.godot', 'tmp', '.cache',
+  'experimental', 'worktrees', '.worktrees'
 ];
 
 export const DEFAULT_COLD_START_EXTENSIONS = [
