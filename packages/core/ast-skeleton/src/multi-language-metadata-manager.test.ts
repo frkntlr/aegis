@@ -31,6 +31,21 @@ test('computeEcosystemHash computes hash accurately from mock files', () => {
   assert.strictEqual(typeof hash, 'string');
 });
 
+test('computeEcosystemHash produces identical hash across CRLF and LF content', () => {
+  const crlfManager = new MultiLanguageMetadataManager({
+    projectRoot: 'C:/mock/crlf',
+    fileReader: () => '{\r\n  "name": "app"\r\n}\r\n'
+  });
+  const lfManager = new MultiLanguageMetadataManager({
+    projectRoot: 'C:/mock/lf',
+    fileReader: () => '{\n  "name": "app"\n}\n'
+  });
+
+  const crlfHash = crlfManager.computeEcosystemHash('npm');
+  const lfHash = lfManager.computeEcosystemHash('npm');
+  assert.strictEqual(crlfHash, lfHash);
+});
+
 test('checkEcosystemDrift identifies changed ecosystems and updates ledger', () => {
   const tempDir = path.join(os.tmpdir(), `aegis-meta-drift-${Date.now()}`);
   fs.mkdirSync(tempDir, { recursive: true });

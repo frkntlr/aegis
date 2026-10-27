@@ -39,9 +39,9 @@ export class MultiLanguageMetadataManager {
   private readonly fileReader?: (filePath: string) => string | null;
 
   public static readonly ECOSYSTEM_DEFINITIONS: EcosystemManifests[] = [
-    { type: 'npm', relativeFiles: ['package.json', 'package-lock.json'] },
-    { type: 'godot', relativeFiles: ['project.godot'] },
-    { type: 'nuget', relativeFiles: ['packages.lock.json'] }
+    { type: 'npm', relativeFiles: ['package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'] },
+    { type: 'godot', relativeFiles: ['project.godot', 'export_presets.cfg'] },
+    { type: 'nuget', relativeFiles: ['packages.lock.json', 'Directory.Packages.props'] }
   ];
 
   constructor(options: MetadataManagerOptions = {}) {
@@ -157,5 +157,5 @@ export class MultiLanguageMetadataManager {
 function haserUpdate(hasher: crypto.Hash, rel: string, content: string): void {
   hasher.update(rel);
   hasher.update(':');
-  hasher.update(content);
+  hasher.update(content.replace(/\r\n/g, '\n'));
 }
