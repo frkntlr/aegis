@@ -12,4 +12,5 @@ export * from './system-browser-detector.js';
 export * from './native-browser-cdp-attacher.js';
 export * from './rpc-parsers.js';
 export * from './deep-research-workflow.js';
+export * from './source-freshness.js';
 export * from './unified-knowledge-oracle.js';
