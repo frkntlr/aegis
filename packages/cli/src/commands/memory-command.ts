@@ -9,6 +9,14 @@ import { generateLanguageConstitution } from './prompt-command.js';
 
 let sharedEngine: CodebaseMemoryEngine | null = null;
 
+export function setSharedMemoryEngine(engine: CodebaseMemoryEngine | null): void {
+  sharedEngine = engine;
+}
+
+export function resetSharedMemoryEngine(): void {
+  sharedEngine = null;
+}
+
 export function getSharedMemoryEngine(): CodebaseMemoryEngine {
   if (!sharedEngine) {
     const bridge = new Context7Bridge();
@@ -100,7 +108,8 @@ export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsP
 
   const engine = getSharedMemoryEngine();
   const stats = engine.getMemoryStats(activeWorktree);
-  if (stats.totalFiles === 0 || stats.totalEdges === 0) {
+  const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
+  if (stats.totalFiles === 0 && !isTest) {
     const scanDir = fs.existsSync('packages') ? 'packages' : '.';
     engine.indexDirectory(scanDir, activeWorktree);
   }
@@ -193,7 +202,6 @@ export function handleMemoryWatch(dirPath = 'packages', worktreeId?: string): Co
   console.log('   Watching for file changes... (Press Ctrl+C to terminate)');
   return watcher;
 }
-
 
 export function handleMemoryVerify(worktreeId?: string): void {
   showBanner();

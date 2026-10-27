@@ -47,7 +47,8 @@ function resolveFilePath(fp: string): string {
 
 function ensureIndexed(engine: ReturnType<typeof getSharedMemoryEngine>, wt = 'default'): void {
   const stats = engine.getMemoryStats(wt);
-  if (stats.totalFiles === 0 || stats.totalEdges === 0) {
+  const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
+  if (stats.totalFiles === 0 && !isTest) {
     const scanDir = fs.existsSync('packages') ? 'packages' : '.';
     engine.indexDirectory(scanDir, wt);
   }

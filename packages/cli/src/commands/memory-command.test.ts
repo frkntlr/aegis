@@ -3,17 +3,20 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { CodebaseMemoryEngine } from '@aegis/ast-skeleton';
 import {
   handleMemoryQuery,
   handleMemoryStats,
   handleMemoryRefresh,
   handleMemoryWatch,
   handleMemoryColdStart,
-  getSharedMemoryEngine
+  setSharedMemoryEngine,
+  resetSharedMemoryEngine
 } from './memory-command.js';
 
 test('handleMemoryQuery: queries memory and handles non-existent or existing symbol', () => {
-  const engine = getSharedMemoryEngine();
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  setSharedMemoryEngine(engine);
   engine.indexFile('test/dummy.ts', 'export class DummyService { public run(): void {} }');
 
   let output = '';
@@ -30,10 +33,13 @@ test('handleMemoryQuery: queries memory and handles non-existent or existing sym
     assert.ok(output.includes('Symbol \'NonExistentSymbol123\' not found'));
   } finally {
     console.log = origLog;
+    resetSharedMemoryEngine();
   }
 });
 
 test('handleMemoryStats and handleMemoryRefresh execute cleanly', () => {
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  setSharedMemoryEngine(engine);
   let output = '';
   const origLog = console.log;
   console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
@@ -48,6 +54,7 @@ test('handleMemoryStats and handleMemoryRefresh execute cleanly', () => {
     assert.ok(output.includes('Memory Refreshed in'));
   } finally {
     console.log = origLog;
+    resetSharedMemoryEngine();
   }
 });
 
@@ -65,6 +72,7 @@ test('handleMemoryWatch initializes watcher on target directory', () => {
     if (watcher) watcher.stop();
     console.log = origLog;
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    resetSharedMemoryEngine();
   }
 });
 
@@ -83,7 +91,8 @@ test('handleMemoryQuery: prints worktree header, mutex lock status, and line bud
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(path.join(srcDir, 'locked.ts'), 'export class LockedModule { execute(): void {} }', 'utf8');
 
-  const engine = getSharedMemoryEngine();
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  setSharedMemoryEngine(engine);
   engine.indexFile('src/locked.ts', 'export class LockedModule { execute(): void {} }', 'solver');
 
   let output = '';
@@ -100,6 +109,7 @@ test('handleMemoryQuery: prints worktree header, mutex lock status, and line bud
     console.log = origLog;
     process.chdir(prevCwd);
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    resetSharedMemoryEngine();
   }
 });
 
@@ -108,6 +118,9 @@ test('handleMemoryColdStart executes cleanly', async () => {
   const srcDir = path.join(tmpDir, 'src');
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(path.join(srcDir, 'cold_sample.ts'), 'export const val = 42;');
+
+  const engine = new CodebaseMemoryEngine({ persistToDisk: false });
+  setSharedMemoryEngine(engine);
 
   let output = '';
   const origLog = console.log;
@@ -120,5 +133,6 @@ test('handleMemoryColdStart executes cleanly', async () => {
   } finally {
     console.log = origLog;
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    resetSharedMemoryEngine();
   }
 });

@@ -3,6 +3,9 @@ import * as assert from 'node:assert';
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compilePrompt, handlePrompt } from './commands/prompt-command.js';
+import { handleRfcTriage } from './commands/contribute-command.js';
+import { handleVerify } from './commands/dev-commands.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,36 +27,56 @@ test('Aegis CLI displays help menu with all core and live commands', () => {
   assert.ok(output.includes('aegis gh:sync'));
 });
 
-test('Aegis CLI compiles surgical prompt context for agents', () => {
-  const output = execSync(`node "${cliPath}" prompt solver 101 --json`, { encoding: 'utf8' });
-  const parsed = JSON.parse(output);
+test('Aegis CLI compiles surgical prompt context for agents', async () => {
+  const result = await compilePrompt('solver', 101);
 
-  assert.strictEqual(parsed.agentName, 'solver');
-  assert.strictEqual(parsed.issue.number, 101);
-  assert.ok(parsed.context.cacheRatioPercent > 0);
-  assert.ok(parsed.promptMarkdown.includes('Demir Kafes Constitution'));
-  assert.ok(parsed.promptMarkdown.includes('SURGICAL CONTEXT (AST SKELETON MAP)'));
+  assert.strictEqual(result.agentName, 'solver');
+  assert.strictEqual(result.issue.number, 101);
+  assert.ok(result.context.cacheRatioPercent > 0);
+  assert.ok(result.promptMarkdown.includes('Demir Kafes Constitution'));
+  assert.ok(result.promptMarkdown.includes('SURGICAL CONTEXT (AST SKELETON MAP)'));
 });
 
-test('Aegis CLI auto-classifies agent role when role parameter is omitted', () => {
-  const output = execSync(`node "${cliPath}" prompt 101 --json`, { encoding: 'utf8' });
-  const parsed = JSON.parse(output);
+test('Aegis CLI auto-classifies agent role when role parameter is omitted', async () => {
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
-  assert.ok(['solver', 'qa', 'docs'].includes(parsed.agentName));
-  assert.strictEqual(parsed.issue.number, 101);
+  try {
+    await handlePrompt('101', '--json');
+    const parsed = JSON.parse(output);
+    assert.ok(['solver', 'qa', 'docs'].includes(parsed.agentName));
+    assert.strictEqual(parsed.issue.number, 101);
+  } finally {
+    console.log = origLog;
+  }
 });
 
-test('Aegis CLI executes rfc:triage command and formats issue preview', () => {
-  const output = execSync(`node "${cliPath}" rfc:triage "RFC: Add Go AST Extractor" "Go language support"`, { encoding: 'utf8' });
+test('Aegis CLI executes rfc:triage command and formats issue preview', async () => {
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
-  assert.ok(output.includes('RFC Discussion Triaged'));
-  assert.ok(output.includes('LANGUAGE'));
-  assert.ok(output.includes('Go'));
-  assert.ok(output.includes('packages/core/ast-skeleton/src/go-extractor.ts'));
+  try {
+    await handleRfcTriage('RFC: Add Go AST Extractor', 'Go language support');
+    assert.ok(output.includes('RFC Discussion Triaged'));
+    assert.ok(output.includes('LANGUAGE'));
+    assert.ok(output.includes('Go'));
+    assert.ok(output.includes('packages/core/ast-skeleton/src/go-extractor.ts'));
+  } finally {
+    console.log = origLog;
+  }
 });
 
 test('Aegis CLI executes Iron Cage self-verification on its own source files', () => {
-  const output = execSync(`node "${cliPath}" verify "${sourceFile}"`, { encoding: 'utf8' });
+  let output = '';
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
-  assert.ok(output.includes('Iron Cage: PASSED'));
+  try {
+    handleVerify(sourceFile);
+    assert.ok(output.includes('Iron Cage: PASSED'));
+  } finally {
+    console.log = origLog;
+  }
 });

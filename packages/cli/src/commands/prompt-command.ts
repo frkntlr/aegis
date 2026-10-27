@@ -33,16 +33,23 @@ function loadFromPromptDir(issueNumber: number): GitHubIssue | undefined {
   };
 }
 
+function shouldConnectLive(): boolean {
+  return process.env.NODE_ENV !== 'test' && process.env.AEGIS_TEST !== '1';
+}
+
 async function resolveIssue(issueNumber: number, client: GitHubClient): Promise<GitHubIssue> {
   const existing = client.getIssue(issueNumber);
   if (existing) return existing;
-  const fetched = await client.fetchIssue(issueNumber);
-  if (fetched) return fetched;
 
   const diskIssue = loadFromPromptDir(issueNumber);
   if (diskIssue) {
     client.registerIssue(diskIssue);
     return diskIssue;
+  }
+
+  if (shouldConnectLive()) {
+    const fetched = await client.fetchIssue(issueNumber);
+    if (fetched) return fetched;
   }
 
   const fallback: GitHubIssue = {
@@ -134,18 +141,20 @@ export function generateLanguageConstitution(targetFiles: string[]): string {
   return baseLines.join('\n');
 }
 
-export function extractMemoryContext(targetFiles: string[], worktreeId = 'default', engine = new CodebaseMemoryEngine()): string {
+export function extractMemoryContext(targetFiles: string[], worktreeId = 'default', engine?: CodebaseMemoryEngine): string {
+  const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
+  const memEngine = engine || new CodebaseMemoryEngine({ persistToDisk: !isTest });
   const lines: string[] = ['### 🧠 Codebase Memory & Relational Impact'];
   let found = false;
   for (const f of targetFiles) {
     const norm = f.replace(/\\/g, '/');
-    let res = engine.queryMemory(norm, { worktreeId });
+    let res = memEngine.queryMemory(norm, { worktreeId });
     if (!res.found) {
       const base = path.basename(f, path.extname(f));
-      res = engine.queryMemory(base, { worktreeId });
+      res = memEngine.queryMemory(base, { worktreeId });
       if (!res.found) {
         const pascal = base.split(/[-_]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
-        res = engine.queryMemory(pascal, { worktreeId });
+        res = memEngine.queryMemory(pascal, { worktreeId });
       }
     }
     if (res.found) {
@@ -167,7 +176,7 @@ export function extractMemoryContext(targetFiles: string[], worktreeId = 'defaul
 export async function compilePrompt(
   agentName: string,
   issueNumber: number,
-  client = new GitHubClient({ autoConnectLive: true })
+  client = new GitHubClient({ autoConnectLive: shouldConnectLive() })
 ): Promise<PromptResult> {
   const wtManager = new WorktreeManager();
   const worktreePath = wtManager.getWorktreePath(agentName);
@@ -215,7 +224,7 @@ async function resolveRoleAndIssue(
   rawRole: string,
   issueNumber: number,
   isJson: boolean,
-  client = new GitHubClient({ autoConnectLive: true })
+  client = new GitHubClient({ autoConnectLive: shouldConnectLive() })
 ): Promise<{ role: string; issueNumber: number; issue: GitHubIssue }> {
   const issue = await resolveIssue(issueNumber, client);
   if (rawRole === 'auto' || !['solver', 'qa', 'docs', 'ui', 'contributor', 'alice', 'bob'].includes(rawRole)) {
