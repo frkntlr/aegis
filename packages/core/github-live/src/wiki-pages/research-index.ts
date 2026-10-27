@@ -5,7 +5,7 @@ export const RESEARCH_INDEX_PAGE: WikiSuitePage = {
   title: 'Aegis Yaşayan Araştırma & Zemin Gerçeği Raporları Dizini',
   threeBullets: [
     'Google NotebookLM ile Doğrulanmış ve Alıntılanmış Derin Mimari Araştırmalar.',
-    'Bağlam Kaymasını Önleyen Etkileşimli Diyalog ve Çoklu-Worktree Kilitleme Modelleri.',
+    'Bağlam Kaymasını Önleyen Etkileşimli Diyalog, Çoklu-Worktree Kilitleme ve Mikro-Çekirdek Mimarileri.',
     'Yaşayan Bellek Olarak GitHub Wiki Deposuyla Sürekli Senkronize Araştırma Bilgi Tabanı.'
   ],
   content: [
@@ -25,7 +25,22 @@ export const RESEARCH_INDEX_PAGE: WikiSuitePage = {
     '2. **[[research-multi-worktree-git-locking-protocols]]:**',
     '   - *Konu:* Multi-Worktree Git Locking Protocols & Mutex Strategies.',
     '   - *Kapsam:* Dağıtık ve paralel ajanların Git worktree ve dosya kilitleri üzerinden çakışmasız eşzamanlı çalışması.',
-    '   - *Kaynaklar:* 3 yetkili Git ve işletim sistemi mimari kaynağı alıntıları.',
+    '   - *Kaynaklar:* Yetkili Git ve işletim sistemi mimari kaynağı alıntıları.',
+    '',
+    '3. **[[research-autonomous-multi-agent-coordination-and-consensus]]:**',
+    '   - *Konu:* Autonomous Multi-Agent Coordination and Consensus in High-Stakes Codebases.',
+    '   - *Kapsam:* Dağıtık ajanların ortak hedefte uzlaşması ve çakışmasız görev dağıtım stratejileri.',
+    '   - *Kaynaklar:* Çoklu ajan konsensüs literatürü ve canlı telemetri modelleri.',
+    '',
+    '4. **[[research-decoupled-micro-kernels]]:**',
+    '   - *Konu:* Decoupled Micro-Kernels for Autonomous Software Engines.',
+    '   - *Kapsam:* 14-paket monoreponun mikro-çekirdek izolasyonu, minimal bağımlılık ve tak-çıkar modül prensipleri.',
+    '   - *Kaynaklar:* Modern yazılım mimarisi ve mikro-çekirdek zemin kaynakları.',
+    '',
+    '5. **[[research-speculative-multi-agent-execution-and-tournament-verification]]:**',
+    '   - *Konu:* Speculative Multi-Agent Execution & Tournament Verification.',
+    '   - *Kapsam:* Spekülatif paralel yürütme, alternatif çözüm hipotezleri ve turnuva usulü mutasyon testi doğrulama modelleri.',
+    '   - *Kaynaklar:* Dağıtık spekülatif hesaplama ve formal verification çalışmaları.',
     '',
     '---',
     '',
@@ -33,7 +48,7 @@ export const RESEARCH_INDEX_PAGE: WikiSuitePage = {
     '',
     'Ajanlar veya geliştiriciler herhangi bir teknik konuda NotebookLM zemin araştırması başlatıp doğrudan Wiki\'ye aktarabilir:',
     '```powershell',
-    'npm run aegis -- nlm:research "Zero-Copy AST Memory Buffers" fast',
+    'aegis nlm:research "Zero-Copy AST Memory Buffers" --deep',
     '```'
   ].join('\n')
 };

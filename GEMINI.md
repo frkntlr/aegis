@@ -5,6 +5,13 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 
 - `/aegis` or `/aegis status`: Run `npm run aegis -- status` and display worktrees and file locks.
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.
+- `/aegis task:list [status]`: List ready, in_progress, or blocked tasks in TIP queue.
+- `/aegis task:claim <id> [agent]`: Claim task for role, acquire file locks, set in_progress.
+- `/aegis task:release <id> [status]`: Release or complete task, release locks, update status.
+- `/aegis task:inject <id> [agent]`: Compile prompt & stage task into TIP inbox (.aegis/task-inbox.json).
+- `/aegis task:pull [agent]`: Pull next staged task matching role from TIP inbox.
+- `/aegis lock:status`: Inspect active file mutex locks across worktrees.
+- `/aegis verify:task [file]`: Run Multimodal Quality Gate (Demir Kafes + Godot Playtest).
 - `/aegis debug [error|file]`: Run Socratic evidence-based interactive debugging session.
 - `/aegis dashboard [port]`: Run `npm run aegis -- dashboard [port]` as daemon and provide web link.
 - `/aegis skeleton:scan`: Run `npm run aegis -- skeleton:scan` and show token savings.
@@ -44,6 +51,13 @@ When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and
 - `/aegis branch:sync [agent|--all]`: Safely synchronize worktree branches with master with zero data loss stash protection.
 - `/aegis loop:status`: Inspect Circuit Breaker failure counters and blocked tasks.
 - `/aegis loop:reset [num]`: Reset failure counters and unblock tasks.
+
+## Mandatory Identity Badges
+Every autonomous agent must prefix its conversational announcements with its designated role badge:
+- `qa-hunter` -> `🎯 [QA HUNTER] AKTİF | Teşhis, Oynanış ve Görsel UI Denetçisi`
+- `issue-solver` -> `🛠️ [ISSUE SOLVER] AKTİF | İzole Çözücü ve Geliştirici`
+- `ui-specialist` -> `🎨 [UI SPECIALIST] AKTİF | Arayüz, Tema ve Görsel Cilalama Uzmanı`
+- `doc-architect` -> `📚 [DOC ARCHITECT] AKTİF | GitHub Dokümantasyon ve Proje Mimarı`
 
 ## NotebookLM Interactive Auth Resolution & Tri-State Protocol
 Whenever any `/aegis nlm:*` command or NotebookLM tool call encounters an authentication failure, expired session, or connection issue (`AUTH_REQUIRED_INTERACTIVE` or HTTP 401/403/400):

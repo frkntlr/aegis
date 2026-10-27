@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { GitHubClient } from './github-client.js';
@@ -65,20 +68,25 @@ test('GitHubClient blocks failed issue and assigns status:blocked', async () => 
 });
 
 test('WikiMemoryManager extracts selective tagged memory summaries', () => {
-  const wiki = new WikiMemoryManager();
-  wiki.setPage('ui-header', 'Navigation Header', [
-    'Uses React + CSS Modules with flexbox',
-    'Mobile breakpoint is 768px',
-    'Never hardcode user avatar URL; use auth context'
-  ]);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-gh-test-'));
+  try {
+    const wiki = new WikiMemoryManager(tmpDir);
+    wiki.setPage('ui-header', 'Navigation Header', [
+      'Uses React + CSS Modules with flexbox',
+      'Mobile breakpoint is 768px',
+      'Never hardcode user avatar URL; use auth context'
+    ]);
 
-  const context = wiki.getContextForLabels(['status:ready', 'wiki:ui-header']);
-  assert.ok(context.includes('Navigation Header'));
-  assert.ok(context.includes('Mobile breakpoint is 768px'));
+    const context = wiki.getContextForLabels(['status:ready', 'wiki:ui-header']);
+    assert.ok(context.includes('Navigation Header'));
+    assert.ok(context.includes('Mobile breakpoint is 768px'));
 
-  // Irrelevant wiki pages are NOT pulled in, avoiding context bloat
-  const irrelevant = wiki.getContextForLabels(['status:ready', 'wiki:unrelated']);
-  assert.ok(!irrelevant.includes('Navigation Header'));
+    // Irrelevant wiki pages are NOT pulled in, avoiding context bloat
+    const irrelevant = wiki.getContextForLabels(['status:ready', 'wiki:unrelated']);
+    assert.ok(!irrelevant.includes('Navigation Header'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('GitHubClient completes issue and filters out done issues from ready list', async () => {

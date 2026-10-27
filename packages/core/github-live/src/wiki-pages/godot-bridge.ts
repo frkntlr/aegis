@@ -6,7 +6,7 @@ export const GODOT_BRIDGE_PAGE: WikiSuitePage = {
   threeBullets: [
     'ClassDB Oracle ile Godot 4 yerleşik sınıfları, metodları ve sinyalleri için sıfır-halüsinasyon doğrulaması.',
     'Çift Yönlü JSON-RPC Sunucusu (Port 4242) ve Sıfır-Token BoundingBox UI Düzen Denetimi.',
-    'Headless Otomatik Playtesting, GDScript Statik Doğrulama ve DocTool Senkronizasyonu.'
+    'Multimodal Kalite Kapısı (aegis verify:task), Headless Playtesting ve GDScript Statik Doğrulama.'
   ],
   content: [
     '## 🎮 Godot 4.x Oyun Motoru Köprüsü (`@aegis/godot-bridge`)',
@@ -24,8 +24,8 @@ export const GODOT_BRIDGE_PAGE: WikiSuitePage = {
     '',
     '### 2. Çift Yönlü JSON-RPC Köprüsü (Port 4242)',
     'Aegis, çalışan Godot editörü ve oyun örneği ile canlı TCP/JSON-RPC üzerinden haberleşir:',
-    '- Sahne ağacı telemetrisini ve runtime durumunu çeker.',
-    '- Hata durumunda motor loglarını ve yığın izlerini anlık yakalar.',
+    '- Sahne ağacı telemetrisini ve runtime durumunu anlık çeker.',
+    '- Hata durumunda motor loglarını ve yığın izlerini yakalayarak Sokratik hata ayıklama motoruna aktarır.',
     '',
     '---',
     '',
@@ -36,11 +36,12 @@ export const GODOT_BRIDGE_PAGE: WikiSuitePage = {
     '',
     '---',
     '',
-    '### 4. Otomatik Headless Playtesting (`aegis godot playtest <scene>`)',
+    '### 4. Multimodal Kalite Kapısı & Playtest-Before-PR (`aegis verify:task`)',
     'Pull Request açılmadan önce `Playtest-Before-PR` standardını uygular:',
     '- Hedef sahneyi headless modda başlatır.',
     '- Sanal girdi senaryolarını (klavye, fare tıklaması) koşturur.',
     '- Runtime çökmelerini (crash) ve GDScript çalışma zamanı hatalarını raporlar.',
+    '- Hem Demir Kafes AST sınırlarını hem de headless playtesti tek komutta doğrular (`aegis verify:task`).',
     '',
     '---',
     '',
@@ -55,13 +56,14 @@ export const GODOT_BRIDGE_PAGE: WikiSuitePage = {
     '',
     '| Komut | Açıklama |',
     '|---|---|',
-    '| `npm run aegis -- godot init` | Godot projesine Aegis Bridge eklentisini kurar. |',
-    '| `npm run aegis -- godot status` | Godot editörü ve RPC bağlantı durumunu kontrol eder. |',
-    '| `npm run aegis -- godot query <Sınıf>` | ClassDB Oracle üzerinden sınıf API\'sini sorgular. |',
-    '| `npm run aegis -- godot validate <dosya>` | GDScript dosyasını statik olarak doğrular. |',
-    '| `npm run aegis -- godot inspect` | Sahne ağacını ve UI kontrol düğümlerini sıfır-token ile denetler. |',
-    '| `npm run aegis -- godot run <sahne>` | Belirtilen sahneyi Godot motorunda çalıştırır. |',
-    '| `npm run aegis -- godot doctool` | Godot motor dokümantasyonunu senkronize eder. |',
-    '| `npm run aegis -- godot playtest <sahne>` | Sahneyi headless modda başlatıp otomatik test senaryolarını koşturur. |'
+    '| `aegis godot init` | Godot projesine Aegis Bridge eklentisini kurar. |',
+    '| `aegis godot status` | Godot editörü ve RPC bağlantı durumunu kontrol eder. |',
+    '| `aegis godot query <Sınıf>` | ClassDB Oracle üzerinden sınıf API\'sini sorgular. |',
+    '| `aegis godot validate <dosya>` | GDScript dosyasını statik olarak doğrular. |',
+    '| `aegis godot inspect` | Sahne ağacını ve UI kontrol düğümlerini sıfır-token ile denetler. |',
+    '| `aegis godot run <sahne>` | Belirtilen sahneyi Godot motorunda çalıştırır. |',
+    '| `aegis godot doctool` | Godot motor dokümantasyonunu senkronize eder. |',
+    '| `aegis godot playtest <sahne>` | Sahneyi headless modda başlatıp otomatik test senaryolarını koşturur. |',
+    '| `aegis verify:task [dosya]` | Demir Kafes AST ve Headless Playtesti bir arada doğrular. |'
   ].join('\n')
 };
