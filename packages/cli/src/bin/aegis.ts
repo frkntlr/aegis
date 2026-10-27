@@ -50,7 +50,8 @@ import {
   handleNlmPoll,
   handleNlmImport,
   handleNlmPrune,
-  handleNlmAuth
+  handleNlmAuth,
+  handleNlmSwitch
 } from '../commands/nlm-command.js';
 import {
   handleGodot,
@@ -83,69 +84,8 @@ import {
   handleMemoryColdStart
 } from '../commands/memory-command.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
-
-const HELP_LINES: readonly string[] = [
-  'Commands:',
-  '  aegis init                             Initialize worktrees and environment',
-  '  aegis status                           View worktrees and active file locks',
-  '  aegis auto                             Run autonomous task queue & dispatcher',
-  '  aegis prompt [role|id] [id]         Compile surgical AST prompt caching context',
-  '  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution',
-  '  aegis rfc:triage "<title>" [body]      Triage RFC discussion into actionable issue criteria',
-  '  aegis rfc:create "<title>" [desc]      Create architectural RFC & publish Ideation Discussion',
-  '  aegis rfc:approve <rfcId>              Approve RFC and synthesize clean-room Wiki architecture',
-  '  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues',
-  '  aegis nlm:sync                         Export and synchronize architecture with NotebookLM',
-  '  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations',
-  '  aegis nlm:research "<topic>" [--deep]  Run fast or deep research and stage in Wiki/Notebook',
-  '  aegis nlm:sources [notebookId]         List and audit Notebook sources for freshness',
-  '  aegis nlm:poll <taskId> [notebookId]   Poll background deep research progress',
-  '  aegis nlm:import <taskId> [notebookId] Ingest completed research as Synthesized Digest',
-  '  aegis nlm:prune [--dry-run|--force]    Safely prune obsolete or superseded sources',
-  '  aegis gh:locate [domain]               Resolve authoritative GitHub & Research locations',
-  '  aegis project:list [owner]             List GitHub Projects v2 boards',
-  '  aegis project:sync <proj> <issue> [st] Map and sync issue to Projects v2 column',
-  '  aegis wiki:list                        List living memory pages directly from GitHub Wiki',
-  '  aegis wiki:show <slug>                 Display page content directly from GitHub Wiki',
-  '  aegis wiki:clean [rfcId]               Synthesize clean-room authoritative Wiki architecture',
-  '  aegis wiki:seed                        Seed 8-page living architecture suite into Wiki cache',
-  '  aegis wiki:sync                        Sync/pull directly from GitHub Wiki remote repo',
-  '  aegis wiki:status                      Inspect GitHub Wiki remote git availability',
-  '  aegis merge <agent|branch> [base] Multi-tier atomic merge & dynamic sibling synchronization',
-  '  aegis branch:sync [agent|--all]        Synchronize worktree branches safely with master',
-  '  aegis dashboard [port]                 Launch Aegis Command Center web dashboard',
-  '  aegis ide:list                         List supported IDEs and Multi-Agent capability matrix',
-  '  aegis ide:sync                         Synchronize MCP servers & Skills across all IDEs',
-  '  aegis gh:status [token]                Inspect live GitHub authentication & limits',
-  '  aegis gh:sync [token]                  Sync live issues & dispatch to agents',
-  '  aegis gh:comment <num> <msg> [token]   Post comment to GitHub issue',
-  '  aegis gh:pr <head> <base> <title> <body> Create GitHub pull request',
-  '  aegis godot [subcmd]                   Godot Bridge: init, status, inspect, query, doctool, validate',
-  '  aegis inspect                          Run zero-token BoundingBox UI inspection',
-  '  aegis mutate [filepath]                Run Mutation Testing gate evaluation',
-  '  aegis estimate <files> <tests>         Compute adaptive timeout for build/test',
-  '  aegis verify <filepath>                Run deterministic Iron Cage validation',
-  '  aegis skeleton <filepath>              Generate token-saving AST Skeleton Map',
-  '  aegis skeleton:scan [dir]              Scan project and compute total token savings',
-  '  aegis cage:check [dir]                 Run Demir Kafes audit across all project code',
-  '  aegis diff <diff>                      Validate surgical unified diff compliance',
-  '  aegis audit <files>                    Run Immutable Oracle trust verification',
-  '  aegis find <symbol>                    Fast AST symbol lookup and precision surgical slice',
-  '  aegis triage [dir]                     Run Evidence-Based Bug Triage (zero false-alarm bugs)',
-  '  aegis trace <target>                   Trace relational callers, signal listeners & scenes',
-  '  aegis graph:scan [dir]                 Build cross-reference relational knowledge graph',
-  '  aegis ast:search <pat> [dir]           Structural AST search via ast-grep',
-  '  aegis ast:replace <p> <r> <f>          Structural AST replacement via ast-grep',
-  '  aegis rtk:compress [file]              Compress terminal/test output via RTK Token Killer',
-  '  aegis context7:query <lib> <top>       Query official ground-truth library documentation',
-  '  aegis memory:query <sym> [wt] [log]    Query 5-Layer Codebase Memory (AST, Graph, Context7, Demir Kafes)',
-  '  aegis memory:stats [worktree]          Display Codebase Memory indexing and token savings stats',
-  '  aegis memory:refresh [dir] [wt]        Incrementally refresh Codebase Memory cache',
-  '  aegis memory:cold-start [dir] [wt]    Run full project cold-start AST indexing',
-  '  aegis memory:watch [dir] [wt]          Run live incremental Codebase Memory watcher daemon',
-  '  aegis debug [error|file]               Socratic evidence-based interactive debugging',
-  '  aegis mcp                              Start native JSON-RPC stdio MCP server'
-];
+import { ConversationalIntentDetector } from '@aegis/github-live';
+import { HELP_LINES } from './help-text.js';
 
 function handleHelp(): void {
   showBanner();
@@ -172,6 +112,8 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'nlm:import': (a) => handleNlmImport(a[1], a[2]),
   'nlm:prune': (a) => handleNlmPrune(...a.slice(1)),
   'nlm:auth': (a) => handleNlmAuth(...a.slice(1)),
+  'nlm:switch': (a) => handleNlmSwitch(...a.slice(1)),
+  switch: (a) => handleNlmSwitch(...a.slice(1)),
   'gh:locate': (a) => handleGhLocate(a[1]),
   'project:list': (a) => handleProjectList(a[1]),
   'project:sync': (a) => handleProjectSync(a[1], a[2], a[3], a[4]),
@@ -267,6 +209,12 @@ async function main(): Promise<void> {
   if (handler) {
     await handler(args);
   } else {
+    const rawJoin = args.join(' ');
+    if (ConversationalIntentDetector.isAccountSwitchIntent(rawJoin)) {
+      console.log(`🔄 Conversational Account Switch Intent Detected: "${rawJoin}"`);
+      await handleNlmSwitch(...args);
+      return;
+    }
     const idea = detectIdeaIntent(args);
     if (idea.isIdea) {
       console.log(`💡 Idea Intent Detected: "${idea.title}"`);

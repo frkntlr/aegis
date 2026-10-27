@@ -19,8 +19,9 @@ import {
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
 import { handleNlmAuth, promptInteractiveAuthResolution } from './nlm-auth-helper.js';
+import { handleNlmSwitch } from './nlm-switch-helper.js';
 
-export { handleNlmAuth };
+export { handleNlmAuth, handleNlmSwitch, promptInteractiveAuthResolution };
 
 const DEFAULT_NOTEBOOK_ID = '3767b1fc-5759-416d-b938-495b8138ccd7';
 

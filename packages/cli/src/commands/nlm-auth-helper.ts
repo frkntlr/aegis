@@ -16,6 +16,7 @@ import {
   type AuthResolutionAction
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
+import { runZeroClickSessionImport } from './nlm-switch-helper.js';
 
 export async function handleNlmAuth(...args: string[]): Promise<void> {
   showBanner();
@@ -71,6 +72,11 @@ async function handleBrowserCommand(args: string[], isForce: boolean): Promise<v
       console.log(`✅ Session credentials imported from clipboard and saved to: ${save.path}`);
       return;
     }
+  }
+
+  if (!isForce) {
+    const zeroClick = await runZeroClickSessionImport();
+    if (zeroClick) return;
   }
 
   await launchBrowserFlow(args);

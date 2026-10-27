@@ -17,3 +17,7 @@ export * from './auth-challenge.js';
 export * from './session-credentials-manager.js';
 export * from './native-browser-spawner.js';
 export * from './unified-knowledge-oracle.js';
+export * from './ambient-cdp-scanner.js';
+export * from './ambient-cookie-vault-extractor.js';
+export * from './conversational-intent-detector.js';
+export * from './account-switch-lifecycle-manager.js';
