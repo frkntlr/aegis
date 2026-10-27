@@ -58,6 +58,32 @@ test('TriageCacheRadar records, checks hit and misses accurately', () => {
   assert.ok(stats.ratio > 0);
 });
 
+test('TriageCacheRadar checkFileStat provides zero-IO hit and quotaAlert memoization', () => {
+  const cacheDir = createTempCacheDir();
+  const radar = new TriageCacheRadar({ cacheDir, engineRulesSalt: 'v1' });
+
+  const content = 'export const large = 1;';
+  const mtime = 1500;
+  const size = content.length;
+  const quota = { file: 'src/large.ts', lines: 285, msg: 'Kritik kota' };
+
+  radar.recordFile('src/large.ts', mtime, size, content, [], quota);
+  radar.flush();
+
+  // Fast-stat check without reading content
+  const statHit = radar.checkFileStat('src/large.ts', mtime, size);
+  assert.strictEqual(statHit.hit, true);
+  assert.deepStrictEqual(statHit.quotaAlert, quota);
+  assert.deepStrictEqual(statHit.cachedViolations, []);
+
+  // Stat miss on altered mtime or size
+  const mtimeMiss = radar.checkFileStat('src/large.ts', mtime + 1, size);
+  assert.strictEqual(mtimeMiss.hit, false);
+
+  const sizeMiss = radar.checkFileStat('src/large.ts', mtime, size + 10);
+  assert.strictEqual(sizeMiss.hit, false);
+});
+
 test('TriageCacheRadar invalidates cache on engine rule salt change', () => {
   const cacheDir = createTempCacheDir();
   const radar1 = new TriageCacheRadar({ cacheDir, engineRulesSalt: 'v1' });

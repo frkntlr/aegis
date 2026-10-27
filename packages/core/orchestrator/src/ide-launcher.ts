@@ -23,6 +23,8 @@ export interface LaunchIdeResult {
 
 export class IdeLauncher {
   private customCommands: Map<string, string> = new Map();
+  private cachedRunningIdes: { timestamp: number; list: RunningIdeProcess[] } | null = null;
+  private readonly CACHE_TTL_MS = 3000;
 
   constructor(customExecutables?: Record<string, string>) {
     if (customExecutables) {
@@ -43,7 +45,11 @@ export class IdeLauncher {
     return { originalExe: match[2], exe: match[2].toLowerCase(), pid: parseInt(match[1], 10) };
   }
 
-  public detectRunningIdes(): RunningIdeProcess[] {
+  public detectRunningIdes(forceRefresh = false): RunningIdeProcess[] {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedRunningIdes && (now - this.cachedRunningIdes.timestamp < this.CACHE_TTL_MS)) {
+      return this.cachedRunningIdes.list;
+    }
     const list: RunningIdeProcess[] = [];
     try {
       const isWin = process.platform === 'win32';
@@ -65,6 +71,7 @@ export class IdeLauncher {
     } catch {
       // Fallback on systems where tasklist is restricted
     }
+    this.cachedRunningIdes = { timestamp: now, list };
     return list;
   }
 

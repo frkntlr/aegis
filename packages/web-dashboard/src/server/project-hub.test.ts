@@ -77,7 +77,7 @@ test('ProjectHub maintains strictly isolated namespaced contexts', () => {
 
 test('DashboardServer handles /api/projects and /api/projects/focus endpoints', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-api-hub-'));
-  const server = new DashboardServer({ port: 0, repoRoot: tmpDir });
+  const server = new DashboardServer({ port: 0, repoRoot: tmpDir, offline: true });
   const port = await server.start();
 
   try {

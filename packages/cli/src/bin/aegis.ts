@@ -149,7 +149,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   mutate: (a) => handleMutate(a[1]),
   estimate: (a) => handleEstimate(a),
   verify: (a) => handleVerify(a[1]),
-  'cage:check': (a) => handleCageCheck(a[1]),
+  'cage:check': (a) => handleCageCheck(a.slice(1)),
   skeleton: (a) => handleSkeleton(a[1]),
   'skeleton:scan': (a) => handleSkeletonScan(a[1]),
   diff: (a) => handleDiff(a.length > 2 ? a.slice(1).join(' ') : a[1]),

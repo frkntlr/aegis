@@ -5,13 +5,13 @@ import { AegisEngineService } from './engine-service.js';
 test('AegisEngineService executes analysis tools cleanly', () => {
   const engine = new AegisEngineService();
 
-  const cage = engine.runCageCheck();
+  const cage = engine.runCageCheck('packages/core/iron-cage/src');
   assert.strictEqual(cage.tool, 'cage_check');
   assert.ok(typeof cage.filesScanned === 'number');
   assert.ok(cage.filesScanned > 0);
   assert.strictEqual(cage.violationsCount, 0);
 
-  const triage = engine.runBugTriage();
+  const triage = engine.runBugTriage('packages/core/iron-cage/src');
   assert.strictEqual(triage.tool, 'bug_triage');
   assert.strictEqual(triage.criticalCount, 0);
   assert.strictEqual(triage.clean, true);

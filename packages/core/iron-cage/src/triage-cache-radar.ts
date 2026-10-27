@@ -1,7 +1,7 @@
 /**
  * @file triage-cache-radar.ts
- * High-speed incremental content-digest radar cache for triage scans.
- * Enforces rule-version salt and fast FNV-1a content fingerprinting.
+ * High-speed incremental content-digest radar cache for triage and cage checks.
+ * Enforces rule-version salt and fast-stat zero-I/O fingerprinting.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
@@ -10,11 +10,18 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import type { CageViolation } from '@aegis/shared';
 
+export interface QuotaAlert {
+  file: string;
+  lines: number;
+  msg: string;
+}
+
 export interface TriageCacheEntry {
   mtimeMs: number;
   size: number;
   hash: string;
   violations: CageViolation[];
+  quotaAlert?: QuotaAlert;
 }
 
 export interface TriageCacheData {
@@ -27,6 +34,7 @@ export interface TriageCacheData {
 export interface CacheCheckResult {
   hit: boolean;
   cachedViolations?: CageViolation[];
+  quotaAlert?: QuotaAlert;
 }
 
 export function fnv1a(str: string): string {
@@ -54,7 +62,7 @@ export class TriageCacheRadar {
     const baseDir = options.cacheDir || path.resolve(process.cwd(), '.aegis', 'cache');
     fs.mkdirSync(baseDir, { recursive: true });
     this.cacheFilePath = path.join(baseDir, 'triage-cache.json');
-    this.currentEngineHash = this.computeEngineHash(options.engineRulesSalt || 'aegis-iron-cage-v1');
+    this.currentEngineHash = this.computeEngineHash(options.engineRulesSalt || 'aegis-iron-cage-v2');
     this.cacheData = this.loadCache();
   }
 
@@ -87,6 +95,23 @@ export class TriageCacheRadar {
     };
   }
 
+  public checkFileStat(filePath: string, mtimeMs: number, size: number): CacheCheckResult {
+    const norm = normalizeCachePath(filePath);
+    const entry = this.cacheData.files[norm];
+    if (!entry) {
+      this.missCount++;
+      return { hit: false };
+    }
+
+    if (entry.mtimeMs === mtimeMs && entry.size === size) {
+      this.hitCount++;
+      return { hit: true, cachedViolations: entry.violations, quotaAlert: entry.quotaAlert };
+    }
+
+    this.missCount++;
+    return { hit: false };
+  }
+
   public checkFile(filePath: string, mtimeMs: number, size: number, content: string): CacheCheckResult {
     const norm = normalizeCachePath(filePath);
     const entry = this.cacheData.files[norm];
@@ -97,20 +122,28 @@ export class TriageCacheRadar {
 
     if (entry.mtimeMs === mtimeMs && entry.size === size && entry.hash === fnv1a(content)) {
       this.hitCount++;
-      return { hit: true, cachedViolations: entry.violations };
+      return { hit: true, cachedViolations: entry.violations, quotaAlert: entry.quotaAlert };
     }
 
     this.missCount++;
     return { hit: false };
   }
 
-  public recordFile(filePath: string, mtimeMs: number, size: number, content: string, violations: CageViolation[]): void {
+  public recordFile(
+    filePath: string,
+    mtimeMs: number,
+    size: number,
+    content: string,
+    violations: CageViolation[],
+    quotaAlert?: QuotaAlert
+  ): void {
     const norm = normalizeCachePath(filePath);
     this.cacheData.files[norm] = {
       mtimeMs,
       size,
       hash: fnv1a(content),
-      violations
+      violations,
+      quotaAlert
     };
     this.dirty = true;
   }

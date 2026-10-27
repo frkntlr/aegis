@@ -4,6 +4,27 @@ import { execFileSync } from 'node:child_process';
 import type { IronCageValidator } from '@aegis/iron-cage';
 import type { MutationGate } from '@aegis/telemetry-tester';
 
+export interface CageCheckOptions {
+  targetDir?: string;
+  noCache?: boolean;
+  jsonOutput?: boolean;
+}
+
+export function parseCageCheckArgs(rawArgs?: string | string[]): CageCheckOptions {
+  const args = Array.isArray(rawArgs) ? rawArgs : (rawArgs ? [rawArgs] : []);
+  const options: CageCheckOptions = {};
+  for (const arg of args) {
+    if (arg === '--no-cache' || arg === '--force') {
+      options.noCache = true;
+    } else if (arg === '--json') {
+      options.jsonOutput = true;
+    } else if (!arg.startsWith('--') && !options.targetDir) {
+      options.targetDir = arg;
+    }
+  }
+  return options;
+}
+
 export function verifyFile(file: string, validator: IronCageValidator): boolean {
   const full = path.resolve(process.cwd(), file);
   if (!fs.existsSync(full)) {

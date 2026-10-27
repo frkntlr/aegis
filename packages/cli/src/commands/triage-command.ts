@@ -91,15 +91,15 @@ function scanFiles(files: string[], noCache = false): ScanResult {
     const rel = path.relative(process.cwd(), file).replace(/\\/g, '/');
     try {
       const stat = fs.statSync(file);
-      const content = fs.readFileSync(file, 'utf8');
       if (radar) {
-        const check = radar.checkFile(rel, stat.mtimeMs, stat.size, content);
+        const check = radar.checkFileStat(rel, stat.mtimeMs, stat.size);
         if (check.hit && check.cachedViolations) {
           violations.push(...check.cachedViolations);
           cacheHits++;
           continue;
         }
       }
+      const content = fs.readFileSync(file, 'utf8');
       const res = validator.validateFileContent(rel, content);
       violations.push(...res.violations);
       if (radar) {

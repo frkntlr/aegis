@@ -82,7 +82,7 @@ test('AegisEngineService executes all underlying Aegis core tools successfully',
   const diff = await engine.runDiffValidator();
   assert.strictEqual(diff.isSurgical, true);
 
-  const oracle = await engine.runOracleAudit();
+  const oracle = await engine.runOracleAudit(['packages/core/iron-cage/src/cage-validator.ts']);
   assert.strictEqual(oracle.suspicious, false);
 });
 
@@ -108,7 +108,8 @@ test('AegisEngineService loads Godot telemetry with nodes array accurately', () 
 });
 
 test('DashboardServer handles move_task and status via API', async () => {
-  const server = new DashboardServer({ port: 0, offline: true });
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-dash-move-'));
+  const server = new DashboardServer({ port: 0, repoRoot: tmpDir, offline: true });
   const port = await server.start();
   try {
     assert.ok(port > 0);
@@ -135,6 +136,7 @@ test('DashboardServer handles move_task and status via API', async () => {
     assert.strictEqual(doneRes.status, 200);
   } finally {
     await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
 
@@ -190,42 +192,51 @@ test('DashboardServer handles save_settings and reclaim_orphans via API', async 
   }
 });
 
+async function assertServerSyncAndAuto(port: number): Promise<void> {
+  const res = await fetch(`http://localhost:${port}/api/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'sync_github' })
+  });
+  assert.strictEqual(res.status, 200);
+  const d = (await res.json()) as { success: boolean; issues: unknown[] };
+  assert.strictEqual(d.success, true);
+  assert.ok(d.issues.length >= 2);
+
+  const autoRes = await fetch(`http://localhost:${port}/api/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'auto' })
+  });
+  assert.strictEqual(autoRes.status, 200);
+  const autoData = (await autoRes.json()) as { success: boolean; message: string };
+  assert.strictEqual(typeof autoData.success, 'boolean');
+  assert.ok(typeof autoData.message === 'string');
+}
+
 test('GitHubKanbanService manages issues and sync_github responds via API', async () => {
-  const kanban = new GitHubKanbanService({ offline: true });
-  const issues = await kanban.fetchLiveIssues();
-  assert.ok(issues.length >= 2);
-  const created = await kanban.createIssue('Test Offline Issue', ['src/off.ts']);
-  assert.strictEqual(created.title, 'Test Offline Issue');
-  assert.strictEqual(created.status, 'ready');
-
-  const moved = kanban.updateIssueStatus(created.number, 'in_progress', 'solver');
-  assert.strictEqual(moved?.status, 'in_progress');
-  assert.strictEqual(moved?.assignedAgent, 'solver');
-
-  const server = new DashboardServer({ port: 0, offline: true });
-  const port = await server.start();
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-kanban-api-'));
   try {
-    const res = await fetch(`http://localhost:${port}/api/action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'sync_github' })
-    });
-    assert.strictEqual(res.status, 200);
-    const d = (await res.json()) as { success: boolean; issues: unknown[] };
-    assert.strictEqual(d.success, true);
-    assert.ok(d.issues.length >= 2);
+    const kanban = new GitHubKanbanService({ repoRoot: tmpRepo, offline: true });
+    const issues = await kanban.fetchLiveIssues();
+    assert.ok(issues.length >= 2);
+    const created = await kanban.createIssue('Test Offline Issue', ['src/off.ts']);
+    assert.strictEqual(created.title, 'Test Offline Issue');
+    assert.strictEqual(created.status, 'ready');
 
-    const autoRes = await fetch(`http://localhost:${port}/api/action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'auto' })
-    });
-    assert.strictEqual(autoRes.status, 200);
-    const autoData = (await autoRes.json()) as { success: boolean; message: string };
-    assert.strictEqual(typeof autoData.success, 'boolean');
-    assert.ok(typeof autoData.message === 'string');
+    const moved = kanban.updateIssueStatus(created.number, 'in_progress', 'solver');
+    assert.strictEqual(moved?.status, 'in_progress');
+    assert.strictEqual(moved?.assignedAgent, 'solver');
+
+    const server = new DashboardServer({ port: 0, repoRoot: tmpRepo, offline: true });
+    const port = await server.start();
+    try {
+      await assertServerSyncAndAuto(port);
+    } finally {
+      await server.stop();
+    }
   } finally {
-    await server.stop();
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
 
