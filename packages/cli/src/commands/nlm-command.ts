@@ -11,7 +11,6 @@ import {
   NotebookLmNativeClient,
   NotebookLmDeepResearchWorkflow,
   SourceFreshnessAuditor,
-  SourceTombstonePruner,
   GitHubWikiLiveAdapter,
   type OracleQueryOptions,
   type OracleQueryResult,
@@ -20,8 +19,15 @@ import {
 import { showBanner } from './banner.js';
 import { handleNlmAuth, promptInteractiveAuthResolution } from './nlm-auth-helper.js';
 import { handleNlmSwitch } from './nlm-switch-helper.js';
+import { handleNlmPrune, handleNlmRestore } from './nlm-prune-helper.js';
 
-export { handleNlmAuth, handleNlmSwitch, promptInteractiveAuthResolution };
+export {
+  handleNlmAuth,
+  handleNlmSwitch,
+  handleNlmPrune,
+  handleNlmRestore,
+  promptInteractiveAuthResolution
+};
 
 const DEFAULT_NOTEBOOK_ID = '3767b1fc-5759-416d-b938-495b8138ccd7';
 
@@ -120,7 +126,7 @@ async function runDeepResearch(nbId: string, topic: string, detach: boolean, doI
     const workflow = new NotebookLmDeepResearchWorkflow();
     const res = await workflow.execute(nbId, topic, {
       detach,
-      ingestMode: doImport ? 'digest' : 'none'
+      ingestMode: doImport ? 'curated' : 'none'
     });
 
     if (detach) {
@@ -130,7 +136,12 @@ async function runDeepResearch(nbId: string, topic: string, detach: boolean, doI
     }
 
     console.log(`\n═══════════════════════════════════════════════════════════════\n${res.synthesis}\n═══════════════════════════════════════════════════════════════`);
-    if (res.ingestedSourceId) console.log(`\n✅ Research Digest ingested into Notebook (Source ID: ${res.ingestedSourceId})`);
+    if (res.curatedImportCount && res.curatedImportCount > 0) {
+      console.log(`\n✅ Curated ${res.curatedImportCount} high-relevance source(s) into Notebook.`);
+    }
+    if (res.prunedCount && res.prunedCount > 0) {
+      console.log(`🧹 Transactional Swap: Automatically pruned ${res.prunedCount} obsolete source(s) to maintain quota headroom.`);
+    }
     if (res.quotaWarning) console.log(`\n⚠️  Quota Warning: Notebook has ${res.sourceCount}/50 sources. Consider running: aegis nlm:prune`);
   } catch (err: unknown) {
     console.error(`❌ Deep Research Failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -211,22 +222,4 @@ export async function handleNlmImport(taskIdArg?: string, notebookIdArg?: string
   }
 }
 
-export async function handleNlmPrune(...args: string[]): Promise<void> {
-  showBanner();
-  const force = args.includes('--force') || args.includes('-f');
-  const nbId = args.find(a => !a.startsWith('-')) || DEFAULT_NOTEBOOK_ID;
 
-  console.log(`🧹 Running Tombstone Pruner on Notebook [${nbId}] (${force ? 'PHYSICAL DELETE' : 'DRY-RUN'})...`);
-  try {
-    const pruner = new SourceTombstonePruner();
-    const res = await pruner.prune(nbId, { force });
-    if (res.dryRun) {
-      console.log(`\n🔍 [DRY-RUN] Found ${res.candidates.length} candidate(s) for pruning (run with --force to delete):`);
-      for (const c of res.candidates) console.log(` • [${c.sourceId}] ${c.title} (Reason: ${c.reason})`);
-    } else {
-      console.log(`\n✅ Pruning Complete: ${res.pruned.length} stale source(s) deleted permanently.`);
-    }
-  } catch (err: unknown) {
-    console.error(`❌ Prune Failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}

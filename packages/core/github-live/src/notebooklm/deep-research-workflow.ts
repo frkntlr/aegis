@@ -1,11 +1,14 @@
 /**
  * @file deep-research-workflow.ts
- * Quota-guarded deep research workflow with exponential backoff polling & digest ingestion.
+ * Quota-guarded deep research workflow with curated deduplication and transactional pruning swap.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
 import { NotebookLmNativeClient } from './notebooklm-native-client.js';
-import type { ResearchPollResult, DiscoveredSource } from './types.js';
+import { CuratedIngestionPipeline } from './curated-ingestion-pipeline.js';
+import { AutonomousPruningEngine } from './autonomous-pruning-engine.js';
+import { TombstoneVaultManager } from './tombstone-vault-manager.js';
+import type { ResearchPollResult, DiscoveredSource, NotebookSourceSummary } from './types.js';
 
 export type IngestMode = 'digest' | 'curated' | 'none';
 
@@ -16,6 +19,7 @@ export interface DeepWorkflowOptions {
   maxPollAttempts?: number;
   maxCuratedSources?: number;
   sleeper?: (ms: number) => Promise<void>;
+  httpHeadChecker?: (url: string) => Promise<boolean>;
 }
 
 export interface DeepWorkflowResult {
@@ -24,6 +28,8 @@ export interface DeepWorkflowResult {
   synthesis: string;
   sources: DiscoveredSource[];
   ingestedSourceId?: string;
+  curatedImportCount?: number;
+  prunedCount?: number;
   quotaWarning?: boolean;
   sourceCount?: number;
 }
@@ -32,9 +38,20 @@ const MAX_SAFE_SOURCE_COUNT = 45;
 
 export class NotebookLmDeepResearchWorkflow {
   private client: NotebookLmNativeClient;
+  private pipeline: CuratedIngestionPipeline;
+  private pruningEngine: AutonomousPruningEngine;
+  private vaultManager: TombstoneVaultManager;
 
-  constructor(client?: NotebookLmNativeClient) {
+  constructor(
+    client?: NotebookLmNativeClient,
+    pipeline?: CuratedIngestionPipeline,
+    pruningEngine?: AutonomousPruningEngine,
+    vaultManager?: TombstoneVaultManager
+  ) {
     this.client = client || new NotebookLmNativeClient();
+    this.pipeline = pipeline || new CuratedIngestionPipeline();
+    this.pruningEngine = pruningEngine || new AutonomousPruningEngine();
+    this.vaultManager = vaultManager || new TombstoneVaultManager();
   }
 
   public async start(notebookId: string, topic: string): Promise<{ taskId: string }> {
@@ -49,6 +66,27 @@ export class NotebookLmDeepResearchWorkflow {
     return this.client.pollResearch(notebookId, taskId);
   }
 
+  private async processIngestion(
+    notebookId: string,
+    topic: string,
+    taskId: string,
+    pollRes: ResearchPollResult,
+    existingSources: NotebookSourceSummary[],
+    options: DeepWorkflowOptions
+  ): Promise<{ ingestedSourceId?: string; curatedImportCount: number; prunedCount: number }> {
+    const ingestMode = options.ingestMode ?? 'curated';
+    if (ingestMode === 'digest' && pollRes.synthesis) {
+      const digestDoc = NotebookLmDeepResearchWorkflow.formatDigest(topic, pollRes);
+      const addRes = await this.client.addTextSource(notebookId, `Research Digest: ${topic}`, digestDoc);
+      return { ingestedSourceId: addRes.sourceId, curatedImportCount: 0, prunedCount: 0 };
+    }
+    if (ingestMode === 'curated' && pollRes.sources.length > 0) {
+      const outcome = await this.handleCuratedIngest(notebookId, taskId, pollRes.sources, existingSources, options);
+      return { curatedImportCount: outcome.importedCount, prunedCount: outcome.prunedCount };
+    }
+    return { curatedImportCount: 0, prunedCount: 0 };
+  }
+
   public async execute(
     notebookId: string,
     topic: string,
@@ -60,30 +98,66 @@ export class NotebookLmDeepResearchWorkflow {
     }
 
     const pollRes = await this.pollUntilComplete(notebookId, taskId, options);
-    const quotaCheck = await this.checkQuotaSafety(notebookId);
+    const existingSources = await this.fetchSafeSources(notebookId);
+    const { ingestedSourceId, curatedImportCount, prunedCount } = await this.processIngestion(
+      notebookId, topic, taskId, pollRes, existingSources, options
+    );
 
-    let ingestedSourceId: string | undefined;
-    const ingestMode = options.ingestMode ?? 'digest';
-
-    if (ingestMode === 'digest' && pollRes.synthesis) {
-      const digestDoc = NotebookLmDeepResearchWorkflow.formatDigest(topic, pollRes);
-      const addRes = await this.client.addTextSource(notebookId, `Research Digest: ${topic}`, digestDoc);
-      ingestedSourceId = addRes.sourceId;
-    } else if (ingestMode === 'curated' && pollRes.sources.length > 0) {
-      const maxK = options.maxCuratedSources ?? 5;
-      const indices = pollRes.sources.slice(0, maxK).map((_, i) => i);
-      await this.client.importResearchSources(notebookId, taskId, indices);
-    }
-
+    const sourceCount = existingSources.length + (ingestedSourceId ? 1 : curatedImportCount) - prunedCount;
     return {
       taskId,
       status: pollRes.status,
       synthesis: pollRes.synthesis || '',
       sources: pollRes.sources,
       ingestedSourceId,
-      quotaWarning: quotaCheck.warning,
-      sourceCount: quotaCheck.count
+      curatedImportCount,
+      prunedCount,
+      quotaWarning: sourceCount >= MAX_SAFE_SOURCE_COUNT,
+      sourceCount
     };
+  }
+
+  private async fetchSafeSources(notebookId: string): Promise<NotebookSourceSummary[]> {
+    try {
+      return await this.client.listSources(notebookId);
+    } catch {
+      return [];
+    }
+  }
+
+  private async handleCuratedIngest(
+    notebookId: string,
+    taskId: string,
+    sources: DiscoveredSource[],
+    existingSources: NotebookSourceSummary[],
+    options: DeepWorkflowOptions
+  ): Promise<{ importedCount: number; prunedCount: number }> {
+    const curated = await this.pipeline.filterAndRank(sources, {
+      maxCuratedCount: options.maxCuratedSources ?? 5,
+      httpHeadChecker: options.httpHeadChecker,
+      existingSources
+    });
+    if (curated.selectedSources.length === 0) return { importedCount: 0, prunedCount: 0 };
+
+    const selectedIndices = curated.selectedSources.map((_, i) => i);
+    const totalAfter = existingSources.length + curated.selectedSources.length;
+
+    if (totalAfter > MAX_SAFE_SOURCE_COUNT) {
+      const needed = totalAfter - 40;
+      const approved = await this.pruningEngine.filterAutonomousApproved(existingSources);
+      const toPrune = approved.slice(0, Math.max(1, needed)).map(c => ({ id: c.sourceId, title: c.title, type: 'document' }));
+
+      const swap = await this.vaultManager.executeTransactionalSwap(
+        notebookId,
+        toPrune,
+        async () => this.client.importResearchSources(notebookId, taskId, selectedIndices),
+        this.client
+      );
+      return { importedCount: curated.selectedSources.length, prunedCount: swap.prunedCount };
+    }
+
+    await this.client.importResearchSources(notebookId, taskId, selectedIndices);
+    return { importedCount: curated.selectedSources.length, prunedCount: 0 };
   }
 
   private async pollUntilComplete(
@@ -105,15 +179,6 @@ export class NotebookLmDeepResearchWorkflow {
     }
 
     return { status: 'IN_PROGRESS', taskId, sources: [] };
-  }
-
-  private async checkQuotaSafety(notebookId: string): Promise<{ warning: boolean; count: number }> {
-    try {
-      const sources = await this.client.listSources(notebookId);
-      return { warning: sources.length >= MAX_SAFE_SOURCE_COUNT, count: sources.length };
-    } catch {
-      return { warning: false, count: 0 };
-    }
   }
 
   public static formatDigest(topic: string, poll: ResearchPollResult): string {

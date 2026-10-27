@@ -13,7 +13,8 @@ import {
   handleNlmSources,
   handleNlmPoll,
   handleNlmImport,
-  handleNlmPrune
+  handleNlmPrune,
+  handleNlmRestore
 } from './nlm-command.js';
 
 test('parseNlmArgs parses question and notebook id correctly', () => {
@@ -136,7 +137,7 @@ test('handleNlmImport handles ingestion safely', async () => {
   }
 });
 
-test('handleNlmPrune executes dry-run and force modes safely', async () => {
+test('handleNlmPrune executes autonomous and dry-run modes safely', async () => {
   const originalLog = console.log;
   const originalError = console.error;
   const captured: string[] = [];
@@ -144,12 +145,32 @@ test('handleNlmPrune executes dry-run and force modes safely', async () => {
   console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
 
   try {
-    await handleNlmPrune('nb-test-prune');
-    assert.ok(captured.some(line => line.includes('Tombstone Pruner') && line.includes('DRY-RUN')));
+    await handleNlmPrune('nb-test-prune', '--dry-run');
+    assert.ok(captured.some(line => line.includes('Autonomous Pruner') && line.includes('DRY-RUN')));
 
     captured.length = 0;
-    await handleNlmPrune('nb-test-prune', '--force');
-    assert.ok(captured.some(line => line.includes('Tombstone Pruner') && line.includes('PHYSICAL DELETE')));
+    await handleNlmPrune('nb-test-prune');
+    assert.ok(captured.some(line => line.includes('Autonomous Pruner')));
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+test('handleNlmRestore lists vault contents and handles restore safely', async () => {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const captured: string[] = [];
+  console.log = (...args: unknown[]) => { captured.push(args.join(' ')); };
+  console.error = (...args: unknown[]) => { captured.push(args.join(' ')); };
+
+  try {
+    await handleNlmRestore();
+    assert.ok(captured.some(line => line.includes('Tombstone Vault Listing')));
+
+    captured.length = 0;
+    await handleNlmRestore('non-existent-source-id', 'nb-test-restore');
+    assert.ok(captured.some(line => line.includes('Restoring source') || line.includes('Restore Failed')));
   } finally {
     console.log = originalLog;
     console.error = originalError;

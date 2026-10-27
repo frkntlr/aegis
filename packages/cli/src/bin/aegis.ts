@@ -50,6 +50,7 @@ import {
   handleNlmPoll,
   handleNlmImport,
   handleNlmPrune,
+  handleNlmRestore,
   handleNlmAuth,
   handleNlmSwitch
 } from '../commands/nlm-command.js';
@@ -112,6 +113,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'nlm:poll': (a) => handleNlmPoll(a[1], a[2]),
   'nlm:import': (a) => handleNlmImport(a[1], a[2]),
   'nlm:prune': (a) => handleNlmPrune(...a.slice(1)),
+  'nlm:restore': (a) => handleNlmRestore(a[1], a[2]),
   'nlm:auth': (a) => handleNlmAuth(...a.slice(1)),
   'nlm:switch': (a) => handleNlmSwitch(...a.slice(1)),
   switch: (a) => handleNlmSwitch(...a.slice(1)),

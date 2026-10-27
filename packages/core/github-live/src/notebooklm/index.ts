@@ -21,3 +21,6 @@ export * from './ambient-cdp-scanner.js';
 export * from './ambient-cookie-vault-extractor.js';
 export * from './conversational-intent-detector.js';
 export * from './account-switch-lifecycle-manager.js';
+export * from './autonomous-pruning-engine.js';
+export * from './tombstone-vault-manager.js';
+export * from './curated-ingestion-pipeline.js';

@@ -49,36 +49,23 @@ test('NotebookLmDeepResearchWorkflow returns immediately in detach mode', async 
   assert.strictEqual(res.status, 'IN_PROGRESS');
 });
 
-test('NotebookLmDeepResearchWorkflow executes digest ingestion by default', async () => {
+test('NotebookLmDeepResearchWorkflow executes digest ingestion when requested', async () => {
   let addTextCalled = false;
-  let addedTitle = '';
-
   const mockHttp = async (_url: string, body: string) => {
-    if (body.includes('StartResearch')) {
-      return { status: 200, text: async () => ')]}\'\n[["task_id": "task-digest-1"]]', headers: {} };
-    }
-    if (body.includes('PollResearch')) {
-      return {
-        status: 200,
-        text: async () => ')]}\'\n[["COMPLETED", ["https://spec.org/1"]]]\nDeep synthesis content.',
-        headers: {}
-      };
-    }
+    if (body.includes('StartResearch')) return { status: 200, text: async () => ')]}\'\n[["task_id": "task-digest-1"]]', headers: {} };
+    if (body.includes('PollResearch')) return { status: 200, text: async () => ')]}\'\n[["COMPLETED", ["https://spec.org/1"]]]\nDeep synthesis.', headers: {} };
     if (body.includes('AddTextSource')) {
       addTextCalled = true;
-      addedTitle = 'Digest Created';
       return { status: 200, text: async () => ')]}\'\n[["src-digest-uuid-123"]]', headers: {} };
     }
-    if (body.includes('ListSources')) {
-      return { status: 200, text: async () => ')]}\'\n[[["src-1", "Doc 1"]]]', headers: {} };
-    }
+    if (body.includes('ListSources')) return { status: 200, text: async () => ')]}\'\n[[["src-1", "Doc 1"]]]', headers: {} };
     return { status: 200, text: async () => ')]}\'\n[]', headers: {} };
   };
 
   const client = new NotebookLmNativeClient({ cookies: 'SID=test;', httpPost: mockHttp });
   const workflow = new NotebookLmDeepResearchWorkflow(client);
-
   const res = await workflow.execute('nb-1', 'Clean Architecture', {
+    ingestMode: 'digest',
     sleeper: async () => {},
     pollIntervalMs: 1
   });
@@ -86,11 +73,10 @@ test('NotebookLmDeepResearchWorkflow executes digest ingestion by default', asyn
   assert.strictEqual(res.status, 'COMPLETED');
   assert.strictEqual(res.ingestedSourceId, 'src-digest-uuid-123');
   assert.strictEqual(addTextCalled, true);
-  assert.strictEqual(addedTitle, 'Digest Created');
   assert.strictEqual(res.quotaWarning, false);
 });
 
-test('NotebookLmDeepResearchWorkflow executes curated ingestion when requested', async () => {
+test('NotebookLmDeepResearchWorkflow executes curated ingestion by default', async () => {
   let importCalled = false;
 
   const mockHttp = async (_url: string, body: string) => {
@@ -100,7 +86,7 @@ test('NotebookLmDeepResearchWorkflow executes curated ingestion when requested',
     if (body.includes('PollResearch')) {
       return {
         status: 200,
-        text: async () => ')]}\'\n[["COMPLETED", ["https://ref1.com", "https://ref2.com"]]]\nSynthesis.',
+        text: async () => ')]}\'\n[["COMPLETED", ["https://ref1.com/guide", "https://ref2.com/spec"]]]\nSynthesis.',
         headers: {}
       };
     }
@@ -115,13 +101,13 @@ test('NotebookLmDeepResearchWorkflow executes curated ingestion when requested',
   const workflow = new NotebookLmDeepResearchWorkflow(client);
 
   const res = await workflow.execute('nb-1', 'Signals', {
-    ingestMode: 'curated',
     maxCuratedSources: 2,
     sleeper: async () => {}
   });
 
   assert.strictEqual(res.status, 'COMPLETED');
   assert.strictEqual(importCalled, true);
+  assert.strictEqual(res.curatedImportCount, 2);
 });
 
 test('NotebookLmDeepResearchWorkflow warns when source quota is high', async () => {
