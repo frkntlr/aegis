@@ -49,24 +49,22 @@ test('WikiMemoryManager extracts selective tagged memory summaries for prompt co
   }
 });
 
-test('GitHubWikiLiveAdapter seeds 13-page living architecture suite into git cache', () => {
+test('GitHubWikiLiveAdapter seeds 11-page living architecture suite into git cache', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-seed-test-'));
   try {
     const adapter = new GitHubWikiLiveAdapter({ localCloneDir: tmpDir });
     const res = adapter.seedComprehensiveWikiSuite();
-    assert.strictEqual(res.created, 13);
+    assert.strictEqual(res.created, 11);
     assert.ok(res.pages.includes('Home'));
     assert.ok(res.pages.includes('Architecture'));
-    assert.ok(res.pages.includes('Codebase-Memory-Engine'));
-    assert.ok(res.pages.includes('Godot-Bridge-Deep-Integration'));
-    assert.ok(res.pages.includes('Dialogue-Engine'));
-    assert.ok(res.pages.includes('Toolchain-and-IDEs'));
-    assert.ok(res.pages.includes('MCP-and-Skills-Ecosystem'));
-    assert.ok(res.pages.includes('Plugin-and-Extensibility'));
-    assert.ok(res.pages.includes('NotebookLM-Integration'));
-    assert.ok(res.pages.includes('Quality-Shields-and-Gates'));
-    assert.ok(res.pages.includes('Autonomous-Kanban-Protocol'));
     assert.ok(res.pages.includes('RFC-Index'));
+    assert.ok(res.pages.includes('Spec-Memory-and-AST'));
+    assert.ok(res.pages.includes('Spec-Godot-Substrate'));
+    assert.ok(res.pages.includes('Spec-Quality-and-Iron-Cage'));
+    assert.ok(res.pages.includes('Spec-Worktree-and-TIP'));
+    assert.ok(res.pages.includes('Spec-Diagnostic-and-Dialogue'));
+    assert.ok(res.pages.includes('Spec-NotebookLM-and-Knowledge'));
+    assert.ok(res.pages.includes('Spec-Toolchain-and-Performance'));
     assert.ok(res.pages.includes('Research-Index'));
 
     const home = adapter.getPage('Home');
@@ -106,15 +104,12 @@ test('GitHubWikiLiveAdapter backs up conflicting local wiki before re-cloning', 
   }
 });
 
-
 test('GitHubWikiLiveAdapter prevents path traversal when retrieving or publishing pages', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-traversal-test-'));
   try {
     const adapter = new GitHubWikiLiveAdapter({ localCloneDir: tmpDir });
-    // Attempting traversal slug
     adapter.publishPage('../../traversal', 'Traversal Test', ['A', 'B', 'C'], 'content');
 
-    // Page must be contained inside tmpDir, not escape into parent
     const safePage = adapter.getPage('../../traversal');
     assert.ok(safePage);
     assert.strictEqual(safePage.slug, 'traversal');
