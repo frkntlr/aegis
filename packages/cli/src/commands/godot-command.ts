@@ -7,6 +7,7 @@ import {
   GodotUiVerifier,
   ClassDbOracle,
   DoctoolRunner,
+  GodotTestRunner,
   type GodotUiTreePayload
 } from '@aegis/godot-bridge';
 import { showBanner } from './banner.js';
@@ -210,6 +211,19 @@ export function handleGodotPlaytest(scenarioArg?: string): void {
   console.log(' • Status: Ready for Godot AegisBridge autonomous execution.');
 }
 
+export async function handleGodotTest(projectDirArg?: string, scenarioArg?: string): Promise<void> {
+  showBanner();
+  const dir = projectDirArg || process.cwd();
+  console.log(`🎮 Executing Headless Godot Substrate 3.0 Test Harness for: ${dir}...`);
+  const res = await GodotTestRunner.runPlaytestScenario(dir, scenarioArg);
+  if (res.passed) {
+    console.log(`✅ Headless Godot Test PASSED in ${res.durationMs}ms`);
+  } else {
+    console.error(`❌ Headless Godot Test FAILED in ${res.durationMs}ms (exit code: ${res.exitCode})`);
+    if (res.stderr) console.error(res.stderr);
+  }
+}
+
 export async function handleGodot(args: string[]): Promise<void> {
   const subcommand = args[0] || 'status';
   if (subcommand === 'init') {
@@ -228,6 +242,8 @@ export async function handleGodot(args: string[]): Promise<void> {
     handleGodotRun(args[1], ...args.slice(2));
   } else if (subcommand === 'playtest') {
     handleGodotPlaytest(args[1]);
+  } else if (subcommand === 'test') {
+    await handleGodotTest(args[1], args[2]);
   } else {
     console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|status|inspect|query|doctool|validate|run|playtest]`);
   }

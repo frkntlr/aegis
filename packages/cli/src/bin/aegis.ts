@@ -63,7 +63,8 @@ import {
   handleGodotQuery,
   handleGodotRun,
   handleGodotDoctool,
-  handleGodotPlaytest
+  handleGodotPlaytest,
+  handleGodotTest
 } from '../commands/godot-command.js';
 import { notifyDashboardFocus } from '../commands/focus-notifier.js';
 import { handleFind } from '../commands/find-command.js';
@@ -154,6 +155,7 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'godot:run': (a) => handleGodotRun(a[1], ...a.slice(2)),
   'godot:doctool': () => handleGodotDoctool(),
   'godot:playtest': (a) => handleGodotPlaytest(a[1]),
+  'godot:test': async (a) => { await handleGodotTest(a[1], a[2]); },
   inspect: (a) => handleInspect(a[1]),
   mutate: (a) => handleMutate(a[1]),
   estimate: (a) => handleEstimate(a),

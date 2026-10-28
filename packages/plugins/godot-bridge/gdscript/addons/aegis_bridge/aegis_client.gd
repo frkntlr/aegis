@@ -6,44 +6,58 @@ const AegisSyntheticPlayer = preload("res://addons/aegis_bridge/synthetic_player
 
 const DEFAULT_PORT = 6850
 var port: int = DEFAULT_PORT
-var http_request: HTTPRequest
-var poll_request: HTTPRequest
-var result_request: HTTPRequest
-var poll_timer: Timer
+var session_token: String = ""
+var ws: WebSocketPeer = WebSocketPeer.new()
+var is_connected_ws: bool = false
+var reconnect_timer: float = 0.0
 
 func _ready() -> void:
-	http_request = HTTPRequest.new()
-	add_child(http_request)
-	http_request.request_completed.connect(_on_request_completed)
-
-	poll_request = HTTPRequest.new()
-	add_child(poll_request)
-	poll_request.request_completed.connect(_on_poll_completed)
-
-	result_request = HTTPRequest.new()
-	add_child(result_request)
-
-	poll_timer = Timer.new()
-	poll_timer.wait_time = 0.5
-	poll_timer.autostart = true
-	poll_timer.timeout.connect(_on_poll_timer)
-	add_child(poll_timer)
-
-	print("[AegisBridge] Client ready on port: ", port)
+	_parse_cmdline_args()
+	_connect_to_server()
+	print("[AegisBridge] Client initializing on port: ", port)
 	_capture_initial_telemetry()
+
+func _parse_cmdline_args() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--aegis-port="):
+			port = int(arg.replace("--aegis-port=", ""))
+		elif arg.begins_with("--aegis-token="):
+			session_token = arg.replace("--aegis-token=", "")
+
+func _connect_to_server() -> void:
+	var url = "ws://127.0.0.1:" + str(port) + "/?token=" + session_token
+	var err = ws.connect_to_url(url)
+	if err != OK:
+		push_warning("[AegisBridge] Failed to initiate WebSocket connection: " + str(err))
+
+func _process(delta: float) -> void:
+	ws.poll()
+	var state = ws.get_ready_state()
+	if state == WebSocketPeer.STATE_OPEN:
+		if not is_connected_ws:
+			is_connected_ws = true
+			print("[AegisBridge] WebSocket connected with sub-millisecond bridge.")
+		while ws.get_available_packet_count() > 0:
+			var pkt = ws.get_packet()
+			_handle_packet(pkt.get_string_from_utf8())
+	elif state == WebSocketPeer.STATE_CLOSED:
+		is_connected_ws = false
+		reconnect_timer += delta
+		if reconnect_timer >= 2.0:
+			reconnect_timer = 0.0
+			_connect_to_server()
 
 func _capture_initial_telemetry() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var p = AegisUiVerifier.build_payload(get_tree().root, "16:9")
-	_save_telemetry_snapshot(JSON.stringify(p))
+	send_telemetry(p)
 
 func send_telemetry(payload: Dictionary) -> void:
-	var url = "http://127.0.0.1:" + str(port) + "/telemetry"
-	var headers = ["Content-Type: application/json"]
-	var json = JSON.stringify(payload)
-	_save_telemetry_snapshot(json)
-	http_request.request(url, headers, HTTPClient.METHOD_POST, json)
+	_save_telemetry_snapshot(JSON.stringify(payload))
+	if is_connected_ws:
+		var msg = { "type": "telemetry", "payload": payload }
+		ws.send_text(JSON.stringify(msg))
 
 func _save_telemetry_snapshot(json: String) -> void:
 	var dir = DirAccess.open("res://")
@@ -54,18 +68,10 @@ func _save_telemetry_snapshot(json: String) -> void:
 		file.store_string(json)
 		file.close()
 
-func _on_poll_timer() -> void:
-	if poll_request.get_http_client_status() == HTTPClient.STATUS_DISCONNECTED:
-		var url = "http://127.0.0.1:" + str(port) + "/command/poll"
-		poll_request.request(url)
-
-func _on_poll_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if response_code != 200 or body.is_empty():
-		return
-	var text = body.get_string_from_utf8()
+func _handle_packet(text: String) -> void:
 	var json = JSON.parse_string(text)
-	if json is Dictionary and json.has("command") and json["command"] is Dictionary:
-		_execute_command(json["command"])
+	if json is Dictionary:
+		_execute_command(json)
 
 func _execute_command(cmd: Dictionary) -> void:
 	var cmd_id = str(cmd.get("id", "0"))
@@ -84,17 +90,24 @@ func _execute_command(cmd: Dictionary) -> void:
 		var res = await player.execute_scenario(actions)
 		player.queue_free()
 		resp_data["result"] = res
+	elif action == "eval":
+		resp_data["eval_result"] = _evaluate_expression(str(payload.get("expr", "")))
 	elif action == "ping":
 		resp_data["pong"] = true
 
-	_post_command_result(cmd_id, true, resp_data)
+	_send_command_result(cmd_id, true, resp_data)
 
-func _post_command_result(cmd_id: String, success: bool, data: Dictionary) -> void:
-	var url = "http://127.0.0.1:" + str(port) + "/command/result"
-	var headers = ["Content-Type: application/json"]
-	var body = JSON.stringify({ "id": cmd_id, "success": success, "data": data })
-	result_request.request(url, headers, HTTPClient.METHOD_POST, body)
+func _evaluate_expression(expr_str: String) -> Variant:
+	var expression = Expression.new()
+	var error = expression.parse(expr_str)
+	if error != OK:
+		return "PARSE_ERROR: " + expression.get_error_text()
+	var result = expression.execute([], self)
+	if expression.has_execute_failed():
+		return "EXEC_FAILED: " + expression.get_error_text()
+	return result
 
-func _on_request_completed(_result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
-	if response_code != 200:
-		push_warning("[AegisBridge] Server returned HTTP " + str(response_code))
+func _send_command_result(cmd_id: String, success: bool, data: Dictionary) -> void:
+	if is_connected_ws:
+		var resp = { "id": cmd_id, "success": success, "data": data }
+		ws.send_text(JSON.stringify(resp))
