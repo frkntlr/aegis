@@ -1,65 +1,37 @@
+/**
+ * @file toolchain.ts
+ * Consolidation notice for Toolchain & IDE Matrix.
+ * Consolidated into master Architecture guide.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const TOOLCHAIN_PAGE: WikiSuitePage = {
   slug: 'Toolchain-and-IDEs',
-  title: 'Çoklu-IDE & Oyun Motoru Çalışma Zamanı Uyumluluk Matrisi',
+  title: 'Çoklu-IDE & Araç Zinciri Uyumluluk Matrisi',
   threeBullets: [
     'Antigravity (MultiGravity), Cursor, Windsurf, Zed ve VS Code için evrensel çoklu-editör orkestrasyonu.',
     'Evrensel CLI (aegis), Monorepo TypeScript Project References (RFC-033) ve Turborepo Hızlandırma.',
     'Çapraz Platform Süreç Ağacı Sonlandırma (RFC-025/RFC-028) ve Otomatik Dizin İzolasyonu.'
   ],
   content: [
-    '## 💻 Çoklu-IDE & Oyun Motoru Uyumluluk Matrisi',
+    '## 💻 Çoklu-IDE & Araç Zinciri Uyumluluk Matrisi',
     '',
-    'Aegis, geliştiricileri ve otonom ajanları tek bir kod editörüne hapsetmez. Google Antigravity\'nin çoklu-oturum gücünden (MultiGravity) Cursor, Windsurf, Zed ve VS Code\'a kadar tüm modern geliştirme ortamlarını tek bir orkestrasyon çatısı altında birleştirir.',
+    '> [!NOTE]',
+    '> Bu mimari bileşen, dokümantasyon bütünlüğü ve sadeleştirme amacıyla **[[Architecture|Aegis Kapsamlı Mimari Rehberi (Bölüm 1 & 4)]]** altında birleştirilmiştir.',
     '',
-    '---',
+    'Aegis, geliştiricileri ve otonom ajanları tek bir kod editörüne hapsetmez. Google Antigravity\'nin çoklu-oturum gücünden Cursor, Windsurf, Zed ve VS Code\'a kadar tüm modern geliştirme ortamlarını tek çatı altında toplar:',
     '',
-    '### 1. Desteklenen Editörler & Yetenek Tablosu',
+    '- **Evrensel CLI (`aegis`):** Proje dizininden bağımsız evrensel ikili dosya olarak çalışır.',
+    '- **TypeScript Project References & Turborepo:** 14 paketin `tsconfig.json` referansları ve içerik adresli önbelleği ile %80 daha hızlı derleme.',
+    '- **Çapraz Platform Süreç Ağacı Watchdog:** Donan süreçler (Node/Godot) tüm alt dallarıyla birlikte (`taskkill /T /F` veya `process groups`) sonlandırılır.',
+    '- **Otomatik Ayar İzolasyonu:** Editörlerin paralel worktree dizinlerini tarayarak işlemciyi kilitlemesi otomatik ayar enjeksiyonuyla engellenir.',
     '',
-    '| Geliştirme Ortamı | Yerel MCP Desteği | Skills Desteği | Alt-Ajan Desteği | Ayar Dosyası Yolu | Çoklu-Ajan Modu |',
-    '|---|---|---|---|---|---|',
-    '| **Google Antigravity** | ✅ Tam Uyum (`aegis mcp`) | ✅ Yerleşik | ✅ Yerleşik | `.gemini/config/mcp_config.json` | **MultiGravity Doğal** |',
-    '| **Cursor AI** | ✅ Tam Uyum (`aegis mcp`) | ✅ Destekli | ❌ Harici | `.cursor/mcp.json` | İzole Worktree |',
-    '| **Codeium Windsurf** | ✅ Tam Uyum (`aegis mcp`) | ✅ Destekli | ❌ Harici | `.codeium/windsurf/mcp_config.json` | İzole Worktree |',
-    '| **Zed Editor** | ✅ Tam Uyum | ❌ Kural Dışı | ❌ Harici | `.zed/settings.json` | Tekil Ajan Odaklı |',
-    '| **Visual Studio Code** | ✅ Tam Uyum (`aegis mcp`) | ❌ Kural Dışı | ❌ Harici | `.vscode/mcp.json` | Tekil Ajan Odaklı |',
+    'Detaylı şemalar ve IDE matrisi için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** sayfasına bakınız.',
     '',
-    '---',
-    '',
-    '### 2. Evrensel CLI (`aegis`) & Her Depodan Çalışma',
-    'Aegis, yerel paket scripti olmanın ötesinde global/evrensel bir binary olarak kuruludur:',
-    '- Proje dizininde `npm run` sarmalayıcısına gerek olmadan doğrudan `aegis <komut>` çalıştırılabilir.',
-    '- Çalışma dizini (`process.cwd()`) kökünden bağımsız olarak hedef depoyu ve worktree\'yi otomatik algılar.',
-    '',
-    '---',
-    '',
-    '### 3. TypeScript Project References & Turborepo Hızlandırması (RFC-033, RFC-025)',
-    '- **TypeScript Project References:** 14 paketin `tsconfig.json` yapılandırması `composite: true` ve referans bağlantıları ile donatılmıştır. Yalnızca değişen paketler derlenir; tam derleme süreleri %80 kısalır.',
-    '- **Turborepo Önbelleği:** Git hook\'larında (`pre-commit`, `pre-push`) çalıştırılan test ve derleme adımları Turborepo içerik adresli önbelleği ile korunur; değişmeyen paketlerin testleri 0 milisaniyede tamamlanır.',
-    '- **Çapraz Platform Süreç Ağacı Sonlandırma (RFC-025, RFC-028):** Donan veya zaman aşımına uğrayan süreçler Windows üzerinde `taskkill /T /F`, Unix üzerinde süreç grupları ile tüm alt dallarıyla birlikte temizlenir; arkada hayalet node/godot süreçleri bırakılmaz.',
-    '',
-    '---',
-    '',
-    '### 4. Otomatik Ayar ve Dizin İzolasyonu',
-    'Birden fazla ajan paralel worktree\'lerde (`experimental/solver`, `experimental/qa`, `experimental/docs`, `experimental/ui`) çalışırken, modern IDE\'lerin dosya izleyicileri ve dil sunucuları (LSP) tüm worktree\'leri taramaya çalışarak işlemciyi kilitleyebilir.',
-    '',
-    'Aegis `IdeAdapter` katmanı (`packages/core/orchestrator`), her editör yapılandırmasına otomatik olarak şu izolasyon kurallarını enjekte eder:',
-    '```json',
-    '{',
-    '  "files.exclude": { "**/experimental/**": true },',
-    '  "search.exclude": { "**/experimental/**": true },',
-    '  "files.watcherExclude": { "**/experimental/**": true }',
-    '}',
-    '```',
-    '',
-    '---',
-    '',
-    '### 5. Oyun Motoru Uyumluluğu: Godot 4.x Entegrasyonu',
-    'Aegis, oyun projeleri için `@aegis/godot-bridge` paketi üzerinden derinlemesine Godot 4 entegrasyonu sunar:',
-    '- **ClassDB Oracle (`aegis godot query`):** Godot 4 yerleşik sınıflarını ve sinyallerini doğrular; halüsinasyonları engeller.',
-    '- **Çift Yönlü RPC Köprüsü (Port 4242):** Canlı oyun telemetrisini ve girdi simülasyonunu yönetir.',
-    '- **Sıfır-Token BoundingBox UI Denetimi:** UI kontrollerini matematiksel olarak doğrular.',
-    '- **Playtest-Before-PR Kuralı:** PR açılmadan önce `aegis verify:task` ile oyunun headless modda hatasız açıldığı kanıtlanmalıdır.'
+    '### İlgili CLI Komutları',
+    '- `aegis ide:sync`: MCP sunucularını ve becerileri tüm desteklenen editörlere eşitler.',
+    '- `aegis status`: Aktif worktree durumlarını ve kilitleri raporlar.'
   ].join('\n')
 };

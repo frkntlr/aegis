@@ -1,3 +1,10 @@
+/**
+ * @file notebooklm.ts
+ * Consolidation notice for Google NotebookLM Integration.
+ * Consolidated into master Architecture guide.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const NOTEBOOKLM_PAGE: WikiSuitePage = {
@@ -11,56 +18,23 @@ export const NOTEBOOKLM_PAGE: WikiSuitePage = {
   content: [
     '## 🔬 Google NotebookLM Entegrasyonu & Zemin Gerçeği',
     '',
-    'Aegis, karmaşık mimari kararlar ve kütüphane seçimlerinde LLM\'lerin ezbere ve sıklıkla yanıltıcı cevaplar vermesini engellemek için **Google NotebookLM**\'i birincil zemin gerçeği araştırma motoru olarak kullanır.',
+    '> [!NOTE]',
+    '> Bu mimari bileşen, dokümantasyon bütünlüğü ve sadeleştirme amacıyla **[[Architecture|Aegis Kapsamlı Mimari Rehberi (Bölüm 8)]]** altında birleştirilmiştir.',
     '',
-    '### 1. Zemin Gerçeği ve Kaynak Alıntıları (`[cite: x, y]`)',
-    'Geleneksel LLM yanıtları kaynak belirtmezken, NotebookLM modelin ürettiği her mimari tespiti gerçek belgelere ve web kaynaklarına bağlar (`[cite: 1, 3, 12]`).',
-    '- Ajanlar belirsiz bir API veya protokol hakkında karar verirken kanıtlanmış kaynaklara dayanır.',
-    '- Mimari kararlar "varsayım" olmaktan çıkar, doğrulanabilir teknik kararlara (ADR) dönüşür.',
+    'Aegis, mimari kararlar ve kütüphane seçimlerinde LLM\'lerin ezbere tahmin üretmesini engellemek için **Google NotebookLM**\'i birincil zemin gerçeği araştırma motoru olarak kullanır:',
     '',
-    '---',
+    '- **Zemin Gerçeği & Kaynak Alıntıları (`[cite: x, y]`):** Mimari kararları doğrulanabilir teknik kararlara (ADR) dönüştürür.',
+    '- **Otonom Bilgi Yönetimi (AKG) & Mezar Taşı Mahzeni:** 50 kaynak sınırını MFCS puanlamasıyla otonom yönetir; silinen kaynaklar `.aegis/tombstones/` altında saklanır (`aegis nlm:prune`, `aegis nlm:restore`).',
+    '- **Sıfır-Tıklama Ortam Keşfi:** CDP portları ve tarayıcı çerez kasalarından oturum tokenlarını hasat eder.',
+    '- **Tri-State Yetkilendirme Protokolü:** Oturum süresi dolduğunda Antigravity modalı ile şeffaf yönlendirme yapar.',
+    '- **Otonom Araştırma Motoru (`aegis nlm:research`):** Araştırma notlarını derleyip yaşayan Wiki\'ye otomatik yazar.',
     '',
-    '### 2. Otonom Bilgi Yönetimi (AKG) & Mezar Taşı Mahzeni (RFC-023)',
-    'NotebookLM projelerinde 50 kaynak sınırını yönetmek için otonom bilgi döngüsü uygulanır:',
-    '- **50-Kaynak Quota Sentinel:** Kaynak sayısı 45\'i aştığında sistem otomatik uyarır; 50 tavanında yeni kaynak eklenmesini durdurur.',
-    '- **Source Freshness Radar:** 30 günden eski veya projenin güncel mimarisiyle ilgisizleşen bayat kaynakları tespit eder.',
-    '- **MFCS (Multi-Factor Content Scoring) Budama:** Alıntı sıklığı, tazelik ve konu alaka puanına göre en zayıf kaynakları belirler (`aegis nlm:prune`).',
-    '- **Yerel Mezar Taşı Mahzeni (Tombstone Vault):** Budanan kaynaklar silinmeden önce `.aegis/tombstones/` altında meta verileriyle arşivlenir; istendiğinde `aegis nlm:restore <id>` ile anında geri yüklenir.',
+    'Detaylı şemalar ve yaşam döngüsü için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** sayfasına bakınız.',
     '',
-    '---',
-    '',
-    '### 3. Sıfır-Tıklama Ortam Hasatçısı & Hesap Değiştirme (RFC-021, RFC-022)',
-    '- **Sıfır-Tıklama Keşif (Zero-Click Ambient Discovery):** Çalışan Chrome, Edge veya Brave tarayıcılarının CDP hata ayıklama portlarını (9222-9229) ve işletim sistemi şifreli çerez kasalarını (DPAPI) arka planda otomatik tarayarak oturumu kendiliğinden çözer.',
-    '- **Konuşma Odaklı Hesap Değiştirme (`aegis nlm:switch`):** Geliştirici "başka hesaba geç" dediğinde mevcut oturum `.notebooklm-mcp/auth.backup-<ts>.json` içerisine yedeklenir ve yeni oturum açılır.',
-    '- **Tri-State Etkileşimli Yetkilendirme:** Oturum süresi dolduğunda motor asla sessizce çevrimdışı moda düşmez; Antigravity modalı açarak geliştiriciye seçenek sunar (Yenile, Çevrimdışı Devam Et, İptal Et).',
-    '',
-    '---',
-    '',
-    '### 4. Otonom Araştırma Motoru (`aegis nlm:research`)',
-    'Bir geliştirici veya ajan yeni bir mimari tasarım araştırması başlattığında:',
-    '',
-    '```powershell',
-    'aegis nlm:research "Multi-Worktree Git Locking Protocols" --deep',
-    '```',
-    '',
-    '1. **Konu Taraması:** NotebookLM seçilen konuda derin web ve kaynak araştırması başlatır.',
-    '2. **Mimari Sentez:** Temel tasarım kalıpları, performans ödünleşimleri (trade-offs) ve alıntılar sentezlenir.',
-    '3. **Kriter Çıkarımı:** Ajanların takip edeceği 3 somut kabul kriteri üretilir.',
-    '4. **Otomatik Wiki Yayını:** Üretilen araştırma raporu doğrudan GitHub Wiki\'de `research-<topic>` başlığıyla bir yaşayan bellek sayfası olarak kaydedilir ve pushlanır!',
-    '',
-    '---',
-    '',
-    '### 5. NotebookLM CLI Komutları',
-    '',
-    '| Komut | Açıklama |',
-    '|---|---|',
-    '| `aegis nlm:query "<soru>"` | Doğrulanmış zemin alıntılarıyla NotebookLM\'e soru sorar. |',
-    '| `aegis nlm:research "<konu>" [--deep]` | Otonom araştırma başlatır ve sonucu Wiki\'ye aktarır. |',
-    '| `aegis nlm:prune [--dry-run]` | Otonom MFCS puanlamasıyla bayat kaynakları budar ve mahzene arşivler. |',
-    '| `aegis nlm:restore <id>` | Arşivlenmiş bir kaynağı mezar taşı mahzeninden geri yükler. |',
-    '| `aegis nlm:sources` | Aktif kaynakları, tazelik durumlarını ve alıntı sayılarını listeler. |',
-    '| `aegis nlm:auth [--browser\|--paste]` | NotebookLM oturumunu denetler ve kimlik doğrulaması yapar. |',
-    '| `aegis nlm:switch [tarayıcı]` | Hesabı güvenle yedekleyip sıfır tıklamayla değiştirir. |',
-    '| `aegis nlm:sync` | Proje mimarisini ve yaşayan belleği NotebookLM ile eşitler. |'
+    '### İlgili CLI Komutları',
+    '- `aegis nlm:query "<soru>"`: Doğrulanmış zemin alıntılarıyla soru sorar.',
+    '- `aegis nlm:research "<konu>"`: Otonom araştırma başlatır ve Wiki\'ye aktarır.',
+    '- `aegis nlm:prune [--dry-run]`: Bayat kaynakları budar ve mahzene arşivler.',
+    '- `aegis nlm:switch [tarayıcı]`: Sıfır tıklamayla hesap değiştirir.'
   ].join('\n')
 };

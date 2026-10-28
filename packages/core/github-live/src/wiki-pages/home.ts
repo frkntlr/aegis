@@ -1,3 +1,9 @@
+/**
+ * @file home.ts
+ * Home page for Aegis Living Memory Wiki.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const HOME_PAGE: WikiSuitePage = {
@@ -5,15 +11,15 @@ export const HOME_PAGE: WikiSuitePage = {
   title: 'Aegis Otonom Vibe Coding Motoru Ana Dizini',
   threeBullets: [
     '5-Katmanlı Kod Tabanı Hafızası, Symbiotic Substrate 2.0 ve Cerrahi AST İskeletleme (%67-95 Token Tasarrufu).',
-    'Evrensel CLI (aegis), Task Ingestion Protocol (TIP) ve 19 Yerel MCP Aracı.',
-    'Deterministik Demir Kafes Kalite Kapıları, Multimodal Playtesting ve Yaşayan GitHub Wiki Ekosistemi.'
+    'Evrensel CLI (aegis), Task Ingestion Protocol (TIP) ve 27 Yerel MCP Aracı.',
+    'Deterministik Demir Kafes Kalite Kapıları, Godot Substrate 3.0 ve Yaşayan GitHub Wiki Ekosistemi.'
   ],
   content: [
     '## 🛡️ Aegis Yaşayan Mimari Dokümantasyonuna Hoş Geldiniz',
     '',
     'Aegis, modern yapay zekâ destekli kodlamayı ("vibe coding") rastgele ve güvenilmez LLM halüsinasyonlarından kurtarıp; deterministik, cerrahi ve kurumsal düzeyde bir yazılım mühendisliği motoruna dönüştüren açık kaynaklı bir otonom koşum takımıdır (autonomous harness).',
     '',
-    'Geleneksel yapay zekâ asistanlarının aksine Aegis, kod tabanını körlemesine değiştirmek yerine **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI**, **Task Ingestion Protocol (TIP)**, **Fiziksel Git Worktree İzolasyonu**, **Çatışmasız Kalıcı Dosya Kilitleri**, **19 Yerel Stdio MCP Aracı**, **Sokratik Teşhis Kapısı** ve **Multimodal Demir Kafes Doğrulaması** ile birden fazla ajanın aynı anda güvenle çalışmasını sağlar.',
+    'Geleneksel yapay zekâ asistanlarının aksine Aegis, kod tabanını körlemesine değiştirmek yerine **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI**, **Task Ingestion Protocol (TIP)**, **Fiziksel Git Worktree İzolasyonu**, **Çakışmasız Kalıcı Dosya Kilitleri**, **27 Yerel Stdio MCP Aracı**, **Godot Substrate 3.0 Motor Köprüsü**, **Sokratik Teşhis Kapısı** ve **Multimodal Demir Kafes Doğrulaması** ile birden fazla ajanın aynı anda güvenle çalışmasını sağlar.',
     '',
     '---',
     '',
@@ -21,18 +27,12 @@ export const HOME_PAGE: WikiSuitePage = {
     '',
     'Aegis mimarisinin tüm bileşenleri doğrudan GitHub Wiki üzerinde yaşayan bellek (living memory) olarak korunmaktadır:',
     '',
-    '- **[[Architecture]]:** Çekirdek 14-paket monorepo mimarisi, fiziksel Git worktree izolasyonu (`solver`, `qa`, `docs`, `ui`), kalıcı dosya kilitleri, Task Ingestion Protocol (TIP) ve 4 adımlı atomik merge pipeline.',
-    '- **[[Codebase-Memory-Engine]]:** 5-Katmanlı Kod Tabanı Hafızası: Çok dilli AST iskeletleme (TS/PY/GD/RS/Go/C), Symbiotic Substrate 2.0 (`deps:drift`), ilişkisel çağrı grafı, Context7 dokümantasyonu ve canlı watcher daemon.',
-    '- **[[Godot-Bridge-Deep-Integration]]:** Godot 4.x oyun motoru köprüsü, ClassDB Oracle, RPC sunucusu (:4242), sıfır-token BoundingBox UI denetimi, doctool ve otomatik playtesting.',
-    '- **[[Dialogue-Engine]]:** Semptom sınıflandırıcı, deterministik 3-fazlı etkileşimli durum makinesi ve Sokratik kanıt tabanlı hata ayıklayıcı (`aegis debug`).',
-    '- **[[Toolchain-and-IDEs]]:** Antigravity (MultiGravity), Cursor, Windsurf, Zed ve VS Code için tam çalışma zamanı, TypeScript Project References ve Turborepo hızlandırma.',
-    '- **[[MCP-and-Skills-Ecosystem]]:** Yerel stdio MCP sunucusu (`aegis mcp`) ve 19 yerel araç, Task Ingestion Protocol (TIP) araçları, `aegis ide:sync` ile evrensel dağıtım ve 5 uzman ajan rolü matrisi.',
-    '- **[[Plugin-and-Extensibility]]:** `LanguageExtractor` ve `IdeAdapter` eklenti arayüzleri, topluluk katkıları ve sıfır-token RFC değerlendirme boru hattı (`aegis rfc:triage`).',
-    '- **[[NotebookLM-Integration]]:** Google NotebookLM derin araştırma motoru, doğrulanmış zemin kaynakları (`[cite: x, y]`), Otonom Bilgi Yönetimi (AKG), Mezar Taşı Mahzeni (`nlm:prune`, `nlm:restore`) ve Ortam Hasatçısı.',
-    '- **[[Quality-Shields-and-Gates]]:** Deterministik Demir Kafes kuralları (<40 satır/fonksiyon, <300 satır/dosya), Multimodal Kalite Kapısı (`verify:task`), %70 Mutasyon Test Kapısı, Değişmez Kâhin ve Kanıt Tabanlı Hata Triyajı.',
-    '- **[[Autonomous-Kanban-Protocol]]:** GitHub Projects v2 canlı GraphQL entegrasyonu, Task Ingestion Protocol (TIP), gerçek zamanlı SSE Web Komuta Merkezi (`localhost:3000`), görev durum haritası ve Döngü Kırıcı.',
-    '- **[[RFC-Index]]:** Kabul edilmiş 34 çekirdek mimari tasarım spesifikasyonunun (RFC-001 - RFC-034) tam dizini ve durumları.',
-    '- **[[Research-Index]]:** Google NotebookLM tarafından sentezlenen alıntılı mimari zemin araştırmalarının dizini.',
+    '- **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]:** Tüm sistem mimarisini (14-paket monorepo, 5-katmanlı hafıza, Git worktree izolasyonu, 27-araçlık MCP ekosistemi, Godot Substrate 3.0, Demir Kafes, Sokratik teşhis, NotebookLM ve 4 adımlı merge pipeline) tek bir kapsamlı ve anlaşılır rehberde birleştirir.',
+    '- **[[RFC-Index|RFC Mimari Tasarımları]]:** Kabul edilmiş çekirdek mimari tasarım spesifikasyonlarının (RFC-001 - RFC-035) tam dizini ve durumları.',
+    '- **[[Research-Index|Araştırma Notları]]:** Google NotebookLM tarafından sentezlenen alıntılı mimari zemin araştırmalarının dizini.',
+    '',
+    '> [!NOTE]',
+    '> Daha önce ayrı sayfalarda dağınık duran alt mimari bölümleri (Hafıza Motoru, Godot Köprüsü, Diyalog Motoru, Kalite Kapıları, MCP ve Kanban Protokolü), dokümantasyon bütünlüğü ve hızlı kavranabilirlik için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** altında tek bir çatı altında toplanmıştır.',
     '',
     '---',
     '',
@@ -56,7 +56,7 @@ export const HOME_PAGE: WikiSuitePage = {
     '| `aegis nlm:restore <id>` | Arşivlenmiş bir kaynağı mezar taşı mahzeninden geri yükler. |',
     '| `aegis nlm:switch [browser]` | NotebookLM hesabını sıfır tıklamayla ortamdan/tarayıcıdan değiştirir. |',
     '| `aegis dashboard [port]` | `localhost:3000` üzerinde gerçek zamanlı komuta merkezini başlatır. |',
-    '| `aegis mcp` | IDE bağlantısı için yerel stdio JSON-RPC MCP sunucusunu başlatır. |',
+    '| `aegis mcp` | IDE bağlantısı için yerel stdio JSON-RPC MCP sunucusunu başlatır (27 araç). |',
     '| `aegis memory:query <sym>` | 5-katmanlı hafızadan sembol dilimi, çağıranlar ve etki alanını sorgular. |',
     '| `aegis memory:watch` | Kod tabanı hafızasını canlı izleyen artımlı dosya izleyiciyi çalıştırır. |',
     '| `aegis ide:sync` | MCP sunucularını ve becerileri tüm editörlere senkronize eder. |',
@@ -65,7 +65,7 @@ export const HOME_PAGE: WikiSuitePage = {
     '| `aegis find <sembol>` | Hızlı AST sembol araması ve cerrahi dilimleme yapar. |',
     '| `aegis triage [dizin]` | Kanıt bazlı hata triyajı uygular (sıfır sahte alarm). |',
     '| `aegis trace <hedef>` | Çağırıcı, sinyal ve sahne ilişkisel izini çıkarır. |',
-    '| `aegis godot [komut]` | Godot 4 motor köprüsünü çalıştırır (inspect/run/playtest/doctool). |',
+    '| `aegis godot [komut]` | Godot 4 Substrate 3.0 motor köprüsünü çalıştırır (inspect/run/playtest/doctool). |',
     '',
     '---',
     '',

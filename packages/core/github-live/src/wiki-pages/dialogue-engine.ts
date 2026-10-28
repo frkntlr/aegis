@@ -1,3 +1,10 @@
+/**
+ * @file dialogue-engine.ts
+ * Consolidation notice for Dialogue & Diagnostic Engine.
+ * Consolidated into master Architecture guide.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const DIALOGUE_ENGINE_PAGE: WikiSuitePage = {
@@ -11,58 +18,21 @@ export const DIALOGUE_ENGINE_PAGE: WikiSuitePage = {
   content: [
     '## 💬 Etkileşimli Diyalog ve Teşhis Motoru (`@aegis/dialogue-engine`)',
     '',
-    'Aegis, karmaşık hata teşhislerinde veya belirsiz geliştirici taleplerinde ajanların rastgele kararlar alıp bağlam kayması (context drift) yaşamasını engellemek için klinik bir **Diyalog, Sokratik Hata Ayıklama ve Durum Makinesi Motoru** içerir.',
+    '> [!NOTE]',
+    '> Bu mimari bileşen, dokümantasyon bütünlüğü ve sadeleştirme amacıyla **[[Architecture|Aegis Kapsamlı Mimari Rehberi (Bölüm 7)]]** altında birleştirilmiştir.',
     '',
-    '---',
+    'Aegis, karmaşık hata teşhislerinde ve belirsiz geliştirici taleplerinde bağlam kaymasını (context drift) engellemek için deterministik 3-fazlı klinik diyalog ve hata ayıklama motoru içerir:',
     '',
-    '### 1. Deterministik 3-Fazlı Durum Makinesi (State Machine)',
-    'Diyalog süreci sabit ve matematiksel olarak kanıtlanabilir 3 aşamadan oluşur:',
+    '- **Turn 1 - Semptom Girişi:** Gelen hata çıktısı (`SymptomClassifier`) ile ayrıştırılır (RUNTIME_CRASH, PERFORMANCE_REGRESSION, UI_ALIGNMENT_ISSUE vb.).',
+    '- **Turn 2 - Netleştirme & Hipotez:** Sokratik kanıt tabanlı hipotezler üretilir; kök neden adayı triangüle edilir (`aegis debug`).',
+    '- **Turn 3 - Klinik Reçete:** Sadece doğrulanmış hipotez için cerrahi diff ve Demir Kafes limitleri belirlenir (`PrescriptionBuilder`).',
+    '- **Döngü Devre Kesici (Circuit Breaker):** Bir ajan ardışık 3 kez başarısız olursa görev `blocked` yapılır ve kilitler çözülür (`aegis loop:status`).',
     '',
-    '```',
-    '┌────────────────────────┐',
-    '│ Turn 1: Semptom Girişi │ (SymptomClassifier: Kategori ve Seçenek Tespiti)',
-    '└───────────┬────────────┘',
-    '            ▼',
-    '┌────────────────────────┐',
-    '│ Turn 2: Netleştirme    │ (Kullanıcı veya Ajan Belirsizliği Netleştirir)',
-    '└───────────┬────────────┘',
-    '            ▼',
-    '┌────────────────────────┐',
-    '│ Turn 3: Görev Reçetesi │ (PrescriptionBuilder: Somut Demir Kafes Aksiyon Planı)',
-    '└────────────────────────┘',
-    '```',
+    'Detaylı şemalar ve durum makinesi tasarımı için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** sayfasına bakınız.',
     '',
-    '---',
-    '',
-    '### 2. Sokratik Kanıt Tabanlı Hata Ayıklama (`aegis debug` / `socratic_diagnose`)',
-    'Bir çökme veya regresyon yaşandığında ajan doğrudan kod değiştirmeye başlamaz; Sokratik kanıt kapısı işletilir:',
-    '- **PolyglotStackTraceParser:** TypeScript, Node.js, Python ve GDScript yığın izlerini satır satır ayrıştırır; hatanın gerçekleştiği tam dosya ve fonksiyonu izole eder.',
-    '- **SymbioticDiagnosticTriangulator:** Kod tabanı hafızasındaki AST iskeletini ve çağrı ilişkilerini tarayarak hatanın patlama yarıçapını ve kök neden adaylarını triangüle eder.',
-    '- **DynamicHypothesisGenerator:** Belirtiler doğrultusunda önceliklendirilmiş tanı hipotezleri üretir ve doğrulanması gereken zemin testlerini belirler.',
-    '',
-    '```powershell',
-    'aegis debug "TypeError: Cannot read properties of undefined in TaskDispatcher.ts:42"',
-    '```',
-    '',
-    '---',
-    '',
-    '### 3. Semptom Sınıflandırıcı (`SymptomClassifier`)',
-    'Gelen semptom metnini analiz eder ve tanı kategorilerine ayırır:',
-    '- **`RUNTIME_CRASH`:** Çalışma zamanı çökmeleri ve bellek hataları.',
-    '- **`PERFORMANCE_REGRESSION`:** FPS düşüşleri, bellek sızıntıları ve döngü tıkanıklıkları.',
-    '- **`UI_ALIGNMENT_ISSUE`:** Arayüz taşmaları, çözünürlük uyumsuzlukları ve buton çakışmaları.',
-    '- **`ARCHITECTURE_VIOLATION`:** Demir Kafes, modül sınırları veya anti-spagetti ihlalleri.',
-    '- **`TEST_FAILURE`:** Bozuk assertion\'lar ve mutasyon kapısı başarısızlıkları.',
-    '',
-    '---',
-    '',
-    '### 4. Reçete Oluşturucu (`PrescriptionBuilder`)',
-    'Netleştirilen semptoma göre deterministik bir mühendislik reçetesi üretir:',
-    '1. **Hedef Dosyalar:** Değiştirilmesi gereken tam dosya yolları.',
-    '2. **Kabul Kriterleri:** Test edilebilir somut maddeler.',
-    '3. **Demir Kafes Kotaları:** İzin verilen satır ve fonksiyon limitleri.',
-    '4. **Aksiyon Komutları:** Çalıştırılması zorunlu test ve mutasyon komutları.',
-    '',
-    'Reçete doğrudan Task Ingestion Protocol (TIP) ile `.aegis/task-inbox.json` içine enjekte edilebilir (`aegis task:inject`).'
+    '### İlgili CLI Komutları',
+    '- `aegis debug [error]`: Sokratik kanıt tabanlı hata ayıklama oturumu başlatır.',
+    '- `aegis loop:status`: Devre kesici sayaçlarını ve bloke görevleri inceler.',
+    '- `aegis loop:reset [id]`: Sayaçları sıfırlar ve görevi unblock eder.'
   ].join('\n')
 };

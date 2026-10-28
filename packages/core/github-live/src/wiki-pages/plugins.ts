@@ -1,3 +1,10 @@
+/**
+ * @file plugins.ts
+ * Consolidation notice for Plugin & Extensibility Architecture.
+ * Consolidated into master Architecture guide.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const PLUGINS_PAGE: WikiSuitePage = {
@@ -11,57 +18,15 @@ export const PLUGINS_PAGE: WikiSuitePage = {
   content: [
     '## 🧩 Eklenti Mimarisi & Genişletilebilirlik',
     '',
-    'Aegis, monolitik ve kapalı bir sistem yerine; geliştiricilerin ve açık kaynak topluluğunun yeni programlama dilleri, editörler ve iş akışları ekleyebileceği modüler bir eklenti mimarisine sahiptir.',
+    '> [!NOTE]',
+    '> Bu mimari bileşen, dokümantasyon bütünlüğü ve sadeleştirme amacıyla **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** altında birleştirilmiştir.',
     '',
-    '### 1. Dil Çıkarıcı Eklentileri (`LanguageExtractor`)',
-    'Farklı programlama dillerinde AST iskelet analizi yapabilmek için çekirdek koda dokunmadan yeni bir dil çıkarıcısı kaydedilebilir.',
+    'Aegis, geliştiricilerin ve açık kaynak topluluğunun yeni programlama dilleri, editörler ve iş akışları ekleyebileceği modüler bir eklenti yapısına sahiptir:',
     '',
-    'Her dil eklentisi standart `LanguageExtractor` arayüzünü uygular:',
-    '```typescript',
-    'export interface LanguageExtractor {',
-    '  readonly language: string;',
-    '  readonly fileExtensions: string[];',
-    '  canHandle(filePath: string): boolean;',
-    '  extractSkeleton(source: string, filePath: string): ExtractedSkeleton;',
-    '}',
-    '```',
+    '- **Dil Çıkarıcı Eklentileri (`LanguageExtractor`):** Çekirdek koda dokunmadan yeni diller için AST iskelet desteği sağlar (TS/JS, Python, GDScript, Rust, Go, C#).',
+    '- **Özel IDE Adaptörleri (`IdeAdapter`):** Farklı kod editörlerini Aegis orkestrasyonuna bağlar.',
+    '- **Sıfır-Token Topluluk RFC Boru Hattı (`aegis rfc:triage`):** GitHub Discussions üzerinden gelen topluluk RFC\'lerini otonom olarak ayrıştırıp kabul kriterlerine dönüştürür.',
     '',
-    'Topluluk dil eklentileri çalışma zamanında `ExtractorRegistry.register(new MyLanguageExtractor())` çağrısı ile sisteme dahil olur.',
-    '',
-    '#### Desteklenen Diller:',
-    '- **TypeScript / JavaScript:** Tip, arayüz ve sınıf yapılarını korur; gövdeleri kaldırır.',
-    '- **Python:** Fonksiyon ve sınıf imzalarını, decorator\'ları korur; gövdeyi `...` ile değiştirir.',
-    '- **GDScript:** Godot `@onready`, `@export`, sinyaller ve enum\'ları korur; gövdeleri `pass` yapar.',
-    '- **Rust:** `struct`, `impl`, `trait` ve `fn` imzalarını korur; gövdeleri çıkarır.',
-    '- **Go & C#:** Struct, interface ve metot imzalarını korur.',
-    '',
-    '---',
-    '',
-    '### 2. Özel IDE Adaptör Eklentileri (`IdeAdapter`)',
-    'Geliştiriciler kendi tercih ettikleri bir editörü Aegis orkestrasyonuna bağlamak için `IdeAdapter` arayüzünü uygular:',
-    '```typescript',
-    'export interface IdeAdapter {',
-    '  readonly id: string;',
-    '  readonly name: string;',
-    '  getConfigPath(projectRoot: string): string;',
-    '  configureIsolation(projectRoot: string): void;',
-    '  syncMcpConfig(projectRoot: string, mcpServers: Record<string, any>): void;',
-    '}',
-    '```',
-    '`IdeAdapterRegistry.register(new CustomEditorAdapter())` ile bağlanan editör, `aegis ide:sync` komutunda otomatik olarak taranır ve ayar izolasyonu uygulanır.',
-    '',
-    '---',
-    '',
-    '### 3. Sıfır-Token Topluluk RFC Boru Hattı (`aegis rfc:triage`)',
-    'Açık kaynak topluluğu GitHub Discussions üzerinden yeni bir özellik veya dil desteği önerdiğinde (`RFC`), Aegis bunu otonom olarak işler:',
-    '',
-    '1. **Ayrıştırma (`rfc:triage`):** RFC başlığı ve gövdesi analiz edilir; hedeflenen dosyalar ve bileşenler belirlenir.',
-    '2. **Kriter Çıkarımı:** 3-5 adet somut, test edilebilir kabul kriteri (acceptance criteria) otomatik olarak türetilir.',
-    '3. **NotebookLM Zemin Raporu:** Önerilen mimari kalıplar ve kütüphaneler için NotebookLM araştırma notu derlenir.',
-    '4. **GitHub Issue & Projects v2:** RFC onaylandığında doğrudan bir GitHub Issue\'ya dönüştürülür ve Kanban panosuna (`Todo`) yerleştirilir.',
-    '',
-    '```powershell',
-    'npm run aegis -- rfc:triage "RFC: Add Zig Language Extractor" "Support .zig files with AST skeleton mapping"',
-    '```'
+    'Detaylı sistem tasarımı ve arayüz sözleşmeleri için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** sayfasına bakınız.'
   ].join('\n')
 };

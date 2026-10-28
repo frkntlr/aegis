@@ -1,69 +1,40 @@
+/**
+ * @file godot-bridge.ts
+ * Consolidation notice for Godot Bridge Deep Integration.
+ * Consolidated into master Architecture guide.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const GODOT_BRIDGE_PAGE: WikiSuitePage = {
   slug: 'Godot-Bridge-Deep-Integration',
-  title: 'Godot 4.x Oyun Motoru Köprüsü & ClassDB Oracle',
+  title: 'Godot 4.x Oyun Motoru Köprüsü & Substrate 3.0',
   threeBullets: [
-    'ClassDB Oracle ile Godot 4 yerleşik sınıfları, metodları ve sinyalleri için sıfır-halüsinasyon doğrulaması.',
-    'Çift Yönlü JSON-RPC Sunucusu (Port 4242) ve Sıfır-Token BoundingBox UI Düzen Denetimi.',
-    'Multimodal Kalite Kapısı (aegis verify:task), Headless Playtesting ve GDScript Statik Doğrulama.'
+    'Godot Substrate 3.0: Çift yönlü WebSocket köprüsü, tek seferlik token el sıkışması ve deterministik port yönlendirme (6850..6853).',
+    'Derleyici Ön-Kontrolü (--check-only ~200ms), 3-Kademeli Test Piramidi ve Yetim Düğüm Bellek Radarı.',
+    'Sıfır-Token 4-En-Boy Oranlı Duyarlı UI Telemetrisi ve Playtest-Before-PR kalite kapısı.'
   ],
   content: [
-    '## 🎮 Godot 4.x Oyun Motoru Köprüsü (`@aegis/godot-bridge`)',
+    '## 🎮 Godot 4.x Oyun Motoru Köprüsü (Substrate 3.0)',
     '',
-    'Aegis, modern oyun geliştirme projelerinde yapay zekâ modellerinin yaşadığı sözdizimi karışıklıklarını ve halüsinasyonları önlemek için Godot 4.x motorunu derinlemesine destekler.',
+    '> [!NOTE]',
+    '> Bu mimari bileşen, dokümantasyon bütünlüğü ve sadeleştirme amacıyla **[[Architecture|Aegis Kapsamlı Mimari Rehberi (Bölüm 5)]]** altında birleştirilmiştir.',
     '',
-    '---',
+    'Aegis, modern oyun geliştirme projelerinde kör dosya manipülasyonu yerine canlı çalışan Godot motoruyla tam entegre Substrate 3.0 köprüsü sunar:',
     '',
-    '### 1. ClassDB Oracle (`aegis godot query <Class>`)',
-    'Yapay zekâ modelleri sıklıkla Godot 3 ile Godot 4 API\'lerini karıştırır veya var olmayan sinyal/metot isimleri uydurur.',
-    '- **Çevrimdışı ve Canlı Veritabanı:** Godot 4 motorunun tüm yerleşik sınıfları (`Node`, `Control`, `CharacterBody2D`, `Tween`, `Camera3D` vb.) metod ve sinyal imzalarıyla önbelleklenmiştir.',
-    '- **Sözdizimi Koruması:** Ajan kod yazarken veya GDScript doğrulanırken ClassDB Oracle referans alınır; geçersiz çağrılar anında yakalanır.',
+    '- **Çift Yönlü WebSocket Köprüsü:** Canlı motor içi durum manipülasyonu, sahne ağacı (`aegis_godot_tree`), sinyal sözleşmeleri (`aegis_godot_signals`) ve dinamik eval (`aegis_godot_eval`).',
+    '- **Deterministik Port Yönlendirici:** Paralel worktree\'lerin çakışmaması için sabit port rotası (solver: `6850`, qa: `6851`, docs: `6852`, ui: `6853`).',
+    '- **Derleyici Ön-Kontrolü (`aegis_godot_validate`):** `--headless --check-only` ile 200ms altında sözdizimi doğrulaması.',
+    '- **Yetim Düğüm Bellek Radarı:** Her test oturumunda sızan sahipsiz nesneleri anında yakalar.',
+    '- **Sıfır-Token UI Telemetrisi (`aegis_godot_inspect_ui`):** 4 standart çözünürlük oranında taşma ve minimum dokunma hedefi denetimi.',
     '',
-    '---',
+    'Detaylı şemalar ve Godot Substrate 3.0 araçları için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** sayfasına bakınız.',
     '',
-    '### 2. Çift Yönlü JSON-RPC Köprüsü (Port 4242)',
-    'Aegis, çalışan Godot editörü ve oyun örneği ile canlı TCP/JSON-RPC üzerinden haberleşir:',
-    '- Sahne ağacı telemetrisini ve runtime durumunu anlık çeker.',
-    '- Hata durumunda motor loglarını ve yığın izlerini yakalayarak Sokratik hata ayıklama motoruna aktarır.',
-    '',
-    '---',
-    '',
-    '### 3. Sıfır-Token BoundingBox UI Inspector (`aegis godot inspect`)',
-    'Arayüz elemanlarının (`Control`, `Container`, `Label`, `Button`) yerleşimlerini kontrol etmek için pahalı görsel modeller yerine matematiksel sınır kutusu analizi yapılır:',
-    '- UI bileşenlerinin çakışması (overlapping) ve görünüm alanı taşmaları (viewport overflow) 0 LLM token maliyetiyle tespit edilir.',
-    '- Çoklu en-boy oranları (16:9, 18:9, 21:9) `aegis.config.json` standartlarına göre otomatik test edilir.',
-    '',
-    '---',
-    '',
-    '### 4. Multimodal Kalite Kapısı & Playtest-Before-PR (`aegis verify:task`)',
-    'Pull Request açılmadan önce `Playtest-Before-PR` standardını uygular:',
-    '- Hedef sahneyi headless modda başlatır.',
-    '- Sanal girdi senaryolarını (klavye, fare tıklaması) koşturur.',
-    '- Runtime çökmelerini (crash) ve GDScript çalışma zamanı hatalarını raporlar.',
-    '- Hem Demir Kafes AST sınırlarını hem de headless playtesti tek komutta doğrular (`aegis verify:task`).',
-    '',
-    '---',
-    '',
-    '### 5. GDScript Statik Doğrulama & DocTool Senkronizasyonu',
-    '- **`aegis godot validate <dosya>`:** Tip güvenliği, sinyal tanımları, isimlendirme kuralları ve Demir Kafes GDScript sınırlarını denetler.',
-    '- **`aegis godot doctool`:** Godot yerleşik dokümantasyonunu motorla senkronize eder.',
-    '- **`aegis godot init`:** Projeye `addons/aegis_bridge/` köprü eklentisini kurar ve `project.godot` yapılandırmasını tamamlar.',
-    '',
-    '---',
-    '',
-    '### 💻 Godot Köprüsü CLI Komutları',
-    '',
-    '| Komut | Açıklama |',
-    '|---|---|',
-    '| `aegis godot init` | Godot projesine Aegis Bridge eklentisini kurar. |',
-    '| `aegis godot status` | Godot editörü ve RPC bağlantı durumunu kontrol eder. |',
-    '| `aegis godot query <Sınıf>` | ClassDB Oracle üzerinden sınıf API\'sini sorgular. |',
-    '| `aegis godot validate <dosya>` | GDScript dosyasını statik olarak doğrular. |',
-    '| `aegis godot inspect` | Sahne ağacını ve UI kontrol düğümlerini sıfır-token ile denetler. |',
-    '| `aegis godot run <sahne>` | Belirtilen sahneyi Godot motorunda çalıştırır. |',
-    '| `aegis godot doctool` | Godot motor dokümantasyonunu senkronize eder. |',
-    '| `aegis godot playtest <sahne>` | Sahneyi headless modda başlatıp otomatik test senaryolarını koşturur. |',
-    '| `aegis verify:task [dosya]` | Demir Kafes AST ve Headless Playtesti bir arada doğrular. |'
+    '### İlgili CLI Komutları',
+    '- `aegis godot status`: Godot motor yolu ve köprü bağlantı durumunu raporlar.',
+    '- `aegis godot validate <dosya>`: GDScript dosyasını motor derleyicisiyle doğrular.',
+    '- `aegis godot inspect`: Sıfır-token BoundingBox UI analizi yapar.',
+    '- `aegis verify:task [dosya]`: Demir Kafes ve Headless Playtesti bir arada doğrular.'
   ].join('\n')
 };

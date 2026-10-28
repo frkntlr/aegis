@@ -1,10 +1,16 @@
+/**
+ * @file rfc-index.ts
+ * RFC Index page for Aegis Living Memory Wiki.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const RFC_INDEX_PAGE: WikiSuitePage = {
   slug: 'RFC-Index',
   title: 'Aegis Yaşayan Mimari RFC & Karar Kayıtları Dizini',
   threeBullets: [
-    'Aegis Çekirdek Motorunun Onaylanmış 34 Mimari Tasarım Belgesi (RFC-001 - RFC-034).',
+    'Aegis Çekirdek Motorunun Onaylanmış 35 Mimari Tasarım Belgesi (RFC-001 - RFC-035).',
     'Açık Kaynak Topluluk Fikirleri ile Temiz-Oda Wiki Mimarisi Arasındaki Çift Yönlü Köprü.',
     'Demir Kafes Standartları ve Kabul Kriterleriyle Doğrulanmış Üretim Spesifikasyonları.'
   ],
@@ -23,7 +29,7 @@ export const RFC_INDEX_PAGE: WikiSuitePage = {
     '',
     '---',
     '',
-    '### 📚 Onaylanmış Çekirdek RFC Dokümanları (RFC-001 - RFC-034)',
+    '### 📚 Onaylanmış Çekirdek RFC Dokümanları (RFC-001 - RFC-035)',
     '',
     '| RFC No | Başlık ve Mimari Kapsam | Durum | Wiki Bağlantısı |',
     '|---|---|---|---|',
@@ -60,6 +66,7 @@ export const RFC_INDEX_PAGE: WikiSuitePage = {
     '| **RFC-031** | **CLI Test Suite Acceleration:** Süreç üretiminin elenmesi ve kapsamlı bellek soğuk başlangıcı ile test hızlandırma. | `Accepted / Implemented` | [[RFC-031-cli-test-suite-acceleration-process-spawn-elimination-and-scoped-memory-cold-start]] |',
     '| **RFC-032** | **Deterministic Incremental Caching for Demir Kafes (Fast-Stat Radar):** mtime ve dosya boyutu radarıyla anlık cage:check denetimi. | `Accepted / Implemented` | [[RFC-032-deterministic-incremental-caching-for-demir-kafes-cagecheck-via-fast-stat-cache-radar]] |',
     '| **RFC-033** | **Monorepo TypeScript Project References & Incremental Build Engine:** composite: true ve Turborepo ile derleme süresinin %80 kısaltılması. | `Accepted / Implemented` | [[RFC-033-monorepo-typescript-project-references-turborepo-optimization]] |',
-    '| **RFC-034** | **Google Antigravity & Aegis Bidirectional Orchestration & TIP Bridge:** Evrensel CLI (aegis), Task Ingestion Protocol ve 19 MCP aracı. | `Accepted / Implemented` | [[RFC-034-google-antigravity-bidirectional-orchestration-and-task-bridge]] |'
+    '| **RFC-034** | **Google Antigravity & Aegis Bidirectional Orchestration & TIP Bridge:** Evrensel CLI (aegis), Task Ingestion Protocol ve 19 MCP aracı. | `Accepted / Implemented` | [[RFC-034-google-antigravity-bidirectional-orchestration-and-task-bridge]] |',
+    '| **RFC-035** | **Godot Substrate 3.0 Full Lifecycle Engine Harness & Quality Gates:** Canlı WebSocket RPC köprüsü, ClassDB Oracle, deterministik port yönlendirme, derleyici ön-kontrolü, 27-araçlık MCP ve UI telemetrisi. | `Accepted / Implemented` | [[RFC-035-godot-substrate-3-0-full-lifecycle-engine-harness-and-quality-gates]] |'
   ].join('\n')
 };

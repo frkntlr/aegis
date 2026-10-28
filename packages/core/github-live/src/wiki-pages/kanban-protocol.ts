@@ -1,66 +1,40 @@
+/**
+ * @file kanban-protocol.ts
+ * Consolidation notice for Autonomous Kanban & TIP Protocol.
+ * Consolidated into master Architecture guide.
+ * Demir Kafes: <300 lines/file, <40 lines/function.
+ */
+
 import type { WikiSuitePage } from '../types.js';
 
 export const KANBAN_PROTOCOL_PAGE: WikiSuitePage = {
   slug: 'Autonomous-Kanban-Protocol',
   title: 'GitHub Projects v2 & Otonom Görev Protokolü (TIP)',
   threeBullets: [
-    'GitHub Projects v2 (Project 4) ile canlı GraphQL iki yönlü görev senkronizasyonu.',
+    'GitHub Projects v2 ile canlı GraphQL iki yönlü görev senkronizasyonu.',
     'Task Ingestion Protocol (TIP): .aegis/task-inbox.json staged görev köprüsü ve çekme tabanlı mimari.',
     'Görev Yaşam Döngüsü (ready -> in_progress -> review -> done), Kendi Kendini Onaran Nöbetçi ve Devre Kesici.'
   ],
   content: [
     '## 📋 GitHub Projects v2 & Otonom Görev Protokolü (TIP)',
     '',
-    'Aegis, görev yönetiminde yerel geçici listeler yerine doğrudan kurumsal **GitHub Projects v2** panosunu ve **Task Ingestion Protocol (TIP)** çekme tabanlı görev boru hattını tek doğruluk kaynağı (single source of truth) olarak kullanır.',
+    '> [!NOTE]',
+    '> Bu mimari bileşen, dokümantasyon bütünlüğü ve sadeleştirme amacıyla **[[Architecture|Aegis Kapsamlı Mimari Rehberi (Bölüm 3)]]** altında birleştirilmiştir.',
     '',
-    '---',
+    'Aegis, görev yönetiminde geçici listeler yerine kurumsal GitHub Projects v2 ve Task Ingestion Protocol (TIP) çekme tabanlı görev boru hattını uygular:',
     '',
-    '### 1. Çekme Tabanlı Görev Dağıtım Protokolü (Task Ingestion Protocol)',
-    'Aegis, karmaşık çoklu ajan ortamlarında görev kirliliğini önlemek için `.aegis/task-inbox.json` üzerinde iki aşamalı protokol uygular:',
+    '- **Çekme Tabanlı TIP:** Görevler `aegis task:inject` ile `.aegis/task-inbox.json` içine hazırlanır; ajanlar `task_inbox_pull` ile atomik olarak çeker.',
+    '- **Atomik Dosya Kilitleri:** Görevi alan ajan hedef dosyaları `.aegis/locks.json` ile kilitler; eşzamanlı çakışmalar engellenir.',
+    '- **Görev Yaşam Döngüsü:** `ready` -> `in_progress` -> `review` -> `done` (veya Circuit Breaker ile `blocked`).',
+    '- **Aegis Web Komuta Merkezi Panosu (`localhost:3000`):** Canlı drag-and-drop Kanban, SSE olay akışı ve aktif ajan oturum takibi.',
+    '- **Kendi Kendini İyileştirme:** Sahipsiz veya terk edilmiş `in_progress` görevleri otomatik tespit edilerek `ready` kuyruğuna iade edilir.',
     '',
-    '1. **Görev Hazırlama ve Enjeksiyon (`aegis task:inject <id> [agent]`):** Hedef GitHub Issue için AST iskeletleri, Context7 zemin dokümantasyonu ve anayasal kurallar derlenerek cerrahi prompt oluşturulur ve sahnelenir.',
-    '2. **Atomik Görev Çekme (`aegis task:pull [agent]` / `task_inbox_pull`):** Ajan hazır olduğunda rolüne uygun görevi çeker; eşzamanlı çakışmalar engellenir.',
-    '3. **Kilit Edinme (`aegis task:claim <id> [agent]`):** Görev `in_progress` yapılır ve çalışılacak hedef dosyalar `.aegis/locks.json` ile kilitlenir.',
-    '4. **Görev Teslimi (`aegis task:release <id> [status]`):** Görev tamamlandığında dosya kilitleri çözülür, durum güncellenir.',
+    'Detaylı şemalar ve TIP protokol akışı için **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]** sayfasına bakınız.',
     '',
-    '```powershell',
-    '# Görev kuyruğunu listeleme',
-    'aegis task:list',
-    '',
-    '# Görevi sahneleme ve çekme',
-    'aegis task:inject 42 solver',
-    'aegis task:pull solver',
-    '```',
-    '',
-    '---',
-    '',
-    '### 2. Görev Durum Yaşam Döngüsü (Task Lifecycle)',
-    '',
-    '| Durum | GitHub Kolonu | Anlamı ve İşleyişi |',
-    '|---|---|---|',
-    '| **`ready`** | **Todo** | Kabul kriterleri tanımlanmış, boşta duran ve herhangi bir ajan tarafından üstlenilmeye hazır görev. |',
-    '| **`in_progress`** | **In Progress** | Bir ajan (Solver/QA/Docs/UI) tarafından üstlenilmiş; hedef dosyalar `lock:<dosya>` ile kilitlenmiş görev. |',
-    '| **`review`** | **In Progress** | TDD testleri ve Demir Kafes denetimi yerel worktree\'de geçmiş; 4 adımlı atomik merge bekleyen görev. |',
-    '| **`done`** | **Done** | Ana dala birleştirilmiş, test edilmiş, Issue\'su kapatılmış ve panoda Done kolonuna taşınmış görev. |',
-    '| **`blocked`** | **Blocked / Todo** | Ardışık 3 kez hata vererek Loop Breaker tetiklemiş; kilitleri açılmış ve hata telemetrisi Issue\'ya yazılmış görev. |',
-    '',
-    '---',
-    '',
-    '### 3. Aegis Web Komuta Merkezi Panosu (`localhost:3000`)',
-    '`aegis dashboard` çalıştırıldığında yerel makinede modern bir web arayüzü açılır:',
-    '',
-    '1. **Canlı Sürükle-Bırak (Drag-and-Drop) Kanban:** Kartları sütunlar arasında sürüklemek, anında GitHub Projects v2 API\'sini tetikleyerek uzaktaki panoyu günceller.',
-    '2. **Ajan Oturum Algılayıcısı (`SessionDetector`):** Hangi worktree\'de hangi ajanın aktif olduğunu, son kalp atışı (heartbeat) ve açık dosya kilitlerini canlı gösterir.',
-    '3. **SSE Olay Akışı (`/api/events`):** Sıfır gecikmeli sunucu-taraflı telemetri akışı sağlar.',
-    '4. **Devre Kesici Yönetimi (`aegis loop:status`, `aegis loop:reset`):** Hata döngüsüne girip bloke olan görevleri kurtarır.',
-    '5. **Project Hub:** Çoklu proje depoları arasında tek tıkla geçiş yapmayı sağlar.',
-    '',
-    '---',
-    '',
-    '### 4. Hayalet Görevleri Önleme & Kendi Kendini İyileştirme',
-    'Aegis CLI `auto` döngüsünde ya da Web Komuta Merkezi senkronizasyonunda:',
-    '- Sahipsiz `in_progress` görevleri otomatik tespit edilir.',
-    '- Kilit tutmayan veya oturumu kapanmış ajanların görevleri `ready` durumuna iade edilir.',
-    '- Bu sayede sistemde hiçbir görev sonsuza kadar "in progress" kalmaz.'
+    '### İlgili CLI Komutları',
+    '- `aegis task:list [status]`: TIP görev kuyruğunu listeler.',
+    '- `aegis task:pull [agent]`: Sıradaki görevi atomik çeker.',
+    '- `aegis lock:status`: Aktif dosya kilitlerini raporlar.',
+    '- `aegis dashboard [port]`: Web Komuta Merkezi panosunu başlatır.'
   ].join('\n')
 };
