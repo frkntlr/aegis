@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
 export interface DiscoveredSkill {
   name: string;
@@ -222,26 +223,13 @@ export class UniversalToolchainSync {
   }
 
   private writeAegisMcpSchemas(dir: string): void {
-    const tools: Record<string, { desc: string; props: Record<string, unknown>; req: string[] }> = {
-      ast_search: { desc: 'Structural AST search via ast-grep', props: { pattern: { type: 'string' }, path: { type: 'string' } }, req: ['pattern'] },
-      ast_replace: { desc: 'Structural AST replace via ast-grep', props: { pattern: { type: 'string' }, rewrite: { type: 'string' }, file: { type: 'string' } }, req: ['pattern', 'rewrite', 'file'] },
-      rtk_compress: { desc: 'Compress terminal and test logs via RTK Token Killer', props: { text: { type: 'string' } }, req: ['text'] },
-      context7_query: { desc: 'Query official library documentation', props: { library: { type: 'string' }, topic: { type: 'string' } }, req: ['library', 'topic'] },
-      cage_check: { desc: 'Audit Demir Kafes compliance', props: { dir: { type: 'string' } }, req: [] },
-      triage: { desc: 'Evidence-Based Bug Triage', props: { dir: { type: 'string' } }, req: [] },
-      find_symbol: { desc: 'AST symbol lookup & surgical slice', props: { symbol: { type: 'string' } }, req: ['symbol'] },
-      trace_relational: { desc: 'Trace relational callers and signal listeners', props: { target: { type: 'string' } }, req: ['target'] },
-      memory_query: { desc: 'Query 5-layer codebase memory', props: { symbol: { type: 'string' }, worktreeId: { type: 'string' } }, req: ['symbol'] },
-      memory_stats: { desc: 'Codebase memory diagnostics', props: { worktreeId: { type: 'string' } }, req: [] },
-      task_list: { desc: 'List ready, in_progress, or blocked tasks in TIP queue', props: { status: { type: 'string' } }, req: [] },
-      task_claim: { desc: 'Claim a task for an agent role and acquire file locks', props: { issueNumber: { type: 'number' }, agentRole: { type: 'string' } }, req: ['issueNumber'] },
-      task_release: { desc: 'Release or complete a task and release file locks', props: { issueNumber: { type: 'number' }, status: { type: 'string' }, agentRole: { type: 'string' } }, req: ['issueNumber'] },
-      task_inbox_pull: { desc: 'Pull staged task from TIP inbox', props: { agentRole: { type: 'string' } }, req: [] },
-      lock_status: { desc: 'Inspect active file mutex locks across worktrees', props: {}, req: [] }
-    };
-    for (const [name, meta] of Object.entries(tools)) {
-      const schema = { name, description: meta.desc, parameters: { properties: meta.props, required: meta.req, type: 'object' } };
-      fs.writeFileSync(path.join(dir, name + ".json"), JSON.stringify(schema, null, 2), 'utf8');
+    for (const [name, meta] of Object.entries(AEGIS_TOOL_SCHEMAS)) {
+      const schema = {
+        name,
+        description: meta.desc,
+        parameters: { properties: meta.props, required: meta.req, type: 'object' }
+      };
+      fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(schema, null, 2), 'utf8');
     }
   }
 

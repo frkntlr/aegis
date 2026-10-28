@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { UniversalToolchainSync } from './toolchain-sync.js';
+import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
 test('UniversalToolchainSync discovers skills and executes cross-IDE synchronization', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-sync-test-'));
@@ -50,7 +51,6 @@ test('UniversalToolchainSync falls back to mcp.example.json when mcp.json is mis
   }
 });
 
-
 test('UniversalToolchainSync updates .cursorrules dynamically when skills change', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cursor-update-'));
   try {
@@ -68,7 +68,6 @@ test('UniversalToolchainSync updates .cursorrules dynamically when skills change
     assert.ok(content1.includes('new-skill'));
     assert.ok(content1.includes('Some custom rule.'));
 
-    // Add a second skill
     const skill2Dir = path.join(tmpDir, '.agents', 'skills', 'second-skill');
     fs.mkdirSync(skill2Dir, { recursive: true });
     fs.writeFileSync(path.join(skill2Dir, 'SKILL.md'), '---\nname: second-skill\ndescription: Second dynamic skill\n---\n# Doc', 'utf8');
@@ -129,6 +128,7 @@ test('UniversalToolchainSync includes Godot Engine when project.godot is present
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
 test('UniversalToolchainSync automatically registers ast-grep and context7 MCP servers', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mcp-defaults-'));
   try {
@@ -141,4 +141,17 @@ test('UniversalToolchainSync automatically registers ast-grep and context7 MCP s
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test('AEGIS_TOOL_SCHEMAS contains exactly 27 authoritative tools including Godot Substrate 3.0', () => {
+  const toolNames = Object.keys(AEGIS_TOOL_SCHEMAS);
+  assert.strictEqual(toolNames.length, 27);
+  assert.ok(toolNames.includes('aegis_godot_status'));
+  assert.ok(toolNames.includes('aegis_godot_playtest'));
+  assert.ok(toolNames.includes('aegis_godot_inspect_ui'));
+  assert.ok(toolNames.includes('aegis_godot_tree'));
+  assert.ok(toolNames.includes('aegis_godot_signals'));
+  assert.ok(toolNames.includes('aegis_godot_screenshot'));
+  assert.ok(toolNames.includes('aegis_godot_validate'));
+  assert.ok(toolNames.includes('aegis_godot_eval'));
 });

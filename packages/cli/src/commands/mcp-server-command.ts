@@ -7,6 +7,7 @@ import { RTKTokenKiller } from '@aegis/watchdog';
 import { IronCageValidator, EvidenceBasedTriageGate, LineBudgetRadar } from '@aegis/iron-cage';
 import { PolyglotStackTraceParser, SymptomClassifier, SymbioticDiagnosticTriangulator, DynamicHypothesisGenerator } from '@aegis/dialogue-engine';
 import { WorktreeManager } from '@aegis/orchestrator';
+import { GodotMcpProvider } from '@aegis/godot-bridge';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
 import { mcpTaskList, mcpTaskClaim, mcpTaskRelease, mcpTaskInboxPull, mcpLockStatus } from './task-commands.js';
@@ -18,7 +19,7 @@ interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
-export const MCP_TOOLS = [
+const CORE_MCP_TOOLS = [
   { name: 'memory_query', description: '5-Layer Codebase Memory query (AST, callers, callees, locks)', inputSchema: { type: 'object', properties: { symbol: { type: 'string' }, worktreeId: { type: 'string' } }, required: ['symbol'] } },
   { name: 'memory_stats', description: 'Codebase Memory diagnostics & token savings', inputSchema: { type: 'object', properties: { worktreeId: { type: 'string' } } } },
   { name: 'find_symbol', description: 'Fast AST symbol lookup and precision surgical slice', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
@@ -38,6 +39,15 @@ export const MCP_TOOLS = [
   { name: 'task_release', description: 'Release or complete a task and release file locks', inputSchema: { type: 'object', properties: { issueNumber: { type: 'number' }, status: { type: 'string' }, agentRole: { type: 'string' } }, required: ['issueNumber'] } },
   { name: 'task_inbox_pull', description: 'Pull the next staged autonomous task payload from .aegis/task-inbox.json', inputSchema: { type: 'object', properties: { agentRole: { type: 'string' } } } },
   { name: 'lock_status', description: 'Inspect active file mutex locks across worktrees', inputSchema: { type: 'object', properties: {} } }
+];
+
+export const MCP_TOOLS = [
+  ...CORE_MCP_TOOLS,
+  ...GodotMcpProvider.getToolDefinitions().map(t => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: t.parameters
+  }))
 ];
 
 function resolveFilePath(fp: string): string {
@@ -100,13 +110,7 @@ function executeAstTool(name: string, args: Record<string, unknown>): string {
     if (!fs.existsSync(fp)) return JSON.stringify({ error: `File not found: ${rawFp}` });
     const content = fs.readFileSync(fp, 'utf8');
     const res = new SkeletonGenerator().extractFile(fp, content);
-    return JSON.stringify({
-      filePath: fp,
-      skeleton: res.skeletonContent,
-      tokenSavingsPercent: res.tokenSavingsPercent,
-      originalLength: res.originalLength,
-      skeletonLength: res.skeletonLength
-    }, null, 2);
+    return JSON.stringify({ filePath: fp, skeleton: res.skeletonContent, tokenSavingsPercent: res.tokenSavingsPercent, originalLength: res.originalLength, skeletonLength: res.skeletonLength }, null, 2);
   }
   return JSON.stringify({ error: `Unknown AST tool: ${name}` });
 }
@@ -118,15 +122,7 @@ function executeQualityTool(name: string, args: Record<string, unknown>): string
     if (!fs.existsSync(fp)) return JSON.stringify({ filePath: rawFp, fileLines: 0, maxFileLines: 300, fileQuotaRemaining: 300, status: 'SAFE' });
     const content = fs.readFileSync(fp, 'utf8');
     const analysis = LineBudgetRadar.analyze(fp, content);
-    return JSON.stringify({
-      filePath: fp,
-      fileLines: analysis.fileLines,
-      maxFileLines: analysis.maxFileLines,
-      fileQuotaRemaining: analysis.fileQuotaRemaining,
-      status: analysis.status,
-      mustDecompose: analysis.fileQuotaRemaining < 15 || analysis.status === 'CRITICAL_QUOTA',
-      advice: analysis.advice?.recommendedAction ?? analysis.formattedReport
-    }, null, 2);
+    return JSON.stringify({ filePath: fp, fileLines: analysis.fileLines, maxFileLines: analysis.maxFileLines, fileQuotaRemaining: analysis.fileQuotaRemaining, status: analysis.status, mustDecompose: analysis.fileQuotaRemaining < 15 || analysis.status === 'CRITICAL_QUOTA', advice: analysis.advice?.recommendedAction ?? analysis.formattedReport }, null, 2);
   }
   if (name === 'cage_check') {
     const files = collectSourceFiles(String(args.dir || 'packages'));
@@ -150,20 +146,13 @@ function executeQualityTool(name: string, args: Record<string, unknown>): string
 function executeUtilityTool(name: string, args: Record<string, unknown>): string {
   if (name === 'socratic_diagnose') {
     const rawLog = String(args.rawLog || '');
-    const parser = new PolyglotStackTraceParser();
-    const parsed = parser.parse(rawLog);
+    const parsed = new PolyglotStackTraceParser().parse(rawLog);
     const category = SymptomClassifier.classify(rawLog);
     let boundaryOpt: ReturnType<typeof SymbioticDiagnosticTriangulator.toClarificationOption> | undefined;
     if (args.callSiteCode && args.library && args.symbol) {
       const diag = SymbioticDiagnosticTriangulator.triangulate({
         callSiteCode: String(args.callSiteCode),
-        contract: {
-          library: String(args.library),
-          symbol: String(args.symbol),
-          expectedSignature: args.expectedSignature ? String(args.expectedSignature) : undefined,
-          isDeprecated: Boolean(args.isDeprecated),
-          deprecationNotice: args.deprecationNotice ? String(args.deprecationNotice) : undefined
-        },
+        contract: { library: String(args.library), symbol: String(args.symbol), expectedSignature: args.expectedSignature ? String(args.expectedSignature) : undefined, isDeprecated: Boolean(args.isDeprecated), deprecationNotice: args.deprecationNotice ? String(args.deprecationNotice) : undefined },
         runtimeError: rawLog
       });
       boundaryOpt = SymbioticDiagnosticTriangulator.toClarificationOption(diag);
@@ -187,7 +176,10 @@ function executeUtilityTool(name: string, args: Record<string, unknown>): string
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }
 
-export function executeMcpTool(name: string, args: Record<string, unknown> = {}): string {
+export async function executeMcpTool(name: string, args: Record<string, unknown> = {}): Promise<string> {
+  if (name.startsWith('aegis_godot_')) {
+    return GodotMcpProvider.handleToolCall(name, args);
+  }
   const engine = getSharedMemoryEngine();
   if (name.startsWith('memory_') || name === 'find_symbol' || name === 'trace_relational') {
     return executeMemoryTool(name, args, engine);
@@ -206,18 +198,14 @@ export function executeMcpTool(name: string, args: Record<string, unknown> = {})
   return executeUtilityTool(name, args);
 }
 
-export function handleJsonRpc(req: JsonRpcRequest): Record<string, unknown> | null {
+export async function handleJsonRpc(req: JsonRpcRequest): Promise<Record<string, unknown> | null> {
   if (req.method === 'notifications/initialized') return null;
 
   if (req.method === 'initialize') {
     return {
       jsonrpc: '2.0',
       id: req.id,
-      result: {
-        protocolVersion: '2024-11-05',
-        capabilities: { tools: {} },
-        serverInfo: { name: 'aegis', version: '0.1.0' }
-      }
+      result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aegis', version: '0.1.0' } }
     };
   }
 
@@ -229,7 +217,7 @@ export function handleJsonRpc(req: JsonRpcRequest): Record<string, unknown> | nu
     const params = req.params || {};
     const toolName = String(params.name || '');
     const toolArgs = (params.arguments || {}) as Record<string, unknown>;
-    const textResult = executeMcpTool(toolName, toolArgs);
+    const textResult = await executeMcpTool(toolName, toolArgs);
     return { jsonrpc: '2.0', id: req.id, result: { content: [{ type: 'text', text: textResult }] } };
   }
 
@@ -238,12 +226,12 @@ export function handleJsonRpc(req: JsonRpcRequest): Record<string, unknown> | nu
 
 export function startMcpServer(): void {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
-  rl.on('line', (line) => {
+  rl.on('line', async (line) => {
     const trimmed = line.trim();
     if (!trimmed) return;
     try {
       const req = JSON.parse(trimmed) as JsonRpcRequest;
-      const res = handleJsonRpc(req);
+      const res = await handleJsonRpc(req);
       if (res) process.stdout.write(JSON.stringify(res) + '\n');
     } catch (_e: unknown) {
       const err = { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } };

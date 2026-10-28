@@ -55,6 +55,7 @@ Directly run `aegis <command>` via `run_command` (no `npm run` wrapper needed):
 | `/aegis trace <target>` | Trace relational callers, signal listeners & scenes | `aegis trace <target>` |
 | `/aegis graph:scan [dir]` | Build cross-reference relational knowledge graph | `aegis graph:scan [dir]` |
 | `/aegis godot <subcmd>` | Godot Bridge: status, inspect, validate, query, run | `aegis godot <subcmd>` |
+| `/aegis godot:test [dir]` | Run Godot compiler pre-flight and 3-tier playtest runner | `aegis godot:test [dir]` |
 | `/aegis diff <diff>` | Validate surgical unified diff compliance | `aegis diff <diff>` |
 | `/aegis audit <files>` | Run Immutable Oracle trust verification | `aegis audit <files>` |
 | `/aegis ast:search <pat> [dir]` | Structural AST search via Aegis internal ast-grep | `aegis ast:search <pat> [dir]` |
@@ -85,8 +86,10 @@ Directly run `aegis <command>` via `run_command` (no `npm run` wrapper needed):
 5. **Multimodal Quality Gate (Playtest-Before-PR)**:
    - Never open a PR without running `aegis verify:task` or verifying headless runtime playtest on Godot projects.
    - Code must pass 100% unit tests, Demir Kafes rules, and zero runtime crashes.
-6. **Headless Git Safety**: `$env:GIT_TERMINAL_PROMPT=0` mandatory; git push requires prior auth verification and explicit permission.
-7. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
-8. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.
-9. **Anti-Hang Guard (Never use npx ast-grep)**: Unscoped `ast-grep` on npm is an obsolete 2018 package that hangs waiting on STDIN. Always use `/aegis ast:search` or `aegis ast:search` (or `aegis ast-grep` / `aegis sg`).
-10. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.
+6. **Authoritative 27-Tool MCP Server**:
+   - Aegis exposes 27 authoritative tools directly to Antigravity, replacing legacy external bloated MCP servers with zero-token UI inspection, native `--check-only` compiler pre-flight, and deterministic port allocation.
+7. **Headless Git Safety**: `$env:GIT_TERMINAL_PROMPT=0` mandatory; git push requires prior auth verification and explicit permission.
+8. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
+9. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.
+10. **Anti-Hang Guard (Never use npx ast-grep)**: Unscoped `ast-grep` on npm is an obsolete 2018 package that hangs waiting on STDIN. Always use `/aegis ast:search` or `aegis ast:search` (or `aegis ast-grep` / `aegis sg`).
+11. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.
