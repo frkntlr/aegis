@@ -28,11 +28,14 @@ export interface TestExecutionResult {
 }
 
 export class GodotTestRunner {
+  private static extractOrphanDelta(stdout: string): number | undefined {
+    const orphanMatch = stdout.match(/ORPHAN_NODES_DELTA:\s*(\d+)/);
+    return orphanMatch ? parseInt(orphanMatch[1], 10) : undefined;
+  }
+
   public static async checkSyntax(scriptPath: string, godotBinary?: string): Promise<SyntaxCheckResult> {
     const install = GodotLocator.findGodot(godotBinary);
-    if (!install) {
-      return { valid: false, error: 'Godot binary not found', output: '' };
-    }
+    if (!install) return { valid: false, error: 'Godot binary not found', output: '' };
 
     const absPath = path.resolve(scriptPath);
     const args = ['--headless', '--check-only', '-s', absPath];
@@ -62,35 +65,13 @@ export class GodotTestRunner {
     }
 
     const start = Date.now();
-    const args = [
-      '--headless',
-      '--path', projectDir,
-      '--display-driver', 'headless',
-      '--rendering-driver', 'dummy',
-      '--audio-driver', 'Dummy',
-      '-s', scriptPath
-    ];
-
+    const args = ['--headless', '--path', projectDir, '--display-driver', 'headless', '--rendering-driver', 'dummy', '--audio-driver', 'Dummy', '-s', scriptPath];
     const res = await GodotProcessWatchdog.executeWithWatchdog(install.binaryPath, args, { timeoutMs });
     const durationMs = Date.now() - start;
-    const passed = res.exitCode === 0 && !res.timedOut && !res.stderr.includes('SCRIPT ERROR:');
+    const orphanDelta = this.extractOrphanDelta(res.stdout);
+    const passed = res.exitCode === 0 && !res.timedOut && !res.stderr.includes('SCRIPT ERROR:') && (orphanDelta === undefined || orphanDelta === 0);
 
-    // Extract orphan node count if printed
-    let orphanNodesDelta: number | undefined;
-    const orphanMatch = res.stdout.match(/ORPHAN_NODES_DELTA:\s*(\d+)/);
-    if (orphanMatch) {
-      orphanNodesDelta = parseInt(orphanMatch[1], 10);
-    }
-
-    return {
-      passed: passed && (orphanNodesDelta === undefined || orphanNodesDelta === 0),
-      exitCode: res.exitCode,
-      durationMs,
-      stdout: res.stdout,
-      stderr: res.stderr,
-      orphanNodesDelta,
-      timedOut: res.timedOut
-    };
+    return { passed, exitCode: res.exitCode, durationMs, stdout: res.stdout, stderr: res.stderr, orphanNodesDelta: orphanDelta, timedOut: res.timedOut };
   }
 
   public static async runPlaytestScenario(
@@ -115,10 +96,9 @@ export class GodotTestRunner {
     const start = Date.now();
     const res = await GodotProcessWatchdog.executeWithWatchdog(install.binaryPath, ['--path', projectDir, ...args], { timeoutMs: 20000 });
     const durationMs = Date.now() - start;
-    const passed = res.exitCode === 0 && !res.timedOut;
 
     return {
-      passed,
+      passed: res.exitCode === 0 && !res.timedOut,
       exitCode: res.exitCode,
       durationMs,
       stdout: res.stdout,

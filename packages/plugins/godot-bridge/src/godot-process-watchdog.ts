@@ -20,6 +20,31 @@ export interface SpawnAndMonitorResult {
 }
 
 export class GodotProcessWatchdog {
+  private static wireProcessStreams(
+    cp: child_process.ChildProcess,
+    timer: NodeJS.Timeout,
+    options: WatchdogOptions,
+    resolve: (res: SpawnAndMonitorResult) => void
+  ): void {
+    let stdout = '';
+    let stderr = '';
+
+    cp.stdout?.on('data', (d) => { stdout += d.toString('utf8'); });
+    cp.stderr?.on('data', (d) => { stderr += d.toString('utf8'); });
+
+    cp.on('close', (code, signal) => {
+      clearTimeout(timer);
+      if (code !== 0 && options.onCrash) options.onCrash(code, signal, stderr);
+      resolve({ exitCode: code, timedOut: false, stdout, stderr });
+    });
+
+    cp.on('error', (err) => {
+      clearTimeout(timer);
+      stderr += `\nSPAWN_ERROR: ${err.message}`;
+      resolve({ exitCode: 1, timedOut: false, stdout, stderr });
+    });
+  }
+
   public static async executeWithWatchdog(
     binaryPath: string,
     args: string[],
@@ -28,37 +53,18 @@ export class GodotProcessWatchdog {
     const timeoutMs = options.timeoutMs ?? 15000;
 
     return new Promise((resolve) => {
-      let stdout = '';
-      let stderr = '';
-      let timedOut = false;
-
       const cp = child_process.spawn(binaryPath, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true
       });
 
       const timer = setTimeout(() => {
-        timedOut = true;
         if (options.onTimeout && cp.pid) options.onTimeout(cp.pid);
         this.killProcessTree(cp.pid);
+        resolve({ exitCode: 1, timedOut: true, stdout: '', stderr: 'Execution timed out' });
       }, timeoutMs);
 
-      cp.stdout?.on('data', (d) => { stdout += d.toString('utf8'); });
-      cp.stderr?.on('data', (d) => { stderr += d.toString('utf8'); });
-
-      cp.on('close', (code, signal) => {
-        clearTimeout(timer);
-        if (code !== 0 && !timedOut && options.onCrash) {
-          options.onCrash(code, signal, stderr);
-        }
-        resolve({ exitCode: code, timedOut, stdout, stderr });
-      });
-
-      cp.on('error', (err) => {
-        clearTimeout(timer);
-        stderr += `\nSPAWN_ERROR: ${err.message}`;
-        resolve({ exitCode: 1, timedOut, stdout, stderr });
-      });
+      this.wireProcessStreams(cp, timer, options, resolve);
     });
   }
 

@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { handleAstSearch, handleAstReplace } from './ast-grep-command.js';
 import { handleRtkCompress } from './rtk-command.js';
 import { handleContext7Query } from './context7-command.js';
-import { handleMemoryQuery } from './memory-command.js';
+import { handleMemoryQuery, getSharedMemoryEngine } from './memory-command.js';
 
 test('handleAstSearch and handleAstReplace execute without error and transform target files', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ast-cmd-test-'));
@@ -77,6 +77,16 @@ test('handleMemoryQuery injects surgical Ground-Truth without ecosystem bleeding
   console.log = (...args: unknown[]) => { output += args.join(' ') + '\n'; };
 
   try {
+    const engine = getSharedMemoryEngine();
+    const candidates = [
+      path.resolve('packages/cli/src/commands/ast-grep-command.ts'),
+      path.resolve('src/commands/ast-grep-command.ts')
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        engine.indexFile(c, fs.readFileSync(c, 'utf8'));
+      }
+    }
     handleMemoryQuery('handleAstSearch');
     assert.ok(output.includes('Ground-Truth Engine Documentation (Context7)'));
     assert.ok(output.includes('TYPESCRIPT'));
