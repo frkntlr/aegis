@@ -10,9 +10,8 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { TransitiveTypeClosure } from './transitive-type-closure.js';
-import { MultiLanguageMetadataManager } from './multi-language-metadata-manager.js';
-import { ContractDriftRadar, type ContractSignature } from '@aegis/github-live';
+import { TransitiveTypeClosure, MultiLanguageMetadataManager } from '@aegis/ast-skeleton';
+import { ContractDriftRadar, type ContractSignature } from './contract-drift-radar.js';
 
 test('Symbiotic Substrate 2.0: Transitive Type Closure with Opaque Stubbing', () => {
   const serviceCode = `
@@ -78,7 +77,7 @@ test('Symbiotic Substrate 2.0: CRLF resilience, barrel re-export and global shie
     const code = "import { TargetType } from './barrel.ts';\nexport function run(t: TargetType, b: Buffer): void {}";
     const res = closure.resolveClosure('run', 'run.ts', code);
     assert.strictEqual(res.fullDeclarations.length, 1);
-    assert.strictEqual(res.opaqueStubs.length, 0); // Buffer is shielded, TargetType is resolved
+    assert.strictEqual(res.opaqueStubs.length, 0);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

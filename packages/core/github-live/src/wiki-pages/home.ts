@@ -29,7 +29,7 @@ export const HOME_PAGE: WikiSuitePage = {
     '',
     '#### Çekirdek Kılavuzlar',
     '- **[[Architecture|Aegis Kapsamlı Mimari Rehberi]]:** 14-paket monorepo, hafıza, worktree, 27 MCP aracı, Godot Substrate 3.0, Demir Kafes ve merge pipeline\'ını içeren 9 bölümlük ana sistem rehberi.',
-    '- **[[RFC-Index|Mimari Karar Kayıtları & RFC Dizini]]:** Kabul edilmiş 35 çekirdek mimari tasarım spesifikasyonunun (RFC-001 - RFC-035) 7 alana göre yapılandırılmış tam dizini.',
+    '- **[[RFC-Index|Mimari Karar Kayıtları & RFC Dizini]]:** Kabul edilmiş 36 çekirdek mimari tasarım spesifikasyonunun (RFC-001 - RFC-036) 7 alana göre yapılandırılmış tam dizini.',
     '- **[[Research-Index|Zemin Araştırmaları Dizini]]:** Google NotebookLM tarafından sentezlenen alıntılı mimari zemin araştırmalarının dizini.',
     '',
     '#### 7 Temel Mimari Spesifikasyon',

@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -38,6 +40,9 @@ jobs:
 
       - name: Monorepo Lint
         run: npm run lint
+
+      - name: Topological Dependency Radar & Contract Drift (RFC-036)
+        run: node packages/cli/dist/bin/aegis.js deps:drift
 
       - name: Deterministic Demir Kafes (Iron Cage) Audit
         run: node packages/cli/dist/bin/aegis.js cage:check

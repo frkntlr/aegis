@@ -8,18 +8,18 @@ import type { WikiSuitePage } from '../types.js';
 
 export const RFC_INDEX_PAGE: WikiSuitePage = {
   slug: 'RFC-Index',
-  title: 'Aegis Mimari Karar Kayıtları & RFC Dizini (RFC-001 - RFC-035)',
+  title: 'Aegis Mimari Karar Kayıtları & RFC Dizini (RFC-001 - RFC-036)',
   threeBullets: [
-    'Aegis Çekirdek Motorunun Onaylanmış 35 Mimari Tasarım Belgesi (RFC-001 - RFC-035).',
+    'Aegis Çekirdek Motorunun Onaylanmış 36 Mimari Tasarım Belgesi (RFC-001 - RFC-036).',
     '7 Temel Mimari Spesifikasyon Alanı Altında Yapılandırılmış Kanonik Karar Kayıtları.',
     'Demir Kafes Standartları ve Kabul Kriterleriyle Doğrulanmış Üretim Spesifikasyonları.'
   ],
   content: [
-    '## 🏛️ Aegis Mimari Karar Kayıtları & RFC Dizini (RFC-001 - RFC-035)',
+    '## 🏛️ Aegis Mimari Karar Kayıtları & RFC Dizini (RFC-001 - RFC-036)',
     '',
     'Aegis ekosistemindeki tüm mimari evrimler ve köklü yapısal kararlar, **RFC (Request for Comments)** protokolü üzerinden tasarlanır, tartışılır, kabul kriterlerine bölünür ve yaşayan GitHub Wiki spesifikasyonlarına dönüştürülür.',
     '',
-    'Dağınık ve okunaksız onlarca alt sayfa yerine, 35 onaylı RFC belgesi **7 Temel Mimari Spesifikasyon** altında toplanmış ve her bir karar ilgili alan dokümantasyonuna bağlanmıştır.',
+    'Dağınık ve okunaksız onlarca alt sayfa yerine, 36 onaylı RFC belgesi **7 Temel Mimari Spesifikasyon** altında toplanmış ve her bir karar ilgili alan dokümantasyonuna bağlanmıştır.',
     '',
     '---',
     '',
@@ -86,6 +86,7 @@ export const RFC_INDEX_PAGE: WikiSuitePage = {
     '| **RFC-028** | **High-Performance Windows Process Termination:** Görev ağaçlarının taskkill /T /F ile sızdırmaz biçimde kapatılması. | `Accepted / Implemented` | [[Spec-Toolchain-and-Performance]] |',
     '| **RFC-029** | **Zero-Roundtrip GitHub Wiki Synchronization:** Sıfır ağ gecikmeli yerel git radarı ve iki yönlü senkronizasyon. | `Accepted / Implemented` | [[Spec-Toolchain-and-Performance]] |',
     '| **RFC-030** | **Deterministic Zero-Latency Offline Git Substrate:** Soket zaman aşımı koruması ve çevrimdışı çalışma. | `Accepted / Implemented` | [[Spec-Toolchain-and-Performance]] |',
-    '| **RFC-033** | **Monorepo TypeScript Project References & Incremental Build:** composite: true ile derleme süresinin %80 kısaltılması. | `Accepted / Implemented` | [[Spec-Toolchain-and-Performance]] |'
+    '| **RFC-033** | **Monorepo TypeScript Project References & Incremental Build:** composite: true ile derleme süresinin %80 kısaltılması. | `Accepted / Implemented` | [[Spec-Toolchain-and-Performance]] |',
+    '| **RFC-036** | **CI/CD & Multi-Agent Atomic Merge Hardening:** Soğuk başlangıç monorepo bütünlüğü, topolojik bağımlılık grafı ve hermetik doğrulama kapıları. | `Proposed / In Review` | [[Spec-Toolchain-and-Performance]] |'
   ].join('\n')
 };

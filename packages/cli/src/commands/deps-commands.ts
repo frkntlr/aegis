@@ -5,7 +5,11 @@
  */
 
 import { MultiLanguageMetadataManager } from '@aegis/ast-skeleton';
-import { ContractDriftRadar, ProjectReferencesRadar } from '@aegis/github-live';
+import {
+  ContractDriftRadar,
+  ProjectReferencesRadar,
+  TopologicalDependencyRadar
+} from '@aegis/github-live';
 import { showBanner } from './banner.js';
 
 function reportProjectReferences(): void {
@@ -22,10 +26,23 @@ function reportProjectReferences(): void {
   }
 }
 
-export async function handleDepsDrift(): Promise<void> {
-  showBanner();
-  console.log('📡 Running Symbiotic Substrate 2.0 Contract Drift Radar...\n');
+function reportTopologicalDependencies(): boolean {
+  const radar = new TopologicalDependencyRadar();
+  const report = radar.scan();
+  console.log('\n🧭 Monorepo Topological Dependency Radar (RFC-036):');
+  console.log(` • Packages Scanned:      ${report.totalPackages}`);
+  console.log(` • Source Files Checked:  ${report.totalSourceFiles}`);
+  const statusIcon = report.valid ? '✅ 100% CLEAN' : '❌ VIOLATIONS FOUND';
+  console.log(` • Graph Integrity:       ${statusIcon}`);
+  if (!report.valid) {
+    for (const err of report.errors) {
+      console.error(`   - ${err}`);
+    }
+  }
+  return report.valid;
+}
 
+function reportEcosystemStatus(): void {
   const manager = new MultiLanguageMetadataManager();
   const { drifted, ledger } = manager.checkEcosystemDrift();
 
@@ -36,7 +53,9 @@ export async function handleDepsDrift(): Promise<void> {
     const hashPreview = entry.compositeHash ? entry.compositeHash.substring(0, 12) : 'none';
     console.log(` • [${eco.toUpperCase()}] ${icon} (Hash: ${hashPreview})`);
   }
+}
 
+async function reportContractDrift(): Promise<boolean> {
   const radar = new ContractDriftRadar();
   const driftRes = await radar.evaluateDrift();
 
@@ -46,19 +65,28 @@ export async function handleDepsDrift(): Promise<void> {
       console.log(` • ${f}`);
     }
   }
-
   if (driftRes.breakingChanges.length > 0) {
     console.error('\n🚨 Breaking Contract Changes Detected:');
     for (const b of driftRes.breakingChanges) {
       console.error(` • ${b}`);
     }
   }
-
   if (driftRes.shouldBlock) {
     console.error('\n❌ Contract drift contains breaking changes. Worktree tasks should be BLOCKED.');
-  } else {
-    console.log('\n✅ No breaking upstream contract changes detected.');
+    return false;
   }
+  console.log('\n✅ No breaking upstream contract changes detected.');
+  return true;
+}
 
+export async function handleDepsDrift(): Promise<void> {
+  showBanner();
+  console.log('📡 Running Symbiotic Substrate 2.0 Contract Drift Radar...\n');
+  reportEcosystemStatus();
+  const contractClean = await reportContractDrift();
   reportProjectReferences();
+  const topoClean = reportTopologicalDependencies();
+  if (!contractClean || !topoClean) {
+    process.exitCode = 1;
+  }
 }

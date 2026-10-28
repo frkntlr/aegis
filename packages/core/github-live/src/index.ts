@@ -19,3 +19,4 @@ export * from './nuget-metadata-extractor.js';
 export * from './contract-drift-radar.js';
 export * from './notebooklm/index.js';
 export * from './project-references-radar.js';
+export * from './topological-dependency-radar.js';

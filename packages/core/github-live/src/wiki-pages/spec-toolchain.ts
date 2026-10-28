@@ -1,7 +1,7 @@
 /**
  * @file spec-toolchain.ts
  * Specification: Toolchain, Monorepo Performance & Process Watchdog.
- * Covers: RFC-025, RFC-027, RFC-028, RFC-029, RFC-030, RFC-033.
+ * Covers: RFC-025, RFC-027, RFC-028, RFC-029, RFC-030, RFC-033, RFC-036.
  * Demir Kafes: <300 lines/file, <40 lines/function.
  */
 
@@ -13,18 +13,19 @@ export const SPEC_TOOLCHAIN_PAGE: WikiSuitePage = {
   threeBullets: [
     'Turborepo İçerik Adresli Önbellek ve TypeScript Project References (RFC-033) ile %80 daha hızlı derleme.',
     'Çapraz Platform Süreç Ağacı Watchdog (RFC-028) ve Sıfır Gecikmeli Çevrimdışı Git Substrate (RFC-029/030).',
-    'Kapsanan Kararlar: RFC-025, RFC-027, RFC-028, RFC-029, RFC-030, RFC-033.'
+    'Kapsanan Kararlar: RFC-025, RFC-027, RFC-028, RFC-029, RFC-030, RFC-033, RFC-036.'
   ],
   content: [
     '## ⚡ Mimari Spesifikasyon: Araç Zinciri & Monorepo Performansı',
     '',
-    'Aegis, geliştirici ve ajan üretkenliğini en üst düzeye çıkarmak için sıfır gecikmeli monorepo derlemesi, süreç ağacı sonlandırma ve offline-resilient Git altyapısı sunar. Bu spesifikasyon; RFC-025, RFC-027, RFC-028, RFC-029, RFC-030 ve RFC-033 kararlarının sentezidir.',
+    'Aegis, geliştirici ve ajan üretkenliğini en üst düzeye çıkarmak için sıfır gecikmeli monorepo derlemesi, süreç ağacı sonlandırma, topolojik bağımlılık bütünlüğü ve offline-resilient Git altyapısı sunar. Bu spesifikasyon; RFC-025, RFC-027, RFC-028, RFC-029, RFC-030, RFC-033 ve RFC-036 kararlarının sentezidir.',
     '',
     '```mermaid',
     'flowchart LR',
     '  DEV["Ajan / Geliştirici Aksiyonu"] --> TURBO["Turborepo Hızlandırma (RFC-025)"]',
     '  TURBO --> COMP["TS Project References (composite: true) (RFC-033)"]',
-    '  COMP --> WATCHDOG["İşlem Ağacı Watchdog (Tree-Kill SIGKILL) (RFC-028)"]',
+    '  COMP --> TOPO["Topolojik Bağımlılık Radarı (RFC-036)"]',
+    '  TOPO --> WATCHDOG["İşlem Ağacı Watchdog (Tree-Kill SIGKILL) (RFC-028)"]',
     '  WATCHDOG --> WIKI["Sıfır Gecikmeli Wiki Sync Substrate (RFC-029/030)"]',
     '```',
     '',
@@ -49,11 +50,19 @@ export const SPEC_TOOLCHAIN_PAGE: WikiSuitePage = {
     '',
     '---',
     '',
+    '### 4. Topolojik Bağımlılık & Cold-Start Monorepo Bütünlüğü (RFC-036)',
+    '- **Ters Yönlü Bağımlılık Eliminasyonu:** Alt katman çekirdek paketleri (örn. `@aegis/ast-skeleton`) üst entegrasyon paketlerine bağımlı olamaz. Entegrasyon ve E2E testleri üst katman paketlerinde koşturulur.',
+    '- **Topolojik Kod Radarı (`aegis deps:drift`):** Tüm `src/` altındaki iç `@aegis/*` importları taranır; bildirilmeyen veya ters yönlü referanslar derleme başlamadan önce yakalanır ve reddedilir.',
+    '- **Soğuk Başlangıç Hermetikliği:** CI/CD sunucularında önbelleksiz (`--force`) temiz derlemelerde bile build sırası kusursuz acyclic graph olarak yürütülür.',
+    '',
+    '---',
+    '',
     '### 💻 Araç Zinciri Komut Referansı',
     '| Komut | Görev |',
     '|---|---|',
     '| `npm run build` | Turborepo ve TS Project References ile artımlı monorepo derlemesi yapar. |',
     '| `npm test` | İçerik adresli önbellek ile birim testleri anında koşturur. |',
+    '| `aegis deps:drift` | Ekosistem lockfile, TS Project References ve topolojik grafı denetler. |',
     '| `aegis wiki:sync [--force]` | Canlı GitHub Wiki ile yerel yaşayan belleği çift yönlü eşitler. |',
     '| `aegis ide:sync` | MCP sunucularını ve becerileri tüm desteklenen editörlere dağıtır. |'
   ].join('\n')

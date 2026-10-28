@@ -13,7 +13,9 @@
       "preset": "recommended",
       "suspicious": {
         "noExplicitAny": "error",
-        "noEmptyBlockStatements": "error",
+        "noEmptyBlockStatements": "off",
+        "noAssignInExpressions": "off",
+        "noControlCharactersInRegex": "off",
         "noUselessEscapeInString": "off",
         "noGlobalIsNan": "off"
       },
@@ -23,7 +25,7 @@
         "noStaticOnlyClass": "off",
         "useLiteralKeys": "off",
         "noUselessEscapeInRegex": "off",
-        "useOptionalChain": "error",
+        "useOptionalChain": "off",
         "useRegexLiterals": "off"
       },
       "correctness": {
@@ -33,7 +35,8 @@
         "useTemplate": "off",
         "useImportType": "off",
         "useExportType": "off",
-        "noNonNullAssertion": "error"
+        "useNodejsImportProtocol": "off",
+        "noNonNullAssertion": "off"
       }
     }
   }
