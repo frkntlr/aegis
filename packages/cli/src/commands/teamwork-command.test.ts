@@ -48,6 +48,7 @@ test('handleTeamworkSetup exports subagent manifest', () => {
 test('handleTeamwork router invokes subcommands properly', () => {
   assert.doesNotThrow(() => handleTeamwork('status'));
   assert.doesNotThrow(() => handleTeamwork('plan', 'Quick fix in logger'));
+  assert.doesNotThrow(() => handleTeamwork('matrix', 'Quick fix in logger'));
   assert.doesNotThrow(() => handleTeamwork('unknown'));
 });
 

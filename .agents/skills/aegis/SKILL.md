@@ -100,9 +100,9 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 11. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.
 
 
-## Antigravity Subagent Teamwork Runbook (`/aegis teamwork`)
+## Antigravity Subagent Teamwork Runbook (`/aegis teamwork`, `/teamwork`)
 
-When the user triggers `/aegis teamwork <objective>` or `/teamwork`:
+When the user triggers `/aegis teamwork <objective>`, `/aegist teamwork <objective>`, or standard `/teamwork <objective>`:
 
 1. **Plan & Stage Tracks**:
    Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP tool `teamwork_plan`.
@@ -112,25 +112,39 @@ When the user triggers `/aegis teamwork <objective>` or `/teamwork`:
    - Acquires mutex file locks on target files (`.aegis/locks.json`).
    - Stages track payloads into `.aegis/task-inbox.json`.
 
-2. **Define Subagents (if not defined)**:
+2. **Render Live Task Matrix in Chat**:
+   Immediately output the initial status matrix to the user so they can follow parallel execution in real time:
+   ```markdown
+   ### 🤖 Antigravity Teamwork Canlı Görev Matrisi
+   | Ajan / Rol | Durum | Kilitli Dosyalar | Model | Görev Özeti |
+   | :--- | :--- | :--- | :--- | :--- |
+   | `issue-solver` | 🔄 Çalışıyor | `src/...` | `inherit` | Temel mantık kodlanıyor |
+   | `ui-specialist` | 🔄 Çalışıyor | `res://...` | `inherit` | Arayüz ve tema tasarımı |
+   | `qa-hunter` | 🔄 Denetliyor | - | `inherit` | Triage & Test kapısı |
+   | `doc-architect` | 🔄 Hazırlanıyor | `docs/...` | `flash` | Dokümantasyon & Wiki |
+   ```
+
+3. **Define Subagents (if not defined)**:
    Call `define_subagent` for each required role:
    - `issue-solver`: Demir Kafes, surgical diffs, pre-commit tests.
    - `qa-hunter`: Evidence-based triage, Socratic debugging, mutation score >= 70%.
    - `ui-specialist`: Godot 4 UI scenes (.tscn), container-first layouts, responsive anchors (anchors_preset=15), touch targets (>=44px), themes (.tres), and decoupled GDScript controllers (<300 lines).
    - `doc-architect`: Living wiki sync (`<repo>.wiki.git`), RFC ideation, zero premature coding.
 
-3. **Spawn Subagents with Shared Workspace**:
-   Call `invoke_subagent` for each staged track:
+4. **Spawn Subagents with Shared Workspace & Hybrid Models**:
+   Call `invoke_subagent` for each staged track concurrently:
    - Set `Workspace: 'share'` so subagents operate directly on the project's repository worktree.
-   - Set `Model: 'inherit'`.
+   - Set `Model`: `'inherit'` for `issue-solver`, `qa-hunter`, and `ui-specialist`; `'flash'` for `doc-architect`.
    - Provide the compiled prompt containing the role badge, track objective, locks, and acceptance criteria.
 
-4. **Autonomous Parallel Execution & Verification**:
+5. **Autonomous Parallel Execution & Verification**:
    - Subagents pull their task with `aegis task:pull [role]` or MCP `task_inbox_pull`.
    - Subagents implement isolated changes without modifying files locked by peers.
    - Subagents run `aegis verify:task` or `aegis godot ui:lint` before reporting back.
+   - Subagents send completion message: `[ROLE_COMPLETE: <role>]` with verification summary.
 
-5. **Team Lead Coordination & Lock Release**:
-   - Team Lead monitors active subagents with `manage_subagents` and inspects `aegis teamwork status`.
-   - Upon successful completion of each track, release locks with `aegis task:release <id> done`.
-   - Report final consolidated summary to the user.
+6. **Live Progress Reporting & Lock Release**:
+   - As each subagent completes and sends a message, Team Lead receives a reactive wakeup.
+   - Team Lead emits an updated status in chat marking that role `✅ Tamamlandı` with its surgical diff / verification summary.
+   - Team Lead releases the task lock via `aegis task:release <id> done`.
+   - Once all tracks complete, Team Lead presents the final consolidated review card with Demir Kafes and test verification status.

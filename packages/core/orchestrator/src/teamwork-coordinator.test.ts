@@ -100,7 +100,23 @@ test('TeamworkCoordinator exports Antigravity subagents manifest cleanly', () =>
     const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.strictEqual(parsed.framework, 'antigravity-subagents');
     assert.strictEqual(parsed.subagents.length, 4);
+    assert.strictEqual(parsed.subagents.find((s: { name: string }) => s.name === 'doc-architect')?.defaultModel, 'flash');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test('TeamworkCoordinator assigns hybrid models and formats live matrix table', () => {
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork('Build feature and document', ['feature.ts', 'docs/README.md']);
+
+  const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
+  const docTrack = plan.tracks.find(t => t.subagentName === 'doc-architect');
+  assert.strictEqual(solverTrack?.invocationPayload.Model, 'inherit');
+  assert.strictEqual(docTrack?.invocationPayload.Model, 'flash');
+
+  const matrix = coordinator.formatLiveMatrix(plan, { 'issue-solver': 'done', 'doc-architect': 'running' });
+  assert.ok(matrix.includes('Antigravity Teamwork Canlı Görev Matrisi'));
+  assert.ok(matrix.includes('✅ Tamamlandı'));
+  assert.ok(matrix.includes('🔄 Çalışıyor'));
 });

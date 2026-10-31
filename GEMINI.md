@@ -99,18 +99,29 @@ Whenever the user or agent proposes an improvement, feature, toolchain gap, or a
 2. **Autonomous Discussion & RFC Sync**: Automatically publish an RFC and GitHub Discussion under `Ideas` on `frkntlr/aegis` (`npm run aegis -- rfc:create "<title>" [desc]`). Never leave engine feedback lost in local conversation context!
 3. **Traceability**: Link the originating project context or prompt in the published RFC.
 
-## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`)
-When coordinating multi-agent tasks in Antigravity:
-1. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into `.aegis/task-inbox.json`.
-2. **Role Specialization for Godot**:
+## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`, `/teamwork`)
+When the user sends `/aegis teamwork`, `/aegist teamwork`, standard `/teamwork`, or requests multi-agent teamwork:
+1. **Unified Trigger & Immediate Lead Action**: The agent immediately adopts the Team Lead role. Never just print static text or tell the user to run subagents manually; actively orchestrate the subagents.
+2. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into `.aegis/task-inbox.json`.
+3. **Print Live Task Matrix**: Immediately render the initial markdown table in chat showing which subagents are running (`🔄 Çalışıyor`), their locked files, models, and task titles.
+4. **Register & Invoke Subagents Concurrently**:
+   - Register roles via `define_subagent` if not already defined for this session.
+   - Concurrently call `invoke_subagent` for each active track using `Workspace: 'share'` and hybrid models:
+     - `issue-solver`: `Model: 'inherit'`
+     - `qa-hunter`: `Model: 'inherit'`
+     - `ui-specialist`: `Model: 'inherit'`
+     - `doc-architect`: `Model: 'flash'`
+5. **Role Specialization for Godot**:
    - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`).
    - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions.
    - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests, UI layout bounding box sweeps (`aegis godot inspect`), and regression audits.
    - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki, architecture blueprints, and issue specifications.
-3. **Define Subagents**: When subagent roles are needed, register them with Antigravity's `define_subagent` using their official Aegis profile badges and system prompts.
-4. **Invoke Subagents**: Invoke tracks using `invoke_subagent` with `Workspace: 'share'` so subagents share the repository worktree safely without duplication.
-5. **Autonomous Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules, run `aegis verify:task`, and report completion back to the Team Lead.
-6. **Lock Lifecycle**: The Team Lead monitors subagents with `manage_subagents` and releases locks upon verified completion with `aegis task:release <id> done`.
+6. **Autonomous Subagent Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules (<300 lines/file, <40 lines/function), run `aegis verify:task`, and report completion back to Team Lead with `[ROLE_COMPLETE: <role>]`.
+7. **Live Progress Reporting & Lock Release**:
+   - As each subagent message arrives, Team Lead receives a reactive wakeup.
+   - Team Lead emits an updated status in chat marking that role `✅ Tamamlandı` with its surgical diff / verification summary.
+   - Team Lead releases the task lock via `aegis task:release <id> done`.
+8. **Final Consolidation**: Once all tracks complete, Team Lead presents the final consolidated review card with Demir Kafes and test verification status.
 
 ## Godot 4 UI Architecture & Engineering Protocol (Demir Kafes for UI)
 When editing, scaffolding, or polishing Godot UI:

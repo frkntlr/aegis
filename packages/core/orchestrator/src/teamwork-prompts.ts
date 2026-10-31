@@ -16,6 +16,7 @@ export interface SubagentProfile {
   workspaceMode: 'share' | 'branch' | 'inherit';
   enableWriteTools: boolean;
   enableMcpTools: boolean;
+  defaultModel?: 'inherit' | 'flash_lite' | 'flash' | 'pro';
 }
 
 export const SOLVER_SYSTEM_PROMPT = `You are the Aegis Issue Solver subagent.
@@ -68,7 +69,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: SOLVER_SYSTEM_PROMPT,
     workspaceMode: 'share',
     enableWriteTools: true,
-    enableMcpTools: true
+    enableMcpTools: true,
+    defaultModel: 'inherit'
   },
   {
     name: 'qa-hunter',
@@ -79,7 +81,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: QA_SYSTEM_PROMPT,
     workspaceMode: 'share',
     enableWriteTools: true,
-    enableMcpTools: true
+    enableMcpTools: true,
+    defaultModel: 'inherit'
   },
   {
     name: 'ui-specialist',
@@ -90,7 +93,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: UI_SPECIALIST_SYSTEM_PROMPT,
     workspaceMode: 'share',
     enableWriteTools: true,
-    enableMcpTools: true
+    enableMcpTools: true,
+    defaultModel: 'inherit'
   },
   {
     name: 'doc-architect',
@@ -101,7 +105,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: DOC_ARCHITECT_SYSTEM_PROMPT,
     workspaceMode: 'share',
     enableWriteTools: true,
-    enableMcpTools: true
+    enableMcpTools: true,
+    defaultModel: 'flash'
   }
 ];
 
@@ -120,5 +125,5 @@ export function compileTrackPrompt(profile: SubagentProfile, trackDesc: string, 
     `1. Pull staged details using \`aegis task:pull ${profile.roleType}\` or MCP \`task_inbox_pull\`.\n` +
     `2. Execute changes within your designated workspace.\n` +
     `3. Validate with \`aegis verify:task\` before concluding.\n` +
-    `4. Report completion back to the Team Lead.`;
+    `4. Send message to Team Lead: \`[ROLE_COMPLETE: ${profile.name}]\` with changed files and verification summary.`;
 }

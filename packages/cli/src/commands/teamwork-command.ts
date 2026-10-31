@@ -52,7 +52,8 @@ export function handleTeamworkPlan(objectiveArg?: string, ...files: string[]): T
   console.log(`🎯 Aegis Teamwork Plan Created: ${plan.planId}`);
   console.log(` • Objective: "${plan.objective}"`);
   console.log(` • Summary: ${plan.summary}`);
-  console.log(` • Staged in TIP Inbox: .aegis/task-inbox.json`);
+  console.log(` • Staged in TIP Inbox: .aegis/task-inbox.json\n`);
+  console.log(coordinator.formatLiveMatrix(plan));
 
   for (const track of plan.tracks) {
     printTrackPayload(track);
@@ -76,6 +77,12 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
   }
   if (norm === 'setup' || norm === 'init') {
     handleTeamworkSetup(args[0]);
+    return;
+  }
+  if (norm === 'matrix' || norm === 'table') {
+    const coordinator = new TeamworkCoordinator();
+    const plan = coordinator.planTeamwork(args[0] || 'Active Teamwork Mission', args.slice(1));
+    console.log(coordinator.formatLiveMatrix(plan));
     return;
   }
   handleTeamworkStatus();

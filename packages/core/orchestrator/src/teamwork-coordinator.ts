@@ -130,7 +130,7 @@ export class TeamworkCoordinator {
         Role: profile.title,
         Prompt: prompt,
         Workspace: profile.workspaceMode,
-        Model: 'inherit'
+        Model: profile.defaultModel ?? 'inherit'
       }
     };
   }
@@ -180,11 +180,32 @@ export class TeamworkCoordinator {
         systemPrompt: p.systemPrompt,
         workspaceMode: p.workspaceMode,
         enableWriteTools: p.enableWriteTools,
-        enableMcpTools: p.enableMcpTools
+        enableMcpTools: p.enableMcpTools,
+        defaultModel: p.defaultModel ?? 'inherit'
       }))
     };
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
     return { count: profiles.length, manifestPath };
+  }
+
+  public formatLiveMatrix(
+    plan: TeamworkPlan,
+    statuses: Record<string, 'running' | 'done' | 'failed' | 'pending'> = {}
+  ): string {
+    const lines: string[] = [
+      `### 🤖 Antigravity Teamwork Canlı Görev Matrisi [${plan.planId}]`,
+      `**Hedef**: ${plan.objective}`,
+      '',
+      '| Ajan / Rol | Durum | Kilitli Dosyalar | Model | Görev Özeti |',
+      '| :--- | :--- | :--- | :--- | :--- |'
+    ];
+    for (const t of plan.tracks) {
+      const st = statuses[t.subagentName] ?? 'running';
+      const icon = st === 'done' ? '✅ Tamamlandı' : st === 'failed' ? '🛑 Hata' : st === 'pending' ? '⏳ Bekliyor' : '🔄 Çalışıyor';
+      const locks = t.targetFiles.length > 0 ? t.targetFiles.map(f => `\`${f}\``).join(', ') : '-';
+      lines.push(`| \`${t.subagentName}\` | ${icon} | ${locks} | \`${t.invocationPayload.Model}\` | ${t.title} |`);
+    }
+    return lines.join('\n');
   }
 
   public getTeamworkStatus(): TeamworkStatusReport {
