@@ -21,7 +21,7 @@ test('handleTeamworkPlan creates plan and stages tracks', () => {
   assert.ok(plan);
   assert.strictEqual(typeof plan.planId, 'string');
   assert.ok(plan.tracks.length >= 2);
-  const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
+  const solverTrack = plan.tracks.find(t => t.roleType === 'solver' || t.subagentName.startsWith('issue-solver'));
   assert.ok(solverTrack);
   assert.strictEqual(solverTrack?.invocationPayload.TypeName, 'issue-solver');
   assert.strictEqual(solverTrack?.invocationPayload.Workspace, 'inherit');

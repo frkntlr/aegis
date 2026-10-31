@@ -34,7 +34,7 @@ test('TeamworkCoordinator plans teamwork, stages tracks in inbox, and acquires l
     assert.ok(plan.planId.startsWith('tw-'));
     assert.ok(plan.tracks.length >= 3);
 
-    const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
+    const solverTrack = plan.tracks.find(t => t.roleType === 'solver');
     assert.ok(solverTrack);
     assert.strictEqual(solverTrack?.invocationPayload.TypeName, 'issue-solver');
     assert.strictEqual(solverTrack?.invocationPayload.Workspace, 'inherit');
@@ -65,9 +65,9 @@ test('TeamworkCoordinator routes Godot UI scene files to ui-specialist and avoid
     ];
     const plan = coordinator.planTeamwork('Implement Pause Menu and Combat HUD', files);
 
-    const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
-    const uiTrack = plan.tracks.find(t => t.subagentName === 'ui-specialist');
-    const docTrack = plan.tracks.find(t => t.subagentName === 'doc-architect');
+    const solverTrack = plan.tracks.find(t => t.roleType === 'solver');
+    const uiTrack = plan.tracks.find(t => t.roleType === 'ui');
+    const docTrack = plan.tracks.find(t => t.roleType === 'docs');
 
     assert.ok(solverTrack);
     assert.ok(uiTrack);
@@ -110,12 +110,12 @@ test('TeamworkCoordinator assigns hybrid models and formats live matrix table', 
   const coordinator = new TeamworkCoordinator();
   const plan = coordinator.planTeamwork('Build feature and document', ['feature.ts', 'docs/README.md']);
 
-  const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
-  const docTrack = plan.tracks.find(t => t.subagentName === 'doc-architect');
+  const solverTrack = plan.tracks.find(t => t.roleType === 'solver');
+  const docTrack = plan.tracks.find(t => t.roleType === 'docs');
   assert.strictEqual(solverTrack?.invocationPayload.Model, 'inherit');
   assert.strictEqual(docTrack?.invocationPayload.Model, 'flash');
 
-  const matrix = coordinator.formatLiveMatrix(plan, { 'issue-solver': 'done', 'doc-architect': 'running' });
+  const matrix = coordinator.formatLiveMatrix(plan, { solver: 'done', docs: 'running' });
   assert.ok(matrix.includes('Antigravity Teamwork Canlı Görev Matrisi'));
   assert.ok(matrix.includes('✅ Tamamlandı'));
   assert.ok(matrix.includes('🔄 Çalışıyor'));

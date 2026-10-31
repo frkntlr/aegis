@@ -130,7 +130,29 @@ graph LR
 
 ---
 
-## 6. CLI & Tooling Quick Reference
+## 7. Multi-Instance Subagent Scaling & Dynamic Decomposition
+
+Aegis supports scaling beyond 1 agent per role. When complex objectives or multiple files are supplied, the **`TeamworkDecomposer`** dynamically partitions work into concurrent instances of the same persona (e.g. multiple `issue-solver`s working in parallel).
+
+```mermaid
+graph TD
+    Goal["Objective: 1. Parser; 2. Cache Layer; 3. Audit"] --> Dec[TeamworkDecomposer]
+    Dec -->|Partition 1| S1["issue-solver [Parser]<br/>Locks: src/parser.ts"]
+    Dec -->|Partition 2| S2["issue-solver [Cache]<br/>Locks: src/cache.ts"]
+    Dec -->|Quality Gate| QA["qa-hunter [Audit]<br/>Global audit & playtest"]
+    S1 -.-> Mutex[Demir Kafes Mutex .aegis/locks.json]
+    S2 -.-> Mutex
+```
+
+### Key Scaling Guarantees:
+1. **Dynamic Itemization**: Numbered steps (`1. ... 2. ...`), bullet points, semicolons, and compound clauses are parsed into distinct subtasks.
+2. **Disjoint Static File Partitioning**: Target files are grouped and assigned strictly to disjoint subagents. No two solvers ever share a file lock simultaneously.
+3. **Descriptive Role Labeling**: Subagents are named with their specific domain scope (e.g., `issue-solver [Parser]`, `issue-solver [Storage]`, `qa-hunter [Audit]`), displayed directly in the Live Task Matrix and TIP queue.
+4. **Autonomous Completion Signaling**: Each subagent signals completion with `[ROLE_COMPLETE: <subagentName>]`, releasing its allocated subset of file locks immediately upon passing quality checks.
+
+---
+
+## 8. CLI & Tooling Quick Reference
 
 | Action | Aegis CLI Command | MCP Tool Equivalent |
 | :--- | :--- | :--- |

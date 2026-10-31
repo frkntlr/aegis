@@ -114,16 +114,22 @@ export function getSubagentProfiles(): SubagentProfile[] {
   return [...SUBAGENT_PROFILES];
 }
 
-export function compileTrackPrompt(profile: SubagentProfile, trackDesc: string, files: string[]): string {
+export function compileTrackPrompt(
+  profile: SubagentProfile,
+  trackDesc: string,
+  files: string[],
+  subagentName?: string
+): string {
   const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- General codebase scope';
+  const roleIdentity = subagentName ?? profile.name;
   return `${profile.badge}\n\n` +
     `## Assigned Subagent Task\n` +
-    `**Track**: ${profile.title}\n` +
+    `**Track**: ${profile.title} (${roleIdentity})\n` +
     `**Objective**: ${trackDesc}\n\n` +
     `### Target Files & Locks\n${targetStr}\n\n` +
     `### Instructions\n` +
     `1. Pull staged details using \`aegis task:pull ${profile.roleType}\` or MCP \`task_inbox_pull\`.\n` +
     `2. Execute changes within your designated workspace.\n` +
     `3. Validate with \`aegis verify:task\` before concluding.\n` +
-    `4. Send message to Team Lead: \`[ROLE_COMPLETE: ${profile.name}]\` with changed files and verification summary.`;
+    `4. Send message to Team Lead: \`[ROLE_COMPLETE: ${roleIdentity}]\` with changed files and verification summary.`;
 }

@@ -14,6 +14,7 @@ import {
   getSubagentProfiles,
   compileTrackPrompt
 } from './teamwork-prompts.js';
+import { TeamworkDecomposer } from './teamwork-decomposer.js';
 
 export interface AntigravityInvocationPayload {
   TypeName: string;
@@ -74,6 +75,10 @@ export class TeamworkCoordinator {
     this.roleClassifier = roleClassifier ?? new RoleClassifier();
   }
 
+  public getRoleClassifier(): RoleClassifier {
+    return this.roleClassifier;
+  }
+
   public listProfiles(): SubagentProfile[] {
     if (!this.cachedProfiles) {
       this.cachedProfiles = getSubagentProfiles();
@@ -96,54 +101,22 @@ export class TeamworkCoordinator {
       ? `tw-det-${this.hashPlan(objective, targetFiles)}`
       : `tw-${Date.now().toString(36)}`;
     const profiles = this.listProfiles();
+    const subtasks = TeamworkDecomposer.decompose(objective, targetFiles);
     const tracks: TeamworkTrack[] = [];
-    const inference = this.roleClassifier.classify({ title: objective, targetFiles });
 
-    const uiFiles = targetFiles.filter(f => RoleClassifier.isUiFile(f));
-    const docFiles = targetFiles.filter(f => f.endsWith('.md') || f.includes('docs/') || f.includes('wiki/'));
-    const solverFiles = targetFiles.filter(f => !docFiles.includes(f) && !uiFiles.includes(f));
+    for (const sub of subtasks) {
+      const profile = profiles.find(p => p.roleType === sub.roleType) ?? profiles[0];
+      tracks.push(this.buildTrack(sub.roleType, profile, sub.title, sub.targetFiles, sub.label, isDet));
+    }
 
-    const solverProfile = profiles.find(p => p.roleType === 'solver')!;
-    tracks.push(this.buildTrack('solver', solverProfile, `Implement core logic for: ${objective}`, solverFiles, isDet));
-
-    const qaProfile = profiles.find(p => p.roleType === 'qa')!;
-    tracks.push(this.buildTrack('qa', qaProfile, `Audit, triage, and test: ${objective}`, [], isDet));
-
-    this.addAuxiliaryTracks(tracks, profiles, objective, targetFiles, inference.role, uiFiles, docFiles, isDet);
     this.stageTracksIntoInbox(planId, objective, tracks);
     return {
       planId,
       objective,
       createdAt: new Date().toISOString(),
       tracks,
-      summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}; primary: ${inference.role}).`
+      summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}).`
     };
-  }
-
-  private addAuxiliaryTracks(
-    tracks: TeamworkTrack[],
-    profiles: SubagentProfile[],
-    obj: string,
-    files: string[],
-    role: string,
-    uiFiles: string[],
-    docFiles: string[],
-    deterministic = false
-  ): void {
-    const lower = obj.toLowerCase();
-    const hasUi = role === 'ui' || uiFiles.length > 0 || lower.includes('ui') || lower.includes('godot ui') ||
-      lower.includes('theme') || lower.includes('menu') || lower.includes('hud') || lower.includes('screen') ||
-      files.some(f => RoleClassifier.isUiFile(f));
-    if (hasUi) {
-      const p = profiles.find(x => x.roleType === 'ui')!;
-      const assigned = uiFiles.length > 0 ? uiFiles : files.filter(f => RoleClassifier.isUiFile(f));
-      tracks.push(this.buildTrack('ui', p, `Refine interface layout and theme for: ${obj}`, assigned, deterministic));
-    }
-    const hasDocs = role === 'docs' || docFiles.length > 0 || lower.includes('doc') || lower.includes('wiki') || lower.includes('rfc') || files.some(f => f.endsWith('.md'));
-    if (hasDocs) {
-      const p = profiles.find(x => x.roleType === 'docs')!;
-      tracks.push(this.buildTrack('docs', p, `Document specifications and living wiki for: ${obj}`, docFiles, deterministic));
-    }
   }
 
   private buildTrack(
@@ -151,22 +124,24 @@ export class TeamworkCoordinator {
     profile: SubagentProfile,
     desc: string,
     files: string[],
+    label: string,
     deterministic = false
   ): TeamworkTrack {
+    const subagentName = `${profile.name} [${label}]`;
     const id = deterministic
-      ? `${roleType}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 8)}`
-      : `${roleType}-${Date.now().toString(36)}`;
-    const prompt = compileTrackPrompt(profile, desc, files);
+      ? `${roleType}-${label.toLowerCase()}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 6)}`
+      : `${roleType}-${label.toLowerCase()}-${Date.now().toString(36)}`;
+    const prompt = compileTrackPrompt(profile, desc, files, subagentName);
     return {
       id,
       roleType,
-      subagentName: profile.name,
-      title: profile.title,
+      subagentName,
+      title: `${profile.title} [${label}]`,
       targetFiles: files,
       prompt,
       invocationPayload: {
         TypeName: profile.name,
-        Role: profile.title,
+        Role: `${profile.title} - ${label}`,
         Prompt: prompt,
         Workspace: profile.workspaceMode ?? 'inherit',
         Model: profile.defaultModel ?? 'inherit'
@@ -247,7 +222,7 @@ export class TeamworkCoordinator {
       '| :--- | :--- | :--- | :--- | :--- |'
     ];
     for (const t of plan.tracks) {
-      const st = statuses[t.subagentName] ?? 'running';
+      const st = statuses[t.subagentName] ?? statuses[t.roleType] ?? 'running';
       const icon = st === 'done' ? '✅ Tamamlandı' : st === 'failed' ? '🛑 Hata' : st === 'pending' ? '⏳ Bekliyor' : '🔄 Çalışıyor';
       const locks = t.targetFiles.length > 0 ? t.targetFiles.map(f => `\`${f}\``).join(', ') : '-';
       lines.push(`| \`${t.subagentName}\` | ${icon} | ${locks} | \`${t.invocationPayload.Model}\` | ${t.title} |`);
