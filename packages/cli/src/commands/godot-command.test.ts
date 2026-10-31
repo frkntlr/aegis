@@ -9,6 +9,7 @@ import {
   handleGodotQuery,
   handleGodotValidate,
   handleGodotPlaytest,
+  handleGodotUi,
   handleGodot
 } from './godot-command.js';
 
@@ -145,4 +146,24 @@ test('godot-helpers parses telemetry nodes and validates scripts safely', async 
 test('handleGodot dispatches run subcommand with variadic arguments', async () => {
   const out = await captureOutput(() => handleGodot(['run', 'nonexistent_project_path', '--headless', '--quit-after', '5']));
   assert.ok(out.includes('Executing Godot project at: nonexistent_project_path'));
+});
+
+test('handleGodotUi scaffolds UI scenes and lints Godot UI scenes cleanly', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-ui-cli-test-'));
+  try {
+    const directOut = await captureOutput(() => handleGodotUi('scaffold', 'dialog', 'confirm_box', tmp));
+    assert.ok(directOut.includes('Godot UI Scaffolding Complete: [DIALOG] "confirm_box"'));
+
+    const scaffoldOut = await captureOutput(() => handleGodot(['ui', 'scaffold', 'menu', 'pause_menu', tmp]));
+    assert.ok(scaffoldOut.includes('Godot UI Scaffolding Complete: [MENU] "pause_menu"'));
+
+    const sceneFile = path.join(tmp, 'pause_menu.tscn');
+    assert.ok(fs.existsSync(sceneFile));
+
+    const lintOut = await captureOutput(() => handleGodot(['ui', sceneFile]));
+    assert.ok(lintOut.includes('Godot UI Scene Linter Report'));
+    assert.ok(lintOut.includes('Score: 100/100'));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });

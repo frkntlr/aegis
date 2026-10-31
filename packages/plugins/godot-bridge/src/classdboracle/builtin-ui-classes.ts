@@ -134,5 +134,92 @@ export const BUILTIN_UI_CLASSES: Record<string, ClassInfo> = {
     ],
     properties: [{ name: 'text', type: 'String' }, { name: 'bbcode_enabled', type: 'bool' }],
     signals: []
+  },
+  ScrollContainer: {
+    name: 'ScrollContainer',
+    inherits: 'Container',
+    methods: [],
+    properties: [{ name: 'horizontal_scroll_mode', type: 'int' }, { name: 'vertical_scroll_mode', type: 'int' }],
+    signals: [{ name: 'scroll_started', arguments: [] }, { name: 'scroll_ended', arguments: [] }]
+  },
+  ProgressBar: {
+    name: 'ProgressBar',
+    inherits: 'Range',
+    methods: [],
+    properties: [{ name: 'value', type: 'float' }, { name: 'max_value', type: 'float' }, { name: 'show_percentage', type: 'bool' }],
+    signals: [{ name: 'value_changed', arguments: [{ name: 'value', type: 'float' }] }]
+  },
+  TextureProgressBar: {
+    name: 'TextureProgressBar',
+    inherits: 'Range',
+    methods: [],
+    properties: [{ name: 'value', type: 'float' }, { name: 'texture_progress', type: 'Texture2D' }],
+    signals: [{ name: 'value_changed', arguments: [{ name: 'value', type: 'float' }] }]
+  },
+  CheckBox: {
+    name: 'CheckBox',
+    inherits: 'Button',
+    methods: [],
+    properties: [{ name: 'button_pressed', type: 'bool' }],
+    signals: [{ name: 'toggled', arguments: [{ name: 'toggled_on', type: 'bool' }] }]
+  },
+  CheckButton: {
+    name: 'CheckButton',
+    inherits: 'Button',
+    methods: [],
+    properties: [{ name: 'button_pressed', type: 'bool' }],
+    signals: [{ name: 'toggled', arguments: [{ name: 'toggled_on', type: 'bool' }] }]
+  },
+  OptionButton: {
+    name: 'OptionButton',
+    inherits: 'Button',
+    methods: [
+      { name: 'add_item', returnType: 'void', arguments: [{ name: 'label', type: 'String' }] },
+      { name: 'get_item_count', returnType: 'int', arguments: [] }
+    ],
+    properties: [{ name: 'selected', type: 'int' }],
+    signals: [{ name: 'item_selected', arguments: [{ name: 'index', type: 'int' }] }]
+  },
+  HSlider: {
+    name: 'HSlider',
+    inherits: 'Range',
+    methods: [],
+    properties: [{ name: 'value', type: 'float' }, { name: 'min_value', type: 'float' }, { name: 'max_value', type: 'float' }],
+    signals: [{ name: 'value_changed', arguments: [{ name: 'value', type: 'float' }] }]
+  },
+  VSlider: {
+    name: 'VSlider',
+    inherits: 'Range',
+    methods: [],
+    properties: [{ name: 'value', type: 'float' }, { name: 'min_value', type: 'float' }, { name: 'max_value', type: 'float' }],
+    signals: [{ name: 'value_changed', arguments: [{ name: 'value', type: 'float' }] }]
+  },
+  TabContainer: {
+    name: 'TabContainer',
+    inherits: 'Container',
+    methods: [],
+    properties: [{ name: 'current_tab', type: 'int' }],
+    signals: [{ name: 'tab_changed', arguments: [{ name: 'tab', type: 'int' }] }, { name: 'tab_selected', arguments: [{ name: 'tab', type: 'int' }] }]
+  },
+  Panel: {
+    name: 'Panel',
+    inherits: 'Control',
+    methods: [],
+    properties: [],
+    signals: []
+  },
+  NinePatchRect: {
+    name: 'NinePatchRect',
+    inherits: 'Control',
+    methods: [],
+    properties: [{ name: 'texture', type: 'Texture2D' }, { name: 'patch_margin_left', type: 'int' }],
+    signals: []
+  },
+  CanvasLayer: {
+    name: 'CanvasLayer',
+    inherits: 'Node',
+    methods: [],
+    properties: [{ name: 'layer', type: 'int' }, { name: 'visible', type: 'bool' }],
+    signals: []
   }
 };

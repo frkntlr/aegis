@@ -52,6 +52,42 @@ test('TeamworkCoordinator plans teamwork, stages tracks in inbox, and acquires l
   }
 });
 
+test('TeamworkCoordinator routes Godot UI scene files to ui-specialist and avoids mutex collisions', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-tw-test-'));
+  try {
+    const coordinator = new TeamworkCoordinator(tmpDir);
+    const files = [
+      'src/gameplay/combat.ts',
+      'res://scenes/ui/pause_menu.tscn',
+      'res://ui/pause_menu.gd',
+      'res://themes/menu_theme.tres',
+      'docs/CONTRIBUTING.md'
+    ];
+    const plan = coordinator.planTeamwork('Implement Pause Menu and Combat HUD', files);
+
+    const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
+    const uiTrack = plan.tracks.find(t => t.subagentName === 'ui-specialist');
+    const docTrack = plan.tracks.find(t => t.subagentName === 'doc-architect');
+
+    assert.ok(solverTrack);
+    assert.ok(uiTrack);
+    assert.ok(docTrack);
+
+    // ui-specialist owns all Godot UI files
+    assert.ok(uiTrack?.targetFiles.includes('res://scenes/ui/pause_menu.tscn'));
+    assert.ok(uiTrack?.targetFiles.includes('res://ui/pause_menu.gd'));
+    assert.ok(uiTrack?.targetFiles.includes('res://themes/menu_theme.tres'));
+
+    // solver owns non-UI code
+    assert.deepStrictEqual(solverTrack?.targetFiles, ['src/gameplay/combat.ts']);
+
+    // doc-architect owns markdown
+    assert.deepStrictEqual(docTrack?.targetFiles, ['docs/CONTRIBUTING.md']);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('TeamworkCoordinator exports Antigravity subagents manifest cleanly', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-manifest-test-'));
   try {

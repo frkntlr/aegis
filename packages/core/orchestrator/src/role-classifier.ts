@@ -14,8 +14,27 @@ export interface RoleInferenceResult {
   isAmbiguous: boolean;
 }
 
+interface FileHits {
+  docs: number;
+  ui: number;
+  qa: number;
+  solver: number;
+}
+
 export class RoleClassifier {
   public static readonly CONFIDENCE_THRESHOLD = 60;
+
+  public static isUiFile(filePath: string): boolean {
+    const lower = filePath.toLowerCase().replace(/\\/g, '/');
+    if (lower.endsWith('.tres') || lower.endsWith('.theme') || lower.includes('/theme/') || lower.includes('/themes/')) {
+      return true;
+    }
+    const isUiNamed = lower.includes('/ui/') || lower.includes('menu') || lower.includes('hud') ||
+      lower.includes('dialog') || lower.includes('screen') || lower.includes('modal') ||
+      lower.includes('widget') || lower.includes('popup') || lower.includes('toast') ||
+      lower.includes('button') || lower.includes('toolbar') || lower.includes('window');
+    return (lower.endsWith('.tscn') || lower.endsWith('.gd')) && isUiNamed;
+  }
 
   public classify(input: RoleInferenceInput): RoleInferenceResult {
     const scores: Record<RoleType, number> = { solver: 0, qa: 0, docs: 0, ui: 0 };
@@ -45,9 +64,9 @@ export class RoleClassifier {
       scores.docs += 50;
       reasons.push("Etiket analizi: Dokümantasyon ('docs' / 'wiki' / 'rfc')");
     }
-    if (lower.some(l => l === 'role:ui' || l === 'theme' || l === 'styles' || l === 'design')) {
+    if (lower.some(l => l === 'role:ui' || l === 'theme' || l === 'styles' || l === 'design' || l === 'ui' || l === 'godot-ui')) {
       scores.ui += 50;
-      reasons.push("Etiket analizi: UI & Tema ('role:ui' / 'theme' / 'styles')");
+      reasons.push("Etiket analizi: UI & Tema ('role:ui' / 'theme' / 'styles' / 'ui')");
     }
     if (lower.some(l => l === 'role:qa' || l === 'qa' || l === 'test' || l === 'inspect')) {
       scores.qa += 50;
@@ -59,33 +78,43 @@ export class RoleClassifier {
     }
   }
 
-  private evaluateTargetFiles(files: string[], scores: Record<RoleType, number>, reasons: string[]): void {
-    if (files.length === 0) return;
-    let docsHits = 0;
-    let uiHits = 0;
-    let qaHits = 0;
-    let solverHits = 0;
-
+  private countFileHits(files: string[]): FileHits {
+    const hits: FileHits = { docs: 0, ui: 0, qa: 0, solver: 0 };
     for (const f of files) {
       const lower = f.toLowerCase().replace(/\\/g, '/');
-      if (lower.endsWith('.md') || lower.includes('/wiki/') || lower.includes('docs/')) docsHits++;
-      else if (lower.endsWith('.tres') || lower.endsWith('.theme') || lower.includes('/theme/')) uiHits++;
-      else if (lower.includes('.test.') || lower.includes('.spec.') || lower.endsWith('.tscn')) qaHits++;
-      else if (lower.endsWith('.ts') || lower.endsWith('.py') || lower.endsWith('.gd') || lower.endsWith('.rs')) solverHits++;
+      if (lower.endsWith('.md') || lower.includes('/wiki/') || lower.includes('docs/')) {
+        hits.docs++;
+      } else if (RoleClassifier.isUiFile(f)) {
+        hits.ui++;
+      } else if (lower.includes('.test.') || lower.includes('.spec.') || lower.endsWith('.tscn')) {
+        hits.qa++;
+      } else if (lower.endsWith('.ts') || lower.endsWith('.py') || lower.endsWith('.gd') || lower.endsWith('.rs')) {
+        hits.solver++;
+      }
     }
+    return hits;
+  }
 
-    if (docsHits > qaHits && docsHits > solverHits && docsHits > uiHits) {
-      scores.docs += 35;
-      reasons.push(`Dosya analizi: Markdown/Wiki dosyaları (${docsHits} adet)`);
-    } else if (uiHits > 0 && uiHits >= qaHits && uiHits >= solverHits) {
-      scores.ui += 35;
-      reasons.push(`Dosya analizi: Tema/Arayüz dosyaları (${uiHits} adet)`);
-    } else if (qaHits > solverHits) {
-      scores.qa += 35;
-      reasons.push(`Dosya analizi: Test/Sahne dosyaları (${qaHits} adet)`);
-    } else if (solverHits > 0) {
-      scores.solver += 35;
-      reasons.push(`Dosya analizi: Kaynak kod dosyaları (${solverHits} adet)`);
+  private evaluateTargetFiles(files: string[], scores: Record<RoleType, number>, reasons: string[]): void {
+    if (files.length === 0) return;
+    const h = this.countFileHits(files);
+    const isExclDocs = h.docs > 0 && h.ui === 0 && h.qa === 0 && h.solver === 0;
+    const isExclUi = h.ui > 0 && h.docs === 0 && h.qa === 0 && h.solver === 0;
+    const isExclQa = h.qa > 0 && h.docs === 0 && h.ui === 0 && h.solver === 0;
+    const isExclSolver = h.solver > 0 && h.docs === 0 && h.ui === 0 && h.qa === 0;
+
+    if (h.docs > h.qa && h.docs > h.solver && h.docs > h.ui) {
+      scores.docs += isExclDocs ? 45 : 35;
+      reasons.push(`Dosya analizi: Markdown/Wiki dosyaları (${h.docs} adet)`);
+    } else if (h.ui > 0 && h.ui >= h.qa && h.ui >= h.solver) {
+      scores.ui += isExclUi ? 45 : 35;
+      reasons.push(`Dosya analizi: Tema/Arayüz dosyaları (${h.ui} adet)`);
+    } else if (h.qa > h.solver) {
+      scores.qa += isExclQa ? 45 : 35;
+      reasons.push(`Dosya analizi: Test/Sahne dosyaları (${h.qa} adet)`);
+    } else if (h.solver > 0) {
+      scores.solver += isExclSolver ? 45 : 35;
+      reasons.push(`Dosya analizi: Kaynak kod dosyaları (${h.solver} adet)`);
     }
   }
 
@@ -94,25 +123,26 @@ export class RoleClassifier {
     if (!lower.trim()) return;
 
     const docsKeywords = ['doküman', 'document', 'wiki', 'rehber', 'guide', 'rfc', 'mimari'];
-    const uiKeywords = ['tema', 'theme', 'stylebox', 'font', 'renk', 'color', 'stil', 'tasarım', 'container', 'margin', 'responsive'];
+    const uiKeywords = [
+      'tema', 'theme', 'stylebox', 'font', 'renk', 'color', 'stil', 'tasarım',
+      'container', 'margin', 'responsive', 'ui', 'godot ui', 'menu', 'menü',
+      'hud', 'dialog', 'diyalog', 'button', 'buton', 'label', 'layout',
+      'anchor', 'control', 'canvas', 'screen', 'ekran', 'arayüz', 'widget'
+    ];
     const qaKeywords = ['test et', 'denetle', 'inspect', 'boundingbox', 'visual', 'görsel', 'layout', 'telemetry', 'playtest', 'aspect ratio'];
     const solverKeywords = ['çöz', 'onarım', 'fix', 'bug', 'hata', 'implement', 'algorithm', 'refactor', 'mutation', 'demir kafes'];
 
-    if (docsKeywords.some(k => lower.includes(k))) {
-      scores.docs += 15;
-      reasons.push('Metin analizi: Dokümantasyon anahtar kelimeleri');
-    }
-    if (uiKeywords.some(k => lower.includes(k))) {
-      scores.ui += 15;
-      reasons.push('Metin analizi: UI & Tema anahtar kelimeleri');
-    }
-    if (qaKeywords.some(k => lower.includes(k))) {
-      scores.qa += 15;
-      reasons.push('Metin analizi: Test & Denetim anahtar kelimeleri');
-    }
-    if (solverKeywords.some(k => lower.includes(k))) {
-      scores.solver += 15;
-      reasons.push('Metin analizi: Hata onarımı anahtar kelimeleri');
+    this.matchKeywords(lower, docsKeywords, 'docs', scores, reasons, 'Dokümantasyon');
+    this.matchKeywords(lower, uiKeywords, 'ui', scores, reasons, 'UI & Tema');
+    this.matchKeywords(lower, qaKeywords, 'qa', scores, reasons, 'Test & Denetim');
+    this.matchKeywords(lower, solverKeywords, 'solver', scores, reasons, 'Hata onarımı');
+  }
+
+  private matchKeywords(text: string, words: string[], role: RoleType, scores: Record<RoleType, number>, reasons: string[], label: string): void {
+    const matches = words.filter(k => text.includes(k));
+    if (matches.length > 0) {
+      scores[role] += matches.length > 1 ? 25 : 15;
+      reasons.push(`Metin analizi: ${label} anahtar kelimeleri`);
     }
   }
 

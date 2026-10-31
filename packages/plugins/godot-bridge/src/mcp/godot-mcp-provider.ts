@@ -7,6 +7,7 @@
 import { GodotLocator } from '../godot-locator.js';
 import { GodotTestRunner } from '../godot-test-runner.js';
 import { GodotUiVerifier } from '../ui/godot-ui-verifier.js';
+import { GodotUiLinter } from '../ui/godot-ui-linter.js';
 import { ClassDbOracle } from '../classdboracle/classdboracle.js';
 import { GodotSceneValidator } from '../godot-scene-validator.js';
 
@@ -35,11 +36,12 @@ const MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'aegis_godot_inspect_ui',
-    description: 'Zero-token responsive UI layout inspection across 4 canonical aspect ratios.',
+    description: 'Zero-token responsive UI layout inspection & static Godot 4 UI compliance sweep.',
     parameters: {
       type: 'object',
       properties: {
         projectDir: { type: 'string', description: 'Target Godot project path.' },
+        scenePath: { type: 'string', description: 'Optional .tscn scene file to inspect and lint.' },
         minTouchTarget: { type: 'number', description: 'Minimum touch target size (default 44px).' }
       }
     }
@@ -78,7 +80,7 @@ const MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'aegis_godot_validate',
-    description: 'Validate GDScript syntax with native compiler and verify ClassDB API usage.',
+    description: 'Validate GDScript syntax with native compiler and verify UI scene structure & best practices.',
     parameters: {
       type: 'object',
       properties: {
@@ -111,10 +113,28 @@ export class GodotMcpProvider {
       return JSON.stringify(res, null, 2);
     }
     if (filePath.endsWith('.tscn')) {
-      const res = GodotSceneValidator.validateSceneFile(filePath);
-      return JSON.stringify(res, null, 2);
+      const sceneRes = GodotSceneValidator.validateSceneFile(filePath);
+      const uiLint = GodotUiLinter.lintScene(filePath);
+      return JSON.stringify({
+        valid: sceneRes.valid && uiLint.valid,
+        sceneStructure: sceneRes,
+        uiBestPractices: uiLint
+      }, null, 2);
     }
     return JSON.stringify({ valid: false, error: 'Unsupported file extension' });
+  }
+
+  private static handleInspectUi(args: Record<string, unknown>): string {
+    const scene = String(args.scenePath || args.filePath || args.tscnPath || '');
+    if (scene && scene.endsWith('.tscn')) {
+      const lint = GodotUiLinter.lintScene(scene);
+      return JSON.stringify({
+        scenePath: scene,
+        uiReport: lint,
+        supportedAspects: GodotUiVerifier.REQUIRED_ASPECT_RATIOS
+      }, null, 2);
+    }
+    return JSON.stringify({ verifier: 'active', supportedAspects: GodotUiVerifier.REQUIRED_ASPECT_RATIOS }, null, 2);
   }
 
   public static async handleToolCall(name: string, args: Record<string, unknown>): Promise<string> {
@@ -137,11 +157,10 @@ export class GodotMcpProvider {
     }
     if (name === 'aegis_godot_playtest') {
       const dir = String(args.projectDir || process.cwd());
-      const res = await GodotTestRunner.runPlaytestScenario(dir, args.scenarioPath ? String(args.scenarioPath) : undefined);
-      return JSON.stringify(res, null, 2);
+      return JSON.stringify(await GodotTestRunner.runPlaytestScenario(dir, args.scenarioPath ? String(args.scenarioPath) : undefined), null, 2);
     }
     if (name === 'aegis_godot_inspect_ui') {
-      return JSON.stringify({ verifier: 'active', supportedAspects: GodotUiVerifier.REQUIRED_ASPECT_RATIOS }, null, 2);
+      return this.handleInspectUi(args);
     }
     return JSON.stringify({ tool: name, executed: true, note: 'Processed via @aegis/godot-bridge 2.0 substrate' });
   }

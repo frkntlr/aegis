@@ -93,3 +93,24 @@ test('RoleClassifier identifies qa role from telemetry and playtest semantics', 
   assert.strictEqual(res.role, 'qa');
   assert.ok(res.confidence >= 60);
 });
+
+test('RoleClassifier.isUiFile correctly detects Godot UI scenes, themes, and UI controllers', () => {
+  assert.strictEqual(RoleClassifier.isUiFile('res://scenes/ui/pause_menu.tscn'), true);
+  assert.strictEqual(RoleClassifier.isUiFile('ui/hud.gd'), true);
+  assert.strictEqual(RoleClassifier.isUiFile('assets/theme.tres'), true);
+  assert.strictEqual(RoleClassifier.isUiFile('scenes/settings_dialog.tscn'), true);
+  assert.strictEqual(RoleClassifier.isUiFile('src/player_movement.gd'), false);
+  assert.strictEqual(RoleClassifier.isUiFile('scenes/dungeon_level.tscn'), false);
+});
+
+test('RoleClassifier classifies Godot menu / HUD scene tasks as ui role with high confidence', () => {
+  const classifier = new RoleClassifier();
+  const res = classifier.classify({
+    title: 'Create pause menu UI with buttons and health bar HUD in Godot',
+    targetFiles: ['res://scenes/ui/pause_menu.tscn', 'res://ui/hud.gd']
+  });
+
+  assert.strictEqual(res.role, 'ui');
+  assert.ok(res.confidence >= 60);
+  assert.strictEqual(res.isAmbiguous, false);
+});

@@ -36,7 +36,9 @@ When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegi
 - `/aegis triage [dir]`: Evidence-Based Bug Triage (zero false alarms).
 - `/aegis trace <target>`: Trace relational callers, signal listeners & scenes.
 - `/aegis graph:scan [dir]`: Build cross-reference relational knowledge graph.
-- `/aegis godot <subcmd>`: Godot Bridge: status, inspect, validate, query, run.
+- `/aegis godot <subcmd>`: Godot Bridge: status, ui, inspect, validate, query, run, playtest.
+- `/aegis godot ui:lint <scene>`: Run static Godot 4 UI compliance linter (anchors, container rules, touch targets).
+- `/aegis godot ui:scaffold <type> <name> [dir]`: Scaffold production-ready Godot 4 UI (menu, hud, dialog, theme).
 - `/aegis mutate <file>`: Run mutation testing gate on target file.
 - `/aegis diff <diff>`: Validate surgical unified diff compliance.
 - `/aegis audit <files>`: Run Immutable Oracle trust verification.
@@ -100,10 +102,24 @@ Whenever the user or agent proposes an improvement, feature, toolchain gap, or a
 ## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`)
 When coordinating multi-agent tasks in Antigravity:
 1. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into `.aegis/task-inbox.json`.
-2. **Define Subagents**: When subagent roles are needed, register them with Antigravity's `define_subagent` using their official Aegis profile badges and system prompts.
-3. **Invoke Subagents**: Invoke tracks using `invoke_subagent` with `Workspace: 'share'` so subagents share the repository worktree safely without duplication.
-4. **Autonomous Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules, run `aegis verify:task`, and report completion back to the Team Lead.
-5. **Lock Lifecycle**: The Team Lead monitors subagents with `manage_subagents` and releases locks upon verified completion with `aegis task:release <id> done`.
+2. **Role Specialization for Godot**:
+   - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`).
+   - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions.
+   - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests, UI layout bounding box sweeps (`aegis godot inspect`), and regression audits.
+   - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki, architecture blueprints, and issue specifications.
+3. **Define Subagents**: When subagent roles are needed, register them with Antigravity's `define_subagent` using their official Aegis profile badges and system prompts.
+4. **Invoke Subagents**: Invoke tracks using `invoke_subagent` with `Workspace: 'share'` so subagents share the repository worktree safely without duplication.
+5. **Autonomous Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules, run `aegis verify:task`, and report completion back to the Team Lead.
+6. **Lock Lifecycle**: The Team Lead monitors subagents with `manage_subagents` and releases locks upon verified completion with `aegis task:release <id> done`.
+
+## Godot 4 UI Architecture & Engineering Protocol (Demir Kafes for UI)
+When editing, scaffolding, or polishing Godot UI:
+1. **Container-First Layout**: Always wrap UI elements inside responsive containers (`MarginContainer`, `PanelContainer`, `VBoxContainer`, `HBoxContainer`, `GridContainer`, `ScrollContainer`). Never hardcode manual pixel positions or offsets on container children.
+2. **Responsive Anchors**: Full-screen root UI (`Control`, `CanvasLayer`) must define `anchors_preset = 15` (Full Rect) with `grow_horizontal = 2, grow_vertical = 2`.
+3. **Touch Targets**: Interactive controls (`Button`, `CheckButton`, `Slider`) must maintain a minimum touch target size of 44x44px (`custom_minimum_size = Vector2(44, 44)`).
+4. **Theme & StyleBoxes**: Consolidate visuals into `.tres` Theme resources using `StyleBoxFlat` (margins, corner radius, borders, background colors).
+5. **Decoupled Controllers**: UI GDScript controllers must extend `Control` or `CanvasLayer`, reference nodes via unique names (`%NodeName`) or clean typed paths, and emit custom signals (`signal start_pressed`) rather than directly mutating business models.
+6. **Pre-PR Static Verification**: Run `aegis godot ui:lint <scene.tscn>` and verify 100/100 score before releasing UI tasks.
 
 ## Code Quality Standards (Demir Kafes)
 All code modifications in this project must strictly comply with:

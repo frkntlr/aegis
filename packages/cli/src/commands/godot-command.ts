@@ -5,6 +5,9 @@ import {
   GodotInitWorkflow,
   GodotLocator,
   GodotUiVerifier,
+  GodotUiLinter,
+  GodotUiScaffolder,
+  type UiScaffoldType,
   ClassDbOracle,
   DoctoolRunner,
   GodotTestRunner,
@@ -224,10 +227,40 @@ export async function handleGodotTest(projectDirArg?: string, scenarioArg?: stri
   }
 }
 
+export function handleGodotUi(subcmd = 'lint', ...args: string[]): void {
+  showBanner();
+  const act = subcmd.toLowerCase();
+  if (act === 'scaffold' || act === 'create') {
+    const type = (args[0] || 'menu') as UiScaffoldType;
+    const name = args[1] || 'menu';
+    const outDir = args[2] || process.cwd();
+    const res = GodotUiScaffolder.scaffold(type, { name, outputDir: outDir });
+    console.log(`🎨 Godot UI Scaffolding Complete: [${type.toUpperCase()}] "${res.name}"`);
+    for (const f of res.filesWritten) console.log(` • Created: ${f}`);
+    return;
+  }
+  const target = args[0] || (subcmd.endsWith('.tscn') ? subcmd : process.cwd());
+  if (target.endsWith('.tscn')) {
+    const report = GodotUiLinter.lintScene(target);
+    console.log(`🎨 Godot UI Scene Linter Report for: ${target}`);
+    console.log(` • Score: ${report.score}/100 | Status: ${report.valid ? '✅ VALID' : '❌ ISSUES FOUND'} | Nodes: ${report.nodeCount}`);
+    for (const iss of report.issues) {
+      console.log(`   [${iss.severity.toUpperCase()}] ${iss.nodeName} (${iss.rule}): ${iss.message}`);
+      console.log(`     💡 Fix: ${iss.fixSuggestion}`);
+    }
+    return;
+  }
+  handleGodotInspect(target);
+}
+
 export async function handleGodot(args: string[]): Promise<void> {
   const subcommand = args[0] || 'status';
   if (subcommand === 'init') {
     handleGodotInit(args[1], args[2]);
+  } else if (subcommand === 'ui' || subcommand.startsWith('ui:')) {
+    const sub = subcommand.includes(':') ? subcommand.split(':')[1] : args[1];
+    const subArgs = subcommand.includes(':') ? args.slice(1) : args.slice(2);
+    handleGodotUi(sub, ...subArgs);
   } else if (subcommand === 'inspect') {
     handleGodotInspect(args[1]);
   } else if (subcommand === 'status') {
@@ -245,6 +278,6 @@ export async function handleGodot(args: string[]): Promise<void> {
   } else if (subcommand === 'test') {
     await handleGodotTest(args[1], args[2]);
   } else {
-    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|status|inspect|query|doctool|validate|run|playtest]`);
+    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|ui|status|inspect|query|doctool|validate|run|playtest]`);
   }
 }

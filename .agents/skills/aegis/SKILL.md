@@ -57,7 +57,9 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis triage [dir]` | Evidence-Based Bug Triage (zero false alarms) | `aegis triage [dir]` |
 | `/aegis trace <target>` | Trace relational callers, signal listeners & scenes | `aegis trace <target>` |
 | `/aegis graph:scan [dir]` | Build cross-reference relational knowledge graph | `aegis graph:scan [dir]` |
-| `/aegis godot <subcmd>` | Godot Bridge: status, inspect, validate, query, run | `aegis godot <subcmd>` |
+| `/aegis godot <subcmd>` | Godot Bridge: status, ui, inspect, validate, query, run | `aegis godot <subcmd>` |
+| `/aegis godot ui:lint <scene>` | Static Godot 4 UI compliance linter (anchors, container rules, touch targets) | `aegis godot ui:lint <scene>` |
+| `/aegis godot ui:scaffold <type> <name>` | Scaffold production-ready Godot 4 UI (menu, hud, dialog, theme) | `aegis godot ui:scaffold <type> <name>` |
 | `/aegis godot:test [dir]` | Run Godot compiler pre-flight and 3-tier playtest runner | `aegis godot:test [dir]` |
 | `/aegis diff <diff>` | Validate surgical unified diff compliance | `aegis diff <diff>` |
 | `/aegis audit <files>` | Run Immutable Oracle trust verification | `aegis audit <files>` |
@@ -91,7 +93,6 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
    - Code must pass 100% unit tests, Demir Kafes rules, and zero runtime crashes.
 6. **Authoritative 29-Tool MCP Server**:
    - Aegis exposes 29 authoritative tools directly to Antigravity (including `teamwork_plan` and `teamwork_status`), replacing legacy external bloated MCP servers with zero-token UI inspection, native `--check-only` compiler pre-flight, and deterministic port allocation.
-   - Aegis exposes 27 authoritative tools directly to Antigravity, replacing legacy external bloated MCP servers with zero-token UI inspection, native `--check-only` compiler pre-flight, and deterministic port allocation.
 7. **Headless Git Safety**: `$env:GIT_TERMINAL_PROMPT=0` mandatory; git push requires prior auth verification and explicit permission.
 8. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
 9. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.
@@ -106,6 +107,8 @@ When the user triggers `/aegis teamwork <objective>` or `/teamwork`:
 1. **Plan & Stage Tracks**:
    Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP tool `teamwork_plan`.
    - Ingests the objective and identifies target tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`).
+   - `ui-specialist` is the designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`).
+   - `issue-solver` owns domain logic, models, and algorithms, eliminating file lock collisions.
    - Acquires mutex file locks on target files (`.aegis/locks.json`).
    - Stages track payloads into `.aegis/task-inbox.json`.
 
@@ -113,7 +116,7 @@ When the user triggers `/aegis teamwork <objective>` or `/teamwork`:
    Call `define_subagent` for each required role:
    - `issue-solver`: Demir Kafes, surgical diffs, pre-commit tests.
    - `qa-hunter`: Evidence-based triage, Socratic debugging, mutation score >= 70%.
-   - `ui-specialist`: Zero-token layout sweeps, theme styling, <300 line controllers.
+   - `ui-specialist`: Godot 4 UI scenes (.tscn), container-first layouts, responsive anchors (anchors_preset=15), touch targets (>=44px), themes (.tres), and decoupled GDScript controllers (<300 lines).
    - `doc-architect`: Living wiki sync (`<repo>.wiki.git`), RFC ideation, zero premature coding.
 
 3. **Spawn Subagents with Shared Workspace**:
@@ -125,7 +128,7 @@ When the user triggers `/aegis teamwork <objective>` or `/teamwork`:
 4. **Autonomous Parallel Execution & Verification**:
    - Subagents pull their task with `aegis task:pull [role]` or MCP `task_inbox_pull`.
    - Subagents implement isolated changes without modifying files locked by peers.
-   - Subagents run `aegis verify:task` (Demir Kafes + tests + playtest) before reporting back.
+   - Subagents run `aegis verify:task` or `aegis godot ui:lint` before reporting back.
 
 5. **Team Lead Coordination & Lock Release**:
    - Team Lead monitors active subagents with `manage_subagents` and inspects `aegis teamwork status`.

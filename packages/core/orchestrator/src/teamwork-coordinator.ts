@@ -69,14 +69,17 @@ export class TeamworkCoordinator {
     const tracks: TeamworkTrack[] = [];
     const inference = this.roleClassifier.classify({ title: objective, targetFiles });
 
+    const uiFiles = targetFiles.filter(f => RoleClassifier.isUiFile(f));
+    const docFiles = targetFiles.filter(f => f.endsWith('.md') || f.includes('docs/') || f.includes('wiki/'));
+    const solverFiles = targetFiles.filter(f => !docFiles.includes(f) && !uiFiles.includes(f));
+
     const solverProfile = profiles.find(p => p.roleType === 'solver')!;
-    const solverFiles = targetFiles.filter(f => !f.endsWith('.md') && !f.endsWith('.tres'));
     tracks.push(this.buildTrack('solver', solverProfile, `Implement core logic for: ${objective}`, solverFiles));
 
     const qaProfile = profiles.find(p => p.roleType === 'qa')!;
     tracks.push(this.buildTrack('qa', qaProfile, `Audit, triage, and test: ${objective}`, []));
 
-    this.addAuxiliaryTracks(tracks, profiles, objective, targetFiles, inference.role);
+    this.addAuxiliaryTracks(tracks, profiles, objective, targetFiles, inference.role, uiFiles, docFiles);
     this.stageTracksIntoInbox(planId, objective, tracks);
     return {
       planId,
@@ -87,17 +90,28 @@ export class TeamworkCoordinator {
     };
   }
 
-  private addAuxiliaryTracks(tracks: TeamworkTrack[], profiles: SubagentProfile[], obj: string, files: string[], role: string): void {
+  private addAuxiliaryTracks(
+    tracks: TeamworkTrack[],
+    profiles: SubagentProfile[],
+    obj: string,
+    files: string[],
+    role: string,
+    uiFiles: string[],
+    docFiles: string[]
+  ): void {
     const lower = obj.toLowerCase();
-    const hasUi = role === 'ui' || lower.includes('ui') || lower.includes('theme') || files.some(f => f.includes('theme') || f.endsWith('.tres'));
+    const hasUi = role === 'ui' || uiFiles.length > 0 || lower.includes('ui') || lower.includes('godot ui') ||
+      lower.includes('theme') || lower.includes('menu') || lower.includes('hud') || lower.includes('screen') ||
+      files.some(f => RoleClassifier.isUiFile(f));
     if (hasUi) {
       const p = profiles.find(x => x.roleType === 'ui')!;
-      tracks.push(this.buildTrack('ui', p, `Refine interface layout and theme for: ${obj}`, files.filter(f => f.endsWith('.tres') || f.includes('theme'))));
+      const assigned = uiFiles.length > 0 ? uiFiles : files.filter(f => RoleClassifier.isUiFile(f));
+      tracks.push(this.buildTrack('ui', p, `Refine interface layout and theme for: ${obj}`, assigned));
     }
-    const hasDocs = role === 'docs' || lower.includes('doc') || lower.includes('wiki') || lower.includes('rfc') || files.some(f => f.endsWith('.md'));
+    const hasDocs = role === 'docs' || docFiles.length > 0 || lower.includes('doc') || lower.includes('wiki') || lower.includes('rfc') || files.some(f => f.endsWith('.md'));
     if (hasDocs) {
       const p = profiles.find(x => x.roleType === 'docs')!;
-      tracks.push(this.buildTrack('docs', p, `Document specifications and living wiki for: ${obj}`, files.filter(f => f.endsWith('.md'))));
+      tracks.push(this.buildTrack('docs', p, `Document specifications and living wiki for: ${obj}`, docFiles));
     }
   }
 
