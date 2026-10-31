@@ -48,14 +48,27 @@ export interface TeamworkStatusReport {
   locks: Record<string, string>;
 }
 
+function resolveSafeRepoRoot(initial?: string): string {
+  if (initial) return initial;
+  const cwd = process.cwd();
+  if (cwd.toLowerCase().includes('system32')) {
+    if (process.env.AEGIS_WORKSPACE && fs.existsSync(process.env.AEGIS_WORKSPACE)) {
+      return process.env.AEGIS_WORKSPACE;
+    }
+    const scratch = path.resolve(process.env.USERPROFILE || 'C:\\Users\\Lenovo', '.gemini', 'antigravity', 'scratch', 'aegis');
+    if (fs.existsSync(scratch)) return scratch;
+  }
+  return cwd;
+}
+
 export class TeamworkCoordinator {
   private repoRoot: string;
   private worktreeManager: WorktreeManager;
   private roleClassifier: RoleClassifier;
 
   constructor(repoRoot?: string, worktreeManager?: WorktreeManager, roleClassifier?: RoleClassifier) {
-    this.repoRoot = repoRoot ?? process.cwd();
-    this.worktreeManager = worktreeManager ?? new WorktreeManager({ persistLocks: true });
+    this.repoRoot = resolveSafeRepoRoot(repoRoot);
+    this.worktreeManager = worktreeManager ?? new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
     this.roleClassifier = roleClassifier ?? new RoleClassifier();
   }
 
@@ -137,7 +150,7 @@ export class TeamworkCoordinator {
 
   private stageTracksIntoInbox(planId: string, objective: string, tracks: TeamworkTrack[]): void {
     const inboxPath = path.resolve(this.repoRoot, '.aegis', 'task-inbox.json');
-    fs.mkdirSync(path.dirname(inboxPath), { recursive: true });
+    try { fs.mkdirSync(path.dirname(inboxPath), { recursive: true }); } catch { return; }
     let existing: unknown[] = [];
     if (fs.existsSync(inboxPath)) {
       try { existing = JSON.parse(fs.readFileSync(inboxPath, 'utf8')); } catch { existing = []; }
@@ -161,12 +174,14 @@ export class TeamworkCoordinator {
         stagedAt: new Date().toISOString()
       });
     }
-    fs.writeFileSync(inboxPath, JSON.stringify(inboxArray, null, 2), 'utf8');
+    try {
+      fs.writeFileSync(inboxPath, JSON.stringify(inboxArray, null, 2), 'utf8');
+    } catch { /* ignore if write not permitted */ }
   }
 
   public exportSubagentManifest(outDir?: string): { count: number; manifestPath: string } {
     const targetDir = outDir ?? path.resolve(this.repoRoot, '.aegis');
-    fs.mkdirSync(targetDir, { recursive: true });
+    try { fs.mkdirSync(targetDir, { recursive: true }); } catch { /* ignore */ }
     const manifestPath = path.join(targetDir, 'subagents.json');
     const profiles = this.listProfiles();
     const manifest = {
@@ -184,7 +199,9 @@ export class TeamworkCoordinator {
         defaultModel: p.defaultModel ?? 'inherit'
       }))
     };
-    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+    try {
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+    } catch { /* ignore if write not permitted */ }
     return { count: profiles.length, manifestPath };
   }
 
