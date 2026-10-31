@@ -208,18 +208,52 @@ export class UniversalToolchainSync {
     } catch { /* ignore non-fatal */ }
   }
 
-  private syncGlobalAntigravity(userHome: string): void {
-    const globalSkillDir = path.resolve(userHome, '.gemini', 'config', 'skills', 'aegis');
-    const localSkill = path.resolve(this.repoRoot, '.agents', 'skills', 'aegis', 'SKILL.md');
-    if (fs.existsSync(localSkill)) {
-      fs.mkdirSync(globalSkillDir, { recursive: true });
-      fs.copyFileSync(localSkill, path.join(globalSkillDir, 'SKILL.md'));
+  private cleanLegacyAntigravity(userHome: string): void {
+    const list = ['.gemini/config/skills/aegis', '.gemini/config/skills/aegist', '.gemini/config/skills.json', '.gemini/config/plugins.json'];
+    for (const rel of list) {
+      const p = path.resolve(userHome, rel);
+      if (fs.existsSync(p)) {
+        try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* ignore */ }
+      }
     }
+  }
+
+  private installAntigravityPlugin(userHome: string, localSkill: string): void {
+    const pluginDir = path.resolve(userHome, '.gemini', 'config', 'plugins', 'aegis');
+    const skillDir = path.join(pluginDir, 'skills', 'aegis');
+    const rulesDir = path.join(pluginDir, 'rules');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.mkdirSync(rulesDir, { recursive: true });
+    fs.writeFileSync(path.join(pluginDir, 'plugin.json'), JSON.stringify({ name: 'aegis', version: '0.1.0' }, null, 2), 'utf8');
+    if (fs.existsSync(localSkill)) fs.copyFileSync(localSkill, path.join(skillDir, 'SKILL.md'));
+    const geminiMd = path.resolve(this.repoRoot, 'GEMINI.md');
+    if (fs.existsSync(geminiMd)) fs.copyFileSync(geminiMd, path.join(rulesDir, 'AGENTS.md'));
+  }
+
+  private installAntigravityShims(userHome: string, cliPath: string): void {
+    const binDir = path.resolve(userHome, '.gemini', 'antigravity', 'bin');
+    if (!fs.existsSync(binDir) && process.platform !== 'win32') return;
+    try {
+      fs.mkdirSync(binDir, { recursive: true });
+      const cmd = `@echo off\r\nnode "${cliPath}" %*\r\n`;
+      const ps1 = `& node "${cliPath}" @args\r\n`;
+      fs.writeFileSync(path.join(binDir, 'aegis.cmd'), cmd, 'utf8');
+      fs.writeFileSync(path.join(binDir, 'aegist.cmd'), cmd, 'utf8');
+      fs.writeFileSync(path.join(binDir, 'aegis.ps1'), ps1, 'utf8');
+      fs.writeFileSync(path.join(binDir, 'aegist.ps1'), ps1, 'utf8');
+    } catch { /* ignore non-fatal */ }
+  }
+
+  private syncGlobalAntigravity(userHome: string): void {
+    const localSkill = path.resolve(this.repoRoot, '.agents', 'skills', 'aegis', 'SKILL.md');
+    const cliPath = path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js');
+    this.cleanLegacyAntigravity(userHome);
+    this.installAntigravityPlugin(userHome, localSkill);
+    this.installAntigravityShims(userHome, cliPath);
     const schemaDir = path.resolve(userHome, '.gemini', 'antigravity', 'mcp', 'aegis');
     fs.mkdirSync(schemaDir, { recursive: true });
     this.writeAegisMcpSchemas(schemaDir);
-    const globalMcp = path.resolve(userHome, '.gemini', 'config', 'mcp_config.json');
-    this.registerAegisMcpServer(globalMcp);
+    this.registerAegisMcpServer(path.resolve(userHome, '.gemini', 'config', 'mcp_config.json'));
   }
 
   private writeAegisMcpSchemas(dir: string): void {

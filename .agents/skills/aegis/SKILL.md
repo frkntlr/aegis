@@ -1,20 +1,20 @@
 ---
 name: aegis
 description: >-
-  Autonomous Vibe Coding Engine command center and slash command (/aegis).
+  Autonomous Vibe Coding Engine command center and slash command (/aegist, /aegis).
   Use this skill whenever the user invokes /aegis, /aegis auto, /aegis dashboard,
   /aegis status, /aegis skeleton, /aegis cage:check, or asks to manage autonomous
   worktrees (solver/qa/docs), dispatch tasks, run quality gates, or inspect UI telemetry.
 ---
 
-# Aegis Autonomous Vibe Coding Engine (/aegis)
+# Aegis Autonomous Vibe Coding Engine (/aegist, /aegis)
 
-This skill activates whenever the user triggers the `/aegis` slash command or requests autonomous orchestration, worktree execution, or quality gate audits.
+This skill activates whenever the user triggers the `/aegist` or `/aegis` slash command or requests autonomous orchestration, worktree execution, or quality gate audits.
 
 ## Universal CLI & Workspace Execution
 
-`aegis` is installed as a universal binary accessible from **ANY** project directory (e.g. `Hake Game`, `aegis`, worktrees).
-Directly run `aegis <command>` via `run_command` (no `npm run` wrapper needed):
+`aegis` and `aegist` are installed as universal binaries accessible from **ANY** project directory (e.g. `Hake Game`, `aegis`, worktrees).
+Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm run` wrapper needed):
 
 | Command | Action | Execution |
 | :--- | :--- | :--- |

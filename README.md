@@ -357,7 +357,7 @@ npm run build
 ```
 
 ### 3. Evrensel CLI Kullanımı
-Aegis, projenin derlenmesiyle birlikte evrensel bir sistem binary'si haline gelir. Herhangi bir çalışma alanında (ana repo, worktree, Godot oyun dizini) `npm run` yazmadan doğrudan `aegis` komutunu kullanabilirsiniz:
+Aegis, projenin derlenmesiyle birlikte evrensel bir sistem binary'si haline gelir. Herhangi bir çalışma alanında (ana repo, worktree, Godot oyun dizini) `npm run` yazmadan doğrudan `aegis` veya `aegist` komutunu kullanabilirsiniz:
 ```bash
 # Worktree'leri ve ortamı hazırlama
 aegis init
@@ -385,7 +385,7 @@ aegis memory:watch packages
 
 ## 💻 Kapsamlı Evrensel CLI Komut Referansı
 
-Aegis komut satırı arayüzü doğrudan `aegis <komut>` veya `npm run aegis -- <komut>` şeklinde kullanılabilir.
+Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya `npm run aegis -- <komut>` şeklinde kullanılabilir.
 
 ### 1. Temel Orkestrasyon & Görev Dağıtımı (TIP)
 | Komut | Açıklama |

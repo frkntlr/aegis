@@ -1,7 +1,7 @@
 # Aegis Autonomous Vibe Coding Engine Rules
 
-## `/aegis` Slash Command Protocol
-When the user sends `/aegis` or `/aegis <subcommand>`, immediately interpret and execute the corresponding Aegis CLI command in PowerShell:
+## `/aegist` and `/aegis` Slash Command Protocol
+When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegist <cmd>` or `/aegis <cmd>`, immediately interpret and execute the corresponding Aegis CLI command in PowerShell:
 
 - `/aegis` or `/aegis status`: Run `npm run aegis -- status` and display worktrees and file locks.
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.

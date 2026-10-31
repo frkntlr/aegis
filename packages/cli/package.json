@@ -7,7 +7,8 @@
     "access": "public"
   },
   "bin": {
-    "aegis": "dist/bin/aegis.js"
+    "aegis": "dist/bin/aegis.js",
+    "aegist": "dist/bin/aegis.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

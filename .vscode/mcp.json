@@ -18,6 +18,13 @@
       "args": [
         "packages/cli/dist/bin/aegis.js"
       ]
+    },
+    "aegis": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\Users\\Lenovo\\AntigravityProfiles\\client-a\\.gemini\\antigravity\\scratch\\aegis\\packages\\cli\\dist\\bin\\aegis.js",
+        "mcp"
+      ]
     }
   }
 }
