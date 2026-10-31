@@ -20,6 +20,9 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | :--- | :--- | :--- |
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `aegis status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `aegis auto` |
+| `/aegis teamwork [status]` | View active Antigravity subagents & locked tracks | `aegis teamwork [status]` |
+| `/aegis teamwork plan "<obj>"` | Generate Antigravity subagent plan & stage TIP tracks | `aegis teamwork plan "<obj>"` |
+| `/aegis teamwork setup [dir]` | Export subagents manifest (.aegis/subagents.json) | `aegis teamwork setup` |
 | `/aegis task:list [status]` | List ready, in_progress, or blocked tasks in TIP queue | `aegis task:list [status]` |
 | `/aegis task:claim <id> [agent]` | Claim task for role, acquire file locks, set in_progress | `aegis task:claim <id> [agent]` |
 | `/aegis task:release <id> [status]` | Release or complete task, release locks, update status | `aegis task:release <id> [status]` |
@@ -86,10 +89,45 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 5. **Multimodal Quality Gate (Playtest-Before-PR)**:
    - Never open a PR without running `aegis verify:task` or verifying headless runtime playtest on Godot projects.
    - Code must pass 100% unit tests, Demir Kafes rules, and zero runtime crashes.
-6. **Authoritative 27-Tool MCP Server**:
+6. **Authoritative 29-Tool MCP Server**:
+   - Aegis exposes 29 authoritative tools directly to Antigravity (including `teamwork_plan` and `teamwork_status`), replacing legacy external bloated MCP servers with zero-token UI inspection, native `--check-only` compiler pre-flight, and deterministic port allocation.
    - Aegis exposes 27 authoritative tools directly to Antigravity, replacing legacy external bloated MCP servers with zero-token UI inspection, native `--check-only` compiler pre-flight, and deterministic port allocation.
 7. **Headless Git Safety**: `$env:GIT_TERMINAL_PROMPT=0` mandatory; git push requires prior auth verification and explicit permission.
 8. **Strict Phase Boundaries**: Research (NotebookLM) -> Blueprint/Wiki -> Issue Breakdown -> Isolated Worktree Code. No premature implementation!
 9. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.
 10. **Anti-Hang Guard (Never use npx ast-grep)**: Unscoped `ast-grep` on npm is an obsolete 2018 package that hangs waiting on STDIN. Always use `/aegis ast:search` or `aegis ast:search` (or `aegis ast-grep` / `aegis sg`).
 11. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.
+
+
+## Antigravity Subagent Teamwork Runbook (`/aegis teamwork`)
+
+When the user triggers `/aegis teamwork <objective>` or `/teamwork`:
+
+1. **Plan & Stage Tracks**:
+   Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP tool `teamwork_plan`.
+   - Ingests the objective and identifies target tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`).
+   - Acquires mutex file locks on target files (`.aegis/locks.json`).
+   - Stages track payloads into `.aegis/task-inbox.json`.
+
+2. **Define Subagents (if not defined)**:
+   Call `define_subagent` for each required role:
+   - `issue-solver`: Demir Kafes, surgical diffs, pre-commit tests.
+   - `qa-hunter`: Evidence-based triage, Socratic debugging, mutation score >= 70%.
+   - `ui-specialist`: Zero-token layout sweeps, theme styling, <300 line controllers.
+   - `doc-architect`: Living wiki sync (`<repo>.wiki.git`), RFC ideation, zero premature coding.
+
+3. **Spawn Subagents with Shared Workspace**:
+   Call `invoke_subagent` for each staged track:
+   - Set `Workspace: 'share'` so subagents operate directly on the project's repository worktree.
+   - Set `Model: 'inherit'`.
+   - Provide the compiled prompt containing the role badge, track objective, locks, and acceptance criteria.
+
+4. **Autonomous Parallel Execution & Verification**:
+   - Subagents pull their task with `aegis task:pull [role]` or MCP `task_inbox_pull`.
+   - Subagents implement isolated changes without modifying files locked by peers.
+   - Subagents run `aegis verify:task` (Demir Kafes + tests + playtest) before reporting back.
+
+5. **Team Lead Coordination & Lock Release**:
+   - Team Lead monitors active subagents with `manage_subagents` and inspects `aegis teamwork status`.
+   - Upon successful completion of each track, release locks with `aegis task:release <id> done`.
+   - Report final consolidated summary to the user.

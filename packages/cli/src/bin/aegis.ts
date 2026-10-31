@@ -97,6 +97,7 @@ import {
 } from '../commands/task-commands.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 import { ConversationalIntentDetector } from '@aegis/github-live';
+import { handleTeamwork } from '../commands/teamwork-command.js';
 import { HELP_LINES } from './help-text.js';
 
 function handleHelp(): void {
@@ -193,7 +194,11 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   'task:pull': (a) => handleTaskPull(a[1]),
   'task:verify': (a) => handleTaskVerify(a[1]),
   'verify:task': (a) => handleTaskVerify(a[1]),
-  'lock:status': () => handleLockStatus()
+  'lock:status': () => handleLockStatus(),
+  teamwork: (a) => handleTeamwork(a[1], ...a.slice(2)),
+  'teamwork:status': () => handleTeamwork('status'),
+  'teamwork:plan': (a) => handleTeamwork('plan', ...a.slice(1)),
+  'teamwork:setup': (a) => handleTeamwork('setup', a[1])
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {

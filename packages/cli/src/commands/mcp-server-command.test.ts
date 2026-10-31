@@ -11,12 +11,15 @@ test('handleJsonRpc handles initialize request', async () => {
   assert.ok((result.serverInfo as Record<string, unknown>).name === 'aegis');
 });
 
-test('handleJsonRpc handles tools/list request with 27 authoritative tools', async () => {
+test('handleJsonRpc handles tools/list request with 29 authoritative tools', async () => {
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 27);
+  assert.strictEqual(result.tools.length, 29);
+
   const names = result.tools.map(t => t.name);
+  assert.ok(names.includes('teamwork_plan'));
+  assert.ok(names.includes('teamwork_status'));
   assert.ok(names.includes('memory_query'));
   assert.ok(names.includes('memory_stats'));
   assert.ok(names.includes('context7_query'));
@@ -227,4 +230,33 @@ test('handleJsonRpc executes aegis_godot_status and signals tools asynchronously
   const sigParsed = JSON.parse(sigContent);
   assert.strictEqual(sigParsed.className, 'Button');
   assert.ok(Array.isArray(sigParsed.signals));
+
+});
+
+
+test('handleJsonRpc executes teamwork_plan and teamwork_status tools', async () => {
+  const planRes = await handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 17,
+    method: 'tools/call',
+    params: { name: 'teamwork_plan', arguments: { objective: 'Test MCP Teamwork Plan' } }
+  });
+  assert.ok(planRes);
+  const planContent = (planRes.result as { content: Array<{ type: string; text: string }> }).content[0].text;
+  const planParsed = JSON.parse(planContent);
+  assert.ok(planParsed.planId);
+  assert.ok(planParsed.tracks.length >= 2);
+
+  const statusRes = await handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 18,
+    method: 'tools/call',
+    params: { name: 'teamwork_status', arguments: {} }
+  });
+  assert.ok(statusRes);
+  const statusContent = (statusRes.result as { content: Array<{ type: string; text: string }> }).content[0].text;
+  const statusParsed = JSON.parse(statusContent);
+  assert.strictEqual(typeof statusParsed.activeTracksCount, 'number');
+  assert.strictEqual(statusParsed.profiles.length, 4);
+
 });

@@ -8,3 +8,5 @@ export * from './toolchain-sync.js';
 export * from './mcp-skills-sync.js';
 export * from './role-classifier.js';
 export * from './mcp-tool-schemas.js';
+export * from './teamwork-prompts.js';
+export * from './teamwork-coordinator.js';

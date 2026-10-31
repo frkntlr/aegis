@@ -5,6 +5,9 @@ When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegi
 
 - `/aegis` or `/aegis status`: Run `npm run aegis -- status` and display worktrees and file locks.
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.
+- `/aegis teamwork [status]`: View active Antigravity subagents and locked tracks.
+- `/aegis teamwork plan "<objective>" [files...]`: Generate Antigravity subagent plan and stage in TIP inbox.
+- `/aegis teamwork setup [outDir]`: Export Antigravity subagents manifest (.aegis/subagents.json).
 - `/aegis task:list [status]`: List ready, in_progress, or blocked tasks in TIP queue.
 - `/aegis task:claim <id> [agent]`: Claim task for role, acquire file locks, set in_progress.
 - `/aegis task:release <id> [status]`: Release or complete task, release locks, update status.
@@ -93,6 +96,14 @@ Whenever the user or agent proposes an improvement, feature, toolchain gap, or a
 1. **Zero-Prompt Upstream Detection**: The agent must recognize that the feedback targets the central Aegis engine (`frkntlr/aegis`).
 2. **Autonomous Discussion & RFC Sync**: Automatically publish an RFC and GitHub Discussion under `Ideas` on `frkntlr/aegis` (`npm run aegis -- rfc:create "<title>" [desc]`). Never leave engine feedback lost in local conversation context!
 3. **Traceability**: Link the originating project context or prompt in the published RFC.
+
+## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`)
+When coordinating multi-agent tasks in Antigravity:
+1. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into `.aegis/task-inbox.json`.
+2. **Define Subagents**: When subagent roles are needed, register them with Antigravity's `define_subagent` using their official Aegis profile badges and system prompts.
+3. **Invoke Subagents**: Invoke tracks using `invoke_subagent` with `Workspace: 'share'` so subagents share the repository worktree safely without duplication.
+4. **Autonomous Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules, run `aegis verify:task`, and report completion back to the Team Lead.
+5. **Lock Lifecycle**: The Team Lead monitors subagents with `manage_subagents` and releases locks upon verified completion with `aegis task:release <id> done`.
 
 ## Code Quality Standards (Demir Kafes)
 All code modifications in this project must strictly comply with:

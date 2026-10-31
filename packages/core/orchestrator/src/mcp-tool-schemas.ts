@@ -108,6 +108,19 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     props: { agentRole: { type: 'string', description: 'Filter by agent role' } },
     req: []
   },
+  teamwork_plan: {
+    desc: 'Generate Antigravity subagent teamwork plan and stage tracks into TIP inbox',
+    props: {
+      objective: { type: 'string', description: 'Teamwork goal or high-level objective' },
+      targetFiles: { type: 'array', items: { type: 'string' }, description: 'Target files to modify or lock' }
+    },
+    req: ['objective']
+  },
+  teamwork_status: {
+    desc: 'Inspect Antigravity subagents, active teamwork tracks, and file mutex locks',
+    props: {},
+    req: []
+  },
   lock_status: {
     desc: 'Inspect active file mutex locks across worktrees',
     props: {},
