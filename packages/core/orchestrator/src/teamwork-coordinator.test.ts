@@ -17,7 +17,7 @@ test('TeamworkCoordinator lists all 4 official Antigravity subagent profiles', (
   assert.ok(names.includes('doc-architect'));
 
   for (const p of profiles) {
-    assert.strictEqual(p.workspaceMode, 'share');
+    assert.strictEqual(p.workspaceMode, 'inherit');
     assert.strictEqual(p.enableWriteTools, true);
     assert.strictEqual(p.enableMcpTools, true);
     assert.ok(p.systemPrompt.includes('Demir Kafes') || p.systemPrompt.includes('Wiki'));
@@ -37,7 +37,7 @@ test('TeamworkCoordinator plans teamwork, stages tracks in inbox, and acquires l
     const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
     assert.ok(solverTrack);
     assert.strictEqual(solverTrack?.invocationPayload.TypeName, 'issue-solver');
-    assert.strictEqual(solverTrack?.invocationPayload.Workspace, 'share');
+    assert.strictEqual(solverTrack?.invocationPayload.Workspace, 'inherit');
 
     const inboxPath = path.join(tmpDir, '.aegis', 'task-inbox.json');
     assert.ok(fs.existsSync(inboxPath));
@@ -119,4 +119,36 @@ test('TeamworkCoordinator assigns hybrid models and formats live matrix table', 
   assert.ok(matrix.includes('Antigravity Teamwork Canlı Görev Matrisi'));
   assert.ok(matrix.includes('✅ Tamamlandı'));
   assert.ok(matrix.includes('🔄 Çalışıyor'));
+});
+
+test('TeamworkCoordinator memoizes subagent profiles cache across multiple calls', () => {
+  const coordinator = new TeamworkCoordinator();
+  const profilesFirst = coordinator.listProfiles();
+  const profilesSecond = coordinator.listProfiles();
+  assert.strictEqual(profilesFirst, profilesSecond);
+  assert.strictEqual(profilesFirst.length, 4);
+});
+
+test('TeamworkCoordinator generates deterministic plan ID when requested', () => {
+  const coordinator = new TeamworkCoordinator();
+  const files = ['packages/core/src/feature.ts', 'docs/API.md'];
+  const obj = 'Build responsive inventory UI and document API';
+
+  const planA = coordinator.planTeamwork(obj, files, { deterministic: true });
+  const planB = coordinator.planTeamwork(obj, files, { deterministic: true });
+
+  assert.ok(planA.planId.startsWith('tw-det-'));
+  assert.strictEqual(planA.planId, planB.planId);
+  assert.strictEqual(planA.tracks.length, planB.tracks.length);
+  for (let i = 0; i < planA.tracks.length; i++) {
+    assert.strictEqual(planA.tracks[i].id, planB.tracks[i].id);
+    assert.strictEqual(planA.tracks[i].invocationPayload.Workspace, 'inherit');
+  }
+
+  const planDiff = coordinator.planTeamwork(obj, ['packages/core/src/other.ts'], { deterministic: true });
+  assert.notStrictEqual(planA.planId, planDiff.planId);
+
+  const planNonDet = coordinator.planTeamwork(obj, files);
+  assert.ok(planNonDet.planId.startsWith('tw-'));
+  assert.ok(!planNonDet.planId.startsWith('tw-det-'));
 });

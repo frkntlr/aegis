@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { WorktreeManager } from './worktree-manager.js';
 import { RoleClassifier, type RoleType } from './role-classifier.js';
 import {
@@ -65,6 +66,7 @@ export class TeamworkCoordinator {
   private repoRoot: string;
   private worktreeManager: WorktreeManager;
   private roleClassifier: RoleClassifier;
+  private cachedProfiles?: SubagentProfile[];
 
   constructor(repoRoot?: string, worktreeManager?: WorktreeManager, roleClassifier?: RoleClassifier) {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
@@ -73,11 +75,26 @@ export class TeamworkCoordinator {
   }
 
   public listProfiles(): SubagentProfile[] {
-    return getSubagentProfiles();
+    if (!this.cachedProfiles) {
+      this.cachedProfiles = getSubagentProfiles();
+    }
+    return this.cachedProfiles;
   }
 
-  public planTeamwork(objective: string, targetFiles: string[] = []): TeamworkPlan {
-    const planId = `tw-${Date.now().toString(36)}`;
+  private hashPlan(objective: string, files: string[]): string {
+    const sorted = [...files].sort().join(',');
+    return crypto.createHash('sha256').update(`${objective.trim()}::${sorted}`).digest('hex').slice(0, 10);
+  }
+
+  public planTeamwork(
+    objective: string,
+    targetFiles: string[] = [],
+    options?: { deterministic?: boolean }
+  ): TeamworkPlan {
+    const isDet = options?.deterministic === true;
+    const planId = isDet
+      ? `tw-det-${this.hashPlan(objective, targetFiles)}`
+      : `tw-${Date.now().toString(36)}`;
     const profiles = this.listProfiles();
     const tracks: TeamworkTrack[] = [];
     const inference = this.roleClassifier.classify({ title: objective, targetFiles });
@@ -87,12 +104,12 @@ export class TeamworkCoordinator {
     const solverFiles = targetFiles.filter(f => !docFiles.includes(f) && !uiFiles.includes(f));
 
     const solverProfile = profiles.find(p => p.roleType === 'solver')!;
-    tracks.push(this.buildTrack('solver', solverProfile, `Implement core logic for: ${objective}`, solverFiles));
+    tracks.push(this.buildTrack('solver', solverProfile, `Implement core logic for: ${objective}`, solverFiles, isDet));
 
     const qaProfile = profiles.find(p => p.roleType === 'qa')!;
-    tracks.push(this.buildTrack('qa', qaProfile, `Audit, triage, and test: ${objective}`, []));
+    tracks.push(this.buildTrack('qa', qaProfile, `Audit, triage, and test: ${objective}`, [], isDet));
 
-    this.addAuxiliaryTracks(tracks, profiles, objective, targetFiles, inference.role, uiFiles, docFiles);
+    this.addAuxiliaryTracks(tracks, profiles, objective, targetFiles, inference.role, uiFiles, docFiles, isDet);
     this.stageTracksIntoInbox(planId, objective, tracks);
     return {
       planId,
@@ -110,7 +127,8 @@ export class TeamworkCoordinator {
     files: string[],
     role: string,
     uiFiles: string[],
-    docFiles: string[]
+    docFiles: string[],
+    deterministic = false
   ): void {
     const lower = obj.toLowerCase();
     const hasUi = role === 'ui' || uiFiles.length > 0 || lower.includes('ui') || lower.includes('godot ui') ||
@@ -119,17 +137,25 @@ export class TeamworkCoordinator {
     if (hasUi) {
       const p = profiles.find(x => x.roleType === 'ui')!;
       const assigned = uiFiles.length > 0 ? uiFiles : files.filter(f => RoleClassifier.isUiFile(f));
-      tracks.push(this.buildTrack('ui', p, `Refine interface layout and theme for: ${obj}`, assigned));
+      tracks.push(this.buildTrack('ui', p, `Refine interface layout and theme for: ${obj}`, assigned, deterministic));
     }
     const hasDocs = role === 'docs' || docFiles.length > 0 || lower.includes('doc') || lower.includes('wiki') || lower.includes('rfc') || files.some(f => f.endsWith('.md'));
     if (hasDocs) {
       const p = profiles.find(x => x.roleType === 'docs')!;
-      tracks.push(this.buildTrack('docs', p, `Document specifications and living wiki for: ${obj}`, docFiles));
+      tracks.push(this.buildTrack('docs', p, `Document specifications and living wiki for: ${obj}`, docFiles, deterministic));
     }
   }
 
-  private buildTrack(roleType: RoleType, profile: SubagentProfile, desc: string, files: string[]): TeamworkTrack {
-    const id = `${roleType}-${Date.now().toString(36)}`;
+  private buildTrack(
+    roleType: RoleType,
+    profile: SubagentProfile,
+    desc: string,
+    files: string[],
+    deterministic = false
+  ): TeamworkTrack {
+    const id = deterministic
+      ? `${roleType}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 8)}`
+      : `${roleType}-${Date.now().toString(36)}`;
     const prompt = compileTrackPrompt(profile, desc, files);
     return {
       id,
@@ -142,7 +168,7 @@ export class TeamworkCoordinator {
         TypeName: profile.name,
         Role: profile.title,
         Prompt: prompt,
-        Workspace: profile.workspaceMode,
+        Workspace: profile.workspaceMode ?? 'inherit',
         Model: profile.defaultModel ?? 'inherit'
       }
     };
@@ -157,13 +183,17 @@ export class TeamworkCoordinator {
     }
     const inboxArray = Array.isArray(existing) ? existing : [];
 
+    const numBase = planId.startsWith('tw-det-')
+      ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
+      : parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10);
+
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
       if (track.targetFiles.length > 0) {
         this.worktreeManager.acquireFileLocks(track.subagentName, track.targetFiles);
       }
       inboxArray.push({
-        issueNumber: parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10) + i,
+        issueNumber: numBase + i,
         title: `[Teamwork Track] ${track.title}`,
         role: track.subagentName,
         worktree: `experimental/${track.roleType}`,
@@ -193,7 +223,7 @@ export class TeamworkCoordinator {
         role: p.title,
         description: p.description,
         systemPrompt: p.systemPrompt,
-        workspaceMode: p.workspaceMode,
+        workspaceMode: p.workspaceMode ?? 'inherit',
         enableWriteTools: p.enableWriteTools,
         enableMcpTools: p.enableMcpTools,
         defaultModel: p.defaultModel ?? 'inherit'

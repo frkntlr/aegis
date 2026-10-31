@@ -13,7 +13,7 @@ export interface SubagentProfile {
   badge: string;
   description: string;
   systemPrompt: string;
-  workspaceMode: 'share' | 'branch' | 'inherit';
+  workspaceMode?: 'share' | 'branch' | 'inherit';
   enableWriteTools: boolean;
   enableMcpTools: boolean;
   defaultModel?: 'inherit' | 'flash_lite' | 'flash' | 'pro';
@@ -67,7 +67,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     badge: '🛠️ [ISSUE SOLVER] AKTİF | İzole Çözücü ve Geliştirici',
     description: 'Solves implementation tasks, bugs, and refactors under Demir Kafes rules.',
     systemPrompt: SOLVER_SYSTEM_PROMPT,
-    workspaceMode: 'share',
+    workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
     defaultModel: 'inherit'
@@ -79,7 +79,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     badge: '🎯 [QA HUNTER] AKTİF | Teşhis, Oynanış ve Görsel UI Denetçisi',
     description: 'Executes evidence-based triage, Socratic diagnosis, playtests, and mutation audits.',
     systemPrompt: QA_SYSTEM_PROMPT,
-    workspaceMode: 'share',
+    workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
     defaultModel: 'inherit'
@@ -91,7 +91,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     badge: '🎨 [UI SPECIALIST] AKTİF | Arayüz, Tema ve Görsel Cilalama Uzmanı',
     description: 'Audits, scaffolds, and polishes Godot UI scenes (.tscn), themes (.tres), and responsive layouts.',
     systemPrompt: UI_SPECIALIST_SYSTEM_PROMPT,
-    workspaceMode: 'share',
+    workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
     defaultModel: 'inherit'
@@ -103,7 +103,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     badge: '📚 [DOC ARCHITECT] AKTİF | GitHub Dokümantasyon ve Proje Mimarı',
     description: 'Maintains GitHub living wiki, RFC ideation, clean-room specs, and issue decomposition.',
     systemPrompt: DOC_ARCHITECT_SYSTEM_PROMPT,
-    workspaceMode: 'share',
+    workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
     defaultModel: 'flash'

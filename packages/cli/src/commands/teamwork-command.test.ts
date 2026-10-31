@@ -24,7 +24,7 @@ test('handleTeamworkPlan creates plan and stages tracks', () => {
   const solverTrack = plan.tracks.find(t => t.subagentName === 'issue-solver');
   assert.ok(solverTrack);
   assert.strictEqual(solverTrack?.invocationPayload.TypeName, 'issue-solver');
-  assert.strictEqual(solverTrack?.invocationPayload.Workspace, 'share');
+  assert.strictEqual(solverTrack?.invocationPayload.Workspace, 'inherit');
 });
 
 test('handleTeamworkPlan handles missing objective gracefully', () => {
