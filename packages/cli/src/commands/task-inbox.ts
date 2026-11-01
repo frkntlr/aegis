@@ -58,13 +58,19 @@ export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskI
   if (!task.dependsOn || task.dependsOn.length === 0) return true;
   return task.dependsOn.every(dep => {
     const depLower = dep.toLowerCase();
-    const parent = allTasks.find(other =>
-      String(other.issueNumber) === dep ||
-      String(other.id) === dep ||
-      other.role.toLowerCase().includes(depLower) ||
-      other.title.toLowerCase().includes(depLower)
+    const candidates = allTasks.filter(other =>
+      other.issueNumber !== task.issueNumber && (
+        String(other.issueNumber) === dep ||
+        String(other.id) === dep ||
+        other.role.toLowerCase().includes(depLower) ||
+        other.title.toLowerCase().includes(depLower)
+      )
     );
-    return parent ? parent.status === 'done' : true;
+    if (candidates.length === 0) return true;
+    const parent = candidates.reduce((best, curr) =>
+      Math.abs(curr.issueNumber - task.issueNumber) < Math.abs(best.issueNumber - task.issueNumber) ? curr : best
+    );
+    return parent.status === 'done';
   });
 }
 
@@ -110,6 +116,15 @@ export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber
 
 export function pullNextPendingTask(role?: string, baseDir = process.cwd()): TaskInboxItem | null {
   const data = readTaskInbox(baseDir);
+  let reconciled = false;
+  for (const t of data.tasks) {
+    if (t.status === 'blocked' && isTaskDependenciesSatisfied(t, data.tasks)) {
+      t.status = 'pending';
+      reconciled = true;
+    }
+  }
+  if (reconciled) writeTaskInbox(data, baseDir);
+
   const task = data.tasks.find(t => {
     if (t.status !== 'pending') return false;
     if (!isTaskDependenciesSatisfied(t, data.tasks)) return false;
@@ -152,6 +167,15 @@ export function updateTaskInboxStatus(
 
 export function listInboxTasks(statusFilter?: string, baseDir = process.cwd()): TaskInboxItem[] {
   const data = readTaskInbox(baseDir);
+  let reconciled = false;
+  for (const t of data.tasks) {
+    if (t.status === 'blocked' && isTaskDependenciesSatisfied(t, data.tasks)) {
+      t.status = 'pending';
+      reconciled = true;
+    }
+  }
+  if (reconciled) writeTaskInbox(data, baseDir);
+
   if (!statusFilter || statusFilter === 'all') return data.tasks;
   return data.tasks.filter(t => t.status === statusFilter);
 }

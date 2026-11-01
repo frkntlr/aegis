@@ -11,6 +11,7 @@ sequenceDiagram
     autonumber
     actor Dev as Developer / Team Lead
     participant TC as TeamworkCoordinator
+    participant Dec as TeamworkDecomposer
     participant TIP as Task Inbox (.aegis/task-inbox.json)
     participant Lock as Mutex Lock (.aegis/locks.json)
     participant Solver as 🛠️ issue-solver (inherit)
@@ -18,21 +19,28 @@ sequenceDiagram
     participant Docs as 📚 doc-architect (flash)
 
     Dev->>TC: /teamwork plan "<objective>" [files]
-    TC->>Lock: acquireFileLocks(subagentName, files)
-    TC->>TIP: Stage atomic tracks with acceptance criteria
-    Dev->>Dev: Render Live Task Matrix (🔄 Running)
-    par Concurrent Invocation
+    TC->>Dec: Decompose into DAG & shard files
+    Dec->>Lock: acquireFileLocks(subagentName, files)
+    Dec->>TIP: Stage atomic tracks with acceptance criteria & dependencies
+    Dev->>Dev: Render Live Task Matrix (🔄 Running / ⏳ Blocked)
+    par Wave 1: Implementation
         Dev->>Solver: invoke_subagent(prompt, share, inherit)
-        Dev->>QA: invoke_subagent(prompt, share, inherit)
-        Dev->>Docs: invoke_subagent(prompt, share, flash)
     end
     Solver->>Solver: aegis task:pull & execute surgical diff
-    Docs->>Docs: aegis task:pull & generate documentation
-    QA->>QA: aegis verify:task & triage audits
-    Docs-->>Dev: [ROLE_COMPLETE: doc-architect]
     Solver-->>Dev: [ROLE_COMPLETE: issue-solver]
+    Dev->>Lock: Release solver locks & unblock Phase 2 in TIP
+    par Wave 2: Quality Assurance
+        Dev->>QA: invoke_subagent(prompt, share, inherit)
+    end
+    QA->>QA: aegis verify:task & triage audits
     QA-->>Dev: [ROLE_COMPLETE: qa-hunter]
-    Dev->>Lock: Release locks & update Live Task Matrix (✅ Done)
+    Dev->>TIP: Unblock Phase 3 in TIP
+    par Wave 3: Living Wiki & Docs
+        Dev->>Docs: invoke_subagent(prompt, share, flash)
+    end
+    Docs->>Docs: aegis task:pull & update specifications
+    Docs-->>Dev: [ROLE_COMPLETE: doc-architect]
+    Dev->>Dev: Final Review Card & Matrix Complete (✅ Done)
 ```
 
 The orchestration layer operates through three pillars:
@@ -59,7 +67,7 @@ Active locks map target relative file paths to their owning subagents:
 1. **Lock File Serialization**: `WorktreeMutex.acquire(lockPath)` takes an OS-level atomic lock before reading or modifying locks.
 2. **Atomic Write-Replace**: New lock states are written to a unique temp file (`.aegis/locks.json.tmp.<pid>.<timestamp>`) and swapped atomically using `fs.renameSync` (with fallback to copy+unlink).
 3. **Collision Rejection**: If another agent attempts to lock a file already held by a peer, `acquireFileLocks()` rejects the claim and returns `{ success: false, conflictingFiles: [...] }`.
-4. **Guaranteed Release**: Upon task conclusion (`[ROLE_COMPLETE]`), Team Lead invokes `releaseFileLocks(agentName)` or `aegis task:release <id> done`.
+4. **Guaranteed Release**: Upon task conclusion (`[ROLE_COMPLETE]`), Team Lead invokes `releaseFiles()` and `releaseFileLocks(agentName)` or `aegis task:release <id> done`.
 
 ---
 
@@ -130,25 +138,62 @@ graph LR
 
 ---
 
-## 7. Multi-Instance Subagent Scaling & Dynamic Decomposition
+## 6. Phased Wave Execution & Topological DAG Engine
 
-Aegis supports scaling beyond 1 agent per role. When complex objectives or multiple files are supplied, the **`TeamworkDecomposer`** dynamically partitions work into concurrent instances of the same persona (e.g. multiple `issue-solver`s working in parallel).
+Naive parallel execution fails when downstream agents (QA auditing unwritten code, Doc Architect documenting unfinished APIs) execute concurrently with core logic. The **Topological DAG Engine** coordinates execution across 3 phased waves:
+
+```text
+┌─── 🌊 FAZ 1: Temel Uygulama (Solvers & UI) ───────────────────
+│   • [issue-solver [ModuleA]] (packages/.../module-a.ts)
+│   • [issue-solver [ModuleB]] (packages/.../module-b.ts)
+│   • [ui-specialist [UI]] (scenes/main.tscn)
+└───────────────────────────────────────────────────────────────
+                  │
+                  ▼  (Önceki faz tamamlanınca açılır)
+┌─── 🛡️ FAZ 2: Kalite Güvence (QA Hunter & Playtest) ──────────
+│   • [qa-hunter [Audit]] ── [bağımlı: ModuleA, ModuleB, UI]
+└───────────────────────────────────────────────────────────────
+                  │
+                  ▼  (Önceki faz tamamlanınca açılır)
+┌─── 📚 FAZ 3: Dokümantasyon & Wiki (Doc Architect) ────────────
+│   • [doc-architect [Docs]] ── [bağımlı: Audit]
+└───────────────────────────────────────────────────────────────
+```
+
+### Key Wave Guarantees:
+1. **Dynamic Dependency Unblocking**: Tasks in Phase 2 and 3 start in the TIP inbox with `status: 'blocked'`. When upstream tasks complete via `aegis task:release <id> done`, all dependent downstream tasks in TIP are unblocked to `'pending'`.
+2. **Safe Task Pulling**: `aegis task:pull <role>` checks `dependsOn` lists and refuses to pull blocked tasks until all upstream dependencies report `done`.
+3. **Upstream Context Handoff**: Prompts compiled for downstream agents automatically inject upstream dependencies and phase tags so the agent operates with full contextual awareness.
+4. **ASCII Wave Visualizer**: Developers and team leads can inspect the dependency graph at any time using `aegis teamwork dag "<objective>"`.
+
+---
+
+## 7. Multi-Instance Subagent Scaling (10+ Concurrent Agents) & File Sharding
+
+Aegis scales seamlessly to **10+ concurrent subagents** with zero lock collisions through dynamic task decomposition and deterministic file sharding.
 
 ```mermaid
 graph TD
-    Goal["Objective: 1. Parser; 2. Cache Layer; 3. Audit"] --> Dec[TeamworkDecomposer]
-    Dec -->|Partition 1| S1["issue-solver [Parser]<br/>Locks: src/parser.ts"]
-    Dec -->|Partition 2| S2["issue-solver [Cache]<br/>Locks: src/cache.ts"]
-    Dec -->|Quality Gate| QA["qa-hunter [Audit]<br/>Global audit & playtest"]
+    Goal["Objective: Multi-file feature across 4 modules"] --> Dec[TeamworkDecomposer]
+    Dec -->|Shard 1| S1["issue-solver [ModuleA]<br/>Lock: module-a.ts"]
+    Dec -->|Shard 2| S2["issue-solver [ModuleB]<br/>Lock: module-b.ts"]
+    Dec -->|Shard 3| S3["issue-solver [ModuleC]<br/>Lock: module-c.ts"]
+    Dec -->|Shard 4| S4["issue-solver [ModuleD]<br/>Lock: module-d.ts"]
+    Dec -->|UI Track| UI["ui-specialist [Theme]<br/>Lock: theme.tres"]
+    Dec -->|Phase 2 Gate| QA["qa-hunter [Audit]<br/>Global playtest"]
+    Dec -->|Phase 3 Sync| Doc["doc-architect [Docs]<br/>Living wiki sync"]
     S1 -.-> Mutex[Demir Kafes Mutex .aegis/locks.json]
     S2 -.-> Mutex
+    S3 -.-> Mutex
+    S4 -.-> Mutex
 ```
 
-### Key Scaling Guarantees:
-1. **Dynamic Itemization**: Numbered steps (`1. ... 2. ...`), bullet points, semicolons, and compound clauses are parsed into distinct subtasks.
-2. **Disjoint Static File Partitioning**: Target files are grouped and assigned strictly to disjoint subagents. No two solvers ever share a file lock simultaneously.
-3. **Descriptive Role Labeling**: Subagents are named with their specific domain scope (e.g., `issue-solver [Parser]`, `issue-solver [Storage]`, `qa-hunter [Audit]`), displayed directly in the Live Task Matrix and TIP queue.
-4. **Autonomous Completion Signaling**: Each subagent signals completion with `[ROLE_COMPLETE: <subagentName>]`, releasing its allocated subset of file locks immediately upon passing quality checks.
+### High-Concurrency Scaling Guarantees:
+1. **Dynamic Itemization**: Numbered lists (`1. ... 2. ...`), bullet points, semicolons, and comma-separated clauses are parsed into distinct subtasks.
+2. **Automatic Solver File Sharding (`shardSolversByFiles`)**: When 3+ source files are provided, the engine automatically splits monolithic solver workloads into fine-grained module solvers (e.g. `issue-solver [Parser]`, `issue-solver [Storage]`).
+3. **Disjoint Static File Partitioning (`partitionFiles`)**: Source files are assigned strictly to disjoint subagents. Mathematically guarantees 0 lock collision across arbitrary agent counts.
+4. **Granular Lock Release (`releaseFiles`)**: Task completion releases exact file lists (`task.targetFiles`) alongside fuzzy instance name matching, preventing stale locks.
+5. **Flexible Task Pulling**: `aegis task:pull <role|id>` matches role prefixes, specific instance names (e.g. `doc-architect [Docs]`), or numeric issue IDs.
 
 ---
 
@@ -161,37 +206,7 @@ graph TD
 | **View ASCII DAG** | `aegis teamwork dag [obj] [files]` | `aegis:teamwork_dag` |
 | **Live Task Matrix** | `aegis teamwork matrix [obj]` | - |
 | **Export Manifest** | `aegis teamwork setup [outDir]` | - |
-| **Pull Role Task** | `aegis task:pull <role>` | `aegis:task_inbox_pull` |
+| **Pull Role Task** | `aegis task:pull <role\|id>` | `aegis:task_inbox_pull` |
 | **Claim Task** | `aegis task:claim <id> [agent]` | `aegis:task_claim` |
 | **Release Task** | `aegis task:release <id> [status]` | `aegis:task_release` |
 | **Verify Gate** | `aegis verify:task [file]` | `aegis:cage_check` |
-
----
-
-## 9. Phased Wave Execution & Topological DAG Engine
-
-Naive parallel execution fails because downstream agents (QA Hunter auditing unwritten code, Doc Architect documenting unfinished APIs) begin before foundations are stable. The **Topological DAG Engine** coordinates subagent execution across 3 phased waves:
-
-```text
-┌─── 🌊 FAZ 1: Temel Uygulama (Solvers & UI) ───────────────────
-│   • [issue-solver [Parser]] (src/parser.ts)
-│   • [ui-specialist [UI]] (scenes/main.tscn)
-└───────────────────────────────────────────────────────────────
-                  │
-                  ▼  (Önceki faz tamamlanınca açılır)
-┌─── 🛡️ FAZ 2: Kalite Güvence (QA Hunter & Playtest) ──────────
-│   • [qa-hunter [Audit]] ── [bağımlı: Parser, UI]
-└───────────────────────────────────────────────────────────────
-                  │
-                  ▼  (Önceki faz tamamlanınca açılır)
-┌─── 📚 FAZ 3: Dokümantasyon & Wiki (Doc Architect) ────────────
-│   • [doc-architect [Docs]] ── [bağımlı: Audit]
-└───────────────────────────────────────────────────────────────
-```
-
-### Key Wave Guarantees:
-1. **Dynamic Dependency Unblocking**: Tasks in Phase 2 and 3 start in the TIP inbox with `status: 'blocked'`. When upstream tasks complete via `aegis task:release <id> done`, dependent tasks automatically transition to `'pending'`.
-2. **Safe Task Pulling**: `aegis task:pull <role>` verifies all tasks listed in `dependsOn` are `'done'` before releasing a task to an agent.
-3. **Upstream Context Handoff**: Prompts compiled for downstream agents automatically include upstream dependencies and phase tags so the agent understands the completed context.
-4. **ASCII Wave Visualizer**: Developers and team leads can inspect the dependency waves at any time using `aegis teamwork dag "<objective>"`.
-
