@@ -75,6 +75,7 @@ test('GodotUiLinter warns on undersized button touch target (<44px)', () => {
 anchors_preset = 15
 
 [node name="TinyBtn" type="Button" parent="."]
+text = "Tiny"
 custom_minimum_size = Vector2(30, 20)
 `;
 
@@ -82,6 +83,44 @@ custom_minimum_size = Vector2(30, 20)
   const issue = report.issues.find(i => i.rule === 'TOUCH_TARGET_SIZE');
   assert.ok(issue);
   assert.strictEqual(issue.severity, 'warning');
+});
+
+test('GodotUiLinter flags manual layout_mode on container children and suggests layout_mode 2', () => {
+  const tscn = `[gd_scene format=3]
+
+[node name="Root" type="Control"]
+anchors_preset = 15
+
+[node name="Grid" type="GridContainer" parent="."]
+
+[node name="ChildButton" type="Button" parent="Grid"]
+layout_mode = 0
+text = "Click Me"
+custom_minimum_size = Vector2(100, 44)
+`;
+
+  const report = GodotUiLinter.lintContent(tscn);
+  const issue = report.issues.find(i => i.rule === 'CONTAINER_LAYOUT_MODE');
+  assert.ok(issue);
+  assert.strictEqual(issue.severity, 'warning');
+  assert.ok(issue.fixSuggestion.includes('layout_mode = 2'));
+});
+
+test('GodotUiLinter reports info for interactive controls lacking accessibility metadata', () => {
+  const tscn = `[gd_scene format=3]
+
+[node name="Root" type="Control"]
+anchors_preset = 15
+
+[node name="IconOnlyBtn" type="TextureButton" parent="."]
+custom_minimum_size = Vector2(48, 48)
+`;
+
+  const report = GodotUiLinter.lintContent(tscn);
+  const issue = report.issues.find(i => i.rule === 'ACCESSIBILITY_METADATA');
+  assert.ok(issue);
+  assert.strictEqual(issue.severity, 'info');
+  assert.ok(issue.message.includes('lacks text, tooltip_text'));
 });
 
 test('GodotUiLinter flags dangling signal connection to missing node or script method', () => {
@@ -95,6 +134,7 @@ test('GodotUiLinter flags dangling signal connection to missing node or script m
 anchors_preset = 15
 
 [node name="Btn" type="Button" parent="."]
+text = "Ok"
 custom_minimum_size = Vector2(60, 50)
 
 [connection signal="pressed" from="Btn" to="." method="missing_method"]

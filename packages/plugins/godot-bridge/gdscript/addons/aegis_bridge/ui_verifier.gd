@@ -27,6 +27,8 @@ static func _traverse_control_tree(node: Node, acc: Array) -> void:
 			"name": node.name,
 			"type": node.get_class(),
 			"visible": node.visible,
+			"layout_mode": node.layout_mode if "layout_mode" in node else 0,
+			"anchors_preset": node.anchors_preset if "anchors_preset" in node else -1,
 			"rect": {
 				"x": rect.position.x,
 				"y": rect.position.y,
@@ -36,8 +38,12 @@ static func _traverse_control_tree(node: Node, acc: Array) -> void:
 		}
 		if "text" in node and node.get("text") != null:
 			node_info["text"] = str(node.get("text"))
+		if "tooltip_text" in node and node.get("tooltip_text") != "":
+			node_info["tooltip_text"] = str(node.get("tooltip_text"))
 		if "disabled" in node:
 			node_info["disabled"] = bool(node.get("disabled"))
+		if "theme_type_variation" in node and str(node.get("theme_type_variation")) != "":
+			node_info["theme_type_variation"] = str(node.get("theme_type_variation"))
 		acc.append(node_info)
 	for child in node.get_children():
 		_traverse_control_tree(child, acc)

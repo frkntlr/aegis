@@ -50,3 +50,44 @@ test('GodotUiScaffolder generates responsive HUD and Dialog', () => {
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('GodotUiScaffolder generates settings menu with tabs and AccessKit accessibility', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-scaffold-settings-'));
+  const res = GodotUiScaffolder.scaffold('settings', { name: 'game_settings', outputDir: tmpDir, title: 'Game Preferences' });
+
+  assert.strictEqual(res.type, 'settings');
+  assert.strictEqual(res.filesWritten.length, 2);
+  assert.ok(fs.existsSync(res.scenePath!));
+  assert.ok(fs.existsSync(res.scriptPath!));
+
+  const sceneText = fs.readFileSync(res.scenePath!, 'utf8');
+  assert.ok(sceneText.includes('TabContainer'));
+  assert.ok(sceneText.includes('ScreenReaderCheck'));
+  assert.ok(sceneText.includes('AccessKit'));
+
+  const scriptText = fs.readFileSync(res.scriptPath!, 'utf8');
+  assert.ok(scriptText.includes('signal setting_changed'));
+  assert.ok(scriptText.includes('screen_reader_check'));
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('GodotUiScaffolder generates grid-based inventory with details panel', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-scaffold-inv-'));
+  const res = GodotUiScaffolder.scaffold('inventory', { name: 'player_bag', outputDir: tmpDir, title: 'Backpack' });
+
+  assert.strictEqual(res.type, 'inventory');
+  assert.strictEqual(res.filesWritten.length, 2);
+  assert.ok(fs.existsSync(res.scenePath!));
+  assert.ok(fs.existsSync(res.scriptPath!));
+
+  const sceneText = fs.readFileSync(res.scenePath!, 'utf8');
+  assert.ok(sceneText.includes('GridContainer'));
+  assert.ok(sceneText.includes('columns = 4'));
+
+  const scriptText = fs.readFileSync(res.scriptPath!, 'utf8');
+  assert.ok(scriptText.includes('signal item_selected'));
+  assert.ok(scriptText.includes('_populate_slots'));
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});

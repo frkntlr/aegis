@@ -4,6 +4,13 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+export {
+  buildSettingsScene,
+  buildSettingsScript,
+  buildInventoryScene,
+  buildInventoryScript
+} from './godot-ui-templates-ext.js';
+
 const MENU_HEADER = (name: string, script: string) => [
   '[gd_scene load_steps=2 format=3]',
   `[ext_resource type="Script" path="${script}" id="1_script"]`,
@@ -143,25 +150,38 @@ export function buildDialogScript(pascal: string): string {
 
 export function buildThemeContent(): string {
   return [
-    '[gd_resource type="Theme" load_steps=3 format=3]\n',
+    '[gd_resource type="Theme" load_steps=5 format=3]\n',
     '[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_normal"]',
     'bg_color = Color(0.16, 0.18, 0.22, 1)',
     'corner_radius_top_left = 6\ncorner_radius_top_right = 6',
     'corner_radius_bottom_right = 6\ncorner_radius_bottom_left = 6',
-    'content_margin_left = 12.0\ncontent_margin_top = 8.0',
-    'content_margin_right = 12.0\ncontent_margin_bottom = 8.0\n',
+    'content_margin_left = 14.0\ncontent_margin_top = 10.0',
+    'content_margin_right = 14.0\ncontent_margin_bottom = 10.0\n',
     '[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hover"]',
     'bg_color = Color(0.24, 0.28, 0.35, 1)',
     'border_width_left = 1\nborder_width_top = 1\nborder_width_right = 1\nborder_width_bottom = 1',
     'border_color = Color(0.38, 0.65, 0.98, 1)',
     'corner_radius_top_left = 6\ncorner_radius_top_right = 6',
     'corner_radius_bottom_right = 6\ncorner_radius_bottom_left = 6',
-    'content_margin_left = 12.0\ncontent_margin_top = 8.0',
-    'content_margin_right = 12.0\ncontent_margin_bottom = 8.0\n',
+    'content_margin_left = 14.0\ncontent_margin_top = 10.0',
+    'content_margin_right = 14.0\ncontent_margin_bottom = 10.0\n',
+    '[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pressed"]',
+    'bg_color = Color(0.12, 0.14, 0.18, 1)',
+    'corner_radius_top_left = 6\ncorner_radius_top_right = 6',
+    'corner_radius_bottom_right = 6\ncorner_radius_bottom_left = 6',
+    'content_margin_left = 14.0\ncontent_margin_top = 10.0',
+    'content_margin_right = 14.0\ncontent_margin_bottom = 10.0\n',
+    '[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_focus"]',
+    'draw_center = false',
+    'border_width_left = 2\nborder_width_top = 2\nborder_width_right = 2\nborder_width_bottom = 2',
+    'border_color = Color(0.45, 0.75, 1.0, 1)',
+    'corner_radius_top_left = 6\ncorner_radius_top_right = 6',
+    'corner_radius_bottom_right = 6\ncorner_radius_bottom_left = 6\n',
     '[resource]',
     'default_font_size = 16',
     'Button/styles/normal = SubResource("StyleBoxFlat_normal")',
     'Button/styles/hover = SubResource("StyleBoxFlat_hover")',
-    'Button/styles/pressed = SubResource("StyleBoxFlat_hover")'
+    'Button/styles/pressed = SubResource("StyleBoxFlat_pressed")',
+    'Button/styles/focus = SubResource("StyleBoxFlat_focus")'
   ].join('\n') + '\n';
 }

@@ -27,6 +27,11 @@ export interface AspectVerificationResult {
   scannedCount: number;
 }
 
+export interface VerificationOptions {
+  minTouchTarget?: number;
+  enforceMinTouchTarget?: boolean;
+}
+
 export class GodotUiVerifier {
   public static readonly REQUIRED_ASPECT_RATIOS = ['16:9', '21:9', '16:10', '9:16', '9:18', '9:20'];
 
@@ -44,7 +49,7 @@ export class GodotUiVerifier {
 
   public verifyPayload(
     payload: GodotUiTreePayload,
-    options: { minTouchTarget?: number; enforceMinTouchTarget?: boolean } = {}
+    options: VerificationOptions = {}
   ): AspectVerificationResult {
     const minTarget = options.minTouchTarget ?? 44;
     const overlaps = this.findOverlaps(payload.nodes);
@@ -100,7 +105,7 @@ export class GodotUiVerifier {
 
   private isInteractive(node: GodotUiNode): boolean {
     const t = node.type.toLowerCase();
-    return t.includes('button') || t.includes('slider') || t.includes('lineedit');
+    return t.includes('button') || t.includes('slider') || t.includes('lineedit') || t.includes('itemlist');
   }
 
   private findOverlaps(nodes: GodotUiNode[]): UiOverlap[] {

@@ -127,3 +127,25 @@ test('ClassDbOracle resolves PanelContainer, HFlowContainer, and RichTextLabel',
   const appendMethod = oracle.queryMethod('RichTextLabel', 'append_text');
   assert.ok(appendMethod);
 });
+
+test('ClassDbOracle resolves modern Godot 4.x UI classes and accesskit properties', () => {
+  const oracle = new ClassDbOracle();
+  assert.ok(oracle.queryClass('AspectRatioContainer'));
+  assert.ok(oracle.queryClass('CenterContainer'));
+  assert.ok(oracle.queryClass('VFlowContainer'));
+  assert.ok(oracle.queryClass('HSplitContainer'));
+  assert.ok(oracle.queryClass('VSplitContainer'));
+  assert.ok(oracle.queryClass('SubViewportContainer'));
+  assert.ok(oracle.queryClass('Tree'));
+  assert.ok(oracle.queryClass('ItemList'));
+  assert.ok(oracle.queryClass('SpinBox'));
+
+  const setPreset = oracle.queryMethod('Control', 'set_anchors_preset');
+  assert.ok(setPreset);
+
+  const a11yProp = oracle.queryProperty('Control', 'accessibility_name');
+  assert.ok(a11yProp);
+
+  const treeItemMethod = oracle.queryMethod('Tree', 'create_item');
+  assert.ok(treeItemMethod);
+});
