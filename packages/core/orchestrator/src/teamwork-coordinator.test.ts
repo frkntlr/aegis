@@ -152,3 +152,28 @@ test('TeamworkCoordinator generates deterministic plan ID when requested', () =>
   assert.ok(planNonDet.planId.startsWith('tw-'));
   assert.ok(!planNonDet.planId.startsWith('tw-det-'));
 });
+
+test('TeamworkCoordinator assigns phases, dependencies and formats ASCII DAG', () => {
+  const coordinator = new TeamworkCoordinator();
+  const obj = '1. AST Parser; 2. UI Layout; 3. Regression Test; 4. Documentation';
+  const plan = coordinator.planTeamwork(obj, ['src/parser.ts', 'res://ui.tscn', 'docs/README.md']);
+
+  const solver = plan.tracks.find(t => t.roleType === 'solver');
+  const ui = plan.tracks.find(t => t.roleType === 'ui');
+  const qa = plan.tracks.find(t => t.roleType === 'qa');
+  const docs = plan.tracks.find(t => t.roleType === 'docs');
+
+  assert.strictEqual(solver?.phase, 1);
+  assert.strictEqual(ui?.phase, 1);
+  assert.strictEqual(qa?.phase, 2);
+  assert.strictEqual(docs?.phase, 3);
+
+  assert.ok(qa?.dependsOn && qa.dependsOn.length > 0);
+  assert.ok(docs?.dependsOn && docs.dependsOn.length > 0);
+
+  const dag = coordinator.formatAsciiDag(plan);
+  assert.ok(dag.includes('Antigravity Teamwork Dalga Bağımlılık Çizelgesi (DAG)'));
+  assert.ok(dag.includes('FAZ 1'));
+  assert.ok(dag.includes('FAZ 2'));
+  assert.ok(dag.includes('FAZ 3'));
+});

@@ -158,8 +158,40 @@ graph TD
 | :--- | :--- | :--- |
 | **Inspect Status** | `aegis teamwork status` | `aegis:worktree_status` / `aegis:lock_status` |
 | **Generate Plan** | `aegis teamwork plan "<obj>" [files]` | `aegis:teamwork_plan` |
+| **View ASCII DAG** | `aegis teamwork dag [obj] [files]` | `aegis:teamwork_dag` |
+| **Live Task Matrix** | `aegis teamwork matrix [obj]` | - |
 | **Export Manifest** | `aegis teamwork setup [outDir]` | - |
 | **Pull Role Task** | `aegis task:pull <role>` | `aegis:task_inbox_pull` |
 | **Claim Task** | `aegis task:claim <id> [agent]` | `aegis:task_claim` |
 | **Release Task** | `aegis task:release <id> [status]` | `aegis:task_release` |
 | **Verify Gate** | `aegis verify:task [file]` | `aegis:cage_check` |
+
+---
+
+## 9. Phased Wave Execution & Topological DAG Engine
+
+Naive parallel execution fails because downstream agents (QA Hunter auditing unwritten code, Doc Architect documenting unfinished APIs) begin before foundations are stable. The **Topological DAG Engine** coordinates subagent execution across 3 phased waves:
+
+```text
+┌─── 🌊 FAZ 1: Temel Uygulama (Solvers & UI) ───────────────────
+│   • [issue-solver [Parser]] (src/parser.ts)
+│   • [ui-specialist [UI]] (scenes/main.tscn)
+└───────────────────────────────────────────────────────────────
+                  │
+                  ▼  (Önceki faz tamamlanınca açılır)
+┌─── 🛡️ FAZ 2: Kalite Güvence (QA Hunter & Playtest) ──────────
+│   • [qa-hunter [Audit]] ── [bağımlı: Parser, UI]
+└───────────────────────────────────────────────────────────────
+                  │
+                  ▼  (Önceki faz tamamlanınca açılır)
+┌─── 📚 FAZ 3: Dokümantasyon & Wiki (Doc Architect) ────────────
+│   • [doc-architect [Docs]] ── [bağımlı: Audit]
+└───────────────────────────────────────────────────────────────
+```
+
+### Key Wave Guarantees:
+1. **Dynamic Dependency Unblocking**: Tasks in Phase 2 and 3 start in the TIP inbox with `status: 'blocked'`. When upstream tasks complete via `aegis task:release <id> done`, dependent tasks automatically transition to `'pending'`.
+2. **Safe Task Pulling**: `aegis task:pull <role>` verifies all tasks listed in `dependsOn` are `'done'` before releasing a task to an agent.
+3. **Upstream Context Handoff**: Prompts compiled for downstream agents automatically include upstream dependencies and phase tags so the agent understands the completed context.
+4. **ASCII Wave Visualizer**: Developers and team leads can inspect the dependency waves at any time using `aegis teamwork dag "<objective>"`.
+

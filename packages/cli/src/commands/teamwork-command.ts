@@ -33,8 +33,11 @@ export function handleTeamworkStatus(): void {
 }
 
 function printTrackPayload(track: TeamworkTrack): void {
-  console.log(`\n🔹 [${track.roleType.toUpperCase()}] Track: "${track.title}"`);
+  console.log(`\n🔹 [${track.roleType.toUpperCase()}] Track: "${track.title}" (Phase ${track.phase})`);
   console.log(`   Target Files: ${track.targetFiles.join(', ') || 'Codebase-wide'}`);
+  if (track.dependsOn.length > 0) {
+    console.log(`   Dependencies: [${track.dependsOn.join(', ')}]`);
+  }
   console.log('   Antigravity invoke_subagent Payload:');
   console.log(JSON.stringify(track.invocationPayload, null, 2));
 }
@@ -54,6 +57,7 @@ export function handleTeamworkPlan(objectiveArg?: string, ...files: string[]): T
   console.log(` • Summary: ${plan.summary}`);
   console.log(` • Staged in TIP Inbox: .aegis/task-inbox.json\n`);
   console.log(coordinator.formatLiveMatrix(plan));
+  console.log('\n' + coordinator.formatAsciiDag(plan));
 
   for (const track of plan.tracks) {
     printTrackPayload(track);
@@ -69,6 +73,13 @@ export function handleTeamworkSetup(outDir?: string): void {
   console.log(` • Subagents configured: ${result.count}`);
 }
 
+export function handleTeamworkDag(objectiveArg?: string, ...files: string[]): void {
+  showBanner();
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objectiveArg || 'Active Teamwork Mission', files);
+  console.log(coordinator.formatAsciiDag(plan));
+}
+
 export function handleTeamwork(subcmd?: string, ...args: string[]): void {
   const norm = (subcmd || 'status').toLowerCase().trim();
   if (norm === 'plan' || norm === 'run') {
@@ -77,6 +88,10 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
   }
   if (norm === 'setup' || norm === 'init') {
     handleTeamworkSetup(args[0]);
+    return;
+  }
+  if (norm === 'dag' || norm === 'waves') {
+    handleTeamworkDag(args[0], ...args.slice(1));
     return;
   }
   if (norm === 'matrix' || norm === 'table') {
@@ -103,4 +118,12 @@ export function mcpTeamworkStatus(): string {
   const coordinator = new TeamworkCoordinator();
   const status = coordinator.getTeamworkStatus();
   return JSON.stringify(status, null, 2);
+}
+
+export function mcpTeamworkDag(args: Record<string, unknown> = {}): string {
+  const objective = String(args.objective || 'Active Mission');
+  const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objective, targetFiles);
+  return coordinator.formatAsciiDag(plan);
 }

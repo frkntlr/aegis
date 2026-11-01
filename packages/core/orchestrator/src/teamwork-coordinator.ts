@@ -15,6 +15,8 @@ import {
   compileTrackPrompt
 } from './teamwork-prompts.js';
 import { TeamworkDecomposer } from './teamwork-decomposer.js';
+import { TeamworkVisualizer } from './teamwork-visualizer.js';
+export { TeamworkVisualizer };
 
 export interface AntigravityInvocationPayload {
   TypeName: string;
@@ -32,6 +34,8 @@ export interface TeamworkTrack {
   targetFiles: string[];
   prompt: string;
   invocationPayload: AntigravityInvocationPayload;
+  dependsOn: string[];
+  phase: number;
 }
 
 export interface TeamworkPlan {
@@ -106,7 +110,18 @@ export class TeamworkCoordinator {
 
     for (const sub of subtasks) {
       const profile = profiles.find(p => p.roleType === sub.roleType) ?? profiles[0];
-      tracks.push(this.buildTrack(sub.roleType, profile, sub.title, sub.targetFiles, sub.label, isDet));
+      tracks.push(
+        this.buildTrack(
+          sub.roleType,
+          profile,
+          sub.title,
+          sub.targetFiles,
+          sub.label,
+          isDet,
+          sub.dependsOn ?? [],
+          sub.phase ?? 1
+        )
+      );
     }
 
     this.stageTracksIntoInbox(planId, objective, tracks);
@@ -125,13 +140,15 @@ export class TeamworkCoordinator {
     desc: string,
     files: string[],
     label: string,
-    deterministic = false
+    deterministic = false,
+    dependsOn: string[] = [],
+    phase = 1
   ): TeamworkTrack {
     const subagentName = `${profile.name} [${label}]`;
     const id = deterministic
       ? `${roleType}-${label.toLowerCase()}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 6)}`
       : `${roleType}-${label.toLowerCase()}-${Date.now().toString(36)}`;
-    const prompt = compileTrackPrompt(profile, desc, files, subagentName);
+    const prompt = compileTrackPrompt(profile, desc, files, subagentName, dependsOn, phase);
     return {
       id,
       roleType,
@@ -139,6 +156,8 @@ export class TeamworkCoordinator {
       title: `${profile.title} [${label}]`,
       targetFiles: files,
       prompt,
+      dependsOn,
+      phase,
       invocationPayload: {
         TypeName: profile.name,
         Role: `${profile.title} - ${label}`,
@@ -179,7 +198,9 @@ export class TeamworkCoordinator {
         targetFiles: track.targetFiles,
         acceptanceCriteria: [`Complete track objective: ${objective}`, 'Pass Demir Kafes & verify:task'],
         prompt: track.prompt,
-        status: 'pending',
+        status: track.dependsOn.length > 0 ? 'blocked' : 'pending',
+        dependsOn: track.dependsOn,
+        phase: track.phase,
         stagedAt: new Date().toISOString()
       });
     }
@@ -216,22 +237,13 @@ export class TeamworkCoordinator {
 
   public formatLiveMatrix(
     plan: TeamworkPlan,
-    statuses: Record<string, 'running' | 'done' | 'failed' | 'pending'> = {}
+    statuses: Record<string, 'running' | 'done' | 'failed' | 'pending' | 'blocked'> = {}
   ): string {
-    const lines: string[] = [
-      `### 🤖 Antigravity Teamwork Canlı Görev Matrisi [${plan.planId}]`,
-      `**Hedef**: ${plan.objective}`,
-      '',
-      '| Ajan / Rol | Durum | Kilitli Dosyalar | Model | Görev Özeti |',
-      '| :--- | :--- | :--- | :--- | :--- |'
-    ];
-    for (const t of plan.tracks) {
-      const st = statuses[t.subagentName] ?? statuses[t.roleType] ?? 'running';
-      const icon = st === 'done' ? '✅ Tamamlandı' : st === 'failed' ? '🛑 Hata' : st === 'pending' ? '⏳ Bekliyor' : '🔄 Çalışıyor';
-      const locks = t.targetFiles.length > 0 ? t.targetFiles.map(f => `\`${f}\``).join(', ') : '-';
-      lines.push(`| \`${t.subagentName}\` | ${icon} | ${locks} | \`${t.invocationPayload.Model}\` | ${t.title} |`);
-    }
-    return lines.join('\n');
+    return TeamworkVisualizer.formatLiveMatrix(plan, statuses);
+  }
+
+  public formatAsciiDag(plan: TeamworkPlan): string {
+    return TeamworkVisualizer.formatAsciiDag(plan);
   }
 
   public getTeamworkStatus(): TeamworkStatusReport {

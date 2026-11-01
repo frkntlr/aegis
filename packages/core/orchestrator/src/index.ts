@@ -11,4 +11,5 @@ export * from './mcp-tool-schemas.js';
 export * from './teamwork-prompts.js';
 export * from './teamwork-decomposer.js';
 export * from './teamwork-coordinator.js';
+export * from './teamwork-visualizer.js';
 export * from './antigravity-installer.js';

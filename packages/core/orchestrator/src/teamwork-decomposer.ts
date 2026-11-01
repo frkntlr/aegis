@@ -11,6 +11,8 @@ export interface DecomposedSubtask {
   label: string;
   title: string;
   targetFiles: string[];
+  dependsOn?: string[];
+  phase?: number;
 }
 
 export class TeamworkDecomposer {
@@ -22,6 +24,7 @@ export class TeamworkDecomposer {
     const subtasks = this.enrichSubtasks(parsed);
     this.ensureRequiredTracks(subtasks, objective, targetFiles);
     this.partitionFiles(subtasks, targetFiles);
+    this.assignPhasesAndDependencies(subtasks);
     return subtasks;
   }
 
@@ -175,6 +178,34 @@ export class TeamworkDecomposer {
         title: `Audit, triage, and test: ${objective}`,
         targetFiles: []
       });
+    }
+  }
+
+  private static assignPhasesAndDependencies(subtasks: DecomposedSubtask[]): void {
+    const foundationLabels: string[] = [];
+    for (const t of subtasks) {
+      if (t.roleType === 'solver' || t.roleType === 'ui') {
+        t.phase = 1;
+        t.dependsOn = [];
+        foundationLabels.push(t.label);
+      }
+    }
+
+    const qaLabels: string[] = [];
+    for (const t of subtasks) {
+      if (t.roleType === 'qa') {
+        t.phase = foundationLabels.length > 0 ? 2 : 1;
+        t.dependsOn = [...foundationLabels];
+        qaLabels.push(t.label);
+      }
+    }
+
+    const docDeps = qaLabels.length > 0 ? qaLabels : foundationLabels;
+    for (const t of subtasks) {
+      if (t.roleType === 'docs') {
+        t.phase = qaLabels.length > 0 ? 3 : foundationLabels.length > 0 ? 2 : 1;
+        t.dependsOn = [...docDeps];
+      }
     }
   }
 }

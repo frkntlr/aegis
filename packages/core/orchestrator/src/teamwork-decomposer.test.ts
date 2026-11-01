@@ -61,3 +61,22 @@ test('TeamworkCoordinator formats multi-instance live matrix with descriptive la
   assert.ok(matrix.includes('✅ Tamamlandı'));
   assert.ok(matrix.includes('🔄 Çalışıyor'));
 });
+
+test('TeamworkDecomposer assigns phased dependencies correctly (Solvers/UI -> QA -> Docs)', () => {
+  const objective = '1. Parser implement et; 2. UI tema hazırla; 3. QA audit yap; 4. Dokümantasyon yaz';
+  const subtasks = TeamworkDecomposer.decompose(objective, ['src/parser.ts', 'res://ui.tscn', 'docs/README.md']);
+
+  const solvers = subtasks.filter(s => s.roleType === 'solver');
+  const uis = subtasks.filter(s => s.roleType === 'ui');
+  const qas = subtasks.filter(s => s.roleType === 'qa');
+  const docs = subtasks.filter(s => s.roleType === 'docs');
+
+  assert.strictEqual(solvers[0].phase, 1);
+  assert.strictEqual(uis[0].phase, 1);
+  assert.strictEqual(qas[0].phase, 2);
+  assert.strictEqual(docs[0].phase, 3);
+
+  assert.ok(qas[0].dependsOn && qas[0].dependsOn.includes(solvers[0].label));
+  assert.ok(qas[0].dependsOn && qas[0].dependsOn.includes(uis[0].label));
+  assert.ok(docs[0].dependsOn && docs[0].dependsOn.includes(qas[0].label));
+});

@@ -118,15 +118,23 @@ export function compileTrackPrompt(
   profile: SubagentProfile,
   trackDesc: string,
   files: string[],
-  subagentName?: string
+  subagentName?: string,
+  dependsOn?: string[],
+  phase?: number
 ): string {
   const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- General codebase scope';
   const roleIdentity = subagentName ?? profile.name;
+  const phaseInfo = phase ? `**Wave Phase**: Phase ${phase}\n` : '';
+  const depInfo = dependsOn && dependsOn.length > 0
+    ? `**Upstream Dependencies**: [${dependsOn.join(', ')}]\n`
+    : '';
   return `${profile.badge}\n\n` +
     `## Assigned Subagent Task\n` +
     `**Track**: ${profile.title} (${roleIdentity})\n` +
-    `**Objective**: ${trackDesc}\n\n` +
-    `### Target Files & Locks\n${targetStr}\n\n` +
+    `**Objective**: ${trackDesc}\n` +
+    phaseInfo +
+    depInfo +
+    `\n### Target Files & Locks\n${targetStr}\n\n` +
     `### Instructions\n` +
     `1. Pull staged details using \`aegis task:pull ${profile.roleType}\` or MCP \`task_inbox_pull\`.\n` +
     `2. Execute changes within your designated workspace.\n` +

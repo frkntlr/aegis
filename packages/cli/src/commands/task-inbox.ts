@@ -14,6 +14,8 @@ export interface TaskInboxItem {
   stagedAt: string;
   claimedBy?: string;
   claimedAt?: string;
+  dependsOn?: string[];
+  phase?: number;
 }
 
 export interface TaskInboxData {
@@ -52,16 +54,31 @@ export function writeTaskInbox(data: TaskInboxData, baseDir = process.cwd()): vo
   fs.writeFileSync(filePath, JSON.stringify(data.tasks, null, 2), 'utf8');
 }
 
+export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskInboxItem[]): boolean {
+  if (!task.dependsOn || task.dependsOn.length === 0) return true;
+  return task.dependsOn.every(dep => {
+    const depLower = dep.toLowerCase();
+    const parent = allTasks.find(other =>
+      String(other.issueNumber) === dep ||
+      String(other.id) === dep ||
+      other.role.toLowerCase().includes(depLower) ||
+      other.title.toLowerCase().includes(depLower)
+    );
+    return parent ? parent.status === 'done' : true;
+  });
+}
+
 export function stageTaskInInbox(
   item: Omit<TaskInboxItem, 'id' | 'stagedAt' | 'status'>,
   baseDir = process.cwd()
 ): TaskInboxItem {
   const data = readTaskInbox(baseDir);
   const existingIndex = data.tasks.findIndex(t => t.issueNumber === item.issueNumber);
+  const initialStatus = item.dependsOn && item.dependsOn.length > 0 ? 'blocked' : 'pending';
   const stagedItem: TaskInboxItem = {
     ...item,
     id: item.issueNumber,
-    status: 'pending',
+    status: initialStatus,
     stagedAt: new Date().toISOString()
   };
 
@@ -90,6 +107,7 @@ export function pullNextPendingTask(role?: string, baseDir = process.cwd()): Tas
   const data = readTaskInbox(baseDir);
   const task = data.tasks.find(t => {
     if (t.status !== 'pending') return false;
+    if (!isTaskDependenciesSatisfied(t, data.tasks)) return false;
     if (!role || role === 'auto' || role === 'all') return true;
     return matchesTaskRole(t.role, role);
   });
@@ -114,6 +132,15 @@ export function updateTaskInboxStatus(
   task.status = status;
   if (claimedBy) task.claimedBy = claimedBy;
   if (status === 'in_progress' && !task.claimedAt) task.claimedAt = new Date().toISOString();
+
+  if (status === 'done') {
+    for (const other of data.tasks) {
+      if (other.status === 'blocked' && isTaskDependenciesSatisfied(other, data.tasks)) {
+        other.status = 'pending';
+      }
+    }
+  }
+
   writeTaskInbox(data, baseDir);
   return true;
 }

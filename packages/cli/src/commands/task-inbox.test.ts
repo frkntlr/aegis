@@ -124,3 +124,41 @@ test('pullNextPendingTask matches multi-instance subagent roles flexibly', () =>
   assert.strictEqual(pulled.issueNumber, 301);
   assert.strictEqual(pulled.role, 'issue-solver [Parser]');
 });
+
+test('pullNextPendingTask blocks on unfulfilled dependencies and unblocks on completion', () => {
+  stageTaskInInbox({
+    issueNumber: 401,
+    title: 'Core Engine Logic',
+    role: 'issue-solver [Core]',
+    worktree: 'experimental/solver',
+    targetFiles: ['src/core.ts'],
+    acceptanceCriteria: ['Write core'],
+    prompt: 'Implement core'
+  }, tmpDir);
+
+  stageTaskInInbox({
+    issueNumber: 402,
+    title: 'Audit Core Engine',
+    role: 'qa-hunter [Audit]',
+    worktree: 'experimental/qa',
+    targetFiles: ['src/core.ts'],
+    acceptanceCriteria: ['Pass audits'],
+    prompt: 'Audit core',
+    dependsOn: ['Core'],
+    phase: 2
+  }, tmpDir);
+
+  // Task 402 is blocked because Core (401) is not done
+  const blockedPull = pullNextPendingTask('qa-hunter', tmpDir);
+  assert.strictEqual(blockedPull, null);
+
+  // Complete task 401
+  const updateResult = updateTaskInboxStatus(401, 'done', 'issue-solver [Core]', tmpDir);
+  assert.strictEqual(updateResult, true);
+
+  // Task 402 is now unblocked and ready for QA Hunter
+  const unblockedPull = pullNextPendingTask('qa-hunter', tmpDir);
+  assert.ok(unblockedPull);
+  assert.strictEqual(unblockedPull?.issueNumber, 402);
+  assert.strictEqual(unblockedPull?.status, 'in_progress');
+});
