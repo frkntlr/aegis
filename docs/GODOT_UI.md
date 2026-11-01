@@ -12,7 +12,7 @@ All Godot UI scenes, themes, and GDScript presentation controllers in Aegis proj
 2. **Responsive Root Anchors**: Fullscreen roots (`Control`, `CanvasLayer`) must define `anchors_preset = 15` (Full Rect) with `grow_horizontal = 2, grow_vertical = 2`.
 3. **Accessible Touch Targets**: Buttons, checkboxes, and sliders must satisfy a minimum touch target size of 44x44px (`custom_minimum_size = Vector2(44, 44)`).
 4. **Decoupled Controllers**: GDScript UI controllers must extend `Control` or `CanvasLayer`, query nodes via unique names (`%NodeName`), and emit typed signals rather than directly mutating domain business models.
-5. **Pre-PR Quality Gate**: Every `.tscn` scene must pass static linter audit (`aegis godot ui:lint`) with a 100/100 score prior to merge.
+5. **Zero-Stutter Input Hygiene**: Set `mouse_filter = 2` (Ignore) on all non-interactive decorative panels, labels, and layout containers to eliminate mouse-picking raycast overhead on high-polling devices.
 
 ---
 
@@ -45,13 +45,32 @@ Supported Scaffolding Types:
 - `dialog`: Modal confirmation dialog with backdrop dimmer, Title, Message, and Confirm/Cancel actions.
 - `settings`: TabContainer with Audio sliders, Video toggles, and AccessKit Accessibility screen reader controls.
 - `inventory`: GridContainer-based responsive inventory with dynamic slots and item selection events.
+- `virtual_list`: 120 FPS high-performance virtualized recycler list for large data sets (inventories, logs, leaderboards).
 - `theme`: Multi-state StyleBoxFlat Theme (`normal`, `hover`, `pressed`, `disabled`, `focus`).
 
 ---
 
-## 4. Static UI Linter (`aegis godot ui:lint`)
+## 4. UI Performance & Zero-Stutter Optimizer
 
-The Aegis UI Linter evaluates `.tscn` AST hierarchies against structural heuristics:
+Aegis includes static analysis and automated optimization for Godot 4 UI performance:
+
+```bash
+# Audit scene performance and compute Grade (A+ to F)
+aegis godot ui:perf [scene.tscn]
+
+# Automatically inject mouse_filter = 2 and strip redundant clip_contents
+aegis godot ui:optimize <scene.tscn>
+```
+
+Key Performance Heuristics:
+- **Mouse Picking Isolation (`mouse_filter = 2`)**: Eliminates viewport traversal loops on non-interactive nodes when the mouse moves.
+- **2D Batching Preservation**: Strips non-essential `clip_contents = true` which causes scissor buffer switches and breaks draw-call batching.
+- **Virtual Recycler Pattern**: Only renders visible slots in scrolling lists, keeping CPU usage flat even with 10,000+ items.
+- **StyleBox Consolidation**: Warns when inline SubResource style overrides fragment GPU state caching.
+
+---
+
+## 5. Static UI Linter (`aegis godot ui:lint`)
 
 | Rule Code | Severity | Description | Fix Suggestion |
 | :--- | :---: | :--- | :--- |
@@ -66,30 +85,18 @@ The Aegis UI Linter evaluates `.tscn` AST hierarchies against structural heurist
 
 ---
 
-## 5. Multi-Aspect Telemetry Verification
+## 6. Multi-Aspect Telemetry Verification
 
 Aegis verifies zero-token layout integrity across 9 target aspect ratios:
+`16:9`, `21:9`, `16:10`, `4:3`, `9:16`, `9:18`, `9:19.5`, `9:20`, `3:4`.
 
-```text
-[16:9]   1920x1080 (Desktop / Console standard)
-[21:9]   2560x1080 (Ultrawide monitors)
-[16:10]  1920x1200 (Steam Deck & Laptops)
-[4:3]    1440x1080 (iPad & Retro displays)
-[9:16]   1080x1920 (Mobile portrait)
-[9:18]   1080x2160 (Android portrait)
-[9:19.5] 1080x2340 (Modern iPhone notch / Dynamic Island)
-[9:20]   1080x2400 (Tall Android displays)
-[3:4]    1080x1440 (Foldable devices)
-```
-
-Run verification with:
 ```bash
 aegis godot inspect [projectDir]
 ```
 
 ---
 
-## 6. Headless Verification in CI
+## 7. Headless Verification in CI
 
 ```bash
 # Verify GDScript syntax without launching window

@@ -1,6 +1,6 @@
 /**
  * @file godot-ui-scaffolder.ts
- * Production-ready Godot 4.x UI scaffolding engine for menus, HUDs, dialogs, settings, inventory, and themes.
+ * Production-ready Godot 4.x UI scaffolding engine with high-performance templates.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
@@ -17,10 +17,12 @@ import {
   buildSettingsScript,
   buildInventoryScene,
   buildInventoryScript,
+  buildVirtualListScene,
+  buildVirtualListScript,
   buildThemeContent
 } from './godot-ui-templates.js';
 
-export type UiScaffoldType = 'menu' | 'hud' | 'dialog' | 'settings' | 'inventory' | 'theme';
+export type UiScaffoldType = 'menu' | 'hud' | 'dialog' | 'settings' | 'inventory' | 'virtual_list' | 'theme';
 
 export interface ScaffoldOptions {
   name: string;
@@ -90,6 +92,9 @@ export class GodotUiScaffolder {
     }
     if (type === 'inventory') {
       return { scene: buildInventoryScene(name, scriptPath, titleArg ?? 'Inventory'), script: buildInventoryScript(pascal) };
+    }
+    if (type === 'virtual_list') {
+      return { scene: buildVirtualListScene(name, scriptPath, titleArg ?? 'Virtual List'), script: buildVirtualListScript(pascal) };
     }
     return { scene: buildMenuScene(name, scriptPath, titleArg ?? pascal), script: buildMenuScript(pascal) };
   }

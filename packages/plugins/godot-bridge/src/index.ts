@@ -12,6 +12,7 @@ export * from './ui/godot-leak-radar.js';
 export * from './ui/godot-ui-linter.js';
 export * from './ui/godot-ui-templates.js';
 export * from './ui/godot-ui-scaffolder.js';
+export * from './ui/godot-ui-perf-auditor.js';
 export * from './mcp/godot-mcp-provider.js';
 export * from './classdboracle/classdb-types.js';
 export * from './classdboracle/oracle-cache.js';

@@ -1,6 +1,6 @@
 /**
  * @file godot-ui-templates.ts
- * Production-ready Godot 4 UI templates for scenes, scripts, and themes.
+ * Production-ready Godot 4 UI templates with zero mouse-picking overhead.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
@@ -8,34 +8,31 @@ export {
   buildSettingsScene,
   buildSettingsScript,
   buildInventoryScene,
-  buildInventoryScript
+  buildInventoryScript,
+  buildVirtualListScene,
+  buildVirtualListScript
 } from './godot-ui-templates-ext.js';
 
 const MENU_HEADER = (name: string, script: string) => [
   '[gd_scene load_steps=2 format=3]',
   `[ext_resource type="Script" path="${script}" id="1_script"]`,
   `[node name="${name}" type="Control"]`,
-  'layout_mode = 3',
-  'anchors_preset = 15',
-  'anchor_right = 1.0',
-  'anchor_bottom = 1.0',
-  'grow_horizontal = 2',
-  'grow_vertical = 2',
+  'layout_mode = 3\nanchors_preset = 15\nanchor_right = 1.0\nanchor_bottom = 1.0\ngrow_horizontal = 2\ngrow_vertical = 2',
   'script = ExtResource("1_script")'
 ].join('\n');
 
 const MENU_BODY = (title: string) => [
   '[node name="Background" type="ColorRect" parent="."]',
   'layout_mode = 1\nanchors_preset = 15\nanchor_right = 1.0\nanchor_bottom = 1.0\ngrow_horizontal = 2\ngrow_vertical = 2',
-  'color = Color(0.08, 0.09, 0.12, 0.95)\n',
+  'mouse_filter = 2\ncolor = Color(0.08, 0.09, 0.12, 0.95)\n',
   '[node name="Margin" type="MarginContainer" parent="."]',
   'layout_mode = 1\nanchors_preset = 15\nanchor_right = 1.0\nanchor_bottom = 1.0\ngrow_horizontal = 2\ngrow_vertical = 2',
-  'theme_override_constants/margin_left = 40\ntheme_override_constants/margin_top = 40',
+  'mouse_filter = 2\ntheme_override_constants/margin_left = 40\ntheme_override_constants/margin_top = 40',
   'theme_override_constants/margin_right = 40\ntheme_override_constants/margin_bottom = 40\n',
   '[node name="MenuBox" type="VBoxContainer" parent="Margin"]',
-  'layout_mode = 2\nsize_flags_horizontal = 4\nsize_flags_vertical = 4\ntheme_override_constants/separation = 16\nalignment = 1\n',
+  'layout_mode = 2\nmouse_filter = 2\nsize_flags_horizontal = 4\nsize_flags_vertical = 4\ntheme_override_constants/separation = 16\nalignment = 1\n',
   '[node name="TitleLabel" type="Label" parent="Margin/MenuBox"]',
-  'unique_name_in_owner = true\nlayout_mode = 2\ntheme_override_font_sizes/font_size = 36',
+  'unique_name_in_owner = true\nlayout_mode = 2\nmouse_filter = 2\ntheme_override_font_sizes/font_size = 36',
   `text = "${title}"\nhorizontal_alignment = 1\n`,
   '[node name="StartButton" type="Button" parent="Margin/MenuBox"]',
   'unique_name_in_owner = true\ncustom_minimum_size = Vector2(240, 50)\nlayout_mode = 2\ntext = "Start Game"\n',
@@ -72,15 +69,15 @@ const HUD_SCENE_TEXT = (name: string, script: string) => [
   `[node name="${name}" type="CanvasLayer"]`,
   'script = ExtResource("1_script")\n',
   '[node name="TopLeftMargin" type="MarginContainer" parent="."]',
-  'anchors_preset = 0\noffset_right = 260.0\noffset_bottom = 70.0\ntheme_override_constants/margin_left = 20\ntheme_override_constants/margin_top = 20\n',
-  '[node name="HealthBox" type="VBoxContainer" parent="TopLeftMargin"]\nlayout_mode = 2\n',
-  '[node name="HealthLabel" type="Label" parent="TopLeftMargin/HealthBox"]\nlayout_mode = 2\ntext = "Health"\n',
+  'anchors_preset = 0\nmouse_filter = 2\noffset_right = 260.0\noffset_bottom = 70.0\ntheme_override_constants/margin_left = 20\ntheme_override_constants/margin_top = 20\n',
+  '[node name="HealthBox" type="VBoxContainer" parent="TopLeftMargin"]\nlayout_mode = 2\nmouse_filter = 2\n',
+  '[node name="HealthLabel" type="Label" parent="TopLeftMargin/HealthBox"]\nlayout_mode = 2\nmouse_filter = 2\ntext = "Health"\n',
   '[node name="HealthBar" type="ProgressBar" parent="TopLeftMargin/HealthBox"]',
   'unique_name_in_owner = true\ncustom_minimum_size = Vector2(200, 24)\nlayout_mode = 2\nvalue = 100.0\n',
   '[node name="TopRightMargin" type="MarginContainer" parent="."]',
-  'anchors_preset = 1\nanchor_left = 1.0\nanchor_right = 1.0\noffset_left = -220.0\noffset_bottom = 70.0\ngrow_horizontal = 0\ntheme_override_constants/margin_top = 20\ntheme_override_constants/margin_right = 20\n',
+  'anchors_preset = 1\nanchor_left = 1.0\nanchor_right = 1.0\nmouse_filter = 2\noffset_left = -220.0\noffset_bottom = 70.0\ngrow_horizontal = 0\ntheme_override_constants/margin_top = 20\ntheme_override_constants/margin_right = 20\n',
   '[node name="ScoreLabel" type="Label" parent="TopRightMargin"]',
-  'unique_name_in_owner = true\nlayout_mode = 2\ntheme_override_font_sizes/font_size = 24\ntext = "Score: 0"\nhorizontal_alignment = 2'
+  'unique_name_in_owner = true\nlayout_mode = 2\nmouse_filter = 2\ntheme_override_font_sizes/font_size = 24\ntext = "Score: 0"\nhorizontal_alignment = 2'
 ].join('\n');
 
 export function buildHudScene(name: string, scriptPath: string): string {
@@ -111,16 +108,16 @@ const DIALOG_SCENE_TEXT = (name: string, script: string, title: string) => [
   'script = ExtResource("1_script")\n',
   '[node name="Dimmer" type="ColorRect" parent="."]',
   'layout_mode = 1\nanchors_preset = 15\nanchor_right = 1.0\nanchor_bottom = 1.0\ngrow_horizontal = 2\ngrow_vertical = 2',
-  'color = Color(0, 0, 0, 0.6)\n',
+  'mouse_filter = 2\ncolor = Color(0, 0, 0, 0.6)\n',
   '[node name="Panel" type="PanelContainer" parent="."]',
   'layout_mode = 1\nanchors_preset = 8\nanchor_left = 0.5\nanchor_top = 0.5\nanchor_right = 0.5\nanchor_bottom = 0.5',
   'offset_left = -160.0\noffset_top = -90.0\noffset_right = 160.0\noffset_bottom = 90.0\ngrow_horizontal = 2\ngrow_vertical = 2\n',
-  '[node name="VBox" type="VBoxContainer" parent="Panel"]\nlayout_mode = 2\ntheme_override_constants/separation = 12\n',
+  '[node name="VBox" type="VBoxContainer" parent="Panel"]\nlayout_mode = 2\nmouse_filter = 2\ntheme_override_constants/separation = 12\n',
   '[node name="DialogTitle" type="Label" parent="Panel/VBox"]',
-  `layout_mode = 2\ntheme_override_font_sizes/font_size = 20\ntext = "${title}"\nhorizontal_alignment = 1\n`,
+  `layout_mode = 2\nmouse_filter = 2\ntheme_override_font_sizes/font_size = 20\ntext = "${title}"\nhorizontal_alignment = 1\n`,
   '[node name="DialogMessage" type="Label" parent="Panel/VBox"]',
-  'unique_name_in_owner = true\nlayout_mode = 2\ntext = "Are you sure you want to proceed?"\nhorizontal_alignment = 1\n',
-  '[node name="Actions" type="HBoxContainer" parent="Panel/VBox"]\nlayout_mode = 2\ntheme_override_constants/separation = 16\nalignment = 1\n',
+  'unique_name_in_owner = true\nlayout_mode = 2\nmouse_filter = 2\ntext = "Are you sure you want to proceed?"\nhorizontal_alignment = 1\n',
+  '[node name="Actions" type="HBoxContainer" parent="Panel/VBox"]\nlayout_mode = 2\nmouse_filter = 2\ntheme_override_constants/separation = 16\nalignment = 1\n',
   '[node name="CancelButton" type="Button" parent="Panel/VBox/Actions"]',
   'unique_name_in_owner = true\ncustom_minimum_size = Vector2(100, 44)\nlayout_mode = 2\ntext = "Cancel"\n',
   '[node name="ConfirmButton" type="Button" parent="Panel/VBox/Actions"]',

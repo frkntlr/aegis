@@ -91,3 +91,23 @@ test('GodotUiScaffolder generates grid-based inventory with details panel', () =
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('GodotUiScaffolder generates high-performance virtualized recycler list', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-scaffold-vlist-'));
+  const res = GodotUiScaffolder.scaffold('virtual_list', { name: 'leaderboard', outputDir: tmpDir, title: 'Top Players' });
+
+  assert.strictEqual(res.type, 'virtual_list');
+  assert.strictEqual(res.filesWritten.length, 2);
+  assert.ok(fs.existsSync(res.scenePath!));
+  assert.ok(fs.existsSync(res.scriptPath!));
+
+  const sceneText = fs.readFileSync(res.scenePath!, 'utf8');
+  assert.ok(sceneText.includes('ScrollContainer'));
+  assert.ok(sceneText.includes('RowsVBox'));
+
+  const scriptText = fs.readFileSync(res.scriptPath!, 'utf8');
+  assert.ok(scriptText.includes('signal item_selected'));
+  assert.ok(scriptText.includes('_refresh_visible_pool'));
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});

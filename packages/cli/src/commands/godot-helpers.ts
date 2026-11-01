@@ -5,6 +5,7 @@ import {
   GodotUiVerifier,
   GodotLocator,
   DoctoolRunner,
+  GodotUiPerfAuditor,
   type ClassDbOracle,
   type GodotUiNode,
   type ValidationResult
@@ -129,4 +130,49 @@ export function handleGodotPlaytest(scenarioArg?: string): void {
   const reqId = `playtest-${Date.now()}`;
   console.log(`✅ Queued playtest scenario [${reqId}] with ${actions.length} action(s).`);
   console.log(' • Status: Ready for Godot AegisBridge autonomous execution.');
+}
+
+export function handleGodotUiPerf(targetArg?: string): void {
+  showBanner();
+  const target = targetArg || process.cwd();
+  console.log(`⚡ Running Zero-Stutter UI Performance Audit for: ${target}...`);
+  const files: string[] = [];
+  if (fs.existsSync(target) && fs.statSync(target).isFile() && target.endsWith('.tscn')) {
+    files.push(target);
+  } else if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+    const entries = fs.readdirSync(target, { recursive: true });
+    for (const e of entries) {
+      if (String(e).endsWith('.tscn')) files.push(path.join(target, String(e)));
+    }
+  }
+
+  if (files.length === 0) {
+    console.log('ℹ️ No .tscn UI scene files found to audit.');
+    return;
+  }
+
+  for (const f of files) {
+    const rep = GodotUiPerfAuditor.auditScene(f);
+    console.log(`🎨 UI Performance: ${path.basename(f)} [Grade: ${rep.grade} | Score: ${rep.score}/100]`);
+    console.log(` • Nodes: ${rep.totalNodes} | Mouse Picking Stop on Decoratives: ${rep.metrics.mouseFilterStopOnNonInteractive}`);
+    for (const iss of rep.issues) {
+      console.log(`   [${iss.severity.toUpperCase()}] ${iss.nodeName} (${iss.rule}): ${iss.message}`);
+      console.log(`     💡 Fix: ${iss.fixSuggestion}`);
+    }
+  }
+}
+
+export function handleGodotUiOptimize(targetArg?: string): void {
+  showBanner();
+  const target = targetArg || process.cwd();
+  if (!fs.existsSync(target) || !target.endsWith('.tscn')) {
+    console.log('Usage: aegis godot ui:optimize <scene.tscn>');
+    return;
+  }
+  const content = fs.readFileSync(target, 'utf8');
+  const { optimizedContent, fixesApplied } = GodotUiPerfAuditor.optimizeContent(content);
+  fs.writeFileSync(target, optimizedContent, 'utf8');
+  console.log(`⚡ Optimized UI Scene: ${target}`);
+  console.log(` • Applied ${fixesApplied.length} performance fix(es):`);
+  for (const fix of fixesApplied) console.log(`   - ${fix}`);
 }

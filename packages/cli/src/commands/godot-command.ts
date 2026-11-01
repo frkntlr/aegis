@@ -18,7 +18,9 @@ import {
   scanAndValidateGd,
   handleGodotRun,
   handleGodotDoctool,
-  handleGodotPlaytest
+  handleGodotPlaytest,
+  handleGodotUiPerf,
+  handleGodotUiOptimize
 } from './godot-helpers.js';
 
 export { handleGodotRun, handleGodotDoctool, handleGodotPlaytest };
@@ -171,6 +173,14 @@ export async function handleGodotTest(projectDirArg?: string, scenarioArg?: stri
 export function handleGodotUi(subcmd = 'lint', ...args: string[]): void {
   showBanner();
   const act = subcmd.toLowerCase();
+  if (act === 'perf' || act === 'audit') {
+    handleGodotUiPerf(args[0]);
+    return;
+  }
+  if (act === 'optimize' || act === 'fix') {
+    handleGodotUiOptimize(args[0]);
+    return;
+  }
   if (act === 'scaffold' || act === 'create') {
     const type = (args[0] || 'menu') as UiScaffoldType;
     const name = args[1] || 'menu';
