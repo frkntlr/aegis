@@ -14,9 +14,10 @@ import {
   getSubagentProfiles,
   compileTrackPrompt
 } from './teamwork-prompts.js';
-import { TeamworkDecomposer } from './teamwork-decomposer.js';
+import { TeamworkDecomposer, type DecomposedSubtask } from './teamwork-decomposer.js';
 import { TeamworkVisualizer } from './teamwork-visualizer.js';
-export { TeamworkVisualizer };
+import { TeamworkGroundingEngine } from './teamwork-grounding.js';
+export { TeamworkVisualizer, TeamworkGroundingEngine };
 
 export interface AntigravityInvocationPayload {
   TypeName: string;
@@ -58,9 +59,7 @@ function resolveSafeRepoRoot(initial?: string): string {
   if (initial) return initial;
   const cwd = process.cwd();
   if (cwd.toLowerCase().includes('system32')) {
-    if (process.env.AEGIS_WORKSPACE && fs.existsSync(process.env.AEGIS_WORKSPACE)) {
-      return process.env.AEGIS_WORKSPACE;
-    }
+    if (process.env.AEGIS_WORKSPACE && fs.existsSync(process.env.AEGIS_WORKSPACE)) return process.env.AEGIS_WORKSPACE;
     const scratch = path.resolve(process.env.USERPROFILE || 'C:\\Users\\Lenovo', '.gemini', 'antigravity', 'scratch', 'aegis');
     if (fs.existsSync(scratch)) return scratch;
   }
@@ -71,22 +70,26 @@ export class TeamworkCoordinator {
   private repoRoot: string;
   private worktreeManager: WorktreeManager;
   private roleClassifier: RoleClassifier;
+  private groundingEngine: TeamworkGroundingEngine;
   private cachedProfiles?: SubagentProfile[];
 
-  constructor(repoRoot?: string, worktreeManager?: WorktreeManager, roleClassifier?: RoleClassifier) {
+  constructor(repoRoot?: string, wtManager?: WorktreeManager, roleClassifier?: RoleClassifier, grounding?: TeamworkGroundingEngine) {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
-    this.worktreeManager = worktreeManager ?? new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
+    this.worktreeManager = wtManager ?? new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
     this.roleClassifier = roleClassifier ?? new RoleClassifier();
+    this.groundingEngine = grounding ?? new TeamworkGroundingEngine(this.repoRoot);
   }
 
   public getRoleClassifier(): RoleClassifier {
     return this.roleClassifier;
   }
 
+  public getGroundingEngine(): TeamworkGroundingEngine {
+    return this.groundingEngine;
+  }
+
   public listProfiles(): SubagentProfile[] {
-    if (!this.cachedProfiles) {
-      this.cachedProfiles = getSubagentProfiles();
-    }
+    if (!this.cachedProfiles) this.cachedProfiles = getSubagentProfiles();
     return this.cachedProfiles;
   }
 
@@ -101,27 +104,16 @@ export class TeamworkCoordinator {
     options?: { deterministic?: boolean }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
-    const planId = isDet
-      ? `tw-det-${this.hashPlan(objective, targetFiles)}`
-      : `tw-${Date.now().toString(36)}`;
+    const planId = isDet ? `tw-det-${this.hashPlan(objective, targetFiles)}` : `tw-${Date.now().toString(36)}`;
     const profiles = this.listProfiles();
     const subtasks = TeamworkDecomposer.decompose(objective, targetFiles);
     const tracks: TeamworkTrack[] = [];
+    const upstreamFilesMap = new Map<string, string[]>();
 
     for (const sub of subtasks) {
-      const profile = profiles.find(p => p.roleType === sub.roleType) ?? profiles[0];
-      tracks.push(
-        this.buildTrack(
-          sub.roleType,
-          profile,
-          sub.title,
-          sub.targetFiles,
-          sub.label,
-          isDet,
-          sub.dependsOn ?? [],
-          sub.phase ?? 1
-        )
-      );
+      const track = this.buildSubtaskTrack(sub, profiles, upstreamFilesMap, isDet);
+      tracks.push(track);
+      upstreamFilesMap.set(sub.label, sub.targetFiles);
     }
 
     this.stageTracksIntoInbox(planId, objective, tracks);
@@ -134,6 +126,34 @@ export class TeamworkCoordinator {
     };
   }
 
+  private buildSubtaskTrack(
+    sub: DecomposedSubtask,
+    profiles: SubagentProfile[],
+    upstreamFilesMap: Map<string, string[]>,
+    isDet: boolean
+  ): TeamworkTrack {
+    const profile = profiles.find(p => p.roleType === sub.roleType) ?? profiles[0];
+    const grounding = this.groundingEngine.buildGroundingSection(sub.targetFiles);
+    const upstreamItems = (sub.dependsOn ?? []).map(dep => ({
+      subagentName: dep,
+      files: upstreamFilesMap.get(dep) ?? []
+    }));
+    const upstreamContracts = this.groundingEngine.buildUpstreamContractsSection(upstreamItems);
+
+    return this.buildTrack(
+      sub.roleType,
+      profile,
+      sub.title,
+      sub.targetFiles,
+      sub.label,
+      isDet,
+      sub.dependsOn ?? [],
+      sub.phase ?? 1,
+      grounding,
+      upstreamContracts
+    );
+  }
+
   private buildTrack(
     roleType: RoleType,
     profile: SubagentProfile,
@@ -142,13 +162,15 @@ export class TeamworkCoordinator {
     label: string,
     deterministic = false,
     dependsOn: string[] = [],
-    phase = 1
+    phase = 1,
+    groundingContext?: string,
+    upstreamContracts?: string
   ): TeamworkTrack {
     const subagentName = `${profile.name} [${label}]`;
     const id = deterministic
       ? `${roleType}-${label.toLowerCase()}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 6)}`
       : `${roleType}-${label.toLowerCase()}-${Date.now().toString(36)}`;
-    const prompt = compileTrackPrompt(profile, desc, files, subagentName, dependsOn, phase);
+    const prompt = compileTrackPrompt(profile, desc, files, subagentName, dependsOn, phase, groundingContext, upstreamContracts);
     return {
       id,
       roleType,
@@ -175,11 +197,9 @@ export class TeamworkCoordinator {
     if (fs.existsSync(inboxPath)) {
       try { existing = JSON.parse(fs.readFileSync(inboxPath, 'utf8')); } catch { existing = null; }
     }
-    const inboxArray: unknown[] = Array.isArray(existing)
-      ? existing
+    const inboxArray: unknown[] = Array.isArray(existing) ? existing
       : (existing && typeof existing === 'object' && Array.isArray((existing as { tasks?: unknown[] }).tasks))
-        ? (existing as { tasks: unknown[] }).tasks
-        : [];
+        ? (existing as { tasks: unknown[] }).tasks : [];
 
     const numBase = planId.startsWith('tw-det-')
       ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
@@ -206,7 +226,7 @@ export class TeamworkCoordinator {
     }
     try {
       fs.writeFileSync(inboxPath, JSON.stringify(inboxArray, null, 2), 'utf8');
-    } catch { /* ignore if write not permitted */ }
+    } catch { /* ignore */ }
   }
 
   public exportSubagentManifest(outDir?: string): { count: number; manifestPath: string } {
@@ -219,14 +239,9 @@ export class TeamworkCoordinator {
       framework: 'antigravity-subagents',
       version: '0.1.0',
       subagents: profiles.map(p => ({
-        name: p.name,
-        role: p.title,
-        description: p.description,
-        systemPrompt: p.systemPrompt,
-        workspaceMode: p.workspaceMode ?? 'inherit',
-        enableWriteTools: p.enableWriteTools,
-        enableMcpTools: p.enableMcpTools,
-        defaultModel: p.defaultModel ?? 'inherit'
+        name: p.name, role: p.title, description: p.description, systemPrompt: p.systemPrompt,
+        workspaceMode: p.workspaceMode ?? 'inherit', enableWriteTools: p.enableWriteTools,
+        enableMcpTools: p.enableMcpTools, defaultModel: p.defaultModel ?? 'inherit'
       }))
     };
     try {

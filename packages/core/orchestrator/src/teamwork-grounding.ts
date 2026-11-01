@@ -1,0 +1,131 @@
+/**
+ * @file teamwork-grounding.ts
+ * Zero-Hallucination Grounding Engine for Antigravity Teamwork.
+ * Injects immutable AST skeletons, line budgets, and upstream contracts into prompts.
+ * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { SkeletonGenerator } from '@aegis/ast-skeleton';
+
+export interface FileGroundingReport {
+  filePath: string;
+  exists: boolean;
+  lineCount: number;
+  headroom: number;
+  budgetStatus: 'healthy' | 'warning' | 'critical';
+  skeleton: string;
+  tokenSavingsPercent: number;
+}
+
+export class TeamworkGroundingEngine {
+  private repoRoot: string;
+  private skeletonGen: SkeletonGenerator;
+
+  constructor(repoRoot: string = process.cwd(), skeletonGen?: SkeletonGenerator) {
+    this.repoRoot = repoRoot;
+    this.skeletonGen = skeletonGen ?? new SkeletonGenerator();
+  }
+
+  public resolvePath(targetPath: string): string {
+    if (path.isAbsolute(targetPath)) return targetPath;
+    return path.resolve(this.repoRoot, targetPath);
+  }
+
+  public inspectFile(relPath: string): FileGroundingReport {
+    const fullPath = this.resolvePath(relPath);
+    if (!fs.existsSync(fullPath)) {
+      return {
+        filePath: relPath,
+        exists: false,
+        lineCount: 0,
+        headroom: 300,
+        budgetStatus: 'healthy',
+        skeleton: '',
+        tokenSavingsPercent: 0
+      };
+    }
+
+    try {
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const lines = content.split('\n').length;
+      const headroom = Math.max(0, 300 - lines);
+      const budgetStatus: FileGroundingReport['budgetStatus'] = lines >= 280 ? 'critical' : lines >= 240 ? 'warning' : 'healthy';
+      const extRes = this.skeletonGen.extractFile(relPath, content);
+      return {
+        filePath: relPath,
+        exists: true,
+        lineCount: lines,
+        headroom,
+        budgetStatus,
+        skeleton: this.trimSkeleton(extRes.skeletonContent),
+        tokenSavingsPercent: extRes.tokenSavingsPercent
+      };
+    } catch {
+      return { filePath: relPath, exists: false, lineCount: 0, headroom: 300, budgetStatus: 'healthy', skeleton: '', tokenSavingsPercent: 0 };
+    }
+  }
+
+  private trimSkeleton(skel: string, maxLines = 35): string {
+    const lines = skel.trim().split('\n');
+    if (lines.length <= maxLines) return skel.trim();
+    return lines.slice(0, maxLines).join('\n') + '\n// ... (additional members truncated for prompt economy)';
+  }
+
+  private resolveStatusIcon(status: FileGroundingReport['budgetStatus']): string {
+    if (status === 'critical') return '🔴 Critical Headroom (Modular Extraction Required)';
+    if (status === 'warning') return '🟡 Approaching Limit (Extract Helpers)';
+    return '🟢 Healthy Headroom';
+  }
+
+  private resolveCodeFenceLang(filePath: string): string {
+    if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) return 'typescript';
+    if (filePath.endsWith('.py')) return 'python';
+    if (filePath.endsWith('.gd')) return 'gdscript';
+    if (filePath.endsWith('.tscn')) return 'ini';
+    if (filePath.endsWith('.json')) return 'json';
+    return 'text';
+  }
+
+  public buildGroundingSection(targetFiles: string[]): string {
+    if (!targetFiles || targetFiles.length === 0) return '';
+    const reports = targetFiles.map(f => this.inspectFile(f));
+    const lines: string[] = ['### 🛡️ Ground-Truth Codebase Reality (Zero-Hallucination)'];
+
+    for (const r of reports) {
+      if (!r.exists) {
+        lines.push(`- \`${r.filePath}\`: (New File to Create - Max 300 lines, 0 any)`);
+        continue;
+      }
+      const icon = this.resolveStatusIcon(r.budgetStatus);
+      lines.push(`- \`${r.filePath}\` (Lines: ${r.lineCount}/300, Headroom: ${r.headroom} lines | ${icon}):`);
+      if (r.skeleton.trim().length > 0) {
+        const lang = this.resolveCodeFenceLang(r.filePath);
+        lines.push(`\`\`\`${lang}\n${r.skeleton}\n\`\`\``);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  public buildUpstreamContractsSection(
+    upstreamItems: Array<{ subagentName: string; files: string[] }>
+  ): string {
+    if (!upstreamItems || upstreamItems.length === 0) return '';
+    const lines: string[] = ['### 🔗 Upstream Dependency Contracts (Verified Interfaces)'];
+    let count = 0;
+
+    for (const item of upstreamItems) {
+      for (const f of item.files) {
+        const rep = this.inspectFile(f);
+        if (rep.exists && rep.skeleton.trim().length > 0) {
+          count++;
+          const lang = this.resolveCodeFenceLang(f);
+          lines.push(`- Upstream Export from \`${item.subagentName}\` (\`${f}\`):`);
+          lines.push(`\`\`\`${lang}\n${rep.skeleton}\n\`\`\``);
+        }
+      }
+    }
+    return count > 0 ? lines.join('\n') : '';
+  }
+}

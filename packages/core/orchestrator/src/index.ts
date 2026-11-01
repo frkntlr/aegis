@@ -12,4 +12,5 @@ export * from './teamwork-prompts.js';
 export * from './teamwork-decomposer.js';
 export * from './teamwork-coordinator.js';
 export * from './teamwork-visualizer.js';
+export * from './teamwork-grounding.js';
 export * from './antigravity-installer.js';

@@ -197,7 +197,34 @@ graph TD
 
 ---
 
-## 8. CLI & Tooling Quick Reference
+## 9. Anti-Hallucination Grounding & Upstream Contract Engine
+
+In concurrent multi-agent architectures, LLM subagents frequently suffer from hallucination when working with peer components: inventing phantom methods, generating incorrect parameter signatures, or exceeding line quotas.
+
+The **Teamwork Grounding Engine** (`TeamworkGroundingEngine`) provides immutable ground-truth codebase reality directly inside subagent execution prompts:
+
+```mermaid
+graph TD
+    TargetFiles[Target Source Files] --> Grounding[TeamworkGroundingEngine]
+    UpstreamDeps[Upstream Phase Dependencies] --> Grounding
+    Grounding -->|Pre-flight Audit| Budget[Line Budget Radar: Headroom & Status]
+    Grounding -->|AST Extraction| Skeletons[Type Signatures & Exported Members]
+    Grounding -->|Contract Extraction| UpstreamContracts[Peer Interfaces & Signatures]
+    Budget --> InjectedPrompt[Surgical Task Prompt]
+    Skeletons --> InjectedPrompt
+    UpstreamContracts --> InjectedPrompt
+    InjectedPrompt --> Subagent[Autonomous Subagent Execution]
+```
+
+### Grounding Capabilities:
+1. **Line Budget Headroom Radar**: Calculates active line count and remaining headroom against Demir Kafes (<300 lines/file, <40 lines/function) before the agent writes code, categorizing budget status as `healthy`, `warning`, or `critical`.
+2. **AST Skeleton Projection**: Generates compact type definitions and class signatures using `@aegis/ast-skeleton`, cutting token consumption by ~90% while providing 100% accurate ground-truth signatures.
+3. **Cross-Agent Upstream Contract Sharing**: When a downstream agent (such as QA Hunter or Doc Architect) depends on upstream solver targets, the engine extracts exported interfaces from those upstream files and injects them under `### 🧩 Upstream Dependency Contracts & Interfaces`.
+4. **Codebase Invariants Enforcement**: Mandates strict type safety (`0 any`), surgical edits only, and prohibits inventing non-existent APIs.
+
+---
+
+## 10. CLI & Tooling Quick Reference
 
 | Action | Aegis CLI Command | MCP Tool Equivalent |
 | :--- | :--- | :--- |

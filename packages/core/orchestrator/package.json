@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@aegis/orchestrator",
   "version": "0.1.0",
   "description": "Aegis Git Worktree and Agent Lifecycle Orchestrator",
@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@aegis/shared": "*",
-    "@aegis/github-live": "*"
+    "@aegis/github-live": "*",
+    "@aegis/ast-skeleton": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

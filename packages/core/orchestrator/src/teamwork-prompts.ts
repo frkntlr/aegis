@@ -120,7 +120,9 @@ export function compileTrackPrompt(
   files: string[],
   subagentName?: string,
   dependsOn?: string[],
-  phase?: number
+  phase?: number,
+  groundingContext?: string,
+  upstreamContracts?: string
 ): string {
   const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- General codebase scope';
   const roleIdentity = subagentName ?? profile.name;
@@ -128,13 +130,24 @@ export function compileTrackPrompt(
   const depInfo = dependsOn && dependsOn.length > 0
     ? `**Upstream Dependencies**: [${dependsOn.join(', ')}]\n`
     : '';
+
+  const groundBlock = groundingContext ? `\n${groundingContext.trim()}\n` : '';
+  const contractBlock = upstreamContracts ? `\n${upstreamContracts.trim()}\n` : '';
+
   return `${profile.badge}\n\n` +
     `## Assigned Subagent Task\n` +
     `**Track**: ${profile.title} (${roleIdentity})\n` +
     `**Objective**: ${trackDesc}\n` +
     phaseInfo +
     depInfo +
-    `\n### Target Files & Locks\n${targetStr}\n\n` +
+    `\n### Target Files & Locks\n${targetStr}\n` +
+    groundBlock +
+    contractBlock +
+    `\n### ⚖️ Anti-Hallucination & Codebase Invariants\n` +
+    `1. Strict Type Fidelity: Never import or call non-existent methods. Refer strictly to the AST interface contracts above.\n` +
+    `2. Surgical Diffs: Replace only the relevant blocks; preserve all existing comments, docstrings, and imports.\n` +
+    `3. Line Budget Headroom: Ensure your changes do not push any file past 300 lines (Demir Kafes).\n` +
+    `4. Zero any: All types must be explicitly typed.\n\n` +
     `### Instructions\n` +
     `1. Pull staged details using \`aegis task:pull ${profile.roleType}\` or MCP \`task_inbox_pull\`.\n` +
     `2. Execute changes within your designated workspace.\n` +
