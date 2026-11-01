@@ -23,6 +23,7 @@ export class TeamworkDecomposer {
     const parsed = rawItems.map(item => this.classifyRawItem(item));
     const subtasks = this.enrichSubtasks(parsed);
     this.ensureRequiredTracks(subtasks, objective, targetFiles);
+    this.shardSolversByFiles(subtasks, targetFiles, objective);
     this.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
     return subtasks;
@@ -46,6 +47,11 @@ export class TeamworkDecomposer {
     if (trimmed.includes('\n')) {
       const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
       if (lines.length > 1) return lines;
+    }
+
+    if (trimmed.includes(',')) {
+      const items = trimmed.split(',').map(s => s.trim()).filter(p => p.length >= 3);
+      if (items.length >= 3) return items;
     }
 
     return this.splitCompoundSentence(trimmed);
@@ -106,9 +112,35 @@ export class TeamworkDecomposer {
     });
   }
 
+  private static shardSolversByFiles(subtasks: DecomposedSubtask[], allFiles: string[], objective: string): void {
+    const solvers = subtasks.filter(t => t.roleType === 'solver');
+    if (solvers.length !== 1) return;
+
+    const sourceFiles = allFiles.filter(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'));
+    if (sourceFiles.length < 3) return;
+
+    const solverIndex = subtasks.findIndex(t => t.roleType === 'solver');
+    subtasks.splice(solverIndex, 1);
+
+    for (const file of sourceFiles) {
+      const base = file.split('/').pop()?.split('\\').pop()?.replace(/\.[^/.]+$/, '') || 'Module';
+      const label = base.charAt(0).toUpperCase() + base.slice(1).slice(0, 15);
+      subtasks.splice(solverIndex, 0, {
+        roleType: 'solver',
+        label,
+        title: `${objective}: ${base}`,
+        targetFiles: [file]
+      });
+    }
+  }
+
   private static partitionFiles(subtasks: DecomposedSubtask[], allFiles: string[]): void {
     const assignedFiles = new Set<string>();
     for (const task of subtasks) {
+      if (task.targetFiles.length > 0) {
+        task.targetFiles.forEach(f => assignedFiles.add(f));
+        continue;
+      }
       if (task.roleType === 'ui') {
         task.targetFiles = allFiles.filter(f => RoleClassifier.isUiFile(f) && !assignedFiles.has(f));
         task.targetFiles.forEach(f => assignedFiles.add(f));
@@ -117,7 +149,7 @@ export class TeamworkDecomposer {
         task.targetFiles.forEach(f => assignedFiles.add(f));
       }
     }
-    this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver'), allFiles, assignedFiles);
+    this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver' && t.targetFiles.length === 0), allFiles, assignedFiles);
   }
 
   private static partitionSolverFiles(

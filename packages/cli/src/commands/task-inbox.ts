@@ -92,10 +92,15 @@ export function stageTaskInInbox(
   return stagedItem;
 }
 
-function matchesTaskRole(taskRole: string, roleQuery: string): boolean {
-  const t = taskRole.toLowerCase().trim();
+export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber?: number): boolean {
   const q = roleQuery.toLowerCase().trim();
-  if (t === q || t.startsWith(q) || q.startsWith(t)) return true;
+  if (issueNumber !== undefined && (String(issueNumber) === q || `#${issueNumber}` === q)) {
+    return true;
+  }
+  const t = taskRole.toLowerCase().trim();
+  if (t === q || t.startsWith(q) || q.startsWith(t) || t.includes(q) || q.includes(t)) {
+    return true;
+  }
   if ((q.includes('solver') || q === 'issue') && t.includes('solver')) return true;
   if (q.includes('qa') && t.includes('qa')) return true;
   if (q.includes('ui') && t.includes('ui')) return true;
@@ -109,7 +114,7 @@ export function pullNextPendingTask(role?: string, baseDir = process.cwd()): Tas
     if (t.status !== 'pending') return false;
     if (!isTaskDependenciesSatisfied(t, data.tasks)) return false;
     if (!role || role === 'auto' || role === 'all') return true;
-    return matchesTaskRole(t.role, role);
+    return matchesTaskRole(t.role, role, t.issueNumber);
   });
 
   if (!task) return null;

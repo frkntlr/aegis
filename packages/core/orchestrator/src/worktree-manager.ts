@@ -233,8 +233,21 @@ export class WorktreeManager {
 
   public releaseFileLocks(agentName: string): void {
     this.withLock(() => {
+      const q = agentName.toLowerCase().trim();
       for (const [file, owner] of this.activeLocks.entries()) {
-        if (owner === agentName) this.activeLocks.delete(file);
+        const o = owner.toLowerCase().trim();
+        if (o === q || o.includes(`[${q}]`) || o.startsWith(q) || q.startsWith(o)) {
+          this.activeLocks.delete(file);
+        }
+      }
+    });
+  }
+
+  public releaseFiles(files: string[]): void {
+    this.withLock(() => {
+      const normalized = new Set(files.map(normPath));
+      for (const file of this.activeLocks.keys()) {
+        if (normalized.has(file)) this.activeLocks.delete(file);
       }
     });
   }

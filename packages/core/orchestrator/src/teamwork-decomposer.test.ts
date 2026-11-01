@@ -80,3 +80,31 @@ test('TeamworkDecomposer assigns phased dependencies correctly (Solvers/UI -> QA
   assert.ok(qas[0].dependsOn && qas[0].dependsOn.includes(uis[0].label));
   assert.ok(docs[0].dependsOn && docs[0].dependsOn.includes(qas[0].label));
 });
+
+test('TeamworkDecomposer can scale to 10+ subtasks cleanly with zero lock collision', () => {
+  const objective = '1. Parser, 2. Lexer, 3. Ast, 4. Cache, 5. Auth, 6. Db, 7. Api, 8. Client, 9. UI, 10. Audit, 11. Docs';
+  const files = [
+    'src/parser.ts', 'src/lexer.ts', 'src/ast.ts', 'src/cache.ts',
+    'src/auth.ts', 'src/db.ts', 'src/api.ts', 'src/client.ts',
+    'scenes/main.tscn', 'docs/API.md'
+  ];
+  const subtasks = TeamworkDecomposer.decompose(objective, files);
+
+  assert.ok(subtasks.length >= 10, `Expected at least 10 subtasks, got ${subtasks.length}`);
+  const assigned = subtasks.flatMap(s => s.targetFiles);
+  const unique = new Set(assigned);
+  assert.strictEqual(assigned.length, unique.size, 'All file allocations must be strictly disjoint');
+});
+
+test('TeamworkDecomposer auto-shards single solver into parallel subtasks when multiple source files provided', () => {
+  const objective = 'Refactor core modules';
+  const files = ['src/parser.ts', 'src/cache.ts', 'src/auth.ts', 'src/db.ts'];
+  const subtasks = TeamworkDecomposer.decompose(objective, files);
+
+  const solvers = subtasks.filter(s => s.roleType === 'solver');
+  assert.strictEqual(solvers.length, 4);
+  assert.strictEqual(solvers[0].targetFiles.length, 1);
+  assert.strictEqual(solvers[1].targetFiles.length, 1);
+  assert.strictEqual(solvers[2].targetFiles.length, 1);
+  assert.strictEqual(solvers[3].targetFiles.length, 1);
+});

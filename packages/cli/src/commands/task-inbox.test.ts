@@ -148,17 +148,44 @@ test('pullNextPendingTask blocks on unfulfilled dependencies and unblocks on com
     phase: 2
   }, tmpDir);
 
-  // Task 402 is blocked because Core (401) is not done
   const blockedPull = pullNextPendingTask('qa-hunter', tmpDir);
   assert.strictEqual(blockedPull, null);
 
-  // Complete task 401
   const updateResult = updateTaskInboxStatus(401, 'done', 'issue-solver [Core]', tmpDir);
   assert.strictEqual(updateResult, true);
 
-  // Task 402 is now unblocked and ready for QA Hunter
   const unblockedPull = pullNextPendingTask('qa-hunter', tmpDir);
   assert.ok(unblockedPull);
   assert.strictEqual(unblockedPull?.issueNumber, 402);
   assert.strictEqual(unblockedPull?.status, 'in_progress');
+});
+
+test('pullNextPendingTask pulls specifically by issue number or subagent label', () => {
+  stageTaskInInbox({
+    issueNumber: 501,
+    title: 'Task A',
+    role: 'issue-solver [Parser]',
+    worktree: 'experimental/solver',
+    targetFiles: ['src/parser.ts'],
+    acceptanceCriteria: [],
+    prompt: 'Prompt A'
+  }, tmpDir);
+
+  stageTaskInInbox({
+    issueNumber: 502,
+    title: 'Task B',
+    role: 'issue-solver [Cache]',
+    worktree: 'experimental/solver',
+    targetFiles: ['src/cache.ts'],
+    acceptanceCriteria: [],
+    prompt: 'Prompt B'
+  }, tmpDir);
+
+  const pulledCache = pullNextPendingTask('Cache', tmpDir);
+  assert.ok(pulledCache);
+  assert.strictEqual(pulledCache.issueNumber, 502);
+
+  const pulledNum = pullNextPendingTask('501', tmpDir);
+  assert.ok(pulledNum);
+  assert.strictEqual(pulledNum.issueNumber, 501);
 });

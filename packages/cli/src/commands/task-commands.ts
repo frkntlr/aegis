@@ -76,7 +76,16 @@ export function handleTaskRelease(issueArg?: string, statusArg?: string, reasonA
   }
   const status = (statusArg === 'done' || statusArg === 'blocked') ? statusArg : 'pending';
   const wtManager = new WorktreeManager({ persistLocks: true });
-  wtManager.releaseFileLocks(normalizeRole(reasonArg));
+  const tasks = listInboxTasks();
+  const task = tasks.find(t => t.issueNumber === issueNum);
+  if (task) {
+    if (task.targetFiles && task.targetFiles.length > 0) {
+      wtManager.releaseFiles(task.targetFiles);
+    }
+    if (task.role) wtManager.releaseFileLocks(task.role);
+    if (task.claimedBy) wtManager.releaseFileLocks(task.claimedBy);
+  }
+  if (reasonArg) wtManager.releaseFileLocks(reasonArg);
   updateTaskInboxStatus(issueNum, status);
   console.log(`🔓 Task #${issueNum} released. New Status: [${status.toUpperCase()}]`);
 }
@@ -120,7 +129,7 @@ export async function handleTaskInject(issueArg?: string, roleArg?: string, flag
 
 export function handleTaskPull(roleArg?: string): void {
   showBanner();
-  const role = roleArg ? normalizeRole(roleArg) : undefined;
+  const role = roleArg ? roleArg.trim() : undefined;
   const task = pullNextPendingTask(role);
   if (!task) {
     console.log(`⏳ No pending tasks waiting in inbox${role ? ` for @${role}` : ''}.`);
@@ -221,15 +230,23 @@ export function mcpTaskClaim(args: Record<string, unknown> = {}): string {
 export function mcpTaskRelease(args: Record<string, unknown> = {}): string {
   const issueNum = Number(args.issueNumber || 0);
   const status = (args.status === 'done' || args.status === 'blocked') ? args.status : 'pending';
-  const role = normalizeRole(typeof args.agentRole === 'string' ? args.agentRole : undefined);
   const wtManager = new WorktreeManager({ persistLocks: true });
-  wtManager.releaseFileLocks(role);
+  const tasks = listInboxTasks();
+  const task = tasks.find(t => t.issueNumber === issueNum);
+  if (task) {
+    if (task.targetFiles && task.targetFiles.length > 0) {
+      wtManager.releaseFiles(task.targetFiles);
+    }
+    if (task.role) wtManager.releaseFileLocks(task.role);
+    if (task.claimedBy) wtManager.releaseFileLocks(task.claimedBy);
+  }
+  if (typeof args.agentRole === 'string') wtManager.releaseFileLocks(args.agentRole);
   updateTaskInboxStatus(issueNum, status);
   return JSON.stringify({ success: true, issueNumber: issueNum, status }, null, 2);
 }
 
 export function mcpTaskInboxPull(args: Record<string, unknown> = {}): string {
-  const role = typeof args.agentRole === 'string' ? normalizeRole(args.agentRole) : undefined;
+  const role = typeof args.agentRole === 'string' ? args.agentRole.trim() : undefined;
   const task = pullNextPendingTask(role);
   if (!task) return JSON.stringify({ task: null, message: 'No pending tasks found in inbox' });
   return JSON.stringify({ task }, null, 2);
