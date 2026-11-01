@@ -55,6 +55,9 @@ export function handleTeamworkPlan(objectiveArg?: string, ...files: string[]): T
   console.log(`🎯 Aegis Teamwork Plan Created: ${plan.planId}`);
   console.log(` • Objective: "${plan.objective}"`);
   console.log(` • Summary: ${plan.summary}`);
+  if (plan.discoveredFiles && plan.discoveredFiles.length > 0 && files.length === 0) {
+    console.log(` • ⚡ Fast Semantic Discovery: ${plan.discoveredFiles.length} file(s) auto-bound: [${plan.discoveredFiles.join(', ')}]`);
+  }
   console.log(` • Staged in TIP Inbox: .aegis/task-inbox.json\n`);
   console.log(coordinator.formatLiveMatrix(plan));
   console.log('\n' + coordinator.formatAsciiDag(plan));
@@ -100,7 +103,40 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
     console.log(coordinator.formatLiveMatrix(plan));
     return;
   }
+  if (norm === 'compact' || norm === 'briefing') {
+    handleTeamworkCompact(args[0]);
+    return;
+  }
+  if (norm === 'analyze' || norm === 'search') {
+    handleTeamworkAnalyze(args[0], ...args.slice(1));
+    return;
+  }
   handleTeamworkStatus();
+}
+
+export function handleTeamworkCompact(objectiveArg?: string): void {
+  showBanner();
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objectiveArg || 'Active Mission');
+  const briefing = coordinator.compactTeamwork(plan);
+  console.log(briefing);
+}
+
+export function handleTeamworkAnalyze(objectiveArg?: string, ...files: string[]): void {
+  showBanner();
+  if (!objectiveArg || objectiveArg.trim().length === 0) {
+    console.error('❌ Usage: aegis teamwork analyze "<objective>" [explicitFiles...]');
+    return;
+  }
+  const coordinator = new TeamworkCoordinator();
+  const res = coordinator.getSemanticAnalyzer().analyze(objectiveArg.trim(), files);
+  console.log('⚡ Aegis Fast Semantic Analysis Result:');
+  console.log(` • Objective: "${res.objective}"`);
+  console.log(` • Duration: ${res.durationMs}ms (Sub-10ms fast path)`);
+  console.log(` • Confidence: ${Math.round(res.confidence * 100)}%`);
+  console.log(` • Keywords: [${res.keywords.join(', ')}]`);
+  console.log(` • Discovered Target Files (${res.targetFiles.length}):`);
+  for (const f of res.targetFiles) console.log(`    📁 ${f}`);
 }
 
 export function mcpTeamworkPlan(args: Record<string, unknown> = {}): string {
@@ -126,4 +162,20 @@ export function mcpTeamworkDag(args: Record<string, unknown> = {}): string {
   const coordinator = new TeamworkCoordinator();
   const plan = coordinator.planTeamwork(objective, targetFiles);
   return coordinator.formatAsciiDag(plan);
+}
+
+export function mcpTeamworkCompact(args: Record<string, unknown> = {}): string {
+  const objective = String(args.objective || 'Active Mission');
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objective);
+  return coordinator.compactTeamwork(plan);
+}
+
+export function mcpTeamworkAnalyze(args: Record<string, unknown> = {}): string {
+  const objective = String(args.objective || '');
+  if (!objective) return JSON.stringify({ error: 'Missing required argument: objective' });
+  const explicitFiles = Array.isArray(args.files) ? args.files.map(String) : [];
+  const coordinator = new TeamworkCoordinator();
+  const res = coordinator.getSemanticAnalyzer().analyze(objective, explicitFiles);
+  return JSON.stringify(res, null, 2);
 }

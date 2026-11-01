@@ -121,6 +121,21 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     props: {},
     req: []
   },
+  teamwork_compact: {
+    desc: 'Archive completed tasks and generate Antigravity Compact mission briefing',
+    props: {
+      objective: { type: 'string', description: 'Active teamwork mission or plan identifier' }
+    },
+    req: []
+  },
+  teamwork_analyze: {
+    desc: 'Fast sub-10ms semantic codebase analysis and target file discovery',
+    props: {
+      objective: { type: 'string', description: 'Objective text to analyze and discover target files for' },
+      files: { type: 'array', items: { type: 'string' }, description: 'Optional explicit file list' }
+    },
+    req: ['objective']
+  },
   lock_status: {
     desc: 'Inspect active file mutex locks across worktrees',
     props: {},

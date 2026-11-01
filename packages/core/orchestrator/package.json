@@ -12,7 +12,8 @@
   "dependencies": {
     "@aegis/shared": "*",
     "@aegis/github-live": "*",
-    "@aegis/ast-skeleton": "*"
+    "@aegis/ast-skeleton": "*",
+    "@aegis/watchdog": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

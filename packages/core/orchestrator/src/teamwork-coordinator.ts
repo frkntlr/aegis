@@ -17,43 +17,16 @@ import {
 import { TeamworkDecomposer, type DecomposedSubtask } from './teamwork-decomposer.js';
 import { TeamworkVisualizer } from './teamwork-visualizer.js';
 import { TeamworkGroundingEngine } from './teamwork-grounding.js';
-export { TeamworkVisualizer, TeamworkGroundingEngine };
+import { FastSemanticAnalyzer } from './fast-semantic-analyzer.js';
+import { TeamworkCompactEngine } from './teamwork-compact.js';
+import type {
+  TeamworkTrack,
+  TeamworkPlan,
+  TeamworkStatusReport
+} from './teamwork-types.js';
 
-export interface AntigravityInvocationPayload {
-  TypeName: string;
-  Role: string;
-  Prompt: string;
-  Workspace: 'share' | 'branch' | 'inherit';
-  Model: 'inherit' | 'flash_lite' | 'flash' | 'pro';
-}
-
-export interface TeamworkTrack {
-  id: string;
-  roleType: RoleType;
-  subagentName: string;
-  title: string;
-  targetFiles: string[];
-  prompt: string;
-  invocationPayload: AntigravityInvocationPayload;
-  dependsOn: string[];
-  phase: number;
-}
-
-export interface TeamworkPlan {
-  planId: string;
-  objective: string;
-  createdAt: string;
-  tracks: TeamworkTrack[];
-  summary: string;
-}
-
-export interface TeamworkStatusReport {
-  activeTracksCount: number;
-  lockedFilesCount: number;
-  pendingInboxCount: number;
-  profiles: SubagentProfile[];
-  locks: Record<string, string>;
-}
+export * from './teamwork-types.js';
+export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine };
 
 function resolveSafeRepoRoot(initial?: string): string {
   if (initial) return initial;
@@ -71,6 +44,8 @@ export class TeamworkCoordinator {
   private worktreeManager: WorktreeManager;
   private roleClassifier: RoleClassifier;
   private groundingEngine: TeamworkGroundingEngine;
+  private semanticAnalyzer: FastSemanticAnalyzer;
+  private compactEngine: TeamworkCompactEngine;
   private cachedProfiles?: SubagentProfile[];
 
   constructor(repoRoot?: string, wtManager?: WorktreeManager, roleClassifier?: RoleClassifier, grounding?: TeamworkGroundingEngine) {
@@ -78,6 +53,8 @@ export class TeamworkCoordinator {
     this.worktreeManager = wtManager ?? new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
     this.roleClassifier = roleClassifier ?? new RoleClassifier();
     this.groundingEngine = grounding ?? new TeamworkGroundingEngine(this.repoRoot);
+    this.semanticAnalyzer = new FastSemanticAnalyzer(this.repoRoot);
+    this.compactEngine = new TeamworkCompactEngine(this.repoRoot);
   }
 
   public getRoleClassifier(): RoleClassifier {
@@ -86,6 +63,14 @@ export class TeamworkCoordinator {
 
   public getGroundingEngine(): TeamworkGroundingEngine {
     return this.groundingEngine;
+  }
+
+  public getSemanticAnalyzer(): FastSemanticAnalyzer {
+    return this.semanticAnalyzer;
+  }
+
+  public getCompactEngine(): TeamworkCompactEngine {
+    return this.compactEngine;
   }
 
   public listProfiles(): SubagentProfile[] {
@@ -104,9 +89,12 @@ export class TeamworkCoordinator {
     options?: { deterministic?: boolean }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
-    const planId = isDet ? `tw-det-${this.hashPlan(objective, targetFiles)}` : `tw-${Date.now().toString(36)}`;
+    const effectiveFiles = (targetFiles && targetFiles.length > 0)
+      ? targetFiles
+      : this.semanticAnalyzer.analyze(objective).targetFiles;
+    const planId = isDet ? `tw-det-${this.hashPlan(objective, effectiveFiles)}` : `tw-${Date.now().toString(36)}`;
     const profiles = this.listProfiles();
-    const subtasks = TeamworkDecomposer.decompose(objective, targetFiles);
+    const subtasks = TeamworkDecomposer.decompose(objective, effectiveFiles);
     const tracks: TeamworkTrack[] = [];
     const upstreamFilesMap = new Map<string, string[]>();
 
@@ -122,8 +110,16 @@ export class TeamworkCoordinator {
       objective,
       createdAt: new Date().toISOString(),
       tracks,
-      summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}).`
+      summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}).`,
+      discoveredFiles: effectiveFiles
     };
+  }
+
+  public compactTeamwork(plan?: TeamworkPlan): string {
+    const activePlan = plan ?? this.planTeamwork('Active Mission');
+    const status = this.getTeamworkStatus();
+    this.compactEngine.compactInbox();
+    return this.compactEngine.generateCompactBriefing(activePlan, status);
   }
 
   private buildSubtaskTrack(

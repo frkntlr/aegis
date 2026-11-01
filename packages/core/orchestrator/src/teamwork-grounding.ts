@@ -22,6 +22,7 @@ export interface FileGroundingReport {
 export class TeamworkGroundingEngine {
   private repoRoot: string;
   private skeletonGen: SkeletonGenerator;
+  private fileCache = new Map<string, { mtimeMs: number; size: number; report: FileGroundingReport }>();
 
   constructor(repoRoot: string = process.cwd(), skeletonGen?: SkeletonGenerator) {
     this.repoRoot = repoRoot;
@@ -37,31 +38,29 @@ export class TeamworkGroundingEngine {
     const fullPath = this.resolvePath(relPath);
     if (!fs.existsSync(fullPath)) {
       return {
-        filePath: relPath,
-        exists: false,
-        lineCount: 0,
-        headroom: 300,
-        budgetStatus: 'healthy',
-        skeleton: '',
-        tokenSavingsPercent: 0
+        filePath: relPath, exists: false, lineCount: 0,
+        headroom: 300, budgetStatus: 'healthy', skeleton: '', tokenSavingsPercent: 0
       };
     }
 
     try {
+      const stat = fs.statSync(fullPath);
+      const cached = this.fileCache.get(relPath);
+      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+        return cached.report;
+      }
       const content = fs.readFileSync(fullPath, 'utf8');
       const lines = content.split('\n').length;
       const headroom = Math.max(0, 300 - lines);
       const budgetStatus: FileGroundingReport['budgetStatus'] = lines >= 280 ? 'critical' : lines >= 240 ? 'warning' : 'healthy';
       const extRes = this.skeletonGen.extractFile(relPath, content);
-      return {
-        filePath: relPath,
-        exists: true,
-        lineCount: lines,
-        headroom,
-        budgetStatus,
-        skeleton: this.trimSkeleton(extRes.skeletonContent),
+      const report: FileGroundingReport = {
+        filePath: relPath, exists: true, lineCount: lines, headroom,
+        budgetStatus, skeleton: this.trimSkeleton(extRes.skeletonContent),
         tokenSavingsPercent: extRes.tokenSavingsPercent
       };
+      this.fileCache.set(relPath, { mtimeMs: stat.mtimeMs, size: stat.size, report });
+      return report;
     } catch {
       return { filePath: relPath, exists: false, lineCount: 0, headroom: 300, budgetStatus: 'healthy', skeleton: '', tokenSavingsPercent: 0 };
     }
