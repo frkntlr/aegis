@@ -198,7 +198,8 @@ const commandMap: Record<string, (args: string[]) => Promise<void> | void> = {
   teamwork: (a) => handleTeamwork(a[1], ...a.slice(2)),
   'teamwork:status': () => handleTeamwork('status'),
   'teamwork:plan': (a) => handleTeamwork('plan', ...a.slice(1)),
-  'teamwork:setup': (a) => handleTeamwork('setup', a[1])
+  'teamwork:setup': (a) => handleTeamwork('setup', a[1]),
+  'teamwork:matrix': (a) => handleTeamwork('matrix', a[1])
 };
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {

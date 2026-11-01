@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import * as child_process from 'node:child_process';
 import {
   GodotInitWorkflow,
   GodotLocator,
@@ -9,7 +8,6 @@ import {
   GodotUiScaffolder,
   type UiScaffoldType,
   ClassDbOracle,
-  DoctoolRunner,
   GodotTestRunner,
   type GodotUiTreePayload
 } from '@aegis/godot-bridge';
@@ -17,8 +15,13 @@ import { showBanner } from './banner.js';
 import {
   resolveInspectAspectRatios,
   loadProjectTelemetryNodes,
-  scanAndValidateGd
+  scanAndValidateGd,
+  handleGodotRun,
+  handleGodotDoctool,
+  handleGodotPlaytest
 } from './godot-helpers.js';
+
+export { handleGodotRun, handleGodotDoctool, handleGodotPlaytest };
 
 export function handleGodotInit(projectDirArg?: string, portArg?: string): void {
   showBanner();
@@ -114,25 +117,6 @@ export function handleGodotInspect(projectDirArg?: string): void {
   }
 }
 
-export function handleGodotRun(projectDirArg?: string, ...extraArgs: string[]): void {
-  showBanner();
-  const projectDir = projectDirArg || process.cwd();
-  console.log(`🚀 Executing Godot project at: ${projectDir}...`);
-  const inst = GodotLocator.findGodot();
-  if (!inst) {
-    console.error('❌ Cannot run project: No Godot binary detected.');
-    return;
-  }
-  const args = ['--path', projectDir, ...extraArgs];
-  console.log(` • Godot: ${inst.binaryPath} (${inst.versionString})`);
-  try {
-    const cp = child_process.spawn(inst.binaryPath, args, { stdio: 'inherit' });
-    console.log(`✅ Godot process spawned with PID ${cp.pid}.`);
-  } catch (err) {
-    console.error(`❌ Failed to spawn Godot: ${(err as Error).message}`);
-  }
-}
-
 export function handleGodotQuery(className?: string): void {
   showBanner();
   if (!className) {
@@ -155,14 +139,6 @@ export function handleGodotQuery(className?: string): void {
   }
 }
 
-export function handleGodotDoctool(): void {
-  showBanner();
-  console.log('📚 Running Godot doctool / ClassDB zero-bloat indexing...');
-  const runner = new DoctoolRunner();
-  const indexed = runner.dumpAndIndexApi(true);
-  console.log(`✅ Indexed ${indexed.size} Godot classes into local zero-bloat cache.`);
-}
-
 export function handleGodotValidate(targetDir?: string): void {
   showBanner();
   const dir = targetDir || process.cwd();
@@ -177,41 +153,6 @@ export function handleGodotValidate(targetDir?: string): void {
       console.log(` • [${v.severity.toUpperCase()}] ${v.file}:${v.line} - ${v.message}`);
     }
   }
-}
-
-export function handleGodotPlaytest(scenarioArg?: string): void {
-  showBanner();
-  console.log('🎮 Autonomous Aegis Playtest Queue...');
-  const cwd = process.cwd();
-  const fileCandidates = [
-    scenarioArg,
-    path.join(cwd, '.aegis', 'playtest.json'),
-    path.join(cwd, 'test', 'playtest.json'),
-    path.join(cwd, 'playtest.json')
-  ].filter(Boolean) as string[];
-
-  const scenarioPath = fileCandidates.find(p => fs.existsSync(p));
-  let actions: unknown[] = [
-    { type: 'ping' },
-    { type: 'wait', duration: 0.1 },
-    { type: 'get_ui_tree' }
-  ];
-
-  if (scenarioPath) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
-      actions = Array.isArray(raw) ? raw : (raw.actions || actions);
-      console.log(` • Scenario loaded from: ${path.basename(scenarioPath)} (${actions.length} action(s))`);
-    } catch {
-      console.log(' ℹ️ Failed to read scenario file; using default smoke scenario.');
-    }
-  } else {
-    console.log(' • Using default smoke playtest scenario (3 actions).');
-  }
-
-  const reqId = `playtest-${Date.now()}`;
-  console.log(`✅ Queued playtest scenario [${reqId}] with ${actions.length} action(s).`);
-  console.log(' • Status: Ready for Godot AegisBridge autonomous execution.');
 }
 
 export async function handleGodotTest(projectDirArg?: string, scenarioArg?: string): Promise<void> {

@@ -152,11 +152,15 @@ export class TeamworkCoordinator {
   private stageTracksIntoInbox(planId: string, objective: string, tracks: TeamworkTrack[]): void {
     const inboxPath = path.resolve(this.repoRoot, '.aegis', 'task-inbox.json');
     try { fs.mkdirSync(path.dirname(inboxPath), { recursive: true }); } catch { return; }
-    let existing: unknown[] = [];
+    let existing: unknown = null;
     if (fs.existsSync(inboxPath)) {
-      try { existing = JSON.parse(fs.readFileSync(inboxPath, 'utf8')); } catch { existing = []; }
+      try { existing = JSON.parse(fs.readFileSync(inboxPath, 'utf8')); } catch { existing = null; }
     }
-    const inboxArray = Array.isArray(existing) ? existing : [];
+    const inboxArray: unknown[] = Array.isArray(existing)
+      ? existing
+      : (existing && typeof existing === 'object' && Array.isArray((existing as { tasks?: unknown[] }).tasks))
+        ? (existing as { tasks: unknown[] }).tasks
+        : [];
 
     const numBase = planId.startsWith('tw-det-')
       ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
@@ -240,7 +244,10 @@ export class TeamworkCoordinator {
     if (fs.existsSync(inboxPath)) {
       try {
         const raw = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
-        if (Array.isArray(raw)) pendingCount = raw.filter((t: { status?: string }) => t.status !== 'done').length;
+        const list = Array.isArray(raw)
+          ? raw
+          : (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown[] }).tasks) ? (raw as { tasks: unknown[] }).tasks : []);
+        pendingCount = list.filter((t: { status?: string }) => t.status !== 'done').length;
       } catch { /* ignore */ }
     }
 

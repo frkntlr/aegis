@@ -95,3 +95,32 @@ test('listInboxTasks filters tasks by status correctly', () => {
   const all = listInboxTasks('all', tmpDir);
   assert.strictEqual(all.length, 1);
 });
+
+test('readTaskInbox handles polymorphic raw array file format cleanly', () => {
+  const filePath = getInboxFilePath(tmpDir);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify([
+    { issueNumber: 201, title: 'Legacy Array Task', role: 'issue-solver', status: 'pending', targetFiles: [] }
+  ]), 'utf8');
+
+  const data = readTaskInbox(tmpDir);
+  assert.strictEqual(data.tasks.length, 1);
+  assert.strictEqual(data.tasks[0].issueNumber, 201);
+});
+
+test('pullNextPendingTask matches multi-instance subagent roles flexibly', () => {
+  stageTaskInInbox({
+    issueNumber: 301,
+    title: 'AST Parser Optimization',
+    role: 'issue-solver [Parser]',
+    worktree: 'experimental/solver',
+    targetFiles: ['src/parser.ts'],
+    acceptanceCriteria: ['Optimize AST'],
+    prompt: 'Implement AST optimization'
+  }, tmpDir);
+
+  const pulled = pullNextPendingTask('solver', tmpDir);
+  assert.ok(pulled);
+  assert.strictEqual(pulled.issueNumber, 301);
+  assert.strictEqual(pulled.role, 'issue-solver [Parser]');
+});

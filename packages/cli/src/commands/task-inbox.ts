@@ -34,6 +34,9 @@ export function readTaskInbox(baseDir = process.cwd()): TaskInboxData {
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
     const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return { version: '1.0.0', updatedAt: new Date().toISOString(), tasks: parsed as TaskInboxItem[] };
+    }
     if (parsed && Array.isArray(parsed.tasks)) return parsed as TaskInboxData;
   } catch {
     // Return empty on corrupt file
@@ -46,7 +49,7 @@ export function writeTaskInbox(data: TaskInboxData, baseDir = process.cwd()): vo
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   data.updatedAt = new Date().toISOString();
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  fs.writeFileSync(filePath, JSON.stringify(data.tasks, null, 2), 'utf8');
 }
 
 export function stageTaskInInbox(
@@ -72,12 +75,23 @@ export function stageTaskInInbox(
   return stagedItem;
 }
 
+function matchesTaskRole(taskRole: string, roleQuery: string): boolean {
+  const t = taskRole.toLowerCase().trim();
+  const q = roleQuery.toLowerCase().trim();
+  if (t === q || t.startsWith(q) || q.startsWith(t)) return true;
+  if ((q.includes('solver') || q === 'issue') && t.includes('solver')) return true;
+  if (q.includes('qa') && t.includes('qa')) return true;
+  if (q.includes('ui') && t.includes('ui')) return true;
+  if ((q.includes('doc') || q === 'wiki') && t.includes('doc')) return true;
+  return false;
+}
+
 export function pullNextPendingTask(role?: string, baseDir = process.cwd()): TaskInboxItem | null {
   const data = readTaskInbox(baseDir);
   const task = data.tasks.find(t => {
     if (t.status !== 'pending') return false;
     if (!role || role === 'auto' || role === 'all') return true;
-    return t.role.toLowerCase() === role.toLowerCase();
+    return matchesTaskRole(t.role, role);
   });
 
   if (!task) return null;

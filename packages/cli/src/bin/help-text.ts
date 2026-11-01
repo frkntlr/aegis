@@ -12,6 +12,7 @@ export const HELP_LINES: readonly string[] = [
   '  aegis teamwork [status]                View active Antigravity subagents and locked tracks',
   '  aegis teamwork plan "<objective>"      Generate Antigravity subagent plan and stage in TIP inbox',
   '  aegis teamwork setup [outDir]          Export Antigravity subagents manifest (.aegis/subagents.json)',
+  '  aegis teamwork matrix [planId]         Display live Antigravity subagent task status matrix',
   '  aegis task:list [status]               List ready, in_progress, or blocked tasks in TIP queue',
   '  aegis task:claim <id> [agent]          Claim a task for an agent role and acquire file locks',
   '  aegis task:release <id> [status]       Release or complete task and release file locks',
