@@ -4,28 +4,18 @@ import { IronCageValidator, EvidenceBasedTriageGate } from '@aegis/iron-cage';
 import { SymbolIndexer, GraphQueryEngine, RelationalGraph, CodebaseMemoryEngine, AstGrepBridge } from '@aegis/ast-skeleton';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import { Context7Bridge } from '@aegis/github-live';
-import type { CageViolation } from '@aegis/shared';
+import { resolveSafeRepoRoot, resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
 import { collectSourceFiles } from './metrics-helpers.js';
 
 function resolveTargetDir(targetDir?: string): string {
-  if (targetDir) {
-    const direct = path.resolve(process.cwd(), targetDir);
-    if (fs.existsSync(direct)) return direct;
-    const rootRel = path.resolve(process.cwd(), '..', '..', targetDir);
-    if (fs.existsSync(rootRel)) return rootRel;
-    return direct;
-  }
-  const localPkg = path.resolve(process.cwd(), 'packages');
-  if (fs.existsSync(localPkg)) return localPkg;
-  const rootPkg = path.resolve(process.cwd(), '..', '..', 'packages');
-  if (fs.existsSync(rootPkg)) return rootPkg;
-  return process.cwd();
+  const root = resolveSafeRepoRoot();
+  if (targetDir) return path.resolve(root, targetDir);
+  const pkgDir = path.resolve(root, 'packages');
+  return fs.existsSync(pkgDir) ? pkgDir : root;
 }
 
 function resolveCachePath(fileName: string): string {
-  const local = path.resolve(process.cwd(), '.aegis', 'cache', fileName);
-  if (fs.existsSync(path.dirname(local))) return local;
-  return path.resolve(process.cwd(), '..', '..', '.aegis', 'cache', fileName);
+  return resolveSafeCacheDir(fileName);
 }
 
 export class EngineAnalysisTools {
@@ -101,7 +91,7 @@ export class EngineAnalysisTools {
 
     if (matches.length === 0) {
       const files = collectSourceFiles(resolveTargetDir());
-      indexer.indexFiles(files, process.cwd(), cachePath);
+      indexer.indexFiles(files, resolveSafeRepoRoot(), cachePath);
       matches = indexer.findSymbols(symbolQuery);
     }
 

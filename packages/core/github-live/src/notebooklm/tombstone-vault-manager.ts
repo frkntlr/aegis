@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { NotebookLmNativeClient } from './notebooklm-native-client.js';
 import type { NotebookSourceSummary } from './types.js';
 
@@ -30,8 +31,8 @@ export class TombstoneVaultManager {
   private vaultDir: string;
 
   constructor(vaultDir?: string) {
-    this.vaultDir = vaultDir || path.resolve(process.cwd(), '.aegis', 'vault', 'tombstones');
-    fs.mkdirSync(this.vaultDir, { recursive: true });
+    this.vaultDir = vaultDir || path.join(resolveSafeAegisDir(), 'vault', 'tombstones');
+    try { fs.mkdirSync(this.vaultDir, { recursive: true }); } catch { /* ignore */ }
   }
 
   public getVaultDir(): string {

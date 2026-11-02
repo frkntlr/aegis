@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
 import type { CodebaseMemoryEngine } from './codebase-memory.js';
@@ -89,7 +90,7 @@ export class ColdStartIndexer {
     options: ColdStartOptions = {}
   ): Promise<ColdStartIndexResult> {
     const startTime = Date.now();
-    const root = path.resolve(options.repoRoot || process.cwd());
+    const root = resolveSafeRepoRoot(options.repoRoot);
     const worktreeId = options.worktreeId;
     const files = this.collectCandidateFiles(root);
     const { indexed, skipped } = this.indexFileList(engine, files, worktreeId);

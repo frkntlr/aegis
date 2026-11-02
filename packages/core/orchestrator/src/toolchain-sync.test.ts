@@ -143,7 +143,7 @@ test('UniversalToolchainSync automatically registers ast-grep and context7 MCP s
   }
 });
 
-test('AEGIS_TOOL_SCHEMAS contains exactly 29 authoritative tools including Godot Substrate 3.0', () => {
+test('AEGIS_TOOL_SCHEMAS contains exactly 31 authoritative tools including Godot Substrate 3.0', () => {
   const toolNames = Object.keys(AEGIS_TOOL_SCHEMAS);
   assert.strictEqual(toolNames.length, 31);
   assert.ok(toolNames.includes('teamwork_compact'));

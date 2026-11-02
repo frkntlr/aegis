@@ -14,6 +14,12 @@
     },
     {
       "path": "../github-live"
+    },
+    {
+      "path": "../ast-skeleton"
+    },
+    {
+      "path": "../watchdog"
     }
   ]
 }

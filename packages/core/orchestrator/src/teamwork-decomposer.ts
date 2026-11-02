@@ -116,7 +116,7 @@ export class TeamworkDecomposer {
     const solvers = subtasks.filter(t => t.roleType === 'solver');
     if (solvers.length !== 1) return;
 
-    const sourceFiles = allFiles.filter(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'));
+    const sourceFiles = allFiles.filter(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/') && !f.includes('.test.') && !f.includes('.spec.'));
     if (sourceFiles.length < 3) return;
 
     const solverIndex = subtasks.findIndex(t => t.roleType === 'solver');
@@ -138,15 +138,18 @@ export class TeamworkDecomposer {
     const assignedFiles = new Set<string>();
     for (const task of subtasks) {
       if (task.targetFiles.length > 0) {
-        task.targetFiles.forEach(f => assignedFiles.add(f));
+        task.targetFiles.forEach(f => { assignedFiles.add(f); });
         continue;
       }
       if (task.roleType === 'ui') {
         task.targetFiles = allFiles.filter(f => RoleClassifier.isUiFile(f) && !assignedFiles.has(f));
-        task.targetFiles.forEach(f => assignedFiles.add(f));
+        task.targetFiles.forEach(f => { assignedFiles.add(f); });
       } else if (task.roleType === 'docs') {
         task.targetFiles = allFiles.filter(f => (f.endsWith('.md') || f.includes('docs/') || f.includes('wiki/')) && !assignedFiles.has(f));
-        task.targetFiles.forEach(f => assignedFiles.add(f));
+        task.targetFiles.forEach(f => { assignedFiles.add(f); });
+      } else if (task.roleType === 'qa') {
+        task.targetFiles = allFiles.filter(f => (f.includes('.test.') || f.includes('.spec.')) && !assignedFiles.has(f));
+        task.targetFiles.forEach(f => { assignedFiles.add(f); });
       }
     }
     this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver' && t.targetFiles.length === 0), allFiles, assignedFiles);
@@ -158,7 +161,7 @@ export class TeamworkDecomposer {
     assigned: Set<string>
   ): void {
     if (solvers.length === 0) return;
-    const remaining = allFiles.filter(f => !assigned.has(f) && !RoleClassifier.isUiFile(f) && !f.endsWith('.md'));
+    const remaining = allFiles.filter(f => !assigned.has(f) && !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('.test.') && !f.includes('.spec.'));
     
     for (const solver of solvers) {
       const labelLower = solver.label.toLowerCase();

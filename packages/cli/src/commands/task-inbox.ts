@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 
 export interface TaskInboxItem {
   id: number;
@@ -24,11 +25,12 @@ export interface TaskInboxData {
   tasks: TaskInboxItem[];
 }
 
-export function getInboxFilePath(baseDir = process.cwd()): string {
-  return path.resolve(baseDir, '.aegis', 'task-inbox.json');
+export function getInboxFilePath(baseDir?: string): string {
+  const root = resolveSafeRepoRoot(baseDir);
+  return path.resolve(root, '.aegis', 'task-inbox.json');
 }
 
-export function readTaskInbox(baseDir = process.cwd()): TaskInboxData {
+export function readTaskInbox(baseDir?: string): TaskInboxData {
   const filePath = getInboxFilePath(baseDir);
   if (!fs.existsSync(filePath)) {
     return { version: '1.0.0', updatedAt: new Date().toISOString(), tasks: [] };
@@ -46,7 +48,7 @@ export function readTaskInbox(baseDir = process.cwd()): TaskInboxData {
   return { version: '1.0.0', updatedAt: new Date().toISOString(), tasks: [] };
 }
 
-export function writeTaskInbox(data: TaskInboxData, baseDir = process.cwd()): void {
+export function writeTaskInbox(data: TaskInboxData, baseDir?: string): void {
   const filePath = getInboxFilePath(baseDir);
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -76,7 +78,7 @@ export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskI
 
 export function stageTaskInInbox(
   item: Omit<TaskInboxItem, 'id' | 'stagedAt' | 'status'>,
-  baseDir = process.cwd()
+  baseDir?: string
 ): TaskInboxItem {
   const data = readTaskInbox(baseDir);
   const existingIndex = data.tasks.findIndex(t => t.issueNumber === item.issueNumber);
@@ -114,7 +116,7 @@ export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber
   return false;
 }
 
-export function pullNextPendingTask(role?: string, baseDir = process.cwd()): TaskInboxItem | null {
+export function pullNextPendingTask(role?: string, baseDir?: string): TaskInboxItem | null {
   const data = readTaskInbox(baseDir);
   let reconciled = false;
   for (const t of data.tasks) {
@@ -144,7 +146,7 @@ export function updateTaskInboxStatus(
   issueNumber: number,
   status: TaskInboxItem['status'],
   claimedBy?: string,
-  baseDir = process.cwd()
+  baseDir?: string
 ): boolean {
   const data = readTaskInbox(baseDir);
   const task = data.tasks.find(t => t.issueNumber === issueNumber);
@@ -165,7 +167,7 @@ export function updateTaskInboxStatus(
   return true;
 }
 
-export function listInboxTasks(statusFilter?: string, baseDir = process.cwd()): TaskInboxItem[] {
+export function listInboxTasks(statusFilter?: string, baseDir?: string): TaskInboxItem[] {
   const data = readTaskInbox(baseDir);
   let reconciled = false;
   for (const t of data.tasks) {
@@ -178,4 +180,16 @@ export function listInboxTasks(statusFilter?: string, baseDir = process.cwd()): 
 
   if (!statusFilter || statusFilter === 'all') return data.tasks;
   return data.tasks.filter(t => t.status === statusFilter);
+}
+
+export function clearInboxTasks(statusFilter?: string, baseDir?: string): number {
+  const data = readTaskInbox(baseDir);
+  const before = data.tasks.length;
+  if (!statusFilter || statusFilter === 'all') {
+    data.tasks = [];
+  } else {
+    data.tasks = data.tasks.filter(t => t.status !== statusFilter);
+  }
+  writeTaskInbox(data, baseDir);
+  return before - data.tasks.length;
 }

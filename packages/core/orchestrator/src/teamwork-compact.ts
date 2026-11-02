@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import type { TeamworkPlan, TeamworkStatusReport } from './teamwork-coordinator.js';
 
@@ -25,8 +26,8 @@ export interface CompactInboxResult {
 export class TeamworkCompactEngine {
   private repoRoot: string;
 
-  constructor(repoRoot: string = process.cwd()) {
-    this.repoRoot = path.resolve(repoRoot);
+  constructor(repoRoot?: string) {
+    this.repoRoot = resolveSafeRepoRoot(repoRoot);
   }
 
   public compactOutput(rawText: string): CompactOutputResult {

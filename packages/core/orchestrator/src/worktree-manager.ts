@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AgentWorktree, WorktreeListResult } from '@aegis/shared';
-import { WorktreeMutex, cleanGitEnv, normPath } from './worktree-mutex.js';
+import { resolveSafeRepoRoot } from '@aegis/shared';
+import { WorktreeMutex, cleanGitEnv, normPath, parseWorktreePorcelainBlock } from './worktree-mutex.js';
 
 export interface WorktreeManagerOptions {
   repoRoot?: string;
@@ -19,7 +20,7 @@ export class WorktreeManager {
   private readonly WT_CACHE_TTL_MS = 2000;
 
   constructor(options: WorktreeManagerOptions = {}) {
-    this.repoRoot = options.repoRoot ?? process.cwd();
+    this.repoRoot = resolveSafeRepoRoot(options.repoRoot);
     this.worktreePrefix = options.worktreePrefix ?? 'experimental';
     this.persistLocks = options.persistLocks ?? false;
     if (this.persistLocks) this.loadLocks();
@@ -163,27 +164,6 @@ export class WorktreeManager {
     }
   }
 
-  private parseWorktreeBlock(block: string): AgentWorktree | null {
-    if (!block.trim()) return null;
-    const lines = block.split('\n');
-    const worktreeLine = lines.find(l => l.startsWith('worktree '));
-    const branchLine = lines.find(l => l.startsWith('branch '));
-    if (!worktreeLine) return null;
-
-    const wtPath = worktreeLine.replace('worktree ', '').trim();
-    const branch = branchLine ? branchLine.replace('branch refs/heads/', '').trim() : 'HEAD';
-    if (!wtPath.includes(this.worktreePrefix)) return null;
-
-    return {
-      agentName: path.basename(wtPath),
-      branch,
-      path: wtPath,
-      status: 'idle',
-      lockedFiles: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-  }
 
   public invalidateWorktreeCache(): void {
     this.cachedWorktrees = null;
@@ -206,7 +186,7 @@ export class WorktreeManager {
       });
       const worktrees = output
         .split('\n\n')
-        .map(b => this.parseWorktreeBlock(b))
+        .map(b => parseWorktreePorcelainBlock(b, this.worktreePrefix))
         .filter((wt): wt is AgentWorktree => Boolean(wt));
 
       const res = { worktrees, activeCount: worktrees.length };
@@ -266,6 +246,14 @@ export class WorktreeManager {
     } catch {
       return false;
     }
+  }
+
+  public clearAllLocks(): number {
+    return this.withLock(() => {
+      const count = this.activeLocks.size;
+      this.activeLocks.clear();
+      return count;
+    });
   }
 
   public getLockedFiles(): Map<string, string> {

@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import { WorktreeManager } from '@aegis/orchestrator';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { GodotLocator } from '@aegis/godot-bridge';
+import { GitHubTokenResolver, GitHubClient } from '@aegis/github-live';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { compilePrompt } from './prompt-command.js';
 import { getChangedSourceFiles, verifyFile } from './dev-helpers.js';
@@ -10,7 +12,9 @@ import {
   stageTaskInInbox,
   pullNextPendingTask,
   updateTaskInboxStatus,
-  listInboxTasks
+  listInboxTasks,
+  clearInboxTasks,
+  matchesTaskRole
 } from './task-inbox.js';
 
 export function normalizeRole(rawRole?: string): string {
@@ -67,27 +71,57 @@ export function handleTaskClaim(issueArg?: string, roleArg?: string): void {
   console.log(`🎯 Task #${issueNum} claimed by [${role.toUpperCase()}]! Status: IN_PROGRESS.`);
 }
 
-export function handleTaskRelease(issueArg?: string, statusArg?: string, reasonArg?: string): void {
+export async function closeGitHubIssueIfConfigured(issueNum: number, agent?: string): Promise<void> {
+  try {
+    const auth = GitHubTokenResolver.resolve();
+    if (auth.hasCredentials && auth.token && auth.owner && auth.repo) {
+      const client = new GitHubClient({ autoConnectLive: true });
+      await client.completeIssue(issueNum, agent);
+      console.log(`🌐 GitHub Issue #${issueNum} marked DONE and closed on ${auth.owner}/${auth.repo}.`);
+    }
+  } catch { /* soft-fail */ }
+}
+
+export async function handleTaskRelease(issueArg?: string, statusArg?: string, reasonArg?: string): Promise<void> {
   showBanner();
-  const issueNum = parseInt(issueArg || '0', 10);
-  if (!issueNum) {
-    console.error('❌ Usage: aegis task:release <issueNumber> [done|blocked|ready] [reason]');
+  if (!issueArg) {
+    console.error('❌ Usage: aegis task:release <issueNumber|role|trackId> [done|blocked|ready] [reason]');
     process.exit(1);
   }
   const status = (statusArg === 'done' || statusArg === 'blocked') ? statusArg : 'pending';
   const wtManager = new WorktreeManager({ persistLocks: true });
   const tasks = listInboxTasks();
-  const task = tasks.find(t => t.issueNumber === issueNum);
-  if (task) {
-    if (task.targetFiles && task.targetFiles.length > 0) {
-      wtManager.releaseFiles(task.targetFiles);
-    }
-    if (task.role) wtManager.releaseFileLocks(task.role);
-    if (task.claimedBy) wtManager.releaseFileLocks(task.claimedBy);
+  const parsedNum = parseInt(issueArg, 10);
+  const hasNum = Number.isFinite(parsedNum) && parsedNum > 0;
+
+  const matched = hasNum
+    ? tasks.filter(t => t.issueNumber === parsedNum)
+    : tasks.filter(t => matchesTaskRole(t.role, issueArg, t.issueNumber) || (t.title && t.title.toLowerCase().includes(issueArg.toLowerCase())));
+
+  for (const t of matched) {
+    if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
+    if (t.role) wtManager.releaseFileLocks(t.role);
+    if (t.claimedBy) wtManager.releaseFileLocks(t.claimedBy);
+    updateTaskInboxStatus(t.issueNumber, status);
+    if (status === 'done') await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
   }
+
+  if (matched.length === 0) wtManager.releaseFileLocks(issueArg);
   if (reasonArg) wtManager.releaseFileLocks(reasonArg);
-  updateTaskInboxStatus(issueNum, status);
-  console.log(`🔓 Task #${issueNum} released. New Status: [${status.toUpperCase()}]`);
+  console.log(`🔓 Task release complete for "${issueArg}". New Status: [${status.toUpperCase()}]`);
+}
+
+export function handleLockClear(): void {
+  showBanner();
+  const wtManager = new WorktreeManager({ persistLocks: true });
+  const cleared = wtManager.clearAllLocks();
+  console.log(`🔓 Cleared all ${cleared} active file lock(s) from .aegis/locks.json.`);
+}
+
+export function handleTaskClear(statusArg?: string): void {
+  showBanner();
+  const cleared = clearInboxTasks(statusArg);
+  console.log(`🧹 Cleared ${cleared} task(s) from .aegis/task-inbox.json${statusArg ? ` (filter: ${statusArg})` : ''}.`);
 }
 
 export async function handleTaskInject(issueArg?: string, roleArg?: string, flag?: string): Promise<void> {
@@ -121,10 +155,6 @@ export async function handleTaskInject(issueArg?: string, roleArg?: string, flag
   console.log(`📥 Task #${issueNum} Injected into TIP Inbox (.aegis/task-inbox.json)!`);
   console.log(` • Designated Role: @${role.toUpperCase()} in ${item.worktree}`);
   console.log(` • Target Files:    ${item.targetFiles.join(', ')} (Locked)`);
-  console.log(`\n🤖 Antigravity Subagent Invocation Prompt:`);
-  console.log(`--------------------------------------------------`);
-  console.log(item.prompt);
-  console.log(`--------------------------------------------------`);
 }
 
 export function handleTaskPull(roleArg?: string): void {
@@ -152,6 +182,9 @@ export function handleLockStatus(): void {
 
 function resolveTargetFile(f: string): string {
   if (fs.existsSync(f)) return f;
+  const root = resolveSafeRepoRoot();
+  const fromRoot = path.resolve(root, f);
+  if (fs.existsSync(fromRoot)) return fromRoot;
   const fromCwd = path.resolve(process.cwd(), f);
   if (fs.existsSync(fromCwd)) return fromCwd;
   if (f.startsWith('packages/cli/') && fs.existsSync(f.replace('packages/cli/', ''))) {
@@ -205,55 +238,10 @@ export function handleTaskVerify(targetArg?: string): void {
   }
 }
 
-export function mcpTaskList(args: Record<string, unknown> = {}): string {
-  const status = typeof args.status === 'string' ? args.status : undefined;
-  const tasks = listInboxTasks(status);
-  return JSON.stringify({ count: tasks.length, tasks }, null, 2);
-}
-
-export function mcpTaskClaim(args: Record<string, unknown> = {}): string {
-  const issueNum = Number(args.issueNumber || 0);
-  const role = normalizeRole(typeof args.agentRole === 'string' ? args.agentRole : undefined);
-  const wtManager = new WorktreeManager({ persistLocks: true });
-  const tasks = listInboxTasks();
-  const task = tasks.find(t => t.issueNumber === issueNum);
-  if (task && task.targetFiles.length > 0) {
-    const lockRes = wtManager.acquireFileLocks(role, task.targetFiles);
-    if (!lockRes.success) {
-      return JSON.stringify({ success: false, error: `Lock conflict on ${lockRes.conflictingFiles.join(', ')}` });
-    }
-  }
-  updateTaskInboxStatus(issueNum, 'in_progress', role);
-  return JSON.stringify({ success: true, issueNumber: issueNum, role, status: 'in_progress' }, null, 2);
-}
-
-export function mcpTaskRelease(args: Record<string, unknown> = {}): string {
-  const issueNum = Number(args.issueNumber || 0);
-  const status = (args.status === 'done' || args.status === 'blocked') ? args.status : 'pending';
-  const wtManager = new WorktreeManager({ persistLocks: true });
-  const tasks = listInboxTasks();
-  const task = tasks.find(t => t.issueNumber === issueNum);
-  if (task) {
-    if (task.targetFiles && task.targetFiles.length > 0) {
-      wtManager.releaseFiles(task.targetFiles);
-    }
-    if (task.role) wtManager.releaseFileLocks(task.role);
-    if (task.claimedBy) wtManager.releaseFileLocks(task.claimedBy);
-  }
-  if (typeof args.agentRole === 'string') wtManager.releaseFileLocks(args.agentRole);
-  updateTaskInboxStatus(issueNum, status);
-  return JSON.stringify({ success: true, issueNumber: issueNum, status }, null, 2);
-}
-
-export function mcpTaskInboxPull(args: Record<string, unknown> = {}): string {
-  const role = typeof args.agentRole === 'string' ? args.agentRole.trim() : undefined;
-  const task = pullNextPendingTask(role);
-  if (!task) return JSON.stringify({ task: null, message: 'No pending tasks found in inbox' });
-  return JSON.stringify({ task }, null, 2);
-}
-
-export function mcpLockStatus(): string {
-  const wtManager = new WorktreeManager({ persistLocks: true });
-  const lockedFiles = Object.fromEntries(wtManager.getLockedFiles().entries());
-  return JSON.stringify({ count: Object.keys(lockedFiles).length, lockedFiles }, null, 2);
-}
+export {
+  mcpTaskList,
+  mcpTaskClaim,
+  mcpTaskRelease,
+  mcpTaskInboxPull,
+  mcpLockStatus
+} from './task-mcp-adapters.js';

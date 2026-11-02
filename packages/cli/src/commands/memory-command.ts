@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { CodebaseMemoryEngine, CodebaseMemoryWatcher, ActiveHeadResolver, type MemoryQueryResult } from '@aegis/ast-skeleton';
 import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
-import type { ActiveLockInfo } from '@aegis/shared';
+import { type ActiveLockInfo, resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { generateLanguageConstitution } from './prompt-command.js';
 
@@ -171,7 +171,7 @@ export function handleMemoryRefresh(dirPath = 'packages', worktreeId?: string): 
     : ActiveHeadResolver.resolveActiveWorktree();
 
   const engine = getSharedMemoryEngine();
-  const target = path.resolve(process.cwd(), dirPath);
+  const target = path.resolve(resolveSafeRepoRoot(), dirPath);
   console.log(`🔄 Refreshing Codebase Memory for: ${path.relative(process.cwd(), target) || '.'}...`);
 
   const t0 = performance.now();
@@ -190,7 +190,7 @@ export function handleMemoryWatch(dirPath = 'packages', worktreeId?: string): Co
     : ActiveHeadResolver.resolveActiveWorktree();
 
   const engine = getSharedMemoryEngine();
-  const target = path.resolve(process.cwd(), dirPath);
+  const target = path.resolve(resolveSafeRepoRoot(), dirPath);
   console.log(`👁️  Live Codebase Memory Watcher active on: ${path.relative(process.cwd(), target) || '.'} [${activeWorktree}]`);
 
   const watcher = new CodebaseMemoryWatcher(engine, { worktreeId: activeWorktree, debounceMs: 150 });
@@ -222,7 +222,7 @@ export function handleMemoryVerify(worktreeId?: string): void {
   }
 }
 
-export async function triggerColdStartIfEmpty(repoRoot = process.cwd(), worktreeId?: string): Promise<boolean> {
+export async function triggerColdStartIfEmpty(repoRoot = resolveSafeRepoRoot(), worktreeId?: string): Promise<boolean> {
   const engine = getSharedMemoryEngine();
   const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
   const s = engine.getMemoryStats(active);
@@ -233,7 +233,7 @@ export async function triggerColdStartIfEmpty(repoRoot = process.cwd(), worktree
   return false;
 }
 
-export async function handleMemoryColdStart(repoRoot = process.cwd(), worktreeId?: string): Promise<void> {
+export async function handleMemoryColdStart(repoRoot = resolveSafeRepoRoot(), worktreeId?: string): Promise<void> {
   showBanner();
   const active = (worktreeId && worktreeId !== 'default')
     ? worktreeId

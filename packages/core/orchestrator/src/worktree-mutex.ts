@@ -1,5 +1,28 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { AgentWorktree } from '@aegis/shared';
+
+export function parseWorktreePorcelainBlock(block: string, worktreePrefix: string): AgentWorktree | null {
+  if (!block.trim()) return null;
+  const lines = block.split('\n');
+  const worktreeLine = lines.find(l => l.startsWith('worktree '));
+  const branchLine = lines.find(l => l.startsWith('branch '));
+  if (!worktreeLine) return null;
+
+  const wtPath = worktreeLine.replace('worktree ', '').trim();
+  const branch = branchLine ? branchLine.replace('branch refs/heads/', '').trim() : 'HEAD';
+  if (!wtPath.includes(worktreePrefix)) return null;
+
+  return {
+    agentName: path.basename(wtPath),
+    branch,
+    path: wtPath,
+    status: 'idle',
+    lockedFiles: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
 
 export const normPath = (p: string): string => p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
 export { WorktreeMutexShield, type ActiveLockInfo } from '@aegis/shared';

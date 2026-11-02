@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { SkeletonGenerator } from '@aegis/ast-skeleton';
 
 export interface FileGroundingReport {
@@ -24,8 +25,8 @@ export class TeamworkGroundingEngine {
   private skeletonGen: SkeletonGenerator;
   private fileCache = new Map<string, { mtimeMs: number; size: number; report: FileGroundingReport }>();
 
-  constructor(repoRoot: string = process.cwd(), skeletonGen?: SkeletonGenerator) {
-    this.repoRoot = repoRoot;
+  constructor(repoRoot?: string, skeletonGen?: SkeletonGenerator) {
+    this.repoRoot = resolveSafeRepoRoot(repoRoot);
     this.skeletonGen = skeletonGen ?? new SkeletonGenerator();
   }
 

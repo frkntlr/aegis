@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import type { SymbolIndexer } from './symbol-indexer.js';
 import type { RelationalGraph } from './relational-graph.js';
@@ -48,11 +49,11 @@ export class MemoryDiskStore {
   }
 
   private static resolveSourceDir(id: string): string | null {
-    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
+    const cacheDir = path.join(resolveSafeAegisDir(), 'memory', id);
     if (fs.existsSync(cacheDir)) return cacheDir;
     if (id === 'default') return null;
 
-    const baseDir = path.resolve(process.cwd(), '.aegis', 'memory', 'default');
+    const baseDir = path.join(resolveSafeAegisDir(), 'memory', 'default');
     if (fs.existsSync(baseDir)) return baseDir;
     return null;
   }
@@ -90,7 +91,7 @@ export class MemoryDiskStore {
 
   public static save(id: string, ns: DiskNamespaceData, persistToDisk?: boolean): void {
     if (persistToDisk === false) return;
-    const cacheDir = path.resolve(process.cwd(), '.aegis', 'memory', id);
+    const cacheDir = path.join(resolveSafeAegisDir(), 'memory', id);
     fs.mkdirSync(cacheDir, { recursive: true });
     ns.indexer.saveCache(path.join(cacheDir, 'symbols.json'));
     ns.graph.saveCache(path.join(cacheDir, 'graph.json'));

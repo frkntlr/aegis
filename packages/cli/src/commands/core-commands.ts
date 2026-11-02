@@ -7,6 +7,7 @@ import {
   BranchReconciler
 } from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { LoopBreaker, OrphanTaskReclaimer } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
 import { showBanner } from './banner.js';
@@ -70,7 +71,7 @@ async function syncOrLoadAutoIssues(ghClient: GitHubClient, wtManager: WorktreeM
   if (ghClient.isLive()) {
     await ghClient.syncFromLive('all');
   } else {
-    const localIssuesFile = path.resolve(process.cwd(), '.aegis', 'issues.json');
+    const localIssuesFile = path.join(resolveSafeAegisDir(), 'issues.json');
     if (fs.existsSync(localIssuesFile)) {
       try {
         const raw = JSON.parse(fs.readFileSync(localIssuesFile, 'utf8'));
@@ -116,7 +117,7 @@ export async function handleAuto(): Promise<void> {
 }
 
 function getPrimaryBranch(): string {
-  const sFile = path.resolve(process.cwd(), '.aegis', 'settings.json');
+  const sFile = path.join(resolveSafeAegisDir(), 'settings.json');
   if (fs.existsSync(sFile)) {
     try {
       const s = JSON.parse(fs.readFileSync(sFile, 'utf8'));

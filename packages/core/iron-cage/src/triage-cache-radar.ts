@@ -8,7 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import type { CageViolation } from '@aegis/shared';
+import { resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
 
 export interface QuotaAlert {
   file: string;
@@ -59,8 +59,8 @@ export class TriageCacheRadar {
   private missCount = 0;
 
   constructor(options: { cacheDir?: string; engineRulesSalt?: string } = {}) {
-    const baseDir = options.cacheDir || path.resolve(process.cwd(), '.aegis', 'cache');
-    fs.mkdirSync(baseDir, { recursive: true });
+    const baseDir = options.cacheDir || resolveSafeCacheDir();
+    try { fs.mkdirSync(baseDir, { recursive: true }); } catch { /* ignore */ }
     this.cacheFilePath = path.join(baseDir, 'triage-cache.json');
     this.currentEngineHash = this.computeEngineHash(options.engineRulesSalt || 'aegis-iron-cage-v2');
     this.cacheData = this.loadCache();

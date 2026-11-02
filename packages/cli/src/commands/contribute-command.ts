@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { WorktreeManager } from '@aegis/orchestrator';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { GitHubClient, RfcTriager, NotebookLmBridge } from '@aegis/github-live';
 import { compilePrompt } from './prompt-command.js';
 import { showBanner } from './banner.js';
@@ -29,7 +30,7 @@ export async function handleContribute(issueArg?: string, agentArg = 'contributo
     return;
   }
 
-  const promptDir = path.resolve(process.cwd(), '.aegis', 'prompts');
+  const promptDir = path.join(resolveSafeAegisDir(), 'prompts');
   fs.mkdirSync(promptDir, { recursive: true });
   const promptFile = path.resolve(promptDir, `${agentArg}-issue-${issueId}.md`);
   fs.writeFileSync(promptFile, compiled.promptMarkdown, 'utf8');

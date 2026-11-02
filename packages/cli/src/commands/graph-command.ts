@@ -1,13 +1,15 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CrossReferenceLinker, RelationalGraph } from '@aegis/ast-skeleton';
+import { resolveSafeRepoRoot, resolveSafeCacheDir } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
 
 function resolveTargetDirectory(targetDir?: string): string {
-  if (targetDir) return path.resolve(process.cwd(), targetDir);
-  const pkgPath = path.resolve(process.cwd(), 'packages');
-  return fs.existsSync(pkgPath) ? pkgPath : process.cwd();
+  const root = resolveSafeRepoRoot();
+  if (targetDir) return path.resolve(root, targetDir);
+  const pkgPath = path.resolve(root, 'packages');
+  return fs.existsSync(pkgPath) ? pkgPath : root;
 }
 
 export function handleGraphScan(targetDir?: string): void {
@@ -20,9 +22,9 @@ export function handleGraphScan(targetDir?: string): void {
   const graph = new RelationalGraph();
   const linker = new CrossReferenceLinker(graph);
 
-  linker.linkFiles(files, process.cwd());
+  linker.linkFiles(files, base);
 
-  const cachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
+  const cachePath = resolveSafeCacheDir('graph.json', targetDir || base);
   graph.saveCache(cachePath);
 
   const durationMs = (performance.now() - t0).toFixed(2);

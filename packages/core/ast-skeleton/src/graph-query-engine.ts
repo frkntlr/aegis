@@ -83,8 +83,11 @@ export class GraphQueryEngine {
     if (curId.includes('::')) {
       const shortName = curId.split('::').pop();
       if (shortName) {
+        const seen = new Set(edges.map(e => `${e.from}->${e.to}:${e.type}`));
         for (const e of this.graph.getIncoming(shortName)) {
-          if (!edges.some(x => x.from === e.from && x.to === e.to && x.type === e.type)) {
+          const key = `${e.from}->${e.to}:${e.type}`;
+          if (!seen.has(key)) {
+            seen.add(key);
             edges.push(e);
           }
         }
@@ -98,8 +101,11 @@ export class GraphQueryEngine {
     if (curId.includes('::')) {
       const shortName = curId.split('::').pop();
       if (shortName) {
+        const seen = new Set(edges.map(e => `${e.from}->${e.to}:${e.type}`));
         for (const e of this.graph.getOutgoing(shortName)) {
-          if (!edges.some(x => x.from === e.from && x.to === e.to && x.type === e.type)) {
+          const key = `${e.from}->${e.to}:${e.type}`;
+          if (!seen.has(key)) {
+            seen.add(key);
             edges.push(e);
           }
         }
@@ -119,8 +125,9 @@ export class GraphQueryEngine {
       visited.add(targetNode.name);
     }
 
-    while (queue.length > 0) {
-      const cur = queue.shift();
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
       if (!cur || cur.depth >= maxDepth) continue;
 
       for (const edge of this.collectIncomingEdges(cur.id)) {
@@ -149,8 +156,9 @@ export class GraphQueryEngine {
       visited.add(targetNode.name);
     }
 
-    while (queue.length > 0) {
-      const cur = queue.shift();
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
       if (!cur || cur.depth >= maxDepth) continue;
 
       for (const edge of this.collectOutgoingEdges(cur.id)) {

@@ -1,7 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GitHubTokenResolver, GitHubLiveAdapter, GitHubClient } from '@aegis/github-live';
+import { GitHubTokenResolver, GitHubLiveAdapter, GitHubClient, type GitHubIssue } from '@aegis/github-live';
 import { WorktreeManager, TaskDispatcher } from '@aegis/orchestrator';
+import { stageTaskInInbox } from './task-inbox.js';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { showBanner } from './banner.js';
 
 export async function handleGhStatus(tokenArg?: string): Promise<void> {
@@ -31,6 +33,48 @@ export async function handleGhStatus(tokenArg?: string): Promise<void> {
   }
 }
 
+function stageDispatchedIssue(agentName: string, issue: GitHubIssue): void {
+  console.log(`🎯 Live Issue #${issue.number} Claimed!`);
+  console.log(` • Agent: ${agentName.toUpperCase()} in experimental/${agentName}`);
+  console.log(` • Locks: ${issue.targetFiles.join(', ') || 'General'}`);
+  const pDir = path.join(resolveSafeAegisDir(), 'prompts');
+  try { fs.mkdirSync(pDir, { recursive: true }); } catch { /* ignore */ }
+  const pFile = path.resolve(pDir, `${agentName}-issue-${issue.number}.md`);
+  const pContent = `# 🎯 Task: #${issue.number} ${issue.title}\n` +
+    `Agent: @${agentName.toUpperCase()} | Status: IN_PROGRESS\n` +
+    `Target Files: ${issue.targetFiles.join(', ') || 'General'}\n\n` +
+    `## Acceptance Criteria\n` +
+    issue.acceptanceCriteria.map(c => `- [ ] ${c}`).join('\n');
+  fs.writeFileSync(pFile, pContent, 'utf8');
+  stageTaskInInbox({
+    issueNumber: issue.number,
+    title: issue.title,
+    role: agentName,
+    worktree: `experimental/${agentName}`,
+    targetFiles: issue.targetFiles,
+    acceptanceCriteria: issue.acceptanceCriteria,
+    prompt: pContent
+  });
+  console.log(` • Staged in TIP Inbox: .aegis/task-inbox.json`);
+  console.log(` • Prompt: ${pFile}`);
+}
+
+function stageRemainingReadyIssues(ready: GitHubIssue[], claimedNumber?: number): void {
+  for (const iss of ready) {
+    if (iss.number !== claimedNumber) {
+      stageTaskInInbox({
+        issueNumber: iss.number,
+        title: iss.title,
+        role: 'issue-solver',
+        worktree: 'experimental/solver',
+        targetFiles: iss.targetFiles,
+        acceptanceCriteria: iss.acceptanceCriteria,
+        prompt: `Task #${iss.number}: ${iss.title}\n\n${iss.body}`
+      });
+    }
+  }
+}
+
 export async function handleGhSync(tokenArg?: string): Promise<void> {
   showBanner();
   console.log('🔄 Syncing live issues from GitHub...');
@@ -51,25 +95,15 @@ export async function handleGhSync(tokenArg?: string): Promise<void> {
   const ready = client.listReadyIssues();
   console.log(`📋 Found ${ready.length} ready issue(s) with acceptance criteria.`);
 
-  const dispatchResult = dispatcher.dispatchNextTask(['solver', 'qa', 'docs'], ready);
+  const dispatchResult = dispatcher.dispatchNextTask(['solver', 'qa', 'docs', 'ui'], ready);
   if (dispatchResult.dispatched && dispatchResult.agentName && dispatchResult.issue) {
     await client.claimLiveIssue(dispatchResult.issue.number, dispatchResult.agentName);
-    console.log(`🎯 Live Issue #${dispatchResult.issue.number} Claimed!`);
-    console.log(` • Agent: ${dispatchResult.agentName.toUpperCase()} in experimental/${dispatchResult.agentName}`);
-    console.log(` • Locks: ${dispatchResult.issue.targetFiles.join(', ') || 'General'}`);
-    const pDir = path.resolve(process.cwd(), '.aegis', 'prompts');
-    fs.mkdirSync(pDir, { recursive: true });
-    const pFile = path.resolve(pDir, `${dispatchResult.agentName}-issue-${dispatchResult.issue.number}.md`);
-    const pContent = `# 🎯 Task: #${dispatchResult.issue.number} ${dispatchResult.issue.title}\n` +
-      `Agent: @${dispatchResult.agentName.toUpperCase()} | Status: IN_PROGRESS\n` +
-      `Target Files: ${dispatchResult.issue.targetFiles.join(', ') || 'General'}\n\n` +
-      `## Acceptance Criteria\n` +
-      dispatchResult.issue.acceptanceCriteria.map(c => `- [ ] ${c}`).join('\n');
-    fs.writeFileSync(pFile, pContent, 'utf8');
-    console.log(` • Prompt: ${pFile}`);
+    stageDispatchedIssue(dispatchResult.agentName, dispatchResult.issue);
   } else {
     console.log(`⏸️  No tasks dispatched: ${dispatchResult.reason}`);
   }
+
+  stageRemainingReadyIssues(ready, dispatchResult.issue?.number);
 }
 
 export async function handleGhComment(issueNumberStr: string, commentBody: string, tokenArg?: string): Promise<void> {

@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
@@ -45,8 +46,8 @@ export class AegisEngineService {
   private loadElements(layoutPath?: string): LoadedLayout {
     const candidatePaths = [
       layoutPath,
-      path.resolve(process.cwd(), '.aegis', 'ui_telemetry.json'),
-      path.resolve(process.cwd(), '.aegis', 'telemetry.json')
+      path.join(resolveSafeAegisDir(), 'ui_telemetry.json'),
+      path.join(resolveSafeAegisDir(), 'telemetry.json')
     ].filter(Boolean) as string[];
 
     for (const p of candidatePaths) {

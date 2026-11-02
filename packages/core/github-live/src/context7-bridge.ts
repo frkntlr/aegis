@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GodotTopicResolver, DeprecationLinter, type DeprecationWarning } from '@aegis/shared';
+import { GodotTopicResolver, DeprecationLinter, resolveSafeCacheDir, type DeprecationWarning } from '@aegis/shared';
 import { DependencyMapper, type DiscoveredDependency } from './dependency-mapper.js';
 import { Context7Registry } from './context7-registry.js';
 import { JitDocSynthesizer } from './jit-doc-synthesizer.js';
@@ -121,7 +121,7 @@ export class Context7Bridge {
     return deps;
   }
 
-  public saveToCache(cacheDir = path.resolve(process.cwd(), '.aegis', 'cache', 'context7')): void {
+  public saveToCache(cacheDir = resolveSafeCacheDir('context7')): void {
     try {
       fs.mkdirSync(cacheDir, { recursive: true });
       const records = Array.from(this.docs.values());
@@ -133,7 +133,7 @@ export class Context7Bridge {
     } catch { /* ignore non-fatal cache write errors */ }
   }
 
-  public loadFromCache(cacheDir = path.resolve(process.cwd(), '.aegis', 'cache', 'context7')): void {
+  public loadFromCache(cacheDir = resolveSafeCacheDir('context7')): void {
     if (!fs.existsSync(cacheDir)) return;
     try {
       const mainFile = path.join(cacheDir, 'docs.json');

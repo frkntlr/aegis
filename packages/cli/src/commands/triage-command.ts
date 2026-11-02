@@ -11,7 +11,7 @@ import {
 } from '@aegis/iron-cage';
 import { RelationalGraph } from '@aegis/ast-skeleton';
 import { LoopBreaker } from '@aegis/watchdog';
-import type { CageViolation } from '@aegis/shared';
+import { resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
 import { handleDebugCommand } from './debug-command.js';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
@@ -66,7 +66,7 @@ export function parseTriageArgs(rawArgs?: string | string[]): TriageCommandOptio
 }
 
 function resolveRelationalGraph(): RelationalGraph | undefined {
-  const graphCachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
+  const graphCachePath = resolveSafeCacheDir('graph.json');
   if (fs.existsSync(graphCachePath)) {
     try {
       const graph = new RelationalGraph();

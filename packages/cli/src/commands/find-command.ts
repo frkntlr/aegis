@@ -7,18 +7,20 @@ import {
   GraphQueryEngine,
   type SymbolEntry
 } from '@aegis/ast-skeleton';
+import { resolveSafeRepoRoot, resolveSafeCacheDir } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
 
 function resolveMatches(indexer: SymbolIndexer, queryArg: string): SymbolEntry[] {
-  const cachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'symbols.json');
+  const root = resolveSafeRepoRoot();
+  const cachePath = resolveSafeCacheDir('symbols.json');
   indexer.loadCache(cachePath);
   let matches = indexer.findSymbols(queryArg);
   if (matches.length === 0) {
-    const pkgDir = path.resolve(process.cwd(), 'packages');
-    const baseDir = fs.existsSync(pkgDir) ? pkgDir : process.cwd();
+    const pkgDir = path.resolve(root, 'packages');
+    const baseDir = fs.existsSync(pkgDir) ? pkgDir : root;
     const srcFiles = collectSourceFiles(baseDir);
-    indexer.indexFiles(srcFiles, process.cwd(), cachePath);
+    indexer.indexFiles(srcFiles, root, cachePath);
     matches = indexer.findSymbols(queryArg);
   }
   return matches;
@@ -72,7 +74,7 @@ function printHumanResult(queryArg: string, target: SymbolEntry, matches: Symbol
 }
 
 function printRelationalLinks(symbolName: string): void {
-  const graphCachePath = path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
+  const graphCachePath = resolveSafeCacheDir('graph.json');
   const graph = new RelationalGraph();
   if (graph.loadCache(graphCachePath)) {
     const qEngine = new GraphQueryEngine(graph);

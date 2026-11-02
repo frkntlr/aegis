@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeCacheDir } from '@aegis/shared';
 import {
   RelationalGraph,
   type RelationalNode,
@@ -107,8 +108,8 @@ export class DeltaOverlayGraph {
   constructor(options: DeltaOverlayGraphOptions = {}) {
     this.localGraph = options.localGraph || new RelationalGraph();
     this.externalOverlay = options.externalOverlay || new RelationalGraph();
-    this.localPath = options.localGraphPath || path.resolve(process.cwd(), '.aegis', 'cache', 'graph.json');
-    this.externalPath = options.externalCachePath || path.resolve(process.cwd(), '.aegis', 'cache', 'context7', 'external-graph.cache');
+    this.localPath = options.localGraphPath || resolveSafeCacheDir('graph.json');
+    this.externalPath = options.externalCachePath || path.join(resolveSafeCacheDir('context7'), 'external-graph.cache');
   }
 
   public addExternalNode(lib: string, symbol: string, metadata: Record<string, string> = {}): RelationalNode {

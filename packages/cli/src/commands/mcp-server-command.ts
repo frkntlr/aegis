@@ -7,6 +7,7 @@ import { RTKTokenKiller } from '@aegis/watchdog';
 import { IronCageValidator, EvidenceBasedTriageGate, LineBudgetRadar } from '@aegis/iron-cage';
 import { PolyglotStackTraceParser, SymptomClassifier, SymbioticDiagnosticTriangulator, DynamicHypothesisGenerator } from '@aegis/dialogue-engine';
 import { WorktreeManager } from '@aegis/orchestrator';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { GodotMcpProvider } from '@aegis/godot-bridge';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
@@ -15,7 +16,8 @@ import {
   mcpTeamworkPlan,
   mcpTeamworkStatus,
   mcpTeamworkCompact,
-  mcpTeamworkAnalyze
+  mcpTeamworkAnalyze,
+  mcpTeamworkDag
 } from './teamwork-command.js';
 
 interface JsonRpcRequest {
@@ -48,7 +50,8 @@ const CORE_MCP_TOOLS = [
   { name: 'teamwork_plan', description: 'Generate Antigravity subagent teamwork plan and stage tracks into TIP inbox', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, targetFiles: { type: 'array', items: { type: 'string' } } }, required: ['objective'] } },
   { name: 'teamwork_status', description: 'Inspect Antigravity subagents, active teamwork tracks, and file mutex locks', inputSchema: { type: 'object', properties: {} } },
   { name: 'teamwork_compact', description: 'Archive completed tasks and generate Antigravity Compact mission briefing', inputSchema: { type: 'object', properties: { objective: { type: 'string' } } } },
-  { name: 'teamwork_analyze', description: 'Fast sub-10ms semantic codebase analysis and file discovery', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, files: { type: 'array', items: { type: 'string' } } }, required: ['objective'] } }
+  { name: 'teamwork_analyze', description: 'Fast sub-10ms semantic codebase analysis and file discovery', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, files: { type: 'array', items: { type: 'string' } } }, required: ['objective'] } },
+  { name: 'teamwork_dag', description: 'Display ASCII Execution Waves dependency graph (DAG)', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, targetFiles: { type: 'array', items: { type: 'string' } } } } }
 ];
 
 export const MCP_TOOLS = [
@@ -75,7 +78,9 @@ function ensureIndexed(engine: ReturnType<typeof getSharedMemoryEngine>, wt = 'd
   const stats = engine.getMemoryStats(wt);
   const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
   if (stats.totalFiles === 0 && !isTest) {
-    const scanDir = fs.existsSync('packages') ? 'packages' : '.';
+    const root = resolveSafeRepoRoot();
+    const pkgDir = path.join(root, 'packages');
+    const scanDir = fs.existsSync(pkgDir) ? pkgDir : root;
     engine.indexDirectory(scanDir, wt);
   }
 }
@@ -202,13 +207,14 @@ export async function executeMcpTool(name: string, args: Record<string, unknown>
   }
   if (name === 'task_list') return mcpTaskList(args);
   if (name === 'task_claim') return mcpTaskClaim(args);
-  if (name === 'task_release') return mcpTaskRelease(args);
+  if (name === 'task_release') return await mcpTaskRelease(args);
   if (name === 'task_inbox_pull') return mcpTaskInboxPull(args);
   if (name === 'lock_status') return mcpLockStatus();
   if (name === 'teamwork_plan') return mcpTeamworkPlan(args);
   if (name === 'teamwork_status') return mcpTeamworkStatus();
   if (name === 'teamwork_compact') return mcpTeamworkCompact(args);
   if (name === 'teamwork_analyze') return mcpTeamworkAnalyze(args);
+  if (name === 'teamwork_dag') return mcpTeamworkDag(args);
   return executeUtilityTool(name, args);
 }
 

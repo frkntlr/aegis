@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { SkeletonGenerator, PromptCacheManager, CodebaseMemoryEngine, type LayeredPromptContext } from '@aegis/ast-skeleton';
 import { GitHubClient, Context7Bridge, type GitHubIssue } from '@aegis/github-live';
 import { WorktreeManager, RoleClassifier } from '@aegis/orchestrator';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { generateLanguageConstitution } from './language-constitution.js';
 
@@ -17,7 +18,7 @@ export interface PromptResult {
 }
 
 function loadFromPromptDir(issueNumber: number): GitHubIssue | undefined {
-  const promptDir = path.resolve(process.cwd(), '.aegis', 'prompts');
+  const promptDir = path.join(resolveSafeAegisDir(), 'prompts');
   if (!fs.existsSync(promptDir)) return undefined;
   const files = fs.readdirSync(promptDir).filter(f => f.includes(`-${issueNumber}.md`));
   if (files.length === 0) return undefined;
@@ -211,7 +212,7 @@ export async function handlePrompt(agentArg?: string, issueArg?: string, flag?: 
   console.log(` • Cached Ratio: ${result.context.cacheRatioPercent}% efficiency (${result.context.cachedCharacters} chars)`);
 
   if (parsedArgs.flag === '--save') {
-    const dir = path.resolve(process.cwd(), '.aegis', 'prompts');
+    const dir = path.join(resolveSafeAegisDir(), 'prompts');
     fs.mkdirSync(dir, { recursive: true });
     const target = path.resolve(dir, `${result.agentName}-issue-${issueNumber}.md`);
     fs.writeFileSync(target, result.promptMarkdown, 'utf8');

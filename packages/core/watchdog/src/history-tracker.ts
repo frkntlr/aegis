@@ -1,13 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ExecutionHistoryRecord } from '@aegis/shared';
+import { resolveSafeAegisDir, type ExecutionHistoryRecord } from '@aegis/shared';
 
 export class HistoryTracker {
   private historyFilePath: string;
   private records: Map<string, ExecutionHistoryRecord> = new Map();
 
   constructor(filePath?: string) {
-    this.historyFilePath = filePath ?? path.resolve(process.cwd(), '.aegis-history.json');
+    this.historyFilePath = filePath ?? path.join(resolveSafeAegisDir(), 'history.json');
     this.load();
   }
 
@@ -69,7 +69,16 @@ export class HistoryTracker {
       for (const [k, v] of this.records.entries()) {
         obj[k] = v;
       }
-      fs.writeFileSync(this.historyFilePath, JSON.stringify(obj, null, 2), 'utf8');
+      const dir = path.dirname(this.historyFilePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const tmp = `${this.historyFilePath}.tmp.${process.pid}.${Date.now()}`;
+      fs.writeFileSync(tmp, JSON.stringify(obj), 'utf8');
+      try {
+        fs.renameSync(tmp, this.historyFilePath);
+      } catch {
+        fs.copyFileSync(tmp, this.historyFilePath);
+        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+      }
     } catch {
       // non-fatal
     }

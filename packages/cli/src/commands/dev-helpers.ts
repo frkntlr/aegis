@@ -79,7 +79,8 @@ export function runMutationGateOnFile(file: string, gate: MutationGate): boolean
 export function collectSourceFiles(dir: string, includeScenes = false): string[] {
   const results: string[] = [];
   if (!fs.existsSync(dir)) return results;
-  if (fs.statSync(dir).isFile()) return [dir];
+  try {
+    if (fs.statSync(dir).isFile()) return [dir];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const regex = includeScenes
     ? /\.(ts|tsx|py|gd|tscn|tres|cs|rs|go|cpp|c|h|hpp|sh|bash|xaml)$/
@@ -93,6 +94,9 @@ export function collectSourceFiles(dir: string, includeScenes = false): string[]
     } else if (regex.test(entry.name) && !entry.name.endsWith('.d.ts')) {
       results.push(full);
     }
+  }
+  } catch {
+    // Graceful permission error handling
   }
   return results;
 }

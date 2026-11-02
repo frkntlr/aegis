@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { IronCageValidator, LineBudgetRadar, TriageCacheRadar } from '@aegis/iron-cage';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import {
   collectSourceFiles,
@@ -61,7 +62,7 @@ function scanCageFiles(files: string[], noCache = false): CageScanAcc {
   const acc: CageScanAcc = { passedCount: 0, violations: [], radarAlerts: [], cachedCount: 0 };
 
   for (const file of files) {
-    const rel = path.relative(process.cwd(), file).replace(/\\/g, '/');
+    const rel = path.relative(resolveSafeRepoRoot(), file).replace(/\\/g, '/');
     try {
       const stat = fs.statSync(file);
       const check = radar ? radar.checkFileStat(rel, stat.mtimeMs, stat.size) : { hit: false };
@@ -81,9 +82,9 @@ export function handleCageCheck(rawArgs?: string | string[]): void {
   const opts = parseCageCheckArgs(rawArgs);
   if (!opts.jsonOutput) showBanner();
   const base = opts.targetDir
-    ? path.resolve(process.cwd(), opts.targetDir)
-    : (fs.existsSync(path.resolve(process.cwd(), 'packages')) ? path.resolve(process.cwd(), 'packages') : process.cwd());
-  if (!opts.jsonOutput) console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(process.cwd(), base) || '.'}...`);
+    ? path.resolve(resolveSafeRepoRoot(), opts.targetDir)
+    : (fs.existsSync(path.resolve(resolveSafeRepoRoot(), 'packages')) ? path.resolve(resolveSafeRepoRoot(), 'packages') : resolveSafeRepoRoot());
+  if (!opts.jsonOutput) console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(resolveSafeRepoRoot(), base) || '.'}...`);
   const files = collectSourceFiles(base);
   const { passedCount, violations, radarAlerts, cachedCount } = scanCageFiles(files, opts.noCache);
 

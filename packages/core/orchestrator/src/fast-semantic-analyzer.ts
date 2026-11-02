@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 
 export interface SemanticAnalysisResult {
   objective: string;
@@ -33,8 +34,8 @@ export class FastSemanticAnalyzer {
   private cachedFiles: { files: string[]; timestamp: number } | null = null;
   private static readonly FILE_CACHE_TTL_MS = 10000;
 
-  constructor(repoRoot: string = process.cwd()) {
-    this.repoRoot = path.resolve(repoRoot);
+  constructor(repoRoot?: string) {
+    this.repoRoot = resolveSafeRepoRoot(repoRoot);
   }
 
   public extractKeywords(text: string): string[] {
@@ -61,14 +62,18 @@ export class FastSemanticAnalyzer {
     }
 
     let files: string[] = [];
-    try {
-      const gitOut = execSync('git ls-files', { cwd: this.repoRoot, encoding: 'utf8', timeout: 3000 });
-      files = gitOut.split('\n').map(f => f.trim().replace(/\\/g, '/')).filter(f => {
-        if (!f) return false;
-        const ext = path.extname(f).toLowerCase();
-        return ALLOWED_EXTS.has(ext);
-      });
-    } catch {
+    if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
+      try {
+        const gitOut = execSync('git ls-files -co --exclude-standard', { cwd: this.repoRoot, encoding: 'utf8', timeout: 3000 });
+        files = gitOut.split('\n').map(f => f.trim().replace(/\\/g, '/')).filter(f => {
+          if (!f) return false;
+          const ext = path.extname(f).toLowerCase();
+          return ALLOWED_EXTS.has(ext);
+        });
+      } catch {
+        files = this.walkDirectoryFallback(this.repoRoot, '');
+      }
+    } else {
       files = this.walkDirectoryFallback(this.repoRoot, '');
     }
 
@@ -103,9 +108,10 @@ export class FastSemanticAnalyzer {
     let score = 0;
     const lowerPath = filePath.toLowerCase();
     const basename = path.basename(lowerPath);
+    const ext = path.extname(lowerPath);
 
     for (const kw of keywords) {
-      if (basename === `${kw}${path.extname(basename)}` || basename.startsWith(`${kw}.`)) {
+      if (basename === `${kw}${ext}` || basename.startsWith(`${kw}.`)) {
         score += 25;
       } else if (basename.includes(kw)) {
         score += 15;
@@ -113,6 +119,15 @@ export class FastSemanticAnalyzer {
         score += 8;
       }
     }
+
+    const isCode = ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cs', '.cpp'].includes(ext);
+    if (isCode && score > 0) {
+      score += 12;
+      if (lowerPath.includes('src/') || lowerPath.includes('packages/')) {
+        score += 8;
+      }
+    }
+
     return score;
   }
 

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { WikiMemoryManager } from './wiki-memory.js';
 import { GitHubWikiLiveAdapter } from './wiki-adapter.js';
+import { resolveSafeAegisDir } from '@aegis/shared';
 
 test('GitHubWikiLiveAdapter parses and lists pages directly from git clone directory', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wiki-adapter-test-'));
@@ -85,7 +86,7 @@ test('GitHubWikiLiveAdapter backs up conflicting local wiki before re-cloning', 
     const adapter = new GitHubWikiLiveAdapter({ localCloneDir: cloneDir });
     (adapter as unknown as { cloneWikiRemote: (url: string) => void }).cloneWikiRemote('file:///nonexistent/repo.wiki.git');
 
-    const aegisDir = path.resolve(process.cwd(), '.aegis');
+    const aegisDir = resolveSafeAegisDir();
     const backups = fs.existsSync(aegisDir)
       ? fs.readdirSync(aegisDir).filter(f => f.startsWith('wiki-backup-'))
       : [];

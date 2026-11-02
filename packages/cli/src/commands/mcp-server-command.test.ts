@@ -15,7 +15,7 @@ test('handleJsonRpc handles tools/list request with 29 authoritative tools', asy
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 31);
+  assert.strictEqual(result.tools.length, 32);
 
   const names = result.tools.map(t => t.name);
   assert.ok(names.includes('teamwork_plan'));

@@ -1,6 +1,8 @@
-import { test } from 'node:test';
+import { test, beforeEach, afterEach } from 'node:test';
 import * as assert from 'node:assert';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   normalizeRole,
   mcpTaskList,
@@ -13,6 +15,20 @@ import {
   handleLockStatus,
   handleTaskVerify
 } from './task-commands.js';
+
+let testTmpDir: string;
+
+beforeEach(() => {
+  testTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-task-test-'));
+  process.env.AEGIS_WORKSPACE = testTmpDir;
+});
+
+afterEach(() => {
+  delete process.env.AEGIS_WORKSPACE;
+  try {
+    fs.rmSync(testTmpDir, { recursive: true, force: true });
+  } catch { /* ignore */ }
+});
 
 test('normalizeRole maps agent variants accurately', () => {
   assert.strictEqual(normalizeRole('qa'), 'qa-hunter');
@@ -31,13 +47,13 @@ test('mcpTaskList returns valid JSON task list', () => {
   assert.ok(Array.isArray(res.tasks));
 });
 
-test('mcpTaskClaim and mcpTaskRelease operate cleanly', () => {
+test('mcpTaskClaim and mcpTaskRelease operate cleanly', async () => {
   const claimRes = JSON.parse(mcpTaskClaim({ issueNumber: 999, agentRole: 'solver' }));
   assert.strictEqual(claimRes.success, true);
   assert.strictEqual(claimRes.issueNumber, 999);
   assert.strictEqual(claimRes.role, 'issue-solver');
 
-  const releaseRes = JSON.parse(mcpTaskRelease({ issueNumber: 999, status: 'done', agentRole: 'solver' }));
+  const releaseRes = JSON.parse(await mcpTaskRelease({ issueNumber: 999, status: 'done', agentRole: 'solver' }));
   assert.strictEqual(releaseRes.success, true);
   assert.strictEqual(releaseRes.status, 'done');
 });

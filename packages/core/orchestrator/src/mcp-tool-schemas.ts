@@ -1,6 +1,6 @@
 /**
  * @file mcp-tool-schemas.ts
- * Authoritative 27-Tool MCP Schema Registry for Google Antigravity & Toolchain Sync.
+ * Authoritative 31-Tool MCP Schema Registry for Google Antigravity & Toolchain Sync.
  * Demir Kafes: <300 lines/file, <40 lines/function.
  */
 

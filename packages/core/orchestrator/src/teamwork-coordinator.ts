@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import { resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeManager } from './worktree-manager.js';
 import { RoleClassifier, type RoleType } from './role-classifier.js';
 import {
@@ -19,6 +20,7 @@ import { TeamworkVisualizer } from './teamwork-visualizer.js';
 import { TeamworkGroundingEngine } from './teamwork-grounding.js';
 import { FastSemanticAnalyzer } from './fast-semantic-analyzer.js';
 import { TeamworkCompactEngine } from './teamwork-compact.js';
+import { stageTracksIntoInboxHelper, exportSubagentManifestHelper } from './teamwork-staging.js';
 import type {
   TeamworkTrack,
   TeamworkPlan,
@@ -27,17 +29,6 @@ import type {
 
 export * from './teamwork-types.js';
 export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine };
-
-function resolveSafeRepoRoot(initial?: string): string {
-  if (initial) return initial;
-  const cwd = process.cwd();
-  if (cwd.toLowerCase().includes('system32')) {
-    if (process.env.AEGIS_WORKSPACE && fs.existsSync(process.env.AEGIS_WORKSPACE)) return process.env.AEGIS_WORKSPACE;
-    const scratch = path.resolve(process.env.USERPROFILE || 'C:\\Users\\Lenovo', '.gemini', 'antigravity', 'scratch', 'aegis');
-    if (fs.existsSync(scratch)) return scratch;
-  }
-  return cwd;
-}
 
 export class TeamworkCoordinator {
   private repoRoot: string;
@@ -86,9 +77,11 @@ export class TeamworkCoordinator {
   public planTeamwork(
     objective: string,
     targetFiles: string[] = [],
-    options?: { deterministic?: boolean }
+    options?: { deterministic?: boolean; stage?: boolean; acquireLocks?: boolean }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
+    const shouldStage = options?.stage ?? true;
+    const shouldLock = options?.acquireLocks ?? shouldStage;
     const effectiveFiles = (targetFiles && targetFiles.length > 0)
       ? targetFiles
       : this.semanticAnalyzer.analyze(objective).targetFiles;
@@ -104,7 +97,9 @@ export class TeamworkCoordinator {
       upstreamFilesMap.set(sub.label, sub.targetFiles);
     }
 
-    this.stageTracksIntoInbox(planId, objective, tracks);
+    if (shouldStage) {
+      this.stageTracksIntoInbox(planId, objective, tracks, shouldLock);
+    }
     return {
       planId,
       objective,
@@ -186,64 +181,12 @@ export class TeamworkCoordinator {
     };
   }
 
-  private stageTracksIntoInbox(planId: string, objective: string, tracks: TeamworkTrack[]): void {
-    const inboxPath = path.resolve(this.repoRoot, '.aegis', 'task-inbox.json');
-    try { fs.mkdirSync(path.dirname(inboxPath), { recursive: true }); } catch { return; }
-    let existing: unknown = null;
-    if (fs.existsSync(inboxPath)) {
-      try { existing = JSON.parse(fs.readFileSync(inboxPath, 'utf8')); } catch { existing = null; }
-    }
-    const inboxArray: unknown[] = Array.isArray(existing) ? existing
-      : (existing && typeof existing === 'object' && Array.isArray((existing as { tasks?: unknown[] }).tasks))
-        ? (existing as { tasks: unknown[] }).tasks : [];
-
-    const numBase = planId.startsWith('tw-det-')
-      ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
-      : parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10);
-
-    for (let i = 0; i < tracks.length; i++) {
-      const track = tracks[i];
-      if (track.targetFiles.length > 0) {
-        this.worktreeManager.acquireFileLocks(track.subagentName, track.targetFiles);
-      }
-      inboxArray.push({
-        issueNumber: numBase + i,
-        title: `[Teamwork Track] ${track.title}`,
-        role: track.subagentName,
-        worktree: `experimental/${track.roleType}`,
-        targetFiles: track.targetFiles,
-        acceptanceCriteria: [`Complete track objective: ${objective}`, 'Pass Demir Kafes & verify:task'],
-        prompt: track.prompt,
-        status: track.dependsOn.length > 0 ? 'blocked' : 'pending',
-        dependsOn: track.dependsOn,
-        phase: track.phase,
-        stagedAt: new Date().toISOString()
-      });
-    }
-    try {
-      fs.writeFileSync(inboxPath, JSON.stringify(inboxArray, null, 2), 'utf8');
-    } catch { /* ignore */ }
+  private stageTracksIntoInbox(planId: string, objective: string, tracks: TeamworkTrack[], shouldLock = true): void {
+    stageTracksIntoInboxHelper(this.repoRoot, planId, objective, tracks, this.worktreeManager, shouldLock);
   }
 
   public exportSubagentManifest(outDir?: string): { count: number; manifestPath: string } {
-    const targetDir = outDir ?? path.resolve(this.repoRoot, '.aegis');
-    try { fs.mkdirSync(targetDir, { recursive: true }); } catch { /* ignore */ }
-    const manifestPath = path.join(targetDir, 'subagents.json');
-    const profiles = this.listProfiles();
-    const manifest = {
-      engine: 'aegis',
-      framework: 'antigravity-subagents',
-      version: '0.1.0',
-      subagents: profiles.map(p => ({
-        name: p.name, role: p.title, description: p.description, systemPrompt: p.systemPrompt,
-        workspaceMode: p.workspaceMode ?? 'inherit', enableWriteTools: p.enableWriteTools,
-        enableMcpTools: p.enableMcpTools, defaultModel: p.defaultModel ?? 'inherit'
-      }))
-    };
-    try {
-      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-    } catch { /* ignore if write not permitted */ }
-    return { count: profiles.length, manifestPath };
+    return exportSubagentManifestHelper(this.repoRoot, this.listProfiles(), outDir);
   }
 
   public formatLiveMatrix(

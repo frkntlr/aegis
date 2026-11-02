@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, beforeEach, afterEach } from 'node:test';
 import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -11,6 +11,20 @@ import {
   mcpTeamworkPlan,
   mcpTeamworkStatus
 } from './teamwork-command.js';
+
+let testTmpDir: string;
+
+beforeEach(() => {
+  testTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-tw-test-'));
+  process.env.AEGIS_WORKSPACE = testTmpDir;
+});
+
+afterEach(() => {
+  delete process.env.AEGIS_WORKSPACE;
+  try {
+    fs.rmSync(testTmpDir, { recursive: true, force: true });
+  } catch { /* ignore */ }
+});
 
 test('handleTeamworkStatus runs cleanly without error', () => {
   assert.doesNotThrow(() => handleTeamworkStatus());
@@ -33,16 +47,11 @@ test('handleTeamworkPlan handles missing objective gracefully', () => {
 });
 
 test('handleTeamworkSetup exports subagent manifest', () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cmd-setup-'));
-  try {
-    assert.doesNotThrow(() => handleTeamworkSetup(tmpDir));
-    const manifestPath = path.join(tmpDir, 'subagents.json');
-    assert.ok(fs.existsSync(manifestPath));
-    const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    assert.strictEqual(parsed.subagents.length, 4);
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
+  assert.doesNotThrow(() => handleTeamworkSetup(testTmpDir));
+  const manifestPath = path.join(testTmpDir, 'subagents.json');
+  assert.ok(fs.existsSync(manifestPath));
+  const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert.strictEqual(parsed.subagents.length, 4);
 });
 
 test('handleTeamwork router invokes subcommands properly', () => {

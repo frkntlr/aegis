@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeCacheDir } from '@aegis/shared';
 
 export interface OracleCacheOptions {
   cacheDir?: string;
@@ -19,10 +20,10 @@ export class OracleCache {
   private readonly maxSizeBytes: number;
 
   constructor(options: OracleCacheOptions = {}) {
-    this.cacheDir = options.cacheDir || path.resolve(process.cwd(), '.aegis', 'cache', 'godot');
+    this.cacheDir = options.cacheDir || resolveSafeCacheDir('godot');
     this.ttlMs = options.ttlMs ?? 24 * 60 * 60 * 1000;
     this.maxSizeBytes = options.maxSizeBytes ?? 50 * 1024 * 1024;
-    fs.mkdirSync(this.cacheDir, { recursive: true });
+    try { fs.mkdirSync(this.cacheDir, { recursive: true }); } catch { /* ignore */ }
   }
 
   public getCacheDir(): string {

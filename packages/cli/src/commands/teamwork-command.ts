@@ -79,7 +79,7 @@ export function handleTeamworkSetup(outDir?: string): void {
 export function handleTeamworkDag(objectiveArg?: string, ...files: string[]): void {
   showBanner();
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objectiveArg || 'Active Teamwork Mission', files);
+  const plan = coordinator.planTeamwork(objectiveArg || 'Active Teamwork Mission', files, { stage: false, acquireLocks: false });
   console.log(coordinator.formatAsciiDag(plan));
 }
 
@@ -99,7 +99,7 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
   }
   if (norm === 'matrix' || norm === 'table') {
     const coordinator = new TeamworkCoordinator();
-    const plan = coordinator.planTeamwork(args[0] || 'Active Teamwork Mission', args.slice(1));
+    const plan = coordinator.planTeamwork(args[0] || 'Active Teamwork Mission', args.slice(1), { stage: false, acquireLocks: false });
     console.log(coordinator.formatLiveMatrix(plan));
     return;
   }
@@ -117,7 +117,7 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
 export function handleTeamworkCompact(objectiveArg?: string): void {
   showBanner();
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objectiveArg || 'Active Mission');
+  const plan = coordinator.planTeamwork(objectiveArg || 'Active Mission', [], { stage: false, acquireLocks: false });
   const briefing = coordinator.compactTeamwork(plan);
   console.log(briefing);
 }
@@ -160,14 +160,14 @@ export function mcpTeamworkDag(args: Record<string, unknown> = {}): string {
   const objective = String(args.objective || 'Active Mission');
   const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, targetFiles);
+  const plan = coordinator.planTeamwork(objective, targetFiles, { stage: false, acquireLocks: false });
   return coordinator.formatAsciiDag(plan);
 }
 
 export function mcpTeamworkCompact(args: Record<string, unknown> = {}): string {
   const objective = String(args.objective || 'Active Mission');
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective);
+  const plan = coordinator.planTeamwork(objective, [], { stage: false, acquireLocks: false });
   return coordinator.compactTeamwork(plan);
 }
 

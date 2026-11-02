@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveSafeAegisDir } from '@aegis/shared';
 import { execFileSync } from 'node:child_process';
 import { GitHubTokenResolver } from './token-resolver.js';
 import type { WikiFastSyncResult, WikiPage, WikiSyncOptions, WikiSyncStatus } from './types.js';
@@ -27,7 +28,7 @@ export class GitHubWikiLiveAdapter {
     this.token = auth.token || '';
     this.owner = options.owner || auth.owner || 'frkntlr';
     this.repo = options.repo || auth.repo || 'aegis';
-    this.cloneDir = options.localCloneDir || path.resolve(process.cwd(), '.aegis', 'wiki-cache');
+    this.cloneDir = options.localCloneDir || path.join(resolveSafeAegisDir(), 'wiki-cache');
   }
 
   public getWikiRemoteUrl(): string {
@@ -99,7 +100,7 @@ export class GitHubWikiLiveAdapter {
   private backupConflictingWiki(): void {
     if (!fs.existsSync(this.cloneDir)) return;
     try {
-      const backupDir = path.resolve(process.cwd(), '.aegis', `wiki-backup-${Date.now()}`);
+      const backupDir = path.join(resolveSafeAegisDir(), `wiki-backup-${Date.now()}`);
       fs.mkdirSync(path.dirname(backupDir), { recursive: true });
       fs.cpSync(this.cloneDir, backupDir, { recursive: true });
     } catch {
