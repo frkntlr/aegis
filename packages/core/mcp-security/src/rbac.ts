@@ -15,11 +15,20 @@ export class MCPSecurityManager {
     this.maxCallsPerMinute = options.maxCallsPerMinute ?? 30;
     const godotTools = ['godot_status', 'godot_inspect', 'godot_query', 'godot_validate', 'godot_playtest'];
     const memTools = ['memory_query', 'memory_stats', 'ast_search', 'ast_replace', 'rtk_compress', 'context7_query', 'cage_check', 'triage', 'find_symbol', 'trace_relational'];
-    this.registerAgent('solver', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools]);
-    this.registerAgent('qa', ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools]);
-    this.registerAgent('ui', ['read_file', 'write_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools]);
+    const solverTools = ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools];
+    const qaTools = ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools];
+    const uiTools = ['read_file', 'write_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools];
     const readOnlyMem = ['memory_query', 'memory_stats', 'context7_query', 'find_symbol', 'trace_relational', 'rtk_compress', 'cage_check'];
-    this.registerAgent('docs', ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton', ...readOnlyMem]);
+    const docsTools = ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton', ...readOnlyMem];
+
+    this.registerAgent('solver', solverTools);
+    this.registerAgent('issue-solver', solverTools);
+    this.registerAgent('qa', qaTools);
+    this.registerAgent('qa-hunter', qaTools);
+    this.registerAgent('ui', uiTools);
+    this.registerAgent('ui-specialist', uiTools);
+    this.registerAgent('docs', docsTools);
+    this.registerAgent('doc-architect', docsTools);
     this.registerAgent('contributor', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...memTools]);
     this.registerAgent('alice', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools]);
     this.registerAgent('bob', ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools]);
@@ -57,8 +66,20 @@ export class MCPSecurityManager {
     return null;
   }
 
+  private getPermission(agentName: string): ToolPermission | undefined {
+    const direct = this.permissions.get(agentName);
+    if (direct) return direct;
+    const clean = agentName.toLowerCase().replace(/^@/, '');
+    if (this.permissions.has(clean)) return this.permissions.get(clean);
+    if (clean.includes('solver')) return this.permissions.get('solver');
+    if (clean.includes('qa') || clean.includes('hunter')) return this.permissions.get('qa');
+    if (clean.includes('ui') || clean.includes('specialist')) return this.permissions.get('ui');
+    if (clean.includes('doc') || clean.includes('architect')) return this.permissions.get('docs');
+    return undefined;
+  }
+
   public authorizeToolCall(agentName: string, toolName: string): { allowed: boolean; reason?: string } {
-    const perm = this.permissions.get(agentName);
+    const perm = this.getPermission(agentName);
     if (!perm) {
       this.recordAudit(agentName, toolName, false, 'Unregistered agent.');
       return { allowed: false, reason: `Agent "${agentName}" is not registered in MCP security policy.` };

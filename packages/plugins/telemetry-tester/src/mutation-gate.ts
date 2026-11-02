@@ -66,7 +66,8 @@ export class MutationGate {
 
   public generateMutants(sourceCode: string): Mutant[] {
     const mutants: Mutant[] = [];
-    const lines = sourceCode.split('\n');
+    const eol = sourceCode.includes('\r\n') ? '\r\n' : '\n';
+    const lines = sourceCode.split(/\r?\n/);
     let inTypeBlock = false;
 
     for (let i = 0; i < lines.length; i++) {
@@ -75,13 +76,13 @@ export class MutationGate {
       inTypeBlock = check.inTypeBlock;
       if (check.skip) continue;
 
-      this.applyRulesToLine(lines, i, line, mutants);
+      this.applyRulesToLine(lines, i, line, mutants, eol);
     }
 
     return mutants;
   }
 
-  private applyRulesToLine(lines: string[], i: number, line: string, mutants: Mutant[]): void {
+  private applyRulesToLine(lines: string[], i: number, line: string, mutants: Mutant[], eol = '\n'): void {
     for (const rule of this.mutationRules) {
       rule.pattern.lastIndex = 0;
       if (rule.pattern.test(line)) {
@@ -94,7 +95,7 @@ export class MutationGate {
           originalOp: rule.pattern.source,
           mutatedOp: rule.replacement,
           line: i + 1,
-          mutatedCode: copy.join('\n')
+          mutatedCode: copy.join(eol)
         });
       }
     }

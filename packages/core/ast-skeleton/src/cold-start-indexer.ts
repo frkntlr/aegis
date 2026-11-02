@@ -73,10 +73,18 @@ export class ColdStartIndexer {
   private indexFileList(engine: CodebaseMemoryEngine, files: string[], worktreeId?: string): { indexed: number; skipped: number } {
     let indexed = 0;
     let skipped = 0;
+    const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
+    const ns = engine.getNamespace(active);
     for (const file of files) {
+      const norm = file.replace(/\\/g, '/');
+      const fp = GitFastSyncEngine.getFileFingerprint(file);
+      if (fp && ns.mtimeFingerprints.get(norm) === fp && ns.fileHashes.has(norm)) {
+        skipped++;
+        continue;
+      }
       try {
         const content = fs.readFileSync(file, 'utf8');
-        if (engine.indexFile(file, content, worktreeId)) indexed++;
+        if (engine.indexFile(file, content, active)) indexed++;
         else skipped++;
       } catch {
         skipped++;

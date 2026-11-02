@@ -39,7 +39,10 @@ export class OrphanTaskReclaimer {
   constructor(options: OrphanReclaimerOptions = {}) {
     this.staleTimeoutMs = options.staleTimeoutMs ?? 10 * 60 * 1000;
     this.managedAgents = new Set(
-      (options.managedAgents ?? ['solver', 'qa', 'docs', 'ui', 'contributor', 'alice', 'bob']).map(a => a.toLowerCase())
+      (options.managedAgents ?? [
+        'solver', 'qa', 'docs', 'ui', 'contributor', 'alice', 'bob',
+        'issue-solver', 'qa-hunter', 'ui-specialist', 'doc-architect'
+      ]).map(a => a.toLowerCase())
     );
   }
 
@@ -73,7 +76,10 @@ export class OrphanTaskReclaimer {
       return 'Task marked in_progress with no assigned agent (Ghost task).';
     }
 
-    if (!this.managedAgents.has(issue.assignedAgent.toLowerCase())) {
+    const agentNorm = issue.assignedAgent.toLowerCase().replace(/^@/, '');
+    const isManaged = this.managedAgents.has(agentNorm) ||
+      ['solver', 'qa', 'docs', 'ui'].some(role => agentNorm.includes(role));
+    if (!isManaged) {
       return null;
     }
 
