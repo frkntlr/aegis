@@ -15,11 +15,12 @@ export class MCPSecurityManager {
     this.maxCallsPerMinute = options.maxCallsPerMinute ?? 30;
     const godotTools = ['godot_status', 'godot_inspect', 'godot_query', 'godot_validate', 'godot_playtest'];
     const memTools = ['memory_query', 'memory_stats', 'ast_search', 'ast_replace', 'rtk_compress', 'context7_query', 'cage_check', 'triage', 'find_symbol', 'trace_relational'];
-    const solverTools = ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools];
-    const qaTools = ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools];
-    const uiTools = ['read_file', 'write_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools];
+    const teamworkTools = ['task_list', 'task_claim', 'task_release', 'task_inbox_pull', 'lock_status', 'teamwork_status', 'teamwork_compact', 'teamwork_analyze', 'teamwork_plan'];
+    const solverTools = ['read_file', 'write_file', 'run_test', 'git_commit', 'ast_skeleton', ...godotTools, ...memTools, ...teamworkTools];
+    const qaTools = ['read_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools, ...teamworkTools];
+    const uiTools = ['read_file', 'write_file', 'run_test', 'inspect_ui', 'simulate_input', 'take_screenshot', 'ast_skeleton', ...godotTools, ...memTools, ...teamworkTools];
     const readOnlyMem = ['memory_query', 'memory_stats', 'context7_query', 'find_symbol', 'trace_relational', 'rtk_compress', 'cage_check'];
-    const docsTools = ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton', ...readOnlyMem];
+    const docsTools = ['read_file', 'write_file', 'write_wiki', 'wiki_sync', 'rfc_triage', 'ast_skeleton', ...readOnlyMem, ...teamworkTools];
 
     this.registerAgent('solver', solverTools);
     this.registerAgent('issue-solver', solverTools);

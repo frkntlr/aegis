@@ -47,7 +47,7 @@ export class FuzzyMatcher {
     const results: FuzzyMatchResult<T>[] = [];
 
     for (const item of candidates) {
-      const key = keyFn(item);
+      const key = String(keyFn(item) || '').trim();
       if (Math.abs(qLower.length - key.length) > maxDistance) continue;
       const dist = FuzzyMatcher.damerauLevenshtein(qLower, key);
       if (dist <= maxDistance) {

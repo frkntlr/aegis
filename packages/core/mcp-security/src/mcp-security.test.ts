@@ -60,3 +60,14 @@ test('MCPSecurityManager authorizes UI specialist and Godot toolchain', () => {
   assert.strictEqual(manager.authorizeToolCall('qa', 'godot_status').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('docs', 'godot_inspect').allowed, false);
 });
+
+test('MCPSecurityManager authorizes teamwork tools for all subagent personas', () => {
+  const manager = new MCPSecurityManager();
+  const subagents = ['issue-solver', 'qa-hunter', 'ui-specialist', 'doc-architect'];
+  const teamworkTools = ['task_inbox_pull', 'task_claim', 'task_release', 'lock_status', 'teamwork_status', 'teamwork_compact'];
+  for (const agent of subagents) {
+    for (const tool of teamworkTools) {
+      assert.strictEqual(manager.authorizeToolCall(agent, tool).allowed, true, agent + ' should be allowed to call ' + tool);
+    }
+  }
+});
