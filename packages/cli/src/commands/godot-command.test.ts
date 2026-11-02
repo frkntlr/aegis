@@ -167,3 +167,8 @@ test('handleGodotUi scaffolds UI scenes and lints Godot UI scenes cleanly', asyn
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('handleGodotUi prints usage error when linting without .tscn scene argument', async () => {
+  const out = await captureOutput(() => handleGodotUi('lint'));
+  assert.ok(out.includes('Usage: aegis godot ui:lint <scene.tscn>'));
+});

@@ -30,8 +30,9 @@ export class EngineAnalysisTools {
 
     for (const f of files) {
       const rel = path.relative(process.cwd(), f).replace(/\\/g, '/');
-      const content = fs.readFileSync(f, 'utf8');
-      const res = this.cageValidator.validateFileContent(rel, content);
+      let text = '';
+      try { text = fs.readFileSync(f, 'utf8'); } catch { continue; }
+      const res = this.cageValidator.validateFileContent(rel, text);
       if (res.passed) {
         compliant++;
       } else {
@@ -62,8 +63,9 @@ export class EngineAnalysisTools {
 
     for (const f of files) {
       const rel = path.relative(process.cwd(), f).replace(/\\/g, '/');
-      const content = fs.readFileSync(f, 'utf8');
-      const res = this.cageValidator.validateFileContent(rel, content);
+      let text = '';
+      try { text = fs.readFileSync(f, 'utf8'); } catch { continue; }
+      const res = this.cageValidator.validateFileContent(rel, text);
       allViolations.push(...res.violations);
     }
 

@@ -201,6 +201,10 @@ export function handleGodotUi(subcmd = 'lint', ...args: string[]): void {
     }
     return;
   }
+  if (act === 'lint') {
+    console.log('❌ Usage: aegis godot ui:lint <scene.tscn>');
+    return;
+  }
   handleGodotInspect(target);
 }
 

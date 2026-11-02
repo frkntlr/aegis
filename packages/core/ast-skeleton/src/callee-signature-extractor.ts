@@ -102,6 +102,12 @@ export class CalleeSignatureExtractor {
           if (ts.isMethodDeclaration(member) && member.name?.getText(sf) === methodName) {
             return this.formatSignatureFromNode(member, sf, prefix);
           }
+          if (ts.isPropertyDeclaration(member) && member.name?.getText(sf) === methodName && member.initializer && (ts.isArrowFunction(member.initializer) || ts.isFunctionExpression(member.initializer))) {
+            const fn = member.initializer;
+            const params = fn.parameters.map(p => p.getText(sf)).join(', ');
+            const ret = fn.type ? ': ' + fn.type.getText(sf) : '';
+            return prefix + methodName + '(' + params + ')' + ret + ';';
+          }
         }
       }
       const varSig = this.findVariableSignature(stmt, sf, methodName, prefix);

@@ -230,3 +230,19 @@ test('SymbolSliceExtractor: dynamically expands context lines upwards to capture
   assert.ok(slice.codeSlice.includes('@param xp Total experience points'));
   assert.ok(slice.codeSlice.includes('@returns Level number between 1 and 100'));
 });
+
+test('CalleeSignatureExtractor: extracts signature for arrow function class properties', () => {
+  const extractor = new CalleeSignatureExtractor();
+  const code = [
+    'export class CalculatorService {',
+    '  public compute = (a: number, b: number): number => { return a + b; };',
+    '  public execute(x: number, y: number): number {',
+    '    return this.compute(x, y);',
+    '  }',
+    '}'
+  ].join('\n');
+
+  const res = extractor.extractCalleeSignatures('execute', 'service.ts', code);
+  assert.ok(res.callees.includes('this.compute'));
+  assert.ok(res.signatures.some(s => s.includes('this.compute(a: number, b: number): number;')));
+});

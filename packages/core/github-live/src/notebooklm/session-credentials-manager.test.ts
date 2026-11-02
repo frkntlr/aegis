@@ -69,6 +69,13 @@ test('validateCookieString validates required Google auth tokens', () => {
   assert.ok(resInvalid.missingTokens.includes('__Secure-1PSIDTS'));
 });
 
+test('validateCookieString validates partitioned __Secure-3PSIDTS tokens', () => {
+  const partitionedCookie = 'SID=valid-sid-token-1234567890; HSID=valid-hsid; __Secure-3PSIDTS=valid-3psidts-token-abcdef';
+  const res = SessionCredentialsManager.validateCookieString(partitionedCookie);
+  assert.strictEqual(res.valid, true);
+  assert.strictEqual(res.hasPsidts, true);
+});
+
 test('saveCredentials rejects invalid cookie and does not write to disk', () => {
   const tempPath = path.join(os.tmpdir(), `aegis-invalid-${Date.now()}`, 'auth.json');
   const res = SessionCredentialsManager.saveCredentials('short', tempPath);

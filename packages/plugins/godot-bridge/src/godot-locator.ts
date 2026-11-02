@@ -122,7 +122,7 @@ export class GodotLocator {
 
       const majorMatch = out.match(/^(\d+)/);
       const majorVersion = majorMatch ? parseInt(majorMatch[1], 10) : 4;
-      const isConsole = cleanPath.toLowerCase().includes('console') || process.platform !== 'win32';
+      const isConsole = cleanPath.toLowerCase().includes('console') || majorVersion >= 4 || process.platform !== 'win32';
 
       return {
         binaryPath: cleanPath,

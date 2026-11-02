@@ -18,6 +18,7 @@ function buildTrackInboxItem(
   objective: string
 ): Record<string, unknown> {
   return {
+    id: numBase + index,
     issueNumber: numBase + index,
     title: `[Teamwork Track] ${track.title}`,
     role: track.subagentName,

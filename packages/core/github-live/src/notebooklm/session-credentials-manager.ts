@@ -101,7 +101,7 @@ export class SessionCredentialsManager {
     const cleaned = SessionCredentialsManager.sanitizeCookieInput(cookieString);
     const hasSid = /(?:^|;\s*)SID=/.test(cleaned);
     const hasHsid = /(?:^|;\s*)HSID=/.test(cleaned);
-    const hasPsidts = /(?:^|;\s*)__Secure-1PSIDTS=/.test(cleaned);
+    const hasPsidts = /(?:^|;\s*)__Secure-[13]PSIDTS=/.test(cleaned) || /(?:^|;\s*)__Secure-[13]PSID=/.test(cleaned);
 
     const missing: string[] = [];
     if (!hasSid) missing.push('SID');
