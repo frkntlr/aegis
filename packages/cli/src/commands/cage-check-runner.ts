@@ -40,7 +40,12 @@ function handleUncachedFile(
   radar: TriageCacheRadar | null,
   acc: CageScanAcc
 ): void {
-  const content = fs.readFileSync(file, 'utf8');
+  let content: string;
+  try {
+    content = fs.readFileSync(file, 'utf8');
+  } catch {
+    return;
+  }
   const res = validator.validateFileContent(rel, content);
   let quotaAlert: { file: string; lines: number; msg: string } | undefined;
   if (res.passed) {

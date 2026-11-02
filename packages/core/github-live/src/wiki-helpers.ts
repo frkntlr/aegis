@@ -1,14 +1,7 @@
+import { cleanGitEnv } from '@aegis/shared';
 import type { WikiPage } from './types.js';
 
-export function cleanGitEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-  delete env.GIT_DIR;
-  delete env.GIT_INDEX_FILE;
-  delete env.GIT_WORK_TREE;
-  delete env.GIT_PREFIX;
-  delete env.GIT_COMMON_DIR;
-  return env;
-}
+export { cleanGitEnv };
 
 export function formatWikiMarkdown(
   title: string,

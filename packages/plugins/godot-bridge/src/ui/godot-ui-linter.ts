@@ -59,7 +59,15 @@ export class GodotUiLinter {
         message: `Scene file not found: ${scenePath}`, fixSuggestion: 'Verify the file path exists.'
       }], score: 0 };
     }
-    return this.lintContent(fs.readFileSync(scenePath, 'utf8'), scenePath, gdScriptPath);
+    try {
+      return this.lintContent(fs.readFileSync(scenePath, 'utf8'), scenePath, gdScriptPath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { valid: false, scenePath, nodeCount: 0, issues: [{
+        severity: 'error', nodeName: 'Scene', rule: 'FILE_READ_ERROR',
+        message: `Failed to read scene file: ${msg}`, fixSuggestion: 'Check file permissions.'
+      }], score: 0 };
+    }
   }
 
   public static lintContent(content: string, scenePath = 'scene.tscn', gdScriptPath?: string): UiLintReport {
@@ -239,7 +247,11 @@ export class GodotUiLinter {
     const nodeNames = new Set(nodes.map(n => n.name));
     let methods: Set<string> | null = null;
     if (scriptPath && fs.existsSync(scriptPath)) {
-      methods = this.extractScriptMethods(fs.readFileSync(scriptPath, 'utf8'));
+      try {
+        methods = this.extractScriptMethods(fs.readFileSync(scriptPath, 'utf8'));
+      } catch {
+        methods = null;
+      }
     }
 
     for (const c of conns) {

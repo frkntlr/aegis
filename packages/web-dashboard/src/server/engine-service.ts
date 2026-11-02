@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { resolveSafeAegisDir, cleanGitEnv } from '@aegis/shared';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
@@ -12,16 +12,6 @@ import { getDashboardHtml } from '../ui/dashboard-html.js';
 import { EngineAnalysisTools } from './engine-analysis-tools.js';
 
 const execFileAsync = promisify(execFile);
-
-function cleanGitEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-  delete env.GIT_DIR;
-  delete env.GIT_INDEX_FILE;
-  delete env.GIT_WORK_TREE;
-  delete env.GIT_PREFIX;
-  delete env.GIT_COMMON_DIR;
-  return env;
-}
 
 export interface AdaptiveTimeoutReport {
   tool: string;

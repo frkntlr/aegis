@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { IronCageValidator } from '@aegis/iron-cage';
 import type { MutationGate } from '@aegis/telemetry-tester';
+import { cleanGitEnv, resolveSafeRepoRoot } from '@aegis/shared';
 
 export interface CageCheckOptions {
   targetDir?: string;
@@ -31,7 +32,15 @@ export function verifyFile(file: string, validator: IronCageValidator): boolean 
     console.error(`❌ File not found: ${full}`);
     return false;
   }
-  const res = validator.validateFileContent(file, fs.readFileSync(full, 'utf8'));
+  let content: string;
+  try {
+    content = fs.readFileSync(full, 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to read ${file}: ${msg}`);
+    return false;
+  }
+  const res = validator.validateFileContent(file, content);
   if (res.passed) {
     console.log(`✅ Iron Cage: PASSED for ${file}`);
     return true;
@@ -42,7 +51,8 @@ export function verifyFile(file: string, validator: IronCageValidator): boolean 
 }
 
 export function getChangedSourceFiles(): string[] {
-  if (!fs.existsSync('.git')) return [];
+  const root = resolveSafeRepoRoot();
+  if (!fs.existsSync(path.join(root, '.git'))) return [];
   const diffs = [
     ['diff', '--cached', '--name-only', '--diff-filter=ACM'],
     ['diff', '--name-only', 'origin/master...HEAD', '--diff-filter=ACM'],
@@ -50,8 +60,8 @@ export function getChangedSourceFiles(): string[] {
   ];
   for (const args of diffs) {
     try {
-      const out = execFileSync('git', args, { encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
-      const files = out.split('\n').map(l => l.trim().replace(/\\/g, '/')).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && fs.existsSync(f));
+      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', env: cleanGitEnv() });
+      const files = out.split('\n').map(l => l.trim().replace(/\\/g, '/')).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && fs.existsSync(path.resolve(root, f)));
       if (files.length > 0) return files;
     } catch { /* ignore */ }
   }
@@ -64,7 +74,14 @@ export function runMutationGateOnFile(file: string, gate: MutationGate): boolean
     console.error(`❌ File not found: ${fullPath}`);
     return false;
   }
-  const content = fs.readFileSync(fullPath, 'utf8');
+  let content: string;
+  try {
+    content = fs.readFileSync(fullPath, 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to read ${file}: ${msg}`);
+    return false;
+  }
   const mutants = gate.generateMutants(content);
   const report = gate.evaluateScore(mutants, (m) => m.originalOp !== m.mutatedOp);
 

@@ -153,7 +153,14 @@ export async function handleRfcApprove(rfcArg?: string): Promise<void> {
   }
 
   const filePath = path.join(rfcDir, files[0]);
-  let content = fs.readFileSync(filePath, 'utf8');
+  let content = '';
+  try {
+    content = fs.readFileSync(filePath, 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to read RFC ${files[0]}: ${msg}`);
+    process.exit(1);
+  }
   content = content.replace(/(\*{0,2}Durum:\*{0,2}\s*)Proposed/i, '$1Approved (Onaylandı) ✅');
   fs.writeFileSync(filePath, content, 'utf8');
 
@@ -180,7 +187,12 @@ export async function handleWikiClean(rfcArg?: string): Promise<void> {
   const wiki = new WikiMemoryManager();
   let count = 0;
   for (const f of files) {
-    const content = fs.readFileSync(path.join(rfcDir, f), 'utf8');
+    let content = '';
+    try {
+      content = fs.readFileSync(path.join(rfcDir, f), 'utf8');
+    } catch {
+      continue;
+    }
     const slug = f.replace(/\.md$/, '');
     const cleanDoc = cleanseExistingRfcForWiki(slug, content);
     wiki.setPage(slug, cleanDoc.title, cleanDoc.threeBullets, cleanDoc.cleanContent);
@@ -226,7 +238,14 @@ export async function handleRfcDecompose(rfcArg?: string): Promise<void> {
     process.exit(1);
   }
 
-  const content = fs.readFileSync(path.join(rfcDir, files[0]), 'utf8');
+  let content = '';
+  try {
+    content = fs.readFileSync(path.join(rfcDir, files[0]), 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to read RFC ${files[0]}: ${msg}`);
+    process.exit(1);
+  }
   const titleMatch = content.match(/^#\s+(.+)$/m);
   const rfcTitle = titleMatch ? titleMatch[1].replace(/^[^\w]+/, '').trim() : files[0];
   const parsed = new RfcTriager().parseRfc(rfcTitle, content, 1);

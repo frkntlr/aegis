@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { cleanGitEnv, resolveSafeRepoRoot } from '@aegis/shared';
 
 export interface SemanticAnalysisResult {
   objective: string;
@@ -64,7 +64,7 @@ export class FastSemanticAnalyzer {
     let files: string[] = [];
     if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
       try {
-        const gitOut = execSync('git ls-files -co --exclude-standard', { cwd: this.repoRoot, encoding: 'utf8', timeout: 3000 });
+        const gitOut = execSync('git ls-files -co --exclude-standard', { cwd: this.repoRoot, encoding: 'utf8', timeout: 3000, env: cleanGitEnv() });
         files = gitOut.split('\n').map(f => f.trim().replace(/\\/g, '/')).filter(f => {
           if (!f) return false;
           const ext = path.extname(f).toLowerCase();

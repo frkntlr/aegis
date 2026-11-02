@@ -72,14 +72,16 @@ export class SkeletonGenerator {
       const fullPath = path.isAbsolute(relativePath) ? relativePath : path.join(baseDir, relativePath);
       if (!fs.existsSync(fullPath)) continue;
 
-      const content = fs.readFileSync(fullPath, 'utf8');
-      const result = this.extractFile(relativePath, content);
+      try {
+        const content = fs.readFileSync(fullPath, 'utf8');
+        const result = this.extractFile(relativePath, content);
 
-      entries.set(relativePath, result);
-      totalOriginalBytes += result.originalLength;
-      totalSkeletonBytes += result.skeletonLength;
+        entries.set(relativePath, result);
+        totalOriginalBytes += result.originalLength;
+        totalSkeletonBytes += result.skeletonLength;
 
-      combinedParts.push(`--- ${relativePath} ---\n${result.skeletonContent}\n`);
+        combinedParts.push(`--- ${relativePath} ---\n${result.skeletonContent}\n`);
+      } catch { /* ignore */ }
     }
 
     const overallSavingsPercent =

@@ -1,5 +1,6 @@
 import * as cp from 'node:child_process';
 import * as fs from 'node:fs';
+import { cleanGitEnv } from '@aegis/shared';
 
 export interface FastSyncEvaluation {
   canSkipScan: boolean;
@@ -21,7 +22,8 @@ export class GitFastSyncEngine {
         cwd,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: 2000
+        timeout: 2000,
+        env: cleanGitEnv()
       }).trim();
     } catch {
       return null;
@@ -44,7 +46,8 @@ export class GitFastSyncEngine {
         cwd,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: 3000
+        timeout: 3000,
+        env: cleanGitEnv()
       });
       const deleted: string[] = [];
       for (const line of output.split(/\r?\n/)) {
@@ -76,7 +79,8 @@ export class GitFastSyncEngine {
         cwd,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
-        timeout: 3000
+        timeout: 3000,
+        env: cleanGitEnv()
       });
       const files: string[] = [];
       for (const line of output.split(/\r?\n/)) {

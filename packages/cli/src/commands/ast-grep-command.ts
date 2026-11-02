@@ -15,8 +15,15 @@ export function handleAstSearch(patternArg?: string, targetPathArg = '.', extraA
   const resolved = path.resolve(process.cwd(), targetPath);
   console.log(`🔍 ast-grep Pattern Search: "${pattern}" on ${targetPath}...\n`);
 
-  const stat = fs.existsSync(resolved) ? fs.statSync(resolved) : null;
-  const matches = stat?.isDirectory()
+  let isDir = false;
+  if (fs.existsSync(resolved)) {
+    try {
+      isDir = fs.statSync(resolved).isDirectory();
+    } catch {
+      isDir = false;
+    }
+  }
+  const matches = isDir
     ? AstGrepBridge.searchDirectory(resolved, pattern)
     : AstGrepBridge.searchFile(resolved, pattern);
 
@@ -45,7 +52,14 @@ export function handleAstReplace(pattern: string, rewrite: string, targetFile: s
     process.exit(1);
   }
 
-  const content = fs.readFileSync(resolved, 'utf8');
+  let content: string;
+  try {
+    content = fs.readFileSync(resolved, 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to read target file ${targetFile}: ${msg}`);
+    process.exit(1);
+  }
   const res = AstGrepBridge.replace(content, pattern, rewrite);
 
   if (!res.hasChanges) {

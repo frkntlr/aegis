@@ -116,26 +116,33 @@ export class GdExtensionMetadataExtractor {
     if (!fs.existsSync(addonsDir)) return [];
 
     const contracts: GdExtensionContract[] = [];
-    const addonFolders = fs.readdirSync(addonsDir);
+    let addonFolders: string[] = [];
+    try {
+      addonFolders = fs.readdirSync(addonsDir);
+    } catch {
+      return [];
+    }
 
     for (const folder of addonFolders) {
       const addonPath = path.join(addonsDir, folder);
-      if (!fs.statSync(addonPath).isDirectory()) continue;
+      try {
+        if (!fs.statSync(addonPath).isDirectory()) continue;
 
-      const files = fs.readdirSync(addonPath);
-      const manifestFile = files.find(f => f.endsWith('.gdextension'));
-      if (!manifestFile) continue;
+        const files = fs.readdirSync(addonPath);
+        const manifestFile = files.find(f => f.endsWith('.gdextension'));
+        if (!manifestFile) continue;
 
-      const manifestContent = fs.readFileSync(path.join(addonPath, manifestFile), 'utf8');
-      const { entrySymbol, compatibilityMinimum } = GdExtensionMetadataExtractor.parseGdExtensionManifest(manifestContent);
-      const classes = GdExtensionMetadataExtractor.scanAddonWrappers(addonPath);
+        const manifestContent = fs.readFileSync(path.join(addonPath, manifestFile), 'utf8');
+        const { entrySymbol, compatibilityMinimum } = GdExtensionMetadataExtractor.parseGdExtensionManifest(manifestContent);
+        const classes = GdExtensionMetadataExtractor.scanAddonWrappers(addonPath);
 
-      contracts.push({
-        pluginName: folder,
-        entrySymbol,
-        compatibilityMinimum,
-        classes
-      });
+        contracts.push({
+          pluginName: folder,
+          entrySymbol,
+          compatibilityMinimum,
+          classes
+        });
+      } catch { /* ignore */ }
     }
 
     return contracts;

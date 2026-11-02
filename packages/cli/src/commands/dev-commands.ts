@@ -6,6 +6,7 @@ import { IronCageValidator } from '@aegis/iron-cage';
 import { SkeletonGenerator, DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
+import { cleanGitEnv, resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import {
   verifyFile,
@@ -63,7 +64,14 @@ export function handleSkeleton(targetFile?: string): void {
     process.exit(1);
   }
 
-  const content = fs.readFileSync(fullPath, 'utf8');
+  let content: string;
+  try {
+    content = fs.readFileSync(fullPath, 'utf8');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to read ${fullPath}: ${msg}`);
+    process.exit(1);
+  }
   const generator = new SkeletonGenerator();
   const res = generator.extractFile(targetFile, content);
 
@@ -81,7 +89,14 @@ export function handleDiff(diffText?: string): void {
     console.error('❌ Usage: aegis diff <diffStringOrFile>');
     process.exit(1);
   }
-  const diffContent = (diffText && fs.existsSync(diffText)) ? fs.readFileSync(diffText, 'utf8') : (diffText || '');
+  let diffContent = diffText || '';
+  if (diffText && fs.existsSync(diffText)) {
+    try {
+      diffContent = fs.readFileSync(diffText, 'utf8');
+    } catch {
+      diffContent = diffText;
+    }
+  }
   const engine = new DiffEngine();
   const parsed = engine.parseAndValidate(diffContent);
   if (parsed.isSurgical) {
@@ -152,10 +167,12 @@ export function handleAudit(modifiedFilesStr?: string): void {
   let files = (modifiedFilesStr || '').split(',').map(f => f.trim()).filter(Boolean);
   if (files.length === 0) {
     try {
-      const out = fs.existsSync('.git')
+      const root = resolveSafeRepoRoot();
+      const out = fs.existsSync(path.join(root, '.git'))
         ? execFileSync('git', ['status', '--porcelain'], {
+            cwd: root,
             encoding: 'utf8',
-            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+            env: cleanGitEnv()
           })
         : '';
       files = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);

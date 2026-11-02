@@ -50,7 +50,17 @@ export class GodotUiPerfAuditor {
         maxContainerDepth: 0, inlineStyleBoxCount: 0
       });
     }
-    return this.auditContent(fs.readFileSync(scenePath, 'utf8'), scenePath);
+    try {
+      return this.auditContent(fs.readFileSync(scenePath, 'utf8'), scenePath);
+    } catch {
+      return this.buildReport(scenePath, 0, [{
+        severity: 'high', nodeName: 'Scene', rule: 'FILE_READ_ERROR',
+        message: `Failed to read scene file: ${scenePath}`, fixSuggestion: 'Check file permissions.'
+      }], {
+        mouseFilterStopOnNonInteractive: 0, clipContentsCount: 0,
+        maxContainerDepth: 0, inlineStyleBoxCount: 0
+      });
+    }
   }
 
   public static auditContent(content: string, scenePath = 'scene.tscn'): UiPerfReport {

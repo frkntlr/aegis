@@ -79,15 +79,18 @@ export class TopologicalDependencyRadar {
   private collectTsFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
     const results: string[] = [];
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...this.collectTsFiles(full));
-      } else if (entry.name.endsWith('.ts')) {
-        results.push(full);
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results.push(...this.collectTsFiles(full));
+        } else if (entry.name.endsWith('.ts')) {
+          results.push(full);
+        }
       }
+    } catch {
+      return results;
     }
     return results;
   }
@@ -98,7 +101,12 @@ export class TopologicalDependencyRadar {
     declared: Set<string>,
     violations: TopologicalViolation[]
   ): void {
-    const content = fs.readFileSync(filePath, 'utf8');
+    let content: string;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      return;
+    }
     const escaped = this.scopePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const importRegex = new RegExp(`(?:from\\s+|import\\s*\\(\\s*)['"](${escaped}[^'"]+)['"]`, 'g');
     let match: RegExpExecArray | null;

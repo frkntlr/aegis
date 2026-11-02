@@ -146,7 +146,12 @@ export class AstGrepBridge {
     if (!fs.existsSync(dirPath)) return allMatches;
 
     const scan = (cur: string) => {
-      const entries = fs.readdirSync(cur, { withFileTypes: true });
+      let entries: fs.Dirent[] = [];
+      try {
+        entries = fs.readdirSync(cur, { withFileTypes: true });
+      } catch {
+        return;
+      }
       for (const e of entries) {
         const full = path.join(cur, e.name);
         if (e.isDirectory()) {
@@ -171,7 +176,12 @@ export class AstGrepBridge {
     if (lockInfo?.isLockedByOther) {
       throw new Error(`File is locked by another agent (${lockInfo.lockedBy}): ${filePath}`);
     }
-    const content = fs.readFileSync(filePath, 'utf8');
+    let content: string;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      return { transformed: '', matchCount: 0, hasChanges: false, matches: [], written: false };
+    }
     const result = AstGrepBridge.replace(content, pattern, rewrite);
     if (result.hasChanges) {
       fs.writeFileSync(filePath, result.transformed, 'utf8');
