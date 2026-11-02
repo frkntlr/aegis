@@ -70,7 +70,14 @@ export class LoopBreaker {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       const obj: Record<number, FailureRecord> = {};
       for (const [k, v] of this.failures.entries()) obj[k] = v;
-      fs.writeFileSync(this.persistPath, JSON.stringify(obj, null, 2), 'utf8');
+      const tmpPath = `${this.persistPath}.tmp.${process.pid}.${Date.now()}`;
+      fs.writeFileSync(tmpPath, JSON.stringify(obj, null, 2), 'utf8');
+      try {
+        fs.renameSync(tmpPath, this.persistPath);
+      } catch {
+        fs.copyFileSync(tmpPath, this.persistPath);
+        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+      }
     } catch { /* ignore disk write errors */ }
   }
 

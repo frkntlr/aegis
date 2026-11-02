@@ -55,7 +55,16 @@ export class CompositeGraphView {
   public getIncoming(id: string): RelationalEdge[] {
     const localEdges = this.localGraph.getIncoming(id);
     const extEdges = this.externalOverlay.getIncoming(id);
-    return [...localEdges, ...extEdges];
+    const seen = new Set(localEdges.map((e: RelationalEdge) => `${e.from}->${e.to}:${e.type}`));
+    const combined: RelationalEdge[] = [...localEdges];
+    for (const e of extEdges) {
+      const k = `${e.from}->${e.to}:${e.type}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        combined.push(e);
+      }
+    }
+    return combined;
   }
 
   public getExternalCallees(symbolId: string): RelationalNode[] {
@@ -167,7 +176,14 @@ export class DeltaOverlayGraph {
     };
     try {
       fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, JSON.stringify(payload, null, 2), 'utf8');
+      const tmpPath = `${p}.tmp.${process.pid}.${Date.now()}`;
+      fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), 'utf8');
+      try {
+        fs.renameSync(tmpPath, p);
+      } catch {
+        fs.copyFileSync(tmpPath, p);
+        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+      }
       return true;
     } catch {
       return false;

@@ -48,6 +48,7 @@ export class FuzzyMatcher {
 
     for (const item of candidates) {
       const key = keyFn(item);
+      if (Math.abs(qLower.length - key.length) > maxDistance) continue;
       const dist = FuzzyMatcher.damerauLevenshtein(qLower, key);
       if (dist <= maxDistance) {
         const score = FuzzyMatcher.similarity(qLower, key);

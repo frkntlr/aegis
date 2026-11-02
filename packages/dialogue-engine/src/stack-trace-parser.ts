@@ -20,7 +20,7 @@ export interface StackTraceParseResult {
 const ANSI_REGEX = /\u001b\[[0-9;]*m/g;
 const NODE_V8_REGEX = /(?:^|\s+)at\s+(?:([a-zA-Z0-9_$.<>]+)\s+\()?(?:file:\/\/\/)?([a-zA-Z]:[\\/][^()]+|[a-zA-Z0-9_./\\-]+):(\d+):(\d+)\)?/;
 const GODOT_RES_REGEX = /(?:SCRIPT ERROR:.*)?At:\s+(res:\/\/[^:]+):(\d+)(?::([a-zA-Z0-9_]+))?/;
-const POSIX_LINE_REGEX = /(?:^|\s)([a-zA-Z0-9_./\\-]+\.(?:ts|js|gd|py|rs|cs|cpp|go)):(\d+)(?::(\d+))?/;
+const POSIX_LINE_REGEX = /(?:^|\s)((?:[a-zA-Z]:[\\/][^\s:]+|[a-zA-Z0-9_./\\-]+)\.(?:ts|tsx|js|jsx|gd|py|rs|cs|cpp|c|h|go)):(\d+)(?::(\d+))?/;
 
 export class PolyglotStackTraceParser implements IEvidenceProvider {
   public parse(rawTrace: string): StackTraceParseResult {

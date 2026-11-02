@@ -42,6 +42,20 @@ export class GodotLocator {
       'C:\\Program Files\\Godot\\Godot Console.exe',
       'C:\\Program Files\\Godot\\Godot.exe'
     ];
+    const programFilesX86 = process.env['ProgramFiles(x86)'];
+    if (programFilesX86) {
+      list.push(
+        path.join(programFilesX86, 'Steam', 'steamapps', 'common', 'Godot Engine', 'godot.windows.opt.tools.64.exe'),
+        path.join(programFilesX86, 'Steam', 'steamapps', 'common', 'Godot Engine', 'godot.exe')
+      );
+    }
+    const programFiles = process.env.ProgramFiles;
+    if (programFiles) {
+      list.push(
+        path.join(programFiles, 'Steam', 'steamapps', 'common', 'Godot Engine', 'godot.windows.opt.tools.64.exe'),
+        path.join(programFiles, 'Steam', 'steamapps', 'common', 'Godot Engine', 'godot.exe')
+      );
+    }
     const localAppData = process.env.LOCALAPPDATA;
     if (localAppData) {
       list.push(
