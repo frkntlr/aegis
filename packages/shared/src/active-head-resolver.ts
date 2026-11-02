@@ -57,10 +57,13 @@ export class ActiveHeadResolver {
           ? (data as { worktrees: WorktreeRegistryEntry[] }).worktrees
           : [];
 
+      const isWin = process.platform === 'win32';
+      const testCwd = isWin ? normCwd.toLowerCase() : normCwd;
       for (const wt of list) {
         if (!wt.path) continue;
         const wtNorm = wt.path.replace(/\\/g, '/');
-        if (normCwd === wtNorm || normCwd.startsWith(`${wtNorm}/`)) {
+        const targetNorm = isWin ? wtNorm.toLowerCase() : wtNorm;
+        if (testCwd === targetNorm || testCwd.startsWith(`${targetNorm}/`)) {
           return wt.agentName || wt.name || path.basename(wtNorm);
         }
       }

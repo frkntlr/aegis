@@ -77,20 +77,35 @@ export class CalleeSignatureExtractor {
     return `${prefix}${name}(${params})${ret};`;
   }
 
+  private findVariableSignature(stmt: ts.Statement, sf: ts.SourceFile, methodName: string, prefix: string): string | null {
+    if (!ts.isVariableStatement(stmt)) return null;
+    for (const decl of stmt.declarationList.declarations) {
+      if (decl.name.getText(sf) === methodName && decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
+        const fn = decl.initializer;
+        const params = fn.parameters.map(p => p.getText(sf)).join(', ');
+        const ret = fn.type ? `: ${fn.type.getText(sf)}` : '';
+        return `${prefix}${methodName}(${params})${ret};`;
+      }
+    }
+    return null;
+  }
+
   private findLocalSignature(sf: ts.SourceFile, callText: string): string | null {
     const methodName = callText.includes('.') ? callText.split('.').pop()! : callText;
+    const prefix = callText.startsWith('this.') ? 'this.' : (callText.includes('.') ? callText.slice(0, callText.lastIndexOf('.') + 1) : '');
     for (const stmt of sf.statements) {
       if (ts.isFunctionDeclaration(stmt) && stmt.name?.getText(sf) === methodName) {
-        return this.formatSignatureFromNode(stmt, sf, callText.includes('.') ? callText.slice(0, callText.lastIndexOf('.') + 1) : '');
+        return this.formatSignatureFromNode(stmt, sf, prefix);
       }
       if (ts.isClassDeclaration(stmt)) {
         for (const member of stmt.members) {
           if (ts.isMethodDeclaration(member) && member.name?.getText(sf) === methodName) {
-            const prefix = callText.startsWith('this.') ? 'this.' : (callText.includes('.') ? callText.slice(0, callText.lastIndexOf('.') + 1) : '');
             return this.formatSignatureFromNode(member, sf, prefix);
           }
         }
       }
+      const varSig = this.findVariableSignature(stmt, sf, methodName, prefix);
+      if (varSig) return varSig;
     }
     return null;
   }

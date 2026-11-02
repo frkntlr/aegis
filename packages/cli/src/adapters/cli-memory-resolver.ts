@@ -70,20 +70,29 @@ export class CliMemorySliceResolver implements IMemorySliceResolver {
           };
         }
       }
-      if (fs.existsSync(filePath) && lineNumber) {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.split(/\r?\n/);
-        const start = Math.max(1, lineNumber - 5);
-        const end = Math.min(lines.length, lineNumber + 5);
-        return {
-          symbolName: symbolName || 'snippet',
-          filePath,
-          startLine: start,
-          endLine: end,
-          foldedSkeleton: lines.slice(start - 1, end).join('\n')
-        };
-      }
+      return this.readSnippetSlice(filePath, lineNumber, symbolName);
     } catch { /* ignore */ }
     return null;
+  }
+
+  private readSnippetSlice(
+    filePath: string,
+    lineNumber?: number,
+    symbolName?: string
+  ): MemorySymbolSlice | null {
+    if (!fs.existsSync(filePath) || !lineNumber || lineNumber < 1) return null;
+    const content = fs.readFileSync(filePath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    if (lines.length === 0) return null;
+    const clamped = Math.min(lines.length, lineNumber);
+    const start = Math.max(1, clamped - 5);
+    const end = Math.min(lines.length, Math.max(start, clamped + 5));
+    return {
+      symbolName: symbolName || 'snippet',
+      filePath,
+      startLine: start,
+      endLine: end,
+      foldedSkeleton: lines.slice(start - 1, end).join('\n')
+    };
   }
 }

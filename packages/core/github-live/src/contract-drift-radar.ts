@@ -141,6 +141,16 @@ export class ContractDriftRadar {
     fs.writeFileSync(ledgerPath, JSON.stringify(ledger, null, 2), 'utf8');
   }
 
+  public async recordBaseline(customLockfiles?: string[]): Promise<Record<string, string>> {
+    const metas = await this.scanLockfiles(customLockfiles);
+    const ledger: Record<string, string> = {};
+    for (const m of metas) {
+      ledger[m.path] = m.hash;
+    }
+    this.saveLedger(ledger);
+    return ledger;
+  }
+
   public static compareSignatures(
     oldSigs: ContractSignature[],
     newSigs: ContractSignature[]

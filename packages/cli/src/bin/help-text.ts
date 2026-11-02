@@ -57,6 +57,7 @@ export const HELP_LINES: readonly string[] = [
   '  aegis merge <agent> [base]             Multi-tier atomic merge (FF -> Rebase-FF -> Merge Commit)',
   '  aegis branch:sync [agent|--all]        Safely synchronize worktree branches with master',
   '  aegis deps:drift                       Contract Drift Radar & lockfile integrity verification',
+  '  aegis deps:sync                        Synchronize and lock dependency baselines to cache',
   '  aegis dashboard [port]                 Launch live telemetry Web Dashboard (default port 3000)',
   '  aegis ide:list                         List detected IDE sessions (Cursor, VS Code, Zed)',
   '  aegis ide:sync                         Synchronize active IDE workspace configurations',

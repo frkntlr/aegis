@@ -119,3 +119,29 @@ test('evaluateDrift flags drift on lockfile mismatch and recommends block', asyn
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('recordBaseline captures lockfile hashes and eliminates drift', async () => {
+  const tempDir = path.join(os.tmpdir(), `aegis-baseline-test-${Date.now()}`);
+  fs.mkdirSync(tempDir, { recursive: true });
+  const lockfile = path.join(tempDir, 'package-lock.json');
+  fs.writeFileSync(lockfile, '{"name": "test-repo", "version": "1.0.0"}');
+
+  const radar = new ContractDriftRadar({
+    projectRoot: tempDir,
+    cacheDir: path.join(tempDir, '.cache')
+  });
+
+  try {
+    const pre = await radar.evaluateDrift([], [], [lockfile]);
+    assert.strictEqual(pre.hasDrift, true);
+
+    const baseline = await radar.recordBaseline([lockfile]);
+    assert.ok(baseline[lockfile]);
+
+    const post = await radar.evaluateDrift([], [], [lockfile]);
+    assert.strictEqual(post.hasDrift, false);
+    assert.strictEqual(post.changedFiles.length, 0);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});

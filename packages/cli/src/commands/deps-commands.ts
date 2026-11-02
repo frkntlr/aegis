@@ -79,9 +79,19 @@ async function reportContractDrift(): Promise<boolean> {
   return true;
 }
 
-export async function handleDepsDrift(): Promise<void> {
+export async function handleDepsDrift(args: string[] = []): Promise<void> {
+  const isSync = args.includes('--sync') || args.includes('-s');
   showBanner();
-  console.log('📡 Running Symbiotic Substrate 2.0 Contract Drift Radar...\n');
+  const modeStr = isSync ? ' (Sync Mode)' : '';
+  console.log(`📡 Running Symbiotic Substrate 2.0 Contract Drift Radar${modeStr}...\n`);
+  if (isSync) {
+    const manager = new MultiLanguageMetadataManager();
+    const { ledger } = manager.checkEcosystemDrift();
+    manager.saveLockLedger(ledger);
+    const radar = new ContractDriftRadar();
+    await radar.recordBaseline();
+    console.log('🔒 Baseline dependency ledgers successfully recorded to .aegis/cache\n');
+  }
   reportEcosystemStatus();
   const contractClean = await reportContractDrift();
   reportProjectReferences();
