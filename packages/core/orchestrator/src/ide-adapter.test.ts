@@ -7,6 +7,7 @@ import {
   IdeAdapterRegistry,
   AntigravityAdapter,
   VSCodeAdapter,
+  CopilotAdapter,
   CursorAdapter,
   WindsurfAdapter,
   ZedAdapter,
@@ -19,6 +20,7 @@ test('IdeAdapterRegistry lists default adapters and registers community adapters
   const ids = registry.listAdapterIds();
   assert.ok(ids.includes('antigravity'));
   assert.ok(ids.includes('vscode'));
+  assert.ok(ids.includes('copilot'));
   assert.ok(ids.includes('cursor'));
   assert.ok(ids.includes('windsurf'));
   assert.ok(ids.includes('zed'));
@@ -50,6 +52,12 @@ test('All IDE adapters configure isolation settings properly', () => {
     const vsRes = vsAdapter.setupExclusions(tmpDir);
     assert.strictEqual(vsRes.success, true);
 
+    const copilotAdapter = new CopilotAdapter();
+    const copilotRes = copilotAdapter.setupExclusions(tmpDir);
+    assert.strictEqual(copilotRes.success, true);
+    const copilotSettings = JSON.parse(fs.readFileSync(copilotRes.configuredFiles[1], 'utf8'));
+    assert.strictEqual(copilotSettings.plugins['aegis-copilot'].enabled, true);
+
     const cursorAdapter = new CursorAdapter();
     const cursorRes = cursorAdapter.setupExclusions(tmpDir);
     assert.strictEqual(cursorRes.success, true);
@@ -77,7 +85,7 @@ test('McpSkillsSyncEngine syncs MCP server definitions across capable IDEs', () 
     const registry = new IdeAdapterRegistry();
     const results = engine.syncAll(registry.listAdapters(), tmpDir);
 
-    assert.strictEqual(results.length, 6);
+    assert.strictEqual(results.length, 7);
     const godotResult = results.find(r => r.ideId === 'godot');
     assert.ok(godotResult?.supported);
     const agResult = results.find(r => r.ideId === 'antigravity');
@@ -88,6 +96,42 @@ test('McpSkillsSyncEngine syncs MCP server definitions across capable IDEs', () 
     const writtenJson = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
     assert.ok(writtenJson.mcpServers.notebooklm);
     assert.ok(writtenJson.mcpServers.godot);
+
+    const copilotResult = results.find(r => r.ideId === 'copilot');
+    assert.ok(copilotResult?.supported);
+    const copilotJson = JSON.parse(fs.readFileSync(copilotResult?.targetFile || '', 'utf8'));
+    assert.ok(copilotJson.servers.notebooklm);
+    assert.ok(copilotJson.servers.godot);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('McpSkillsSyncEngine preserves existing servers and custom properties in VS Code / Copilot', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-copilot-preserve-'));
+  try {
+    const vscodeDir = path.join(tmpDir, '.vscode');
+    fs.mkdirSync(vscodeDir, { recursive: true });
+    const mcpPath = path.join(vscodeDir, 'mcp.json');
+    fs.writeFileSync(
+      mcpPath,
+      JSON.stringify({
+        customField: 'preserved',
+        servers: { 'existing-tool': { command: 'custom', args: ['--arg'] } }
+      }),
+      'utf8'
+    );
+
+    const engine = new McpSkillsSyncEngine({
+      'aegis-engine': { command: 'npx', args: ['--yes', '@aegis/cli', 'mcp'] }
+    });
+    const result = engine.syncToIde(new CopilotAdapter(), tmpDir);
+    assert.strictEqual(result.supported, true);
+
+    const parsed = JSON.parse(fs.readFileSync(mcpPath, 'utf8'));
+    assert.strictEqual(parsed.customField, 'preserved');
+    assert.ok(parsed.servers['existing-tool']);
+    assert.ok(parsed.servers['aegis-engine']);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

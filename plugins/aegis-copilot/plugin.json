@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/agent-plugin.json",
+  "name": "aegis-copilot",
+  "version": "0.1.0",
+  "description": "Aegis Autonomous Vibe Coding Engine plugin for GitHub Copilot with multi-agent orchestration, Demir Kafes quality gates, and 5-layer codebase memory.",
+  "author": {
+    "name": "frkntlr"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/frkntlr/aegis",
+  "repository": "https://github.com/frkntlr/aegis",
+  "keywords": [
+    "aegis",
+    "copilot",
+    "agent",
+    "mcp",
+    "vibe-coding",
+    "demir-kafes"
+  ],
+  "mcpServers": "./mcp.json",
+  "agents": "./agents",
+  "skills": "./skills"
+}

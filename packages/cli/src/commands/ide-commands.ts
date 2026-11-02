@@ -60,14 +60,19 @@ export function handleIdeSync(): void {
   showBanner();
   console.log('🔄 Synchronizing MCP Servers & Skills across all supported IDEs...');
   const registry = new IdeAdapterRegistry();
+  const nodeBin = process.execPath || 'node';
   const engine = new McpSkillsSyncEngine({
+    'aegis-engine': {
+      command: 'npx',
+      args: ['--yes', '@aegis/cli', 'mcp']
+    },
     notebooklm: {
-      command: 'C:\\Program Files\\nodejs\\node.exe',
-      args: ['C:\\Users\\Lenovo\\Documents\\work\\notebooklm\\notebooklm-mcp-server\\dist\\index.js', 'server']
+      command: nodeBin,
+      args: ['packages/plugins/notebooklm/dist/index.js', 'server']
     },
     godot: {
-      command: 'C:\\Program Files\\nodejs\\node.exe',
-      args: ['C:\\Users\\Lenovo\\AppData\\Roaming\\npm\\node_modules\\godot-mcp-runtime\\dist\\index.js'],
+      command: nodeBin,
+      args: ['packages/plugins/godot-bridge/dist/bin/godot-mcp.js'],
       env: { GODOT_MCP_DISABLE_ELICITATION: 'true' }
     }
   });

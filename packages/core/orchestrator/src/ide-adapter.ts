@@ -67,6 +67,32 @@ export class VSCodeAdapter implements IdeAdapter {
   }
 }
 
+
+export class CopilotAdapter implements IdeAdapter {
+  public readonly ideId = 'copilot';
+  public readonly name = 'GitHub Copilot';
+  public readonly capabilities: IdeCapabilities = {
+    supportsMcp: true,
+    supportsSkills: true,
+    supportsSubagents: true,
+    mcpConfigFile: '.vscode/mcp.json'
+  };
+
+  public setupExclusions(repoRoot: string): IdeExclusionResult {
+    const settingsFile = path.resolve(repoRoot, '.vscode', 'settings.json');
+    updateJsonSettings(settingsFile, (s) => {
+      s['files.exclude'] = { ...asObj(s['files.exclude']), 'experimental/**': true };
+      s['search.exclude'] = { ...asObj(s['search.exclude']), 'experimental/**': true };
+    });
+    const copilotSettingsFile = path.resolve(repoRoot, '.github', 'copilot', 'settings.json');
+    updateJsonSettings(copilotSettingsFile, (s) => {
+      const plugins = asObj(s['plugins']);
+      s['plugins'] = { ...plugins, 'aegis-copilot': { enabled: true } };
+    });
+    return { ideId: this.ideId, success: true, configuredFiles: [settingsFile, copilotSettingsFile] };
+  }
+}
+
 export class CursorAdapter implements IdeAdapter {
   public readonly ideId = 'cursor';
   public readonly name = 'Cursor AI IDE';
@@ -169,6 +195,7 @@ export class IdeAdapterRegistry {
   constructor() {
     this.register(new AntigravityAdapter());
     this.register(new VSCodeAdapter());
+    this.register(new CopilotAdapter());
     this.register(new CursorAdapter());
     this.register(new WindsurfAdapter());
     this.register(new ZedAdapter());

@@ -1,0 +1,25 @@
+{
+  "name": "aegis-marketplace",
+  "version": "0.1.0",
+  "description": "Aegis Autonomous Vibe Coding Engine Plugin Marketplace Catalog",
+  "plugins": [
+    {
+      "id": "aegis-copilot",
+      "name": "Aegis Vibe Coding Engine",
+      "version": "0.1.0",
+      "description": "Autonomous Vibe Coding Engine with multi-agent orchestration, Demir Kafes quality gates, and 5-layer codebase memory.",
+      "path": "plugins/aegis-copilot",
+      "author": {
+        "name": "frkntlr"
+      },
+      "keywords": [
+        "aegis",
+        "copilot",
+        "vibe-coding",
+        "mcp",
+        "subagents",
+        "demir-kafes"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "plugin.repositories": [
+    "frkntlr/aegis"
+  ],
+  "plugins": {
+    "aegis-copilot": {
+      "enabled": true
+    }
+  }
+}

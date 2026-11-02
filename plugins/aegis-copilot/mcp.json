@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "aegis-engine": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@aegis/cli",
+        "mcp"
+      ]
+    }
+  }
+}

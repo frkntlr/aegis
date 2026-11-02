@@ -44,6 +44,11 @@ export class McpSkillsSyncEngine {
     fs.writeFileSync(targetPath, JSON.stringify(content, null, 2), 'utf8');
   }
 
+  private resolveServerShapeKey(adapter: IdeAdapter, existing: Record<string, unknown>): 'servers' | 'mcpServers' {
+    if (adapter.ideId === 'vscode' || adapter.ideId === 'copilot') return 'servers';
+    if (typeof existing.servers === 'object' && existing.servers !== null && !existing.mcpServers) return 'servers';
+    return 'mcpServers';
+  }
   public syncToIde(adapter: IdeAdapter, repoRoot: string): McpSyncResult {
     if (!adapter.capabilities.supportsMcp || !adapter.capabilities.mcpConfigFile) {
       return {
@@ -63,11 +68,13 @@ export class McpSkillsSyncEngine {
         existingConfig = {};
       }
     }
-    const existingServers = (typeof existingConfig.mcpServers === 'object' && existingConfig.mcpServers !== null && !Array.isArray(existingConfig.mcpServers))
-      ? (existingConfig.mcpServers as Record<string, unknown>)
+    const serverKey = this.resolveServerShapeKey(adapter, existingConfig);
+    const rawExisting = existingConfig[serverKey];
+    const existingServers = (typeof rawExisting === 'object' && rawExisting !== null && !Array.isArray(rawExisting))
+      ? (rawExisting as Record<string, unknown>)
       : {};
     const mergedServers = { ...existingServers, ...this.getServers() };
-    const mcpPayload = { ...existingConfig, mcpServers: mergedServers };
+    const mcpPayload = { ...existingConfig, [serverKey]: mergedServers };
     this.writeConfigFile(targetFile, mcpPayload);
 
     return {

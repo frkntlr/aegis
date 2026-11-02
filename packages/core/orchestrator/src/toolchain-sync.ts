@@ -221,6 +221,8 @@ export class UniversalToolchainSync {
     if (this.syncCursor(skills, mcps, warnings)) syncedIdes.push('Cursor AI');
     if (this.syncVSCode(mcps, warnings)) syncedIdes.push('VS Code');
     if (this.syncAntigravity(mcps, warnings)) syncedIdes.push('Google Antigravity');
+        const hasCopilot = fs.existsSync(path.resolve(this.repoRoot, '.github', 'copilot')) || fs.existsSync(path.resolve(this.repoRoot, 'plugins', 'aegis-copilot'));
+        if (hasCopilot) { syncedIdes.push('GitHub Copilot'); }
 
     const isGodot = fs.existsSync(path.resolve(this.repoRoot, 'project.godot'));
     if (isGodot) {
