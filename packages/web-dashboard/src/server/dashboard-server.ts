@@ -248,6 +248,7 @@ export class DashboardServer {
         } catch { /* ignore */ }
       }
       this.sseClients.clear();
+      (this.server as unknown as { closeAllConnections?: () => void })?.closeAllConnections?.();
       if (this.server) this.server.close(() => resolve());
       else resolve();
     });

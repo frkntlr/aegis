@@ -1,6 +1,6 @@
 /**
  * @file mcp-tool-schemas.ts
- * Authoritative 31-Tool MCP Schema Registry for Google Antigravity & Toolchain Sync.
+ * Authoritative 32-Tool MCP Schema Registry for Google Antigravity & Toolchain Sync.
  * Demir Kafes: <300 lines/file, <40 lines/function.
  */
 
@@ -82,7 +82,7 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     req: ['text']
   },
 
-  // --- Task Ingestion Protocol (TIP) & Locks (6) ---
+  // --- Task Ingestion Protocol (TIP) & Locks (7) ---
   worktree_status: {
     desc: 'Inspect active worktrees and active file mutex locks',
     props: {},
@@ -119,6 +119,14 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
   teamwork_status: {
     desc: 'Inspect Antigravity subagents, active teamwork tracks, and file mutex locks',
     props: {},
+    req: []
+  },
+  teamwork_dag: {
+    desc: 'Display ASCII Execution Waves dependency graph (DAG) for an objective',
+    props: {
+      objective: { type: 'string', description: 'Teamwork goal or high-level objective' },
+      targetFiles: { type: 'array', items: { type: 'string' }, description: 'Target files to analyze' }
+    },
     req: []
   },
   teamwork_compact: {

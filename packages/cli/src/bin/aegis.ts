@@ -12,12 +12,11 @@ import { handleNlmSwitch } from '../commands/nlm-command.js';
 import { handleRfcCreate } from '../commands/rfc-commands.js';
 import { FuzzyMatcher } from '@aegis/ast-skeleton';
 import { ConversationalIntentDetector } from '@aegis/github-live';
-import { HELP_LINES } from './help-text.js';
+import { showHelp } from './help-text.js';
 import { COMMAND_MAP } from './command-registry.js';
 
 function handleHelp(): void {
-  showBanner();
-  console.log(HELP_LINES.join('\n'));
+  showHelp();
 }
 
 function detectIdeaIntent(args: string[]): { isIdea: boolean; title: string; desc?: string } {

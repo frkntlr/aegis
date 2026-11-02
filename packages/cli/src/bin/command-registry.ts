@@ -80,6 +80,7 @@ import { handleContext7Query } from '../commands/context7-command.js';
 import { handleDepsDrift } from '../commands/deps-commands.js';
 import { handleDebugCommand } from '../commands/debug-command.js';
 import { startMcpServer } from '../commands/mcp-server-command.js';
+import { showHelp } from './help-text.js';
 import {
   handleMemoryQuery,
   handleMemoryStats,
@@ -190,6 +191,13 @@ export const COMMAND_MAP: Record<string, CommandHandler> = {
   'loop:reset': (a) => handleLoopReset(a[1]),
   debug: async (a) => { await handleDebugCommand(a.slice(1).join(' ')); },
   mcp: () => startMcpServer(),
+  'mcp:start': () => startMcpServer(),
+  help: () => showHelp(),
+  '--help': () => showHelp(),
+  '-h': () => showHelp(),
+  version: () => console.log('0.1.0'),
+  '--version': () => console.log('0.1.0'),
+  '-v': () => console.log('0.1.0'),
   'task:list': (a) => handleTaskList(a[1]),
   'task:claim': (a) => handleTaskClaim(a[1], a[2]),
   'task:release': (a) => handleTaskRelease(a[1], a[2], a[3]),

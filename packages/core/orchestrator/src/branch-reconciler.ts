@@ -48,7 +48,9 @@ export class BranchReconciler {
       const branchLine = lines.find(l => l.startsWith('branch '));
       if (!wtLine) continue;
       const wtPath = wtLine.replace('worktree ', '').trim();
-      if (!wtPath.includes(this.worktreePrefix)) continue;
+      const normWtPath = wtPath.replace(/\\/g, '/');
+      const normPrefix = this.worktreePrefix.replace(/\\/g, '/');
+      if (!normWtPath.includes(normPrefix)) continue;
       const branch = branchLine ? branchLine.replace('branch refs/heads/', '').trim() : 'HEAD';
       list.push({
         agentName: path.basename(wtPath),

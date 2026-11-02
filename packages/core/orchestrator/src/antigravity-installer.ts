@@ -50,6 +50,11 @@ export class AntigravityInstaller {
       fs.writeFileSync(path.join(binDir, 'aegist.cmd'), cmd, 'utf8');
       fs.writeFileSync(path.join(binDir, 'aegis.ps1'), ps1, 'utf8');
       fs.writeFileSync(path.join(binDir, 'aegist.ps1'), ps1, 'utf8');
+      if (process.platform !== 'win32') {
+        const sh = `#!/bin/sh\nexec node "${cliPath}" "$@"\n`;
+        fs.writeFileSync(path.join(binDir, 'aegis'), sh, { mode: 0o755 });
+        fs.writeFileSync(path.join(binDir, 'aegist'), sh, { mode: 0o755 });
+      }
     } catch { /* ignore non-fatal */ }
   }
 

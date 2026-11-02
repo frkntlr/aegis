@@ -4,6 +4,8 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import { showBanner } from '../commands/banner.js';
+
 export const HELP_LINES: readonly string[] = [
   'Commands:',
   '  aegis init                             Initialize worktrees and environment',
@@ -90,3 +92,8 @@ export const HELP_LINES: readonly string[] = [
   '  aegis memory:cold-start [dir]          Run full project cold-start AST indexing',
   '  aegis memory:watch [dir] [worktree]    Real-time incremental file watcher for codebase memory'
 ];
+
+export function showHelp(): void {
+  showBanner();
+  console.log(HELP_LINES.join('\n'));
+}

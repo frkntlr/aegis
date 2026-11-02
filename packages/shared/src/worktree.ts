@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 
 export interface AgentWorktree {
   agentName: string;
@@ -55,8 +56,8 @@ export function resolveSafeRepoRoot(initial?: string): string {
     return findAncestorRoot(curCwd) || curCwd;
   }
 
-  const userProfile = process.env.USERPROFILE || 'C:\\Users\\Lenovo';
-  const scratch = path.resolve(userProfile, '.gemini', 'antigravity', 'scratch', 'aegis');
+  const homeDir = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  const scratch = path.resolve(homeDir, '.gemini', 'antigravity', 'scratch', 'aegis');
   if (fs.existsSync(scratch)) return scratch;
 
   return curCwd;

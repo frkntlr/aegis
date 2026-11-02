@@ -55,19 +55,35 @@ test('MCPSecurityManager authorizes UI specialist and Godot toolchain', () => {
   assert.strictEqual(manager.authorizeToolCall('ui', 'read_file').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('ui', 'inspect_ui').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('ui', 'godot_inspect').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('ui', 'aegis_godot_inspect_ui').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('ui', 'godot_playtest').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('solver', 'godot_validate').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('solver', 'aegis_godot_validate').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('qa', 'godot_status').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('qa', 'aegis_godot_status').allowed, true);
   assert.strictEqual(manager.authorizeToolCall('docs', 'godot_inspect').allowed, false);
 });
 
 test('MCPSecurityManager authorizes teamwork tools for all subagent personas', () => {
   const manager = new MCPSecurityManager();
   const subagents = ['issue-solver', 'qa-hunter', 'ui-specialist', 'doc-architect'];
-  const teamworkTools = ['task_inbox_pull', 'task_claim', 'task_release', 'lock_status', 'teamwork_status', 'teamwork_compact'];
+  const teamworkTools = [
+    'task_inbox_pull', 'task_claim', 'task_release', 'lock_status',
+    'worktree_status', 'teamwork_status', 'teamwork_compact', 'teamwork_dag'
+  ];
   for (const agent of subagents) {
     for (const tool of teamworkTools) {
       assert.strictEqual(manager.authorizeToolCall(agent, tool).allowed, true, agent + ' should be allowed to call ' + tool);
     }
   }
+});
+
+test('MCPSecurityManager authorizes memory and quality inspection tools for solvers and hunters', () => {
+  const manager = new MCPSecurityManager();
+  assert.strictEqual(manager.authorizeToolCall('solver', 'skeleton_extract').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('solver', 'budget_inspect').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('solver', 'socratic_diagnose').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('qa-hunter', 'skeleton_extract').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('qa-hunter', 'budget_inspect').allowed, true);
+  assert.strictEqual(manager.authorizeToolCall('qa-hunter', 'socratic_diagnose').allowed, true);
 });

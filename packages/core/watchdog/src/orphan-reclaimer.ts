@@ -32,6 +32,15 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
 }
 
+function isOwnerMatching(lockHolder?: string, agentName?: string): boolean {
+  if (!lockHolder || !agentName) return false;
+  const h = lockHolder.toLowerCase().replace(/^@/, '').trim();
+  const a = agentName.toLowerCase().replace(/^@/, '').trim();
+  if (h === a) return true;
+  if (h.includes(`[${a}]`) || h.startsWith(a) || a.startsWith(h)) return true;
+  return false;
+}
+
 export class OrphanTaskReclaimer {
   private staleTimeoutMs: number;
   private managedAgents: Set<string>;
@@ -91,13 +100,13 @@ export class OrphanTaskReclaimer {
     if (issue.targetFiles && issue.targetFiles.length > 0) {
       const hasAnyLock = issue.targetFiles.some(f => {
         const lockHolder = lockedFiles.get(normalizePath(f));
-        return lockHolder?.toLowerCase() === issue.assignedAgent?.toLowerCase();
+        return isOwnerMatching(lockHolder, issue.assignedAgent);
       });
       if (!hasAnyLock) {
         return `Assigned agent [${issue.assignedAgent}] holds zero active file locks for target files.`;
       }
     } else if (sessions.length === 0) {
-      const hasAny = Array.from(lockedFiles.values()).some(h => h.toLowerCase() === issue.assignedAgent?.toLowerCase());
+      const hasAny = Array.from(lockedFiles.values()).some(h => isOwnerMatching(h, issue.assignedAgent));
       if (!hasAny) {
         return `Assigned agent [${issue.assignedAgent}] holds zero active file locks in workspace.`;
       }
