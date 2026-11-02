@@ -60,7 +60,7 @@ export function handleIdeSync(): void {
   showBanner();
   console.log('🔄 Synchronizing MCP Servers & Skills across all supported IDEs...');
   const registry = new IdeAdapterRegistry();
-  const nodeBin = process.execPath || 'node';
+  const nodeBin = 'node';
   const engine = new McpSkillsSyncEngine({
     'aegis-engine': {
       command: 'npx',
