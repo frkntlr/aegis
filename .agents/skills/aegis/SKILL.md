@@ -20,9 +20,12 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | :--- | :--- | :--- |
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `aegis status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `aegis auto` |
-| `/aegis teamwork [status]` | View active Antigravity subagents & locked tracks | `aegis teamwork [status]` |
-| `/aegis teamwork plan "<obj>"` | Generate Antigravity subagent plan & stage TIP tracks | `aegis teamwork plan "<obj>"` |
-| `/aegis teamwork setup [dir]` | Export subagents manifest (.aegis/subagents.json) | `aegis teamwork setup` |
+| `/aegis tw "<obj>"` or `teamwork` | Direct plan & stage tracks (Short: `tw`, `tw:plan`, `tw:status`, `tw:dag`, `tw:matrix`, `tw:compact`, `tw:analyze`, `tw:setup`, `tw:clear`) | `aegis tw "<obj>" [-c] [-j] [--dry-run]` |
+| `/aegis teamwork [status]` | View active Antigravity subagents & locked tracks (alias: `tw:status`) | `aegis tw:status` |
+| `/aegis teamwork plan "<obj>"` | Generate Antigravity subagent plan & stage TIP tracks (alias: `tw:plan`) | `aegis tw:plan "<obj>"` |
+| `/aegis teamwork compact [obj]` | Compact logs & archive completed tasks with 85% token savings (alias: `tw:compact`) | `aegis tw:compact` |
+| `/aegis teamwork clear` | Safely clear TIP inbox and active mutex locks (alias: `tw:clear`) | `aegis tw:clear` |
+| `/aegis teamwork setup [dir]` | Export subagents manifest (.aegis/subagents.json, alias: `tw:setup`) | `aegis tw:setup` |
 | `/aegis task:list [status]` | List ready, in_progress, or blocked tasks in TIP queue | `aegis task:list [status]` |
 | `/aegis task:claim <id> [agent]` | Claim task for role, acquire file locks, set in_progress | `aegis task:claim <id> [agent]` |
 | `/aegis task:release <id> [status]` | Release or complete task, release locks, update status | `aegis task:release <id> [status]` |
@@ -74,6 +77,24 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis memory:watch [d] [wt]` | Real-time incremental file watcher daemon | `aegis memory:watch [d]` |
 | `/aegis loop:status` | Inspect Circuit Breaker failure counters & blocked tasks | `aegis loop:status` |
 | `/aegis loop:reset [num]` | Reset failure counters and unblock tasks | `aegis loop:reset [num]` |
+| `/aegis search <query>` | Filter 100+ subcommands by keyword (alias: `aegis help <query>`) | `aegis search <query>` |
+| `/aegis completion [--install]` | Generate or install PowerShell/Bash tab completion | `aegis completion --install` |
+
+## Antigravity Slash Commands & Sister Skills
+
+Aegis registers dedicated modular slash commands across specialized skill manifests:
+- `/tw` or `/aegis tw`: Antigravity Teamwork orchestrator, DAG execution waves, and task staging ([tw](../tw/SKILL.md)).
+- `/aegis-tw`: Direct alias for Antigravity Teamwork ([aegis-tw](../aegis-tw/SKILL.md)).
+- `/cage`: Instant Demir Kafes compliance audit and line limit radar ([cage](../cage/SKILL.md)).
+- `/aegis` / `/aegist`: Universal engine command center ([aegis](./SKILL.md)).
+
+## Subcommand Discovery & Tab-Completion
+
+- **Instant Subcommand Search**: Run `aegis search <query>` or `aegis help <query>` to instantly discover matching commands (e.g., `aegis search tw`, `aegis search cage`, `aegis search nlm`).
+- **PowerShell / Bash Tab Completion**:
+  - `aegis completion`: Prints native argument completer script block.
+  - `aegis completion --install`: Installs completion directly into `$PROFILE` (`Microsoft.PowerShell_profile.ps1`) and the Antigravity bin script (`aegis.ps1`).
+  - Once active, typing `aegis <TAB>` or `aegis tw<TAB>` auto-completes all 100+ commands natively.
 
 ## Core Principles & Constitutional Routing
 
@@ -98,19 +119,27 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 9. **Meta-Reflex Feedback**: Any engine improvement or toolchain feedback across projects is autonomously published upstream to `frkntlr/aegis` as an RFC & GitHub Discussion.
 10. **Anti-Hang Guard (Never use npx ast-grep)**: Unscoped `ast-grep` on npm is an obsolete 2018 package that hangs waiting on STDIN. Always use `/aegis ast:search` or `aegis ast:search` (or `aegis ast-grep` / `aegis sg`).
 11. **Socratic Diagnostic Gate**: Before modifying code for crash or error reports, run `/aegis debug` or call MCP `socratic_diagnose` to triangulate ground-truth symbols and inspect line budgets.
+12. **CLI Cold-Start & Atomic Mutex Velocity**: Dynamic lazy loading (22 modules) reduces cold start to ~103ms (2.6x speedup). Track file locks are acquired atomically in one pass via `acquireBatchLocks()`, and candidate files resolve in <2ms via persistent disk cache (`.aegis/cache/fast-semantic-manifest.json`).
 
 
-## Antigravity Subagent Teamwork Runbook (`/aegis teamwork`, `/teamwork`)
+## Antigravity Subagent Teamwork Runbook (`/aegis teamwork`, `/teamwork`, `/aegis tw`)
 
-When the user triggers `/aegis teamwork <objective>`, `/aegist teamwork <objective>`, or standard `/teamwork <objective>`:
+When the user triggers `/aegis tw <objective>`, `/aegis teamwork <objective>`, `/aegist tw <objective>`, or standard `/teamwork <objective>`:
 
 1. **Plan & Stage Tracks**:
-   Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP tool `teamwork_plan`.
+   Run `aegis tw "<objective>" [targetFiles]` or `aegis teamwork plan "<objective>" [targetFiles]` (or MCP tool `teamwork_plan`).
+   - Supports direct execution flags:
+     - `--compact` / `-c`: RTK and AST skeleton briefing (saves 85% tokens).
+     - `--json` / `-j`: Structured machine-readable JSON output.
+     - `--dry-run`: Plan simulation without locking files or mutating inbox.
+   - Shortcut commands: `tw`, `tw:plan`, `tw:status`, `tw:compact`, `tw:dag`, `tw:matrix`, `tw:analyze`, `tw:setup`, `tw:clear`.
+   - `FastSemanticAnalyzer` uses persistent disk cache to score and discover target files in <2ms.
+   - Acquires mutex file locks atomically in one pass via `acquireBatchLocks()` (`.aegis/locks.json`).
    - Ingests the objective and identifies target tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`).
    - `ui-specialist` is the designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`).
    - `issue-solver` owns domain logic, models, and algorithms, eliminating file lock collisions.
-   - Acquires mutex file locks on target files (`.aegis/locks.json`).
    - Stages track payloads into `.aegis/task-inbox.json`.
+   - Use `aegis tw:clear` / `aegis teamwork:clear` to reset stale inboxes and release orphaned locks.
 
 2. **Render Live Task Matrix in Chat**:
    Immediately output the initial status matrix to the user so they can follow parallel execution in real time:

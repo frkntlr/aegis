@@ -44,14 +44,14 @@ export async function mcpTaskRelease(args: Record<string, unknown> = {}): Promis
 
   const matched = issueNum > 0
     ? tasks.filter(t => t.issueNumber === issueNum)
-    : (roleQuery ? tasks.filter(t => matchesTaskRole(t.role, roleQuery, t.issueNumber)) : []);
+    : (roleQuery ? tasks.filter(t => (t.trackId && t.trackId.toLowerCase() === roleQuery.toLowerCase()) || matchesTaskRole(t.role, roleQuery, t.issueNumber, t.trackId)) : []);
 
   for (const t of matched) {
     if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
     if (t.role) wtManager.releaseFileLocks(t.role);
     if (t.claimedBy) wtManager.releaseFileLocks(t.claimedBy);
     updateTaskInboxStatus(t.issueNumber, status);
-    if (status === 'done') await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
+    if (status === 'done' && t.isGitHubIssue === true) await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
   }
 
   if (roleQuery) wtManager.releaseFileLocks(roleQuery);

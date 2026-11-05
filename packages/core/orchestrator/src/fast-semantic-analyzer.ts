@@ -24,6 +24,40 @@ const STOP_WORDS = new Set([
   'make', 'build', 'create', 'update', 'fix', 'refactor', 'test', 'check'
 ]);
 
+const TURKISH_SYNONYMS: Record<string, string[]> = {
+  'sağlık': ['health', 'hp'],
+  'saglik': ['health', 'hp'],
+  'oyuncu': ['player'],
+  'karakter': ['player', 'character'],
+  'dövüş': ['combat', 'battle', 'fight'],
+  'dovus': ['combat', 'battle', 'fight'],
+  'savaş': ['combat', 'battle'],
+  'savas': ['combat', 'battle'],
+  'envanter': ['inventory'],
+  'arayüz': ['ui', 'hud', 'interface', 'menu'],
+  'arayuz': ['ui', 'hud', 'interface', 'menu'],
+  'tema': ['theme'],
+  'denetim': ['audit', 'triage', 'test'],
+  'görev': ['task', 'mission', 'quest'],
+  'gorev': ['task', 'mission', 'quest'],
+  'ayarlar': ['settings', 'config'],
+  'ayar': ['setting', 'config'],
+  'ses': ['audio', 'sound'],
+  'kamera': ['camera'],
+  'düşman': ['enemy'],
+  'dusman': ['enemy'],
+  'harita': ['map', 'tilemap'],
+  'yönetici': ['manager', 'controller'],
+  'yonetici': ['manager', 'controller'],
+  'silah': ['weapon'],
+  'doküman': ['doc', 'wiki'],
+  'dokuman': ['doc', 'wiki'],
+  'dokümantasyon': ['doc', 'docs', 'wiki'],
+  'dokumantasyon': ['doc', 'docs', 'wiki'],
+  'hafıza': ['memory', 'cache'],
+  'bellek': ['memory', 'cache']
+};
+
 const ALLOWED_EXTS = new Set([
   '.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cpp', '.cs',
   '.tscn', '.tres', '.json', '.md'
@@ -38,18 +72,25 @@ export class FastSemanticAnalyzer {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
   }
 
+  private appendKeyword(kw: string, target: string[]): void {
+    if (kw.length < 3 || STOP_WORDS.has(kw) || target.includes(kw)) return;
+    target.push(kw);
+    const syns = TURKISH_SYNONYMS[kw];
+    if (!syns) return;
+    for (const s of syns) {
+      if (!target.includes(s)) target.push(s);
+    }
+  }
+
   public extractKeywords(text: string): string[] {
-    const rawTokens = text.replace(/[^\w\s-]/g, ' ').split(/\s+/);
+    const rawTokens = text.replace(/[^\p{L}\p{N}\s_-]/gu, ' ').split(/\s+/);
     const keywords: string[] = [];
 
     for (const token of rawTokens) {
       if (!token || token.length < 3) continue;
       const subTokens = token.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ').toLowerCase().split(' ');
       for (const st of subTokens) {
-        const clean = st.trim();
-        if (clean.length >= 3 && !STOP_WORDS.has(clean) && !keywords.includes(clean)) {
-          keywords.push(clean);
-        }
+        this.appendKeyword(st.trim(), keywords);
       }
     }
     return keywords;
@@ -59,6 +100,12 @@ export class FastSemanticAnalyzer {
     const now = Date.now();
     if (this.cachedFiles && (now - this.cachedFiles.timestamp) < FastSemanticAnalyzer.FILE_CACHE_TTL_MS) {
       return this.cachedFiles.files;
+    }
+
+    const diskFiles = this.readDiskManifest();
+    if (diskFiles) {
+      this.cachedFiles = { files: diskFiles, timestamp: now };
+      return diskFiles;
     }
 
     let files: string[] = [];
@@ -77,8 +124,65 @@ export class FastSemanticAnalyzer {
       files = this.walkDirectoryFallback(this.repoRoot, '');
     }
 
+    this.saveDiskManifest(files);
     this.cachedFiles = { files, timestamp: now };
     return files;
+  }
+
+  private getManifestPath(): string {
+    return path.resolve(this.repoRoot, '.aegis', 'cache', 'fast-semantic-manifest.json');
+  }
+
+  private resolveGitIndexPath(): string | null {
+    const dotGit = path.resolve(this.repoRoot, '.git');
+    if (!fs.existsSync(dotGit)) return null;
+    try {
+      const stat = fs.statSync(dotGit);
+      if (stat.isDirectory()) {
+        const idx = path.join(dotGit, 'index');
+        return fs.existsSync(idx) ? idx : null;
+      }
+      if (stat.isFile()) {
+        const content = fs.readFileSync(dotGit, 'utf8').trim();
+        const match = content.match(/^gitdir:\s*(.+)$/m);
+        if (match) {
+          const rawDir = match[1].trim();
+          const gitDir = path.isAbsolute(rawDir) ? rawDir : path.resolve(this.repoRoot, rawDir);
+          const idx = path.join(gitDir, 'index');
+          return fs.existsSync(idx) ? idx : null;
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  private readDiskManifest(): string[] | null {
+    const gitIndexPath = this.resolveGitIndexPath();
+    if (!gitIndexPath) return null;
+    const manifestPath = this.getManifestPath();
+    if (!fs.existsSync(manifestPath)) return null;
+
+    try {
+      const gitMtime = fs.statSync(gitIndexPath).mtimeMs;
+      const raw = fs.readFileSync(manifestPath, 'utf8');
+      const data = JSON.parse(raw) as { gitIndexMtime?: number; files?: string[] };
+      if (typeof data.gitIndexMtime === 'number' && data.gitIndexMtime === gitMtime && Array.isArray(data.files)) {
+        return data.files;
+      }
+    } catch { /* ignore corrupted disk cache */ }
+    return null;
+  }
+
+  private saveDiskManifest(files: string[]): void {
+    const gitIndexPath = this.resolveGitIndexPath();
+    if (!gitIndexPath) return;
+
+    try {
+      const gitMtime = fs.statSync(gitIndexPath).mtimeMs;
+      const manifestPath = this.getManifestPath();
+      fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+      fs.writeFileSync(manifestPath, JSON.stringify({ gitIndexMtime: gitMtime, files }), 'utf8');
+    } catch { /* ignore */ }
   }
 
   private walkDirectoryFallback(baseDir: string, currentRel: string): string[] {

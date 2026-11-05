@@ -17,6 +17,8 @@ export interface TaskInboxItem {
   claimedAt?: string;
   dependsOn?: string[];
   phase?: number;
+  isGitHubIssue?: boolean;
+  trackId?: string;
 }
 
 export interface TaskInboxData {
@@ -100,8 +102,9 @@ export function stageTaskInInbox(
   return stagedItem;
 }
 
-export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber?: number): boolean {
+export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber?: number, trackId?: string): boolean {
   const q = roleQuery.toLowerCase().trim();
+  if (trackId && trackId.toLowerCase() === q) return true;
   if (issueNumber !== undefined && (String(issueNumber) === q || `#${issueNumber}` === q)) {
     return true;
   }
@@ -131,7 +134,7 @@ export function pullNextPendingTask(role?: string, baseDir?: string): TaskInboxI
     if (t.status !== 'pending') return false;
     if (!isTaskDependenciesSatisfied(t, data.tasks)) return false;
     if (!role || role === 'auto' || role === 'all') return true;
-    return matchesTaskRole(t.role, role, t.issueNumber);
+    return matchesTaskRole(t.role, role, t.issueNumber, t.trackId);
   });
 
   if (!task) return null;

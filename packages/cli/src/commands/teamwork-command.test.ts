@@ -82,3 +82,10 @@ test('mcpTeamworkStatus returns valid JSON report', () => {
   assert.ok(Array.isArray(parsed.profiles));
   assert.strictEqual(parsed.profiles.length, 4);
 });
+
+test('handleTeamwork auto-routes objective and supports flags', () => {
+  assert.doesNotThrow(() => handleTeamwork('Direct objective routing', '--compact'));
+  assert.doesNotThrow(() => handleTeamwork('Direct objective dry-run', '--dry-run'));
+  assert.doesNotThrow(() => handleTeamwork('Direct objective json', '--json'));
+  assert.doesNotThrow(() => handleTeamwork('clear'));
+});

@@ -126,3 +126,22 @@ test('WorktreeMutex marks lock as stale when age exceeds TTL even if process app
     fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
+
+test('WorktreeManager acquires batch file locks atomically', () => {
+  const manager = new WorktreeManager();
+  const batch1 = [
+    { agentName: 'alice', files: ['src/a.ts', 'src/b.ts'] },
+    { agentName: 'bob', files: ['src/c.ts'] }
+  ];
+  const res1 = manager.acquireBatchLocks(batch1);
+  assert.strictEqual(res1.success, true);
+  assert.strictEqual(res1.conflictingFiles.length, 0);
+
+  const batch2 = [
+    { agentName: 'carol', files: ['src/b.ts', 'src/d.ts'] }
+  ];
+  const res2 = manager.acquireBatchLocks(batch2);
+  assert.strictEqual(res2.success, false);
+  assert.deepStrictEqual(res2.conflictingFiles, ['src/b.ts']);
+  assert.strictEqual(manager.getLockedFiles().has('src/d.ts'), false);
+});

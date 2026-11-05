@@ -96,14 +96,14 @@ export async function handleTaskRelease(issueArg?: string, statusArg?: string, r
 
   const matched = hasNum
     ? tasks.filter(t => t.issueNumber === parsedNum)
-    : tasks.filter(t => matchesTaskRole(t.role, issueArg, t.issueNumber) || (t.title && t.title.toLowerCase().includes(issueArg.toLowerCase())));
+    : tasks.filter(t => (t.trackId && t.trackId.toLowerCase() === issueArg.toLowerCase()) || matchesTaskRole(t.role, issueArg, t.issueNumber, t.trackId) || (t.title && t.title.toLowerCase().includes(issueArg.toLowerCase())));
 
   for (const t of matched) {
     if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
     if (t.role) wtManager.releaseFileLocks(t.role);
     if (t.claimedBy) wtManager.releaseFileLocks(t.claimedBy);
     updateTaskInboxStatus(t.issueNumber, status);
-    if (status === 'done') await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
+    if (status === 'done' && t.isGitHubIssue === true) await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
   }
 
   if (matched.length === 0) wtManager.releaseFileLocks(issueArg);
@@ -145,7 +145,8 @@ export async function handleTaskInject(issueArg?: string, roleArg?: string, flag
     worktree: roleToWorktree(role),
     targetFiles: compiled.issue.targetFiles,
     acceptanceCriteria: compiled.issue.acceptanceCriteria,
-    prompt: compiled.promptMarkdown
+    prompt: compiled.promptMarkdown,
+    isGitHubIssue: true
   });
 
   if (isJson) {

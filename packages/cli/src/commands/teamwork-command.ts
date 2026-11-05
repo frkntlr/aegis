@@ -5,17 +5,24 @@
  */
 
 import { showBanner } from './banner.js';
+import { clearInboxTasks } from './task-inbox.js';
 import {
   TeamworkCoordinator,
   type TeamworkPlan,
   type TeamworkTrack
 } from '@aegis/orchestrator';
 
-export function handleTeamworkStatus(): void {
-  showBanner();
+export function handleTeamworkStatus(flag?: string): void {
+  const isJson = flag === '--json' || flag === '-j';
   const coordinator = new TeamworkCoordinator();
   const status = coordinator.getTeamworkStatus();
 
+  if (isJson) {
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+
+  showBanner();
   console.log('🤝 Aegis Antigravity Teamwork Status:');
   console.log(` • Active Tracks Staged: ${status.activeTracksCount}`);
   console.log(` • Locked Files: ${status.lockedFilesCount}`);
@@ -32,6 +39,19 @@ export function handleTeamworkStatus(): void {
   }
 }
 
+export function handleTeamworkClear(flag?: string): void {
+  const isJson = flag === '--json' || flag === '-j';
+  const coordinator = new TeamworkCoordinator();
+  const locksCleared = coordinator.worktreeManager.clearAllLocks();
+  const tasksCleared = clearInboxTasks();
+  if (isJson) {
+    console.log(JSON.stringify({ success: true, tasksCleared, locksCleared }, null, 2));
+    return;
+  }
+  showBanner();
+  console.log(`🧹 Teamwork reset: Cleared ${tasksCleared} task(s) and released ${locksCleared} lock(s).`);
+}
+
 function printTrackPayload(track: TeamworkTrack): void {
   console.log(`\n🔹 [${track.roleType.toUpperCase()}] Track: "${track.title}" (Phase ${track.phase})`);
   console.log(`   Target Files: ${track.targetFiles.join(', ') || 'Codebase-wide'}`);
@@ -42,29 +62,69 @@ function printTrackPayload(track: TeamworkTrack): void {
   console.log(JSON.stringify(track.invocationPayload, null, 2));
 }
 
-export function handleTeamworkPlan(objectiveArg?: string, ...files: string[]): TeamworkPlan | null {
-  showBanner();
-  if (!objectiveArg || objectiveArg.trim().length === 0) {
-    console.error('❌ Usage: aegis teamwork plan "<objective>" [targetFiles...]');
-    return null;
+interface PlanFlags {
+  compact: boolean;
+  json: boolean;
+  dryRun: boolean;
+}
+
+function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
+  const files: string[] = [];
+  const flags: PlanFlags = { compact: false, json: false, dryRun: false };
+  for (const a of args) {
+    if (a === '--compact' || a === '-c') flags.compact = true;
+    else if (a === '--json' || a === '-j') flags.json = true;
+    else if (a === '--dry-run') flags.dryRun = true;
+    else if (a && !a.startsWith('-')) files.push(a);
   }
+  return { files, flags };
+}
 
-  const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objectiveArg.trim(), files);
-
+function printPlanSummary(
+  plan: TeamworkPlan,
+  files: string[],
+  flags: PlanFlags,
+  coordinator: TeamworkCoordinator
+): void {
   console.log(`🎯 Aegis Teamwork Plan Created: ${plan.planId}`);
   console.log(` • Objective: "${plan.objective}"`);
   console.log(` • Summary: ${plan.summary}`);
   if (plan.discoveredFiles && plan.discoveredFiles.length > 0 && files.length === 0) {
     console.log(` • ⚡ Fast Semantic Discovery: ${plan.discoveredFiles.length} file(s) auto-bound: [${plan.discoveredFiles.join(', ')}]`);
   }
-  console.log(` • Staged in TIP Inbox: .aegis/task-inbox.json\n`);
+  const stageMsg = flags.dryRun ? ' • [DRY RUN] Plan not staged in TIP inbox (no locks acquired)\n' : ' • Staged in TIP Inbox: .aegis/task-inbox.json\n';
+  console.log(stageMsg);
   console.log(coordinator.formatLiveMatrix(plan));
   console.log('\n' + coordinator.formatAsciiDag(plan));
+  for (const track of plan.tracks) printTrackPayload(track);
+}
 
-  for (const track of plan.tracks) {
-    printTrackPayload(track);
+export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: string[]): TeamworkPlan | null {
+  if (!objectiveArg || objectiveArg.trim().length === 0) {
+    showBanner();
+    console.error('❌ Usage: aegis teamwork plan "<objective>" [targetFiles...] [--compact] [--json] [--dry-run]');
+    return null;
   }
+
+  const { files, flags } = parsePlanArgs(filesOrFlags);
+  if (!flags.json && !flags.compact) showBanner();
+
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objectiveArg.trim(), files, {
+    stage: !flags.dryRun,
+    acquireLocks: !flags.dryRun
+  });
+
+  if (flags.json) {
+    console.log(JSON.stringify(plan, null, 2));
+    return plan;
+  }
+  if (flags.compact) {
+    console.log(coordinator.compactTeamwork(plan));
+    return plan;
+  }
+
+  printPlanSummary(plan, files, flags, coordinator);
   return plan;
 }
 
@@ -79,45 +139,63 @@ export function handleTeamworkSetup(outDir?: string): void {
 export function handleTeamworkDag(objectiveArg?: string, ...files: string[]): void {
   showBanner();
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objectiveArg || 'Active Teamwork Mission', files, { stage: false, acquireLocks: false });
+  const staged = !objectiveArg ? coordinator.getStagedPlan() : null;
+  const plan = staged || coordinator.planTeamwork(objectiveArg || 'Active Teamwork Mission', files, { stage: false, acquireLocks: false });
   console.log(coordinator.formatAsciiDag(plan));
 }
 
-export function handleTeamwork(subcmd?: string, ...args: string[]): void {
-  const norm = (subcmd || 'status').toLowerCase().trim();
+function routeTeamworkSubcommand(norm: string, all: string[]): boolean {
+  if (!norm || norm === 'status' || norm === '--json' || norm === '-j') {
+    handleTeamworkStatus(all.find(a => a === '--json' || a === '-j'));
+    return true;
+  }
+  if (norm === 'clear' || norm === 'reset') {
+    handleTeamworkClear(all.find(a => a === '--json' || a === '-j'));
+    return true;
+  }
+  if (norm === 'compact' || norm === 'briefing' || norm === '--compact' || norm === '-c') {
+    handleTeamworkCompact(all[1]);
+    return true;
+  }
   if (norm === 'plan' || norm === 'run') {
-    handleTeamworkPlan(args[0], ...args.slice(1));
-    return;
+    handleTeamworkPlan(all[1], ...all.slice(2));
+    return true;
   }
   if (norm === 'setup' || norm === 'init') {
-    handleTeamworkSetup(args[0]);
-    return;
+    handleTeamworkSetup(all[1]);
+    return true;
   }
   if (norm === 'dag' || norm === 'waves') {
-    handleTeamworkDag(args[0], ...args.slice(1));
-    return;
+    handleTeamworkDag(all[1], ...all.slice(2));
+    return true;
   }
   if (norm === 'matrix' || norm === 'table') {
     const coordinator = new TeamworkCoordinator();
-    const plan = coordinator.planTeamwork(args[0] || 'Active Teamwork Mission', args.slice(1), { stage: false, acquireLocks: false });
+    const staged = !all[1] ? coordinator.getStagedPlan() : null;
+    const plan = staged || coordinator.planTeamwork(all[1] || 'Active Teamwork Mission', all.slice(2), { stage: false, acquireLocks: false });
     console.log(coordinator.formatLiveMatrix(plan));
-    return;
-  }
-  if (norm === 'compact' || norm === 'briefing') {
-    handleTeamworkCompact(args[0]);
-    return;
+    return true;
   }
   if (norm === 'analyze' || norm === 'search') {
-    handleTeamworkAnalyze(args[0], ...args.slice(1));
-    return;
+    handleTeamworkAnalyze(all[1], ...all.slice(2));
+    return true;
   }
-  handleTeamworkStatus();
+  return false;
+}
+
+export function handleTeamwork(subcmd?: string, ...args: string[]): void {
+  const all = subcmd ? [subcmd, ...args] : args;
+  const first = all[0]?.trim();
+  const norm = first ? first.toLowerCase() : '';
+  if (routeTeamworkSubcommand(norm, all)) return;
+  handleTeamworkPlan(all[0], ...all.slice(1));
 }
 
 export function handleTeamworkCompact(objectiveArg?: string): void {
   showBanner();
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objectiveArg || 'Active Mission', [], { stage: false, acquireLocks: false });
+  const staged = !objectiveArg ? coordinator.getStagedPlan() : null;
+  const plan = staged || coordinator.planTeamwork(objectiveArg || 'Active Mission', [], { stage: false, acquireLocks: false });
   const briefing = coordinator.compactTeamwork(plan);
   console.log(briefing);
 }
@@ -157,17 +235,19 @@ export function mcpTeamworkStatus(): string {
 }
 
 export function mcpTeamworkDag(args: Record<string, unknown> = {}): string {
-  const objective = String(args.objective || 'Active Mission');
+  const objective = args.objective ? String(args.objective) : undefined;
   const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, targetFiles, { stage: false, acquireLocks: false });
+  const staged = !objective ? coordinator.getStagedPlan() : null;
+  const plan = staged || coordinator.planTeamwork(objective || 'Active Mission', targetFiles, { stage: false, acquireLocks: false });
   return coordinator.formatAsciiDag(plan);
 }
 
 export function mcpTeamworkCompact(args: Record<string, unknown> = {}): string {
-  const objective = String(args.objective || 'Active Mission');
+  const objective = args.objective ? String(args.objective) : undefined;
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, [], { stage: false, acquireLocks: false });
+  const staged = !objective ? coordinator.getStagedPlan() : null;
+  const plan = staged || coordinator.planTeamwork(objective || 'Active Mission', [], { stage: false, acquireLocks: false });
   return coordinator.compactTeamwork(plan);
 }
 

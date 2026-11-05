@@ -18,6 +18,9 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 
 ## 📑 İçindekiler
 
+> 📚 **Modüler Mimari Kütüphanesi:** Projenin her temel başlığı için Demir Kafes standartlarında (< 300 satır) hazırlanan modüler dokümanlara [docs/README.md](docs/README.md) üzerinden erişebilirsiniz.
+
+
 - [🌟 Neden Aegis? (Çözülen Temel Problemler)](#-neden-aegis-çözülen-temel-problemler)
 - [🏛️ Sistem Mimarisi & Akış Şeması](#️-sistem-mimarisi--akış-şeması)
 - [🧠 5-Katmanlı Kod Tabanı Hafıza Motoru](#-5-katmanlı-kod-tabanı-hafıza-motoru)
@@ -31,6 +34,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [🌐 Yaşayan GitHub, RFC (34 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
+- [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
 - [💻 Kapsamlı Evrensel CLI Komut Referansı](#-kapsamlı-evrensel-cli-komut-referansı)
 - [⚙️ IDE & MCP İstemci Yapılandırması](#️-ide--mcp-istemci-yapılandırması)
 - [⚖️ Ajan Anayasası & Katkı Kuralları](#️-ajan-anayasası--katkı-kuralları)
@@ -52,6 +56,8 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 | **Bozuk Kodun Ana Dala Karışması:** Kod derlenir ama çalışma zamanında sahne veya oyun çöker. | **Multimodal Kalite Kapısı (`aegis verify:task`):** Demir Kafes AST denetimi ve Headless Playtesting (Playtest-Before-PR). | **%100 Çalışma Garantisi**, çöken veya hatalı PR açılamaz. |
 | **Güvenilmez Ajan Beyanları:** Ajan "Testler geçti" der ama aslında test dosyasını silmiş ya da `expect(true).toBe(true)` yazmıştır. | **Immutable Oracle (`@aegis/trust-verifier`) & Mutasyon Test Kapısı (%70 Barajı):** Test tahrifini engeller, zayıf testleri eler. | **%100 Güvenilir Doğrulama**, hileli veya sahte testler engellenir. |
 | **Oturum Kopması & Manuel Çerez Hamallığı:** NotebookLM oturumu düştüğünde sistem sessizce kilitlenir veya manuel token ister. | **Ambient Harvester, Hesap Değiştirme (`aegis nlm:switch`) & Tri-State Protokolü:** Sıfır-tıklama CDP/DPAPI keşfi ve interaktif Antigravity modalı. | **Sıfır Kesinti**, tek tıkla oturum yenileme ve sıfır sessiz düşüş. |
+| **CLI Başlangıç Gecikmesi & Yavaş Komutlar:** Monolitik statik importlar CLI başlatma süresini uzatır, hızlı görev akışını aksatır. | **Dinamik Lazy Loading & Persistent Manifest Önbelleği:** 22 komut dinamik import'a geçirildi; manifest ve git index mtime ile taranır. | **~103ms Cold-Start (2.6x Hızlanma)** ve **<2ms** dosya adayı keşfi. |
+| **Çok Ajanlı Görev Karmaşası & Kilit Yarışları:** Paralel ajanlar için görev planlamak uzun komutlar ve manuel kilit koordinasyonu gerektirir. | **Antigravity Native Teamwork UX (`aegis tw`), Atomic Batch Locks & RTK Compact:** `tw` kısayolları, tek geçişte `acquireBatchLocks()` ve `--compact` bayrağı. | **Tek Komutla Planlama**, sıfır kilit yarışması ve **%85 Token Tasarrufu**. |
 
 ---
 
@@ -153,6 +159,30 @@ Aegis, ajanların görevleri rastgele seçmesini önlemek için deterministik **
 2. **Atomik Görev Çekme (`aegis task:pull [agent]` / MCP `task_inbox_pull`):** Ajan rolüne (`solver`, `qa`, `docs`, `ui`) uygun sıradaki görevi tekil olarak çeker.
 3. **Kalıcı Dosya Kilitleri (`.aegis/locks.json`):** Görev üzerinde çalışılacak hedef dosyaları kilitler (`lock:<dosya>`).
 4. **Güvenli Teslim (`aegis task:release <id> [status]`):** İşlem bittiğinde dosya kilitleri serbest bırakılır ve durum güncellenir.
+
+### 🤝 Antigravity Native Teamwork Engine & Kolaylaştırılmış CLI UX (`aegis tw`)
+
+Aegis, Antigravity autonomous subagent'larının (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) eşzamanlı orkestrasyonunu yüksek hızlı CLI arayüzü ile sunar:
+
+- **Doğrudan Hedef Çalıştırma:** `aegis tw "<objective>"` komutu hedefi otomatik olarak faz dalgalarına (DAG) ayırır, dosyaları semantik olarak eşler, mutex kilitlerini alır ve TIP kutusuna sahneler.
+- **Hızlı Takma Adlar (Short Aliases):**
+  - `tw` / `teamwork`: Temel komut ve doğrudan hedef çalıştırma (`aegis tw "<obj>"`).
+  - `tw:plan`: Hedefi DAG izleklerine bölme (`aegis tw:plan "<obj>"`).
+  - `tw:status`: Aktif subagent'ları ve dosya kilitlerini izleme (`aegis tw:status`).
+  - `tw:compact`: RTK ve AST skeleton sıkıştırmasıyla %85 token tasarruflu brifing oluşturma (`aegis tw:compact`).
+  - `tw:dag`: Bağımlılıkların terminalde ASCII dalga grafiğini çizme (`aegis tw:dag`).
+  - `tw:matrix`: Canlı ajan görev matrisini görüntüleme (`aegis tw:matrix`).
+  - `tw:analyze`: Persistent disk önbelleğiyle (<2ms) hedef dosyaları analiz etme (`aegis tw:analyze`).
+  - `tw:setup`: `.aegis/subagents.json` ajan manifestosunu dışa aktarma (`aegis tw:setup`).
+  - `tw:clear`: Görev kutusunu ve kilitleri güvenle sıfırlama (`aegis tw:clear`).
+- **Güçlü Yürütme Bayrakları:**
+  - `--compact` / `-c`: RTK ve AST skeleton sıkıştırmasıyla %85 token tasarruflu brifing oluşturur.
+  - `--json` / `-j`: Otomasyon ve betikler için JSON formatında makine çıktısı sunar.
+  - `--dry-run`: Dosya kilitlerini almadan sadece simülasyon ve plan doğrulaması yapar.
+- **Performans & Atomik Kilit Mimarisi:**
+  - `acquireBatchLocks()`: Tüm hedef dosya mutex'leri tek geçişte atomik olarak kazanılır, kısmi kilitlenme ve yarış durumları önlenir.
+  - `FastSemanticAnalyzer`: Persistent disk caching (`.aegis/cache/fast-semantic-manifest.json` + `.git/index` mtime) ile aday dosya taraması <2ms'ye indirildi.
+  - Dinamik Lazy Loading: 22 statik import dinamik hale getirilerek CLI cold-start süresi ~268ms'den ~103ms'ye (2.6x hızlanma) düşürüldü.
 
 ---
 
@@ -383,6 +413,48 @@ aegis memory:watch packages
 
 ---
 
+## ⚡ Alt Komut Keşfi, Tab-Completion & Antigravity Slash Komutları
+
+Aegis, 100'ü aşkın alt komutu kolayca keşfetmeniz ve terminalde yüksek hızda çalıştırmanız için yerleşik etkileşimli arama ve tab-tamamlama motoru sunar:
+
+### 1. Anlık Alt Komut Arama (`aegis search` / `aegis help`)
+Büyük komut havuzunda aradığınız aracı anahtar kelimeyle anında filtreleyin:
+```bash
+# Teamwork komutlarını listeleme
+aegis search tw
+
+# Demir Kafes ve doğrulama komutlarını arama
+aegis search cage
+
+# NotebookLM veya hafıza komutlarını filtreleme
+aegis search memory
+aegis search nlm
+
+# Komut hakkında detaylı kullanım ve ipuçları
+aegis help completion
+```
+
+### 2. PowerShell & Bash Tab-Completion (`aegis completion`)
+PowerShell ve Bash için bağımsız yerel otomatik tamamlama:
+```bash
+# Tab tamamlama betiğini görüntüleme
+aegis completion
+
+# Tek adımda PowerShell profiline ($PROFILE) ve Antigravity bin betiğine kurma
+aegis completion --install
+```
+
+> **İpucu:** Kurulum tamamlandıktan sonra PowerShell terminalinde `aegis <TAB>` veya `aegis tw<TAB>` tuşlayarak tüm komutları, alt araçları ve bayrakları (`-c`, `-j`, `--dry-run`) otomatik tamamlayabilirsiniz.
+
+### 3. Antigravity Modüler Slash Komutları & Kardeş Beceriler (Skills)
+Google Antigravity ve Mulgravity içinde doğrudan slash komutu olarak çağrılabilen modüler beceriler:
+- `/tw "<hedef>"` veya `/aegis tw "<hedef>"`: Antigravity Teamwork otonom alt ajan planlaması ve TIP kuyruğuna sahneleme ([tw/SKILL.md](skills/tw/SKILL.md)).
+- `/aegis-tw`: Hızlı Teamwork durumu ve görev inceleme takma adı ([aegis-tw/SKILL.md](skills/aegis-tw/SKILL.md)).
+- `/cage`: Anlık Demir Kafes (300 satır / 40 satır) denetimi ve proaktif kota radarı ([cage/SKILL.md](skills/cage/SKILL.md)).
+- `/aegis` veya `/aegist`: Evrensel motor komuta merkezi ve çok ajanlı orkestrasyon ([aegis/SKILL.md](skills/aegis/SKILL.md)).
+
+---
+
 ## 💻 Kapsamlı Evrensel CLI Komut Referansı
 
 Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya `npm run aegis -- <komut>` şeklinde kullanılabilir.
@@ -393,6 +465,17 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya 
 | `aegis init` | Rol tabanlı worktree'leri (`solver`, `qa`, `docs`, `ui`) ve IDE kural dosyalarını hazırlar. |
 | `aegis status` | Aktif worktree'leri, bağlı IDE oturumlarını ve aktif dosya kilitlerini listeler. |
 | `aegis auto` | Otonom görev dağıtım kuyruğunu tetikler. |
+| `aegis search <query>` | 100+ alt komutu anahtar kelimeye göre anlık filtreler (takma ad: `aegis help <query>`). |
+| `aegis completion [--install]` | PowerShell ve Bash için tab-tamamlama betiği üretir veya profiline (`$PROFILE`) kurar. |
+| `aegis tw "<obj>"` | Doğrudan hedef çalıştırma, DAG izleklerine bölme ve atomik batch kilitlerle TIP sahneleme (`-c`, `-j`, `--dry-run`). |
+| `aegis tw:status` / `teamwork` | Aktif Antigravity subagent durumlarını, modellerini ve kilitli dosyalarını listeler. |
+| `aegis tw:plan "<obj>"` | Hedefi izlek dalgalarına böler ve mutex kilitlerini atomik olarak kazanır. |
+| `aegis tw:compact [obj]` | Görev geçmişini ve logları RTK ile %85 sıkıştırıp brifing üretir ve tamamlananları arşivler. |
+| `aegis tw:dag [obj]` | Çok ajanlı yürütmenin 3-fazlı bağımlılık DAG'ını terminalde ASCII olarak çizer. |
+| `aegis tw:matrix [obj]` | Subagent canlı yürütme ve kilit matrisini raporlar. |
+| `aegis tw:analyze "<obj>"` | Persistent disk önbelleğiyle (<2ms) hedef dosyaları semantik puanlar. |
+| `aegis tw:clear` | TIP görev kutusunu ve aktif dosya mutex kilitlerini güvenle temizler. |
+| `aegis tw:setup [dir]` | Antigravity ajan manifestosunu (`.aegis/subagents.json`) dışa aktarır. |
 | `aegis task:list [status]` | TIP görev kuyruğundaki görevleri listeler (ready, in_progress, blocked). |
 | `aegis task:claim <id> [agent]` | Görevi ajan rolü adına üstlenir ve hedef dosya kilitlerini edinir. |
 | `aegis task:release <id> [status]` | Görevi tamamlar/bırakır ve dosya kilitlerini çözer. |

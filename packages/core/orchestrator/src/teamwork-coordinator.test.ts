@@ -177,3 +177,15 @@ test('TeamworkCoordinator assigns phases, dependencies and formats ASCII DAG', (
   assert.ok(dag.includes('FAZ 2'));
   assert.ok(dag.includes('FAZ 3'));
 });
+
+test('TeamworkCoordinator exposes lazy getters for engines and manager', () => {
+  const coordinator = new TeamworkCoordinator();
+  assert.ok(coordinator.worktreeManager);
+  assert.ok(coordinator.groundingEngine);
+  assert.ok(coordinator.semanticAnalyzer);
+  assert.ok(coordinator.compactEngine);
+  assert.strictEqual(coordinator.getWorktreeManager(), coordinator.worktreeManager);
+  assert.strictEqual(coordinator.getGroundingEngine(), coordinator.groundingEngine);
+  assert.strictEqual(coordinator.getSemanticAnalyzer(), coordinator.semanticAnalyzer);
+  assert.strictEqual(coordinator.getCompactEngine(), coordinator.compactEngine);
+});

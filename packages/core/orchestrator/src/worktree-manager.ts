@@ -165,8 +165,14 @@ export class WorktreeManager {
   }
 
 
-  public invalidateWorktreeCache(): void {
-    this.cachedWorktrees = null;
+  public invalidateWorktreeCache(): void { this.cachedWorktrees = null; }
+
+  private findLockOwner(file: string): string | undefined {
+    const fl = file.toLowerCase();
+    for (const [k, v] of this.activeLocks.entries()) {
+      if (k.toLowerCase() === fl) return v;
+    }
+    return undefined;
   }
 
   public listWorktrees(forceRefresh = false): WorktreeListResult {
@@ -202,11 +208,37 @@ export class WorktreeManager {
       const conflictingFiles: string[] = [];
       const normalized = files.map(normPath);
       for (const file of normalized) {
-        const existingOwner = this.activeLocks.get(file);
+        const existingOwner = this.findLockOwner(file);
         if (existingOwner && existingOwner !== agentName) conflictingFiles.push(file);
       }
       if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
       for (const file of normalized) this.activeLocks.set(file, agentName);
+      return { success: true, conflictingFiles: [] };
+    });
+  }
+
+  public acquireBatchLocks(batch: Array<{ agentName: string; files: string[] }>): {
+    success: boolean;
+    conflictingFiles: string[];
+  } {
+    return this.withLock(() => {
+      const conflictingFiles: string[] = [];
+      const toApply: Array<{ file: string; agentName: string }> = [];
+      for (const item of batch) {
+        for (const rawFile of item.files) {
+          const file = normPath(rawFile);
+          const owner = this.findLockOwner(file);
+          if (owner && owner !== item.agentName) {
+            conflictingFiles.push(file);
+          } else {
+            toApply.push({ file, agentName: item.agentName });
+          }
+        }
+      }
+      if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
+      for (const { file, agentName } of toApply) {
+        this.activeLocks.set(file, agentName);
+      }
       return { success: true, conflictingFiles: [] };
     });
   }
@@ -225,9 +257,9 @@ export class WorktreeManager {
 
   public releaseFiles(files: string[]): void {
     this.withLock(() => {
-      const normalized = new Set(files.map(normPath));
+      const lowerSet = new Set(files.map(f => normPath(f).toLowerCase()));
       for (const file of this.activeLocks.keys()) {
-        if (normalized.has(file)) this.activeLocks.delete(file);
+        if (lowerSet.has(file.toLowerCase())) this.activeLocks.delete(file);
       }
     });
   }

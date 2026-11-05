@@ -20,7 +20,12 @@ import { TeamworkVisualizer } from './teamwork-visualizer.js';
 import { TeamworkGroundingEngine } from './teamwork-grounding.js';
 import { FastSemanticAnalyzer } from './fast-semantic-analyzer.js';
 import { TeamworkCompactEngine } from './teamwork-compact.js';
-import { stageTracksIntoInboxHelper, exportSubagentManifestHelper } from './teamwork-staging.js';
+import {
+  stageTracksIntoInboxHelper,
+  exportSubagentManifestHelper,
+  getStagedPlanHelper,
+  getInboxStatusesHelper
+} from './teamwork-staging.js';
 import type {
   TeamworkTrack,
   TeamworkPlan,
@@ -32,20 +37,57 @@ export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, Team
 
 export class TeamworkCoordinator {
   private repoRoot: string;
-  private worktreeManager: WorktreeManager;
-  private roleClassifier: RoleClassifier;
-  private groundingEngine: TeamworkGroundingEngine;
-  private semanticAnalyzer: FastSemanticAnalyzer;
-  private compactEngine: TeamworkCompactEngine;
+  private _worktreeManager?: WorktreeManager;
+  private _roleClassifier?: RoleClassifier;
+  private _groundingEngine?: TeamworkGroundingEngine;
+  private _semanticAnalyzer?: FastSemanticAnalyzer;
+  private _compactEngine?: TeamworkCompactEngine;
   private cachedProfiles?: SubagentProfile[];
 
   constructor(repoRoot?: string, wtManager?: WorktreeManager, roleClassifier?: RoleClassifier, grounding?: TeamworkGroundingEngine) {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
-    this.worktreeManager = wtManager ?? new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
-    this.roleClassifier = roleClassifier ?? new RoleClassifier();
-    this.groundingEngine = grounding ?? new TeamworkGroundingEngine(this.repoRoot);
-    this.semanticAnalyzer = new FastSemanticAnalyzer(this.repoRoot);
-    this.compactEngine = new TeamworkCompactEngine(this.repoRoot);
+    this._worktreeManager = wtManager;
+    this._roleClassifier = roleClassifier;
+    this._groundingEngine = grounding;
+  }
+
+  public get worktreeManager(): WorktreeManager {
+    if (!this._worktreeManager) {
+      this._worktreeManager = new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
+    }
+    return this._worktreeManager;
+  }
+
+  public get roleClassifier(): RoleClassifier {
+    if (!this._roleClassifier) {
+      this._roleClassifier = new RoleClassifier();
+    }
+    return this._roleClassifier;
+  }
+
+  public get groundingEngine(): TeamworkGroundingEngine {
+    if (!this._groundingEngine) {
+      this._groundingEngine = new TeamworkGroundingEngine(this.repoRoot);
+    }
+    return this._groundingEngine;
+  }
+
+  public get semanticAnalyzer(): FastSemanticAnalyzer {
+    if (!this._semanticAnalyzer) {
+      this._semanticAnalyzer = new FastSemanticAnalyzer(this.repoRoot);
+    }
+    return this._semanticAnalyzer;
+  }
+
+  public get compactEngine(): TeamworkCompactEngine {
+    if (!this._compactEngine) {
+      this._compactEngine = new TeamworkCompactEngine(this.repoRoot);
+    }
+    return this._compactEngine;
+  }
+
+  public getWorktreeManager(): WorktreeManager {
+    return this.worktreeManager;
   }
 
   public getRoleClassifier(): RoleClassifier {
@@ -189,11 +231,20 @@ export class TeamworkCoordinator {
     return exportSubagentManifestHelper(this.repoRoot, this.listProfiles(), outDir);
   }
 
+  public getStagedPlan(): TeamworkPlan | null {
+    return getStagedPlanHelper(this.repoRoot);
+  }
+
+  public getInboxStatuses(): Record<string, 'running' | 'done' | 'failed' | 'pending' | 'blocked'> {
+    return getInboxStatusesHelper(this.repoRoot);
+  }
+
   public formatLiveMatrix(
     plan: TeamworkPlan,
     statuses: Record<string, 'running' | 'done' | 'failed' | 'pending' | 'blocked'> = {}
   ): string {
-    return TeamworkVisualizer.formatLiveMatrix(plan, statuses);
+    const effectiveStatuses = Object.keys(statuses).length > 0 ? statuses : this.getInboxStatuses();
+    return TeamworkVisualizer.formatLiveMatrix(plan, effectiveStatuses);
   }
 
   public formatAsciiDag(plan: TeamworkPlan): string {

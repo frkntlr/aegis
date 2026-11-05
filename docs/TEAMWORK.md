@@ -64,10 +64,10 @@ Active locks map target relative file paths to their owning subagents:
 ```
 
 ### Atomic Mutex Acquisition Protocol
-1. **Lock File Serialization**: `WorktreeMutex.acquire(lockPath)` takes an OS-level atomic lock before reading or modifying locks.
-2. **Atomic Write-Replace**: New lock states are written to a unique temp file (`.aegis/locks.json.tmp.<pid>.<timestamp>`) and swapped atomically using `fs.renameSync` (with fallback to copy+unlink).
-3. **Collision Rejection**: If another agent attempts to lock a file already held by a peer, `acquireFileLocks()` rejects the claim and returns `{ success: false, conflictingFiles: [...] }`.
-4. **Guaranteed Release**: Upon task conclusion (`[ROLE_COMPLETE]`), Team Lead invokes `releaseFiles()` and `releaseFileLocks(agentName)` or `aegis task:release <id> done`.
+1. **Batch Atomic Acquisition (`acquireBatchLocks`)**: All track file mutexes are acquired in a single atomic pass, preventing partial locks and race conditions.
+2. **Lock Serialization & Atomic Swap**: `WorktreeMutex.acquire(lockPath)` takes an OS-level atomic lock, writes state to `.aegis/locks.json.tmp.<pid>.<ts>`, and swaps atomically using `fs.renameSync`.
+3. **Collision Rejection**: If another agent attempts to lock a file already held by a peer, `acquireBatchLocks()` rejects the claim and returns `{ success: false, conflictingFiles: [...] }`.
+4. **Guaranteed Release**: Upon task conclusion (`[ROLE_COMPLETE]`), Team Lead invokes `releaseFiles()` or `aegis task:release <id> done`. `aegis tw:clear` flushes stale locks.
 
 ---
 
@@ -130,11 +130,10 @@ graph LR
 ```
 
 ### Optimizations
-- **Deterministic Plan Partitioning**: `RoleClassifier` automatically classifies files (`isUiFile`, markdown patterns) and groups them into non-overlapping tracks, preventing redundant work.
-- **Worktree Cache TTL**: `WorktreeManager` caches git worktree status with a 2000ms TTL (`WT_CACHE_TTL_MS`), preventing repeated synchronous `git worktree list` executions during burst operations.
-- **Safe Root Resolution**: `resolveSafeRepoRoot` detects system fallback paths and dynamically binds to the active repository root.
-- **Monorepo Build Caching**: Turbo pipeline (`turbo run test`) leverages hash caching (`FULL TURBO`), executing test validation in milliseconds.
-- **AST Skeleton Optimization**: Pre-execution code analysis hides function bodies via `@aegis/ast-skeleton`, reducing token usage by 73% to 95%.
+- **CLI Dynamic Lazy Loading**: 22 static command imports converted to dynamic lazy loads, slashing cold-start from ~268ms to ~103ms (2.6x speedup).
+- **Batch Atomic Mutex (`acquireBatchLocks`)**: Acquires all track file mutexes in a single pass without redundant I/O roundtrips.
+- **Deterministic Partitioning & TTL**: `RoleClassifier` shards disjoint tracks; `WorktreeManager` caches worktrees with a 2000ms TTL.
+- **AST Skeleton & Turbo Caching**: Pre-execution AST skeleton hides function bodies (73-95% token savings); Turbo tests leverage hash caching.
 
 ---
 
@@ -263,8 +262,8 @@ graph LR
 ```
 
 ### Key Breakthroughs:
-1. **Zero-Turn Target Discovery**: If target files are omitted, `planTeamwork` automatically invokes `FastSemanticAnalyzer.analyze(objective)`. It parses keywords (handling camelCase, snake_case, and multilingual terms), scores candidates, and auto-binds relevant files to solver tracks.
-2. **Sub-10ms Candidate Evaluation**: Leverages cached git tree lookups (`git ls-files` with 10s TTL) and fast path scoring, achieving <10ms execution duration without full-disk crawls.
+1. **Persistent Disk Caching (<2ms)**: Caches candidate file manifests in `.aegis/cache/fast-semantic-manifest.json` keyed by `.git/index` mtime, dropping candidate evaluation from 10ms to <2ms.
+2. **Zero-Turn Target Discovery**: If target files are omitted, `planTeamwork` automatically invokes `FastSemanticAnalyzer.analyze(objective)`. It parses keywords and auto-binds relevant files to solver tracks.
 3. **Mtime Grounding Cache**: `TeamworkGroundingEngine` caches `FileGroundingReport` by file path, mtime, and size. Repeated file inspections run in <0.001ms.
 4. **Pinpoint Accuracy**: Discovers primary implementation files and tight dependencies, providing high-confidence tracks before subagents start writing code.
 
@@ -272,16 +271,17 @@ graph LR
 
 ## 12. CLI & Tooling Quick Reference
 
-| Action | Aegis CLI Command | MCP Tool Equivalent |
-| :--- | :--- | :--- |
-| **Inspect Status** | `aegis teamwork status` | `aegis:teamwork_status` / `aegis:lock_status` |
-| **Generate Plan** | `aegis teamwork plan "<obj>" [files]` | `aegis:teamwork_plan` |
-| **Fast Semantic Analysis** | `aegis teamwork analyze "<obj>"` | `aegis:teamwork_analyze` |
-| **Compact Mission** | `aegis teamwork compact [obj]` | `aegis:teamwork_compact` |
-| **View ASCII DAG** | `aegis teamwork dag [obj] [files]` | `aegis:teamwork_dag` |
-| **Live Task Matrix** | `aegis teamwork matrix [obj]` | - |
-| **Export Manifest** | `aegis teamwork setup [outDir]` | - |
-| **Pull Role Task** | `aegis task:pull <role\|id>` | `aegis:task_inbox_pull` |
-| **Claim Task** | `aegis task:claim <id> [agent]` | `aegis:task_claim` |
-| **Release Task** | `aegis task:release <id> [status]` | `aegis:task_release` |
-| **Verify Gate** | `aegis verify:task [file]` | `aegis:cage_check` |
+| Action | Aegis CLI Command | Short Alias / Flags | MCP Equivalent |
+| :--- | :--- | :--- | :--- |
+| **Direct Goal Run** | `aegis tw "<obj>"` | `tw "<obj>" [-c] [-j] [--dry-run]` | `aegis:teamwork_plan` |
+| **Inspect Status** | `aegis teamwork status` | `aegis tw:status` / `aegis tw` | `aegis:teamwork_status` |
+| **Generate Plan** | `aegis teamwork plan "<obj>"` | `aegis tw:plan "<obj>"` | `aegis:teamwork_plan` |
+| **Fast Semantic Analysis**| `aegis teamwork analyze "<obj>"` | `aegis tw:analyze` (<2ms cache) | `aegis:teamwork_analyze` |
+| **Compact Mission** | `aegis teamwork compact [obj]` | `aegis tw:compact` (-c: 85% saved) | `aegis:teamwork_compact` |
+| **View ASCII DAG** | `aegis teamwork dag [obj]` | `aegis tw:dag` | `aegis:teamwork_dag` |
+| **Live Task Matrix** | `aegis teamwork matrix [obj]` | `aegis tw:matrix` | - |
+| **Clear Inbox & Locks** | `aegis teamwork clear` | `aegis tw:clear` | - |
+| **Export Manifest** | `aegis teamwork setup [dir]` | `aegis tw:setup` | - |
+| **Pull Role Task** | `aegis task:pull <role\|id>` | `aegis task:pull` | `aegis:task_inbox_pull` |
+| **Claim / Release** | `aegis task:claim` / `release` | `aegis task:release <id> done` | `aegis:task_claim` / `release` |
+| **Verify Gate** | `aegis verify:task [file]` | `aegis verify:task` | `aegis:cage_check` |

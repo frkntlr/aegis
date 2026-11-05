@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import type { TeamworkTrack } from './teamwork-types.js';
+import type { TeamworkTrack, TeamworkPlan } from './teamwork-types.js';
 import type { SubagentProfile } from './teamwork-prompts.js';
 import type { WorktreeManager } from './worktree-manager.js';
 
@@ -29,7 +29,9 @@ function buildTrackInboxItem(
     status: track.dependsOn.length > 0 ? 'blocked' : 'pending',
     dependsOn: track.dependsOn,
     phase: track.phase,
-    stagedAt: new Date().toISOString()
+    stagedAt: new Date().toISOString(),
+    isGitHubIssue: false,
+    trackId: track.id
   };
 }
 
@@ -55,12 +57,17 @@ export function stageTracksIntoInboxHelper(
     ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
     : parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10);
 
-  for (let i = 0; i < tracks.length; i++) {
-    const track = tracks[i];
-    if (shouldLock && track.targetFiles.length > 0) {
-      worktreeManager.acquireFileLocks(track.subagentName, track.targetFiles);
+  if (shouldLock) {
+    const lockBatch = tracks
+      .filter(t => t.targetFiles.length > 0)
+      .map(t => ({ agentName: t.subagentName, files: t.targetFiles }));
+    if (lockBatch.length > 0) {
+      worktreeManager.acquireBatchLocks(lockBatch);
     }
-    inboxArray.push(buildTrackInboxItem(track, numBase, i, objective));
+  }
+
+  for (let i = 0; i < tracks.length; i++) {
+    inboxArray.push(buildTrackInboxItem(tracks[i], numBase, i, objective));
   }
   try {
     fs.writeFileSync(inboxPath, JSON.stringify(inboxArray, null, 2), 'utf8');
@@ -89,4 +96,61 @@ export function exportSubagentManifestHelper(
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
   } catch { /* ignore if write not permitted */ }
   return { count: profiles.length, manifestPath };
+}
+
+export function getInboxStatusesHelper(repoRoot: string): Record<string, 'running' | 'done' | 'failed' | 'pending' | 'blocked'> {
+  const inboxPath = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
+  const statuses: Record<string, 'running' | 'done' | 'failed' | 'pending' | 'blocked'> = {};
+  if (!fs.existsSync(inboxPath)) return statuses;
+  try {
+    const raw = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+    const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.tasks) ? raw.tasks : []);
+    for (const t of list) {
+      const st = t.status === 'in_progress' ? 'running' : t.status === 'done' ? 'done' : t.status === 'blocked' ? 'blocked' : 'pending';
+      if (t.role) statuses[t.role] = st;
+      if (t.trackId) statuses[t.trackId] = st;
+    }
+  } catch { /* ignore */ }
+  return statuses;
+}
+
+export function getStagedPlanHelper(repoRoot: string): TeamworkPlan | null {
+  const inboxPath = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
+  if (!fs.existsSync(inboxPath)) return null;
+  try {
+    const raw = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+    const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.tasks) ? raw.tasks : []);
+    if (list.length === 0) return null;
+    const tracks: TeamworkTrack[] = list.map((t: { id: number; title: string; role: string; targetFiles: string[]; prompt: string; dependsOn?: string[]; phase?: number; stagedAt?: string; trackId?: string }) => {
+      let roleType: 'solver' | 'qa' | 'ui' | 'docs' = 'solver';
+      if (t.role.includes('qa')) roleType = 'qa';
+      else if (t.role.includes('ui')) roleType = 'ui';
+      else if (t.role.includes('doc')) roleType = 'docs';
+      return {
+        id: t.trackId || String(t.id),
+        roleType,
+        subagentName: t.role,
+        title: (t.title || '').replace(/^\[Teamwork Track\]\s*/, ''),
+        targetFiles: Array.isArray(t.targetFiles) ? t.targetFiles : [],
+        prompt: t.prompt || '',
+        dependsOn: Array.isArray(t.dependsOn) ? t.dependsOn : [],
+        phase: t.phase || 1,
+        invocationPayload: {
+          TypeName: roleType === 'solver' ? 'issue-solver' : roleType === 'qa' ? 'qa-hunter' : roleType === 'ui' ? 'ui-specialist' : 'doc-architect',
+          Role: t.role,
+          Prompt: t.prompt || '',
+          Workspace: 'inherit',
+          Model: roleType === 'docs' ? 'flash' : 'inherit'
+        }
+      };
+    });
+    return {
+      planId: `staged-${tracks.length}-tracks`,
+      objective: 'Active Teamwork Mission',
+      createdAt: list[0]?.stagedAt || new Date().toISOString(),
+      tracks,
+      summary: `Active Staged Tasks (${tracks.length} tracks).`,
+      discoveredFiles: Array.from(new Set(tracks.flatMap(t => t.targetFiles)))
+    };
+  } catch { return null; }
 }

@@ -99,8 +99,8 @@ Whenever the user or agent proposes an improvement, feature, toolchain gap, or a
 2. **Autonomous Discussion & RFC Sync**: Automatically publish an RFC and GitHub Discussion under `Ideas` on `frkntlr/aegis` (`npm run aegis -- rfc:create "<title>" [desc]`). Never leave engine feedback lost in local conversation context!
 3. **Traceability**: Link the originating project context or prompt in the published RFC.
 
-## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`, `/teamwork`)
-When the user sends `/aegis teamwork`, `/aegist teamwork`, standard `/teamwork`, or requests multi-agent teamwork:
+## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`, `/teamwork`, `/tw`, `/aegis-tw`)
+When the user sends `/tw`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamwork`, standard `/teamwork`, or requests multi-agent teamwork:
 1. **Unified Trigger & Immediate Lead Action**: The agent immediately adopts the Team Lead role. Never just print static text or tell the user to run subagents manually; actively orchestrate the subagents.
 2. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into `.aegis/task-inbox.json`.
 3. **Print Live Task Matrix**: Immediately render the initial markdown table in chat showing which subagents are running (`🔄 Çalışıyor`), their locked files, models, and task titles.

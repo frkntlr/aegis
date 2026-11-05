@@ -57,7 +57,7 @@ export class WorktreeMutex {
       const code = (err as { code?: string })?.code;
       if (code === 'ESRCH') return true;
       if (code === 'EPERM') return false;
-      return age > 30000;
+      return age > 5000;
     }
   }
 
