@@ -165,13 +165,14 @@ export async function handleRfcApprove(rfcArg?: string): Promise<void> {
   fs.writeFileSync(filePath, content, 'utf8');
 
   const slug = files[0].replace(/\.md$/, '');
-  const cleanDoc = cleanseExistingRfcForWiki(slug, content);
-  const wiki = new WikiMemoryManager();
-  wiki.setPage(slug, cleanDoc.title, cleanDoc.threeBullets, cleanDoc.cleanContent);
-  const sync = wiki.pushAllToRemote();
+  const m = files[0].match(/^RFC-(\d+)/i);
+  const num = m ? parseInt(m[1], 10) : 0;
+  const { syncRfcToWikiAndReadme } = await import('./doc-sync-command.js');
+  const sync = await syncRfcToWikiAndReadme(num, slug, files[0], content, true);
 
   console.log(`✅ RFC Approved: ${files[0]}`);
-  console.log(sync.success ? `🏛️ Clean System Architecture pushed to Wiki: ${slug}` : `⚠️ Wiki push: ${sync.message}`);
+  console.log(sync.wikiPushed ? `🏛️ Clean System Architecture pushed to Wiki: ${slug}` : 'ℹ️  Wiki page cached locally');
+  console.log(`📑 Dynamic RFC-Index & README updated (Active RFCs: ${sync.totalRfcs})`);
 }
 
 export async function handleWikiClean(rfcArg?: string): Promise<void> {

@@ -245,6 +245,8 @@ function printPipelineSummary(
   console.log(` • 💬 Discussion:     ${discUrl || 'Offline / Local'}`);
   console.log(` • 🎯 GitHub Issue:   #${issueNum} ${issueUrl ? '(' + issueUrl + ')' : ''}`);
   console.log(` • 📥 TIP Task Inbox: Staged in .aegis/task-inbox.json (#${issueNum})`);
+  console.log(` • 🏛️ GitHub Wiki:   Clean architecture synced to Wiki & RFC-Index`);
+  console.log(` • 📝 README.md:     Synchronized with active RFCs & 43 Native MCP tools`);
   console.log(` • 👥 Teamwork Swarm: npm run aegis -- teamwork plan "${title}" ${proposedFiles.join(' ')}`);
   console.log('══════════════════════════════════════════════════════════════\n');
 }
@@ -276,5 +278,7 @@ export async function handleRfcPipeline(rfcArg?: string, descArg?: string): Prom
   const { issueNum, issueUrl } = await createLiveIssueIfOnline(auth, padNum, baseIssue, augmentedBody, discInfo);
   stageTaskAndPrompt(issueNum, baseIssue.title, parsed.proposedFiles, baseIssue.acceptanceCriteria, augmentedBody);
   updateRfcFileLinks(path.join(rfcDir, doc.fileName), doc.content, discInfo?.url, issueNum, issueUrl);
+  const { syncRfcToWikiAndReadme } = await import('./doc-sync-command.js');
+  await syncRfcToWikiAndReadme(doc.num, doc.rfcTitle, doc.fileName, doc.content);
   printPipelineSummary(doc.fileName, discInfo?.url, issueNum, issueUrl, baseIssue.title, parsed.proposedFiles);
 }

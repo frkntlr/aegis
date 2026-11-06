@@ -90,6 +90,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis wiki:list                        List all documentation pages in GitHub Wiki',
     '  aegis wiki:show <page>                 Display rendered Wiki page contents',
     '  aegis wiki:sync                        Auto-sync & push living memory directly to Wiki repo',
+    '  aegis doc:sync                         Sync all RFCs, re-index Wiki RFC-Index and update README',
     '  aegis nlm:query "<question>" [id]      Query Google NotebookLM with live citations',
     '  aegis nlm:research "<topic>" [--deep]  Run fast or deep research and stage in Wiki/Notebook',
     '  aegis nlm:sync                         Export and synchronize architecture with NotebookLM'

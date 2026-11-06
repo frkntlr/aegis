@@ -33,7 +33,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
 - [🩺 Sokratik Teşhis & Kanıt Tabanlı Anti-Halüsinasyon](#-sokratik-teşhis--kanıt-tabanlı-anti-halüsinasyon)
 - [📡 Gerçek Zamanlı SSE Web Komuta Merkezi (`localhost:3000`)](#-gerçek-zamanlı-sse-web-komuta-merkezi-localhost3000)
-- [🌐 Yaşayan GitHub, RFC (34 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
+- [🌐 Yaşayan GitHub, RFC (44 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
 - [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
@@ -397,7 +397,7 @@ aegis dashboard 3000
 
 ---
 
-## 🌐 Yaşayan GitHub, RFC (34 Adet) & NotebookLM Döngüsü
+## 🌐 Yaşayan GitHub, RFC (44 Adet) & NotebookLM Döngüsü
 
 Aegis, statik dokümanların unutulması sorununu çözmek için yaşayan bir bellek köprüsü kurar:
 
@@ -440,7 +440,7 @@ aegis/
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
 │   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
-├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-034 Arşivi
+├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-044 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
 └── turbo.json                   # Monorepo Pipeline ve Önbellek Yapılandırması
 ```
@@ -541,6 +541,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya 
 | `aegis init` | Rol tabanlı worktree'leri (`solver`, `qa`, `docs`, `ui`) ve IDE kural dosyalarını hazırlar. |
 | `aegis status` | Aktif worktree'leri, bağlı IDE oturumlarını ve aktif dosya kilitlerini listeler. |
 | `aegis auto` | Otonom görev dağıtım kuyruğunu tetikler. |
+| `aegis update [--clean] [--pull]` | Dinamik sıfır-durum güncelleme, paketleri yeniden derleme ve PC çapında shim kurulumu. |
+| `aegis version:status` | Upstream commit farkı, paket sürüm drifti ve kurulu global/yerel shim sağlık denetimi. |
 | `aegis search <query>` | 100+ alt komutu anahtar kelimeye göre anlık filtreler (takma ad: `aegis help <query>`). |
 | `aegis completion [--install]` | PowerShell ve Bash için tab-tamamlama betiği üretir veya profiline (`$PROFILE`) kurar. |
 | `aegis tw "<obj>"` | Doğrudan hedef çalıştırma, DAG izleklerine bölme ve atomik batch kilitlerle TIP sahneleme (`-c`, `-j`, `--dry-run`). |
@@ -637,6 +639,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya 
 | `aegis rfc:triage "<title>" [b]` | Discussion başlığını parse edip kabul kriterlerine dönüştürür. |
 | `aegis rfc:approve <rfcId>` | Kabul edilen RFC'den clean-room Wiki sayfası sentezler. |
 | `aegis rfc:decompose <rfcId>` | RFC kabul kriterlerini atomik GitHub Issue'larına parçalar. |
+| `aegis rfc:pipeline "<t>" [d]` | Uçtan uca RFC oluşturma, Discussion açma, Issue ayrıştırma, Wiki/README eşitleme ve TIP sahneleme. |
+| `aegis doc:sync` | Tüm RFC'leri yaşayan GitHub Wiki'ye aktarır, dinamik RFC-Index tablosu derler ve README'yi eşitler. |
 | `aegis wiki:sync` | Yaşayan hafızayı doğrudan `<repo>.wiki.git` deposuyla senkronize eder (RFC-029/030). |
 | `aegis wiki:status` | Uzak Wiki bağlantısını, sayfa sayısını ve önbellek tutarlılığını doğrular. |
 | `aegis wiki:list` / `wiki:show` | GitHub Wiki sayfalarını listeler veya içeriğini görüntüler. |
@@ -654,7 +658,7 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya 
 ### 7. Model Context Protocol Sunucusu
 | Komut | Açıklama |
 | :--- | :--- |
-| `aegis mcp` | IDE'lerin bağlanabilmesi için yerel stdio JSON-RPC 19 araçlı MCP sunucusunu başlatır. |
+| `aegis mcp` | IDE'lerin bağlanabilmesi için yerel stdio JSON-RPC 43 araçlı yüksek hızlı MCP sunucusunu başlatır. |
 
 ---
 
