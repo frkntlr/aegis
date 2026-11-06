@@ -17,7 +17,31 @@ export class AntigravityInstaller {
       '.gemini/config/skills.json',
       '.gemini/config/plugins.json',
       '.gemini/config/skills/tr',
-      '.gemini/config/plugins/aegis/skills/tr'
+      '.gemini/config/plugins/aegis/skills/tr',
+      '.gemini/config/skills/aegis',
+      '.gemini/config/skills/aegist',
+      '.gemini/config/skills/tw',
+      '.gemini/config/skills/aegis-tw',
+      '.gemini/config/skills/cage',
+      '.gemini/config/skills/ajan1',
+      '.gemini/config/skills/ajan2',
+      '.gemini/config/skills/ajan-docs',
+      '.gemini/config/skills/ajan-qa',
+      '.gemini/config/skills/ajan-solver',
+      '.gemini/config/skills/ajan-ui',
+      '.gemini/config/skills/agent-status',
+      '.gemini/config/skills/durum',
+      '.gemini/config/skills/doc-architect',
+      '.gemini/config/skills/docs',
+      '.gemini/config/skills/issue-solver',
+      '.gemini/config/skills/solver',
+      '.gemini/config/skills/qa',
+      '.gemini/config/skills/qa-hunter',
+      '.gemini/config/skills/ui',
+      '.gemini/config/skills/ui-specialist',
+      '.gemini/config/skills/teamwork',
+      '.gemini/antigravity/mcp/aegis_aegis',
+      '.gemini/config/plugins/aegis/mcp_config.json'
     ];
     for (const rel of list) {
       const p = path.resolve(userHome, rel);
@@ -43,7 +67,6 @@ export class AntigravityInstaller {
 
   public static installPlugin(userHome: string, repoRoot: string): void {
     const pluginDir = path.resolve(userHome, '.gemini', 'config', 'plugins', 'aegis');
-    const standaloneSkills = path.resolve(userHome, '.gemini', 'config', 'skills');
     const pluginSkills = path.join(pluginDir, 'skills');
     const rulesDir = path.join(pluginDir, 'rules');
     fs.mkdirSync(rulesDir, { recursive: true });
@@ -56,7 +79,6 @@ export class AntigravityInstaller {
       const repoSkillDir = path.resolve(repoRoot, '.agents', 'skills', sk);
       if (fs.existsSync(repoSkillDir)) {
         this.copySkillFiles(repoSkillDir, path.join(pluginSkills, sk));
-        this.copySkillFiles(repoSkillDir, path.join(standaloneSkills, sk));
       }
     }
   }
@@ -120,9 +142,7 @@ export class AntigravityInstaller {
       this.installPlugin(h, repoRoot);
       this.installShims(path.resolve(h, '.gemini', 'antigravity', 'bin'), cliPath);
       this.writeMcpSchemas(path.resolve(h, '.gemini', 'antigravity', 'mcp', 'aegis'));
-      this.writeMcpSchemas(path.resolve(h, '.gemini', 'antigravity', 'mcp', 'aegis_aegis'));
       registerMcpFn(path.resolve(h, '.gemini', 'config', 'mcp_config.json'));
-      registerMcpFn(path.resolve(h, '.gemini', 'config', 'plugins', 'aegis', 'mcp_config.json'));
     }
     if (process.platform === 'win32') {
       const npmCandidates = [

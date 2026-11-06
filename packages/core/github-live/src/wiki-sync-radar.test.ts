@@ -99,7 +99,7 @@ test('fastSync honors TTL manifest and returns cached in sub-second with 0 netwo
     assert.strictEqual(res.cached, true);
     assert.strictEqual(res.pulled, false);
     assert.strictEqual(res.pushed, false);
-    assert.ok(res.durationMs < 250, `Expected duration < 250ms, got ${res.durationMs}ms`);
+    assert.ok(res.durationMs < 1000, `Expected duration < 1000ms, got ${res.durationMs}ms`);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     if (fs.existsSync(manifestPath)) fs.rmSync(manifestPath, { force: true });

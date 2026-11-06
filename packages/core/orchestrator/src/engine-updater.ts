@@ -189,7 +189,6 @@ export class EngineUpdater {
       const binDir = path.resolve(h, '.gemini', 'antigravity', 'bin');
       AntigravityInstaller.installShims(binDir, cliPath);
       AntigravityInstaller.writeMcpSchemas(path.resolve(h, '.gemini', 'antigravity', 'mcp', 'aegis'));
-      AntigravityInstaller.writeMcpSchemas(path.resolve(h, '.gemini', 'antigravity', 'mcp', 'aegis_aegis'));
       shimsCount += 5;
     }
 
