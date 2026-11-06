@@ -34,8 +34,12 @@ export class UniversalToolchainSync {
 
   public discoverSkills(): DiscoveredSkill[] {
     const skills: DiscoveredSkill[] = [];
-    const skillsDir = path.resolve(this.repoRoot, '.agents', 'skills');
-    if (!fs.existsSync(skillsDir)) return skills;
+    const candidates = [
+      path.resolve(this.repoRoot, 'templates', 'skills'),
+      path.resolve(this.repoRoot, '.agents', 'skills')
+    ];
+    const skillsDir = candidates.find(d => fs.existsSync(d));
+    if (!skillsDir) return skills;
 
     try {
       const entries = fs.readdirSync(skillsDir, { withFileTypes: true });

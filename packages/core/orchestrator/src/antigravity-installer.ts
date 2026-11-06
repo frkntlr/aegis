@@ -8,42 +8,47 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
-const SKILL_NAMES: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'cage'];
+const SKILL_NAMES: readonly string[] = ['aegis'];
 const SHIM_COMMANDS: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw', 'tr'];
+
+const LEGACY_PATHS: readonly string[] = [
+  '.gemini/config/skills.json',
+  '.gemini/config/plugins.json',
+  '.gemini/config/skills/tr',
+  '.gemini/config/plugins/aegis/skills/tr',
+  '.gemini/config/plugins/aegis/skills/aegist',
+  '.gemini/config/plugins/aegis/skills/aegis-tw',
+  '.gemini/config/plugins/aegis/skills/cage',
+  '.gemini/config/plugins/aegis/skills/tw',
+  '.gemini/config/skills/aegis',
+  '.gemini/config/skills/aegist',
+  '.gemini/config/skills/tw',
+  '.gemini/config/skills/aegis-tw',
+  '.gemini/config/skills/cage',
+  '.gemini/config/skills/ajan1',
+  '.gemini/config/skills/ajan2',
+  '.gemini/config/skills/ajan-docs',
+  '.gemini/config/skills/ajan-qa',
+  '.gemini/config/skills/ajan-solver',
+  '.gemini/config/skills/ajan-ui',
+  '.gemini/config/skills/agent-status',
+  '.gemini/config/skills/durum',
+  '.gemini/config/skills/doc-architect',
+  '.gemini/config/skills/docs',
+  '.gemini/config/skills/issue-solver',
+  '.gemini/config/skills/solver',
+  '.gemini/config/skills/qa',
+  '.gemini/config/skills/qa-hunter',
+  '.gemini/config/skills/ui',
+  '.gemini/config/skills/ui-specialist',
+  '.gemini/config/skills/teamwork',
+  '.gemini/antigravity/mcp/aegis_aegis',
+  '.gemini/config/plugins/aegis/mcp_config.json'
+];
 
 export class AntigravityInstaller {
   public static cleanLegacy(userHome: string): void {
-    const list = [
-      '.gemini/config/skills.json',
-      '.gemini/config/plugins.json',
-      '.gemini/config/skills/tr',
-      '.gemini/config/plugins/aegis/skills/tr',
-      '.gemini/config/skills/aegis',
-      '.gemini/config/skills/aegist',
-      '.gemini/config/skills/tw',
-      '.gemini/config/skills/aegis-tw',
-      '.gemini/config/skills/cage',
-      '.gemini/config/skills/ajan1',
-      '.gemini/config/skills/ajan2',
-      '.gemini/config/skills/ajan-docs',
-      '.gemini/config/skills/ajan-qa',
-      '.gemini/config/skills/ajan-solver',
-      '.gemini/config/skills/ajan-ui',
-      '.gemini/config/skills/agent-status',
-      '.gemini/config/skills/durum',
-      '.gemini/config/skills/doc-architect',
-      '.gemini/config/skills/docs',
-      '.gemini/config/skills/issue-solver',
-      '.gemini/config/skills/solver',
-      '.gemini/config/skills/qa',
-      '.gemini/config/skills/qa-hunter',
-      '.gemini/config/skills/ui',
-      '.gemini/config/skills/ui-specialist',
-      '.gemini/config/skills/teamwork',
-      '.gemini/antigravity/mcp/aegis_aegis',
-      '.gemini/config/plugins/aegis/mcp_config.json'
-    ];
-    for (const rel of list) {
+    for (const rel of LEGACY_PATHS) {
       const p = path.resolve(userHome, rel);
       if (fs.existsSync(p)) {
         try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* ignore */ }
@@ -76,8 +81,12 @@ export class AntigravityInstaller {
     if (fs.existsSync(geminiMd)) fs.copyFileSync(geminiMd, path.join(rulesDir, 'AGENTS.md'));
 
     for (const sk of SKILL_NAMES) {
-      const repoSkillDir = path.resolve(repoRoot, '.agents', 'skills', sk);
-      if (fs.existsSync(repoSkillDir)) {
+      const candidates = [
+        path.resolve(repoRoot, 'templates', 'skills', sk),
+        path.resolve(repoRoot, '.agents', 'skills', sk)
+      ];
+      const repoSkillDir = candidates.find(d => fs.existsSync(d));
+      if (repoSkillDir) {
         this.copySkillFiles(repoSkillDir, path.join(pluginSkills, sk));
       }
     }

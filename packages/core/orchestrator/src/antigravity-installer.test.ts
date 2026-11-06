@@ -39,7 +39,7 @@ test('AntigravityInstaller installPlugin installs skills to plugin dir without p
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-inst-home-'));
   const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-inst-repo-'));
   try {
-    const srcSkill = path.join(tmpRepo, '.agents', 'skills', 'aegis');
+    const srcSkill = path.join(tmpRepo, 'templates', 'skills', 'aegis');
     fs.mkdirSync(srcSkill, { recursive: true });
     fs.writeFileSync(path.join(srcSkill, 'SKILL.md'), '---\nname: aegis\n---\n# Aegis', 'utf8');
     fs.writeFileSync(path.join(tmpRepo, 'GEMINI.md'), '# Aegis Rules', 'utf8');

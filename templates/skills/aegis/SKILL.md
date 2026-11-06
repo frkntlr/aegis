@@ -93,13 +93,13 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis search <query>` | Filter 100+ subcommands by keyword (alias: `aegis help <query>`) | `aegis search <query>` |
 | `/aegis completion [--install]` | Generate or install PowerShell/Bash tab completion | `aegis completion --install` |
 
-## Antigravity Slash Commands & Sister Skills
+## Antigravity Unified Slash Command Interface
 
-Aegis registers dedicated modular slash commands across specialized skill manifests:
-- `/tw` or `/aegis tw`: Antigravity Teamwork orchestrator, DAG execution waves, and task staging ([tw](../tw/SKILL.md)).
-- `/aegis-tw`: Direct alias for Antigravity Teamwork ([aegis-tw](../aegis-tw/SKILL.md)).
-- `/cage`: Instant Demir Kafes compliance audit and line limit radar ([cage](../cage/SKILL.md)).
-- `/aegis` / `/aegist`: Universal engine command center ([aegis](./SKILL.md)).
+Aegis provides a single, unified command center under /aegis:
+- /aegis: Universal engine command center, quality gates, worktrees, and tools.
+- /aegis tw <objective>: Antigravity Teamwork autonomous orchestrator, DAG waves, and subagents (shortcut: /tw).
+- /aegis cage:check: Instant Demir Kafes compliance audit and line limit radar (shortcut: /cage).
+- /aegis update [--clean]: Dynamic version radar and PC-wide zero-state reinstallation.
 
 ## Subcommand Discovery & Tab-Completion
 
