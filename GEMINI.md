@@ -58,6 +58,7 @@ When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegi
 - `/aegis branch:sync [agent|--all]`: Safely synchronize worktree branches with master with zero data loss stash protection.
 - `/aegis loop:status`: Inspect Circuit Breaker failure counters and blocked tasks.
 - `/aegis loop:reset [num]`: Reset failure counters and unblock tasks.
+- `/aegis push` or `/aegis tw:push`: Autonomous Demir Kafes pre-push gate, staging, commit, and remote push.
 
 ## Mandatory Identity Badges
 Every autonomous agent must prefix its conversational announcements with its designated role badge:
@@ -85,8 +86,9 @@ Whenever any `/aegis nlm:*` command or NotebookLM tool call encounters an authen
 To prevent indefinite command hangs during git remote operations:
 1. **Non-Interactive Flag**: Always prefix git network calls with `$env:GIT_TERMINAL_PROMPT=0` (or set in session). Git must fail fast rather than hanging on credential/passphrase prompts.
 2. **No Background Remote Hangs**: Remote operations (`git push`, `git fetch`, `git clone`) must NEVER run as indefinite background daemons. Use finite timeout (e.g. `WaitMsBeforeAsync: 10000`).
-3. **No Direct Master Push Without Auth Pre-check**: Verify `gh auth status` or remote connectivity before pushing. Direct pushes to `master`/`main` without verification or user consent are strictly forbidden.
+3. **Pre-Push Auth Pre-check & Quality Gate**: Verify `gh auth status` or remote connectivity before pushing. Direct pushes to `master`/`main` must have passing pre-push gates (`cage:check` + monorepo tests).
 4. **Anti-Hang & STDIN Safeguard**: NEVER run `npx ast-grep` (outdated 2018 package that hangs waiting on STDIN). Always use `npm run aegis -- ast:search <pat> [dir]` or `aegis ast:search`. Headless background commands must never wait on STDIN.
+5. **Autonomous Post-Verification Push**: When running an autonomous workflow, goal, or `/tw` teamwork session, once all tasks and quality gates (`cage:check` + unit tests) pass 100%, Aegis MUST automatically commit staged changes and push to GitHub remote (`npm run aegis -- push` or `git push origin master`) rather than leaving completed work unpushed as local commits.
 
 ## Phase Boundary Gate (Zero Premature Coding)
 Whenever the user requests planning, research, architectural analysis, or issue creation:
@@ -128,6 +130,7 @@ When the user sends `/tw`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamwork`, s
    - When an objective involves multiple components, sentences, or files, or when the user invokes `--max-agents=<n>` / `--scale`:
    - Teamwork automatically shards work across up to 12 parallel, conflict-free subagents with 100% disjoint file locks.
    - Multiple issue-solvers (`issue-solver [ModuleA]`, `issue-solver [ModuleB]`) and UI specialists run concurrently in Phase 1 (Wave 1), accelerating completion without lock contention.
+10. **Autonomous Post-Task Remote Push**: Once all tracks complete and the multimodal quality gate (`cage:check` + monorepo unit tests) passes 100%, Team Lead automatically commits remaining staged assets and pushes to the tracking remote branch (`npm run aegis -- push` or `$env:GIT_TERMINAL_PROMPT=0; git push origin master`). Never leave completed and verified work unpushed as orphaned local commits.
 
 ## Godot 4 UI Architecture & Engineering Protocol (Demir Kafes for UI)
 When editing, scaffolding, or polishing Godot UI:

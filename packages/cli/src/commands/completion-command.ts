@@ -9,9 +9,9 @@ import * as path from 'node:path';
 import { showBanner } from './banner.js';
 
 export const ALL_AEGIS_COMMANDS: readonly string[] = [
-  'tw', 'tw:plan', 'tw:status', 'tw:compact', 'tw:clear', 'tw:dag', 'tw:matrix', 'tw:analyze', 'tw:setup', 'tw:mesh', 'tw:peers', 'tw:post', 'tw:broadcast', 'tw:waves', 'tw:radar', 'tw:conflicts', 'tw:scale', 'tw:batch', 'tw:doc', 'tw:synthesize', 'tw:advance',
-  'teamwork', 'teamwork:status', 'teamwork:plan', 'teamwork:compact', 'teamwork:clear', 'teamwork:dag', 'teamwork:matrix', 'teamwork:analyze', 'teamwork:setup', 'teamwork:mesh', 'teamwork:peers', 'teamwork:post', 'teamwork:broadcast', 'teamwork:waves', 'teamwork:radar', 'teamwork:conflicts', 'teamwork:scale', 'teamwork:batch', 'teamwork:doc', 'teamwork:synthesize', 'teamwork:advance',
-  'init', 'status', 'auto', 'prompt', 'contribute',
+  'tw', 'tw:plan', 'tw:status', 'tw:compact', 'tw:clear', 'tw:dag', 'tw:matrix', 'tw:analyze', 'tw:setup', 'tw:mesh', 'tw:peers', 'tw:post', 'tw:broadcast', 'tw:waves', 'tw:radar', 'tw:conflicts', 'tw:scale', 'tw:batch', 'tw:doc', 'tw:synthesize', 'tw:advance', 'tw:push',
+  'teamwork', 'teamwork:status', 'teamwork:plan', 'teamwork:compact', 'teamwork:clear', 'teamwork:dag', 'teamwork:matrix', 'teamwork:analyze', 'teamwork:setup', 'teamwork:mesh', 'teamwork:peers', 'teamwork:post', 'teamwork:broadcast', 'teamwork:waves', 'teamwork:radar', 'teamwork:conflicts', 'teamwork:scale', 'teamwork:batch', 'teamwork:doc', 'teamwork:synthesize', 'teamwork:advance', 'teamwork:push',
+  'init', 'status', 'auto', 'prompt', 'contribute', 'push', 'git:push', 'gh:push',
   'rfc', 'rfc:triage', 'rfc:create', 'rfc:approve', 'rfc:decompose', 'ideate',
   'nlm:sync', 'nlm:query', 'nlm:research', 'nlm:sources', 'nlm:poll', 'nlm:import', 'nlm:prune', 'nlm:restore', 'nlm:auth', 'nlm:switch', 'switch',
   'task:list', 'task:claim', 'task:release', 'task:inject', 'task:pull', 'task:clear', 'task:reset', 'task:verify', 'verify:task',

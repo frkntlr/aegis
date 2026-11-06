@@ -28,6 +28,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis tw:batch [planId]                Print parallel execution batches ready for simultaneous dispatch',
     '  aegis tw:doc [planId] [--compact]      Synthesize human-centric living architecture report & metrics',
     '  aegis tw:advance [planId]              Smoothly advance active wave to next execution phase',
+    '  aegis tw:push [--dry-run]              Autonomously push verified teamwork changes to GitHub',
     '  aegis prompt [role|id] [id]            Compile surgical AST prompt caching context',
     '  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution'
   ],
@@ -101,6 +102,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis init                             Initialize worktrees and environment',
     '  aegis status                           View worktrees and active file locks',
     '  aegis auto                             Run autonomous task queue & dispatcher',
+    '  aegis push [--dry-run] [--message]     Safe automated remote push with pre-push quality shield',
     '  aegis completion [--install]           Generate or install PowerShell/Bash tab autocompletion',
     '  aegis search <term> | help <term>      Search commands and subcommands by keyword or prefix',
     '  aegis dashboard [port]                 Launch live telemetry Web Dashboard (default port 3000)',

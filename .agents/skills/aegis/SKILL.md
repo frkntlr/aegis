@@ -48,6 +48,7 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis debug [err\|file]` | Socratic evidence-based interactive debugging session | `aegis debug [err]` |
 | `/aegis merge <agent> [base]` | Multi-tier atomic merge (FF -> Rebase -> Merge Commit) | `aegis merge <agent> [base]` |
 | `/aegis branch:sync [agent\|all]` | Safely synchronize worktree branches with master | `aegis branch:sync [agent]` |
+| `/aegis push` or `/aegis tw:push` | Autonomous Demir Kafes pre-push gate, staging, commit & remote push | `aegis push` |
 | `/aegis dashboard [port]` | Launch Aegis Web Command Center | `aegis dashboard [port]` (with IsDaemon: true) |
 | `/aegis cage:check [dir]` | Audit codebase against Deterministik Demir Kafes | `aegis cage:check [dir]` |
 | `/aegis skeleton:scan [dir]` | Compute global AST skeleton map & token savings | `aegis skeleton:scan [dir]` |

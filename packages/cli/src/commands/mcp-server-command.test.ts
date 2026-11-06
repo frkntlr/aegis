@@ -11,11 +11,11 @@ test('handleJsonRpc handles initialize request', async () => {
   assert.ok((result.serverInfo as Record<string, unknown>).name === 'aegis');
 });
 
-test('handleJsonRpc handles tools/list request with 43 authoritative tools', async () => {
+test('handleJsonRpc handles tools/list request with 45 authoritative tools', async () => {
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 43);
+  assert.strictEqual(result.tools.length, 45);
   assert.ok(result.tools.some(t => t.name === 'github_rfc_pipeline'));
   assert.ok(result.tools.some(t => t.name === 'engine_update'));
   assert.ok(result.tools.some(t => t.name === 'version_status'));
@@ -24,6 +24,8 @@ test('handleJsonRpc handles tools/list request with 43 authoritative tools', asy
   const names = result.tools.map(t => t.name);
   assert.ok(names.includes('teamwork_plan'));
   assert.ok(names.includes('teamwork_status'));
+  assert.ok(names.includes('git_push'));
+  assert.ok(names.includes('teamwork_push'));
   assert.ok(names.includes('memory_query'));
   assert.ok(names.includes('memory_stats'));
   assert.ok(names.includes('context7_query'));

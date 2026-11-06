@@ -33,7 +33,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
 - [🩺 Sokratik Teşhis & Kanıt Tabanlı Anti-Halüsinasyon](#-sokratik-teşhis--kanıt-tabanlı-anti-halüsinasyon)
 - [📡 Gerçek Zamanlı SSE Web Komuta Merkezi (`localhost:3000`)](#-gerçek-zamanlı-sse-web-komuta-merkezi-localhost3000)
-- [🌐 Yaşayan GitHub, RFC (41 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
+- [🌐 Yaşayan GitHub, RFC (44 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
 - [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
@@ -207,6 +207,7 @@ Aegis, Antigravity autonomous subagent'larının (`issue-solver`, `qa-hunter`, `
   - `tw:matrix`: Canlı ajan görev matrisini görüntüleme (`aegis tw:matrix`).
   - `tw:analyze`: Persistent disk önbelleğiyle (<2ms) hedef dosyaları analiz etme (`aegis tw:analyze`).
   - `tw:setup`: `.aegis/subagents.json` ajan manifestosunu dışa aktarma (`aegis tw:setup`).
+  - `tw:push` / `aegis push`: Demir Kafes ve monorepo test kalkanı sonrası doğrulanmış değişiklikleri GitHub'a otonom commit ve push etme (`aegis tw:push`).
   - `tw:clear`: Görev kutusunu ve kilitleri güvenle sıfırlama (`aegis tw:clear`).
 - **Güçlü Yürütme Bayrakları:**
   - `--compact` / `-c`: RTK ve AST skeleton sıkıştırmasıyla %85 token tasarruflu brifing oluşturur.
@@ -397,7 +398,7 @@ aegis dashboard 3000
 
 ---
 
-## 🌐 Yaşayan GitHub, RFC (41 Adet) & NotebookLM Döngüsü
+## 🌐 Yaşayan GitHub, RFC (44 Adet) & NotebookLM Döngüsü
 
 Aegis, statik dokümanların unutulması sorununu çözmek için yaşayan bir bellek köprüsü kurar:
 
@@ -440,7 +441,7 @@ aegis/
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
 │   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
-├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-043 Arşivi
+├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-044 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
 └── turbo.json                   # Monorepo Pipeline ve Önbellek Yapılandırması
 ```
@@ -564,6 +565,7 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya 
 | `aegis tw:analyze "<obj>"` | Persistent disk önbelleğiyle (<2ms) hedef dosyaları semantik puanlar. |
 | `aegis tw:clear` | TIP görev kutusunu ve aktif dosya mutex kilitlerini güvenle temizler. |
 | `aegis tw:setup [dir]` | Antigravity ajan manifestosunu (`.aegis/subagents.json`) dışa aktarır. |
+| `aegis tw:push` / `aegis push` | Demir Kafes ön-push kalkanı, çalışma dizini commit'leme ve GitHub'a otonom push (`--dry-run`). |
 | `aegis task:list [status]` | TIP görev kuyruğundaki görevleri listeler (ready, in_progress, blocked). |
 | `aegis task:claim <id> [agent]` | Görevi ajan rolü adına üstlenir ve hedef dosya kilitlerini edinir. |
 | `aegis task:release <id> [status]` | Görevi tamamlar/bırakır ve dosya kilitlerini çözer. |

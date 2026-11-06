@@ -70,7 +70,9 @@ export const CORE_MCP_TOOLS = [
   { name: 'teamwork_doc_synthesize', description: 'Synthesize human-centric living architecture briefing, component topology and metrics', inputSchema: { type: 'object', properties: { planId: { type: 'string' }, compact: { type: 'boolean' } } } },
   { name: 'engine_update', description: 'Dynamically update and reinstall Aegis across PC with zero-state clean options', inputSchema: { type: 'object', properties: { clean: { type: 'boolean' }, pull: { type: 'boolean' }, force: { type: 'boolean' } } } },
   { name: 'version_status', description: 'Inspect dynamic version drift, upstream commits, and monorepo packages status', inputSchema: { type: 'object', properties: {} } },
-  { name: 'github_rfc_pipeline', description: 'Execute end-to-end GitHub RFC lifecycle: Discussion <-> Issue cross-link and TIP staging', inputSchema: { type: 'object', properties: { rfc: { type: 'string' }, description: { type: 'string' } }, required: ['rfc'] } }
+  { name: 'github_rfc_pipeline', description: 'Execute end-to-end GitHub RFC lifecycle: Discussion <-> Issue cross-link and TIP staging', inputSchema: { type: 'object', properties: { rfc: { type: 'string' }, description: { type: 'string' } }, required: ['rfc'] } },
+  { name: 'git_push', description: 'Safe, automated post-task remote sync and push with pre-push quality shield', inputSchema: { type: 'object', properties: { branch: { type: 'string' }, dryRun: { type: 'boolean' }, autoCommit: { type: 'boolean' }, message: { type: 'string' } } } },
+  { name: 'teamwork_push', description: 'Autonomously push verified teamwork changes to GitHub origin repository', inputSchema: { type: 'object', properties: { dryRun: { type: 'boolean' }, message: { type: 'string' } } } }
 ];
 
 export const MCP_TOOLS = [
@@ -243,6 +245,10 @@ export async function executeMcpTool(name: string, args: Record<string, unknown>
     const { handleRfcPipeline } = await import('./rfc-pipeline-command.js');
     await handleRfcPipeline(String(args.rfc || ''), args.description ? String(args.description) : undefined);
     return JSON.stringify({ status: 'ok', rfc: args.rfc }, null, 2);
+  }
+  if (name === 'git_push' || name === 'teamwork_push') {
+    const { mcpGitPush } = await import('./git-push-command.js');
+    return mcpGitPush(args);
   }
   return executeUtilityTool(name, args);
 }

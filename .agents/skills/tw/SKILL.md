@@ -34,6 +34,7 @@ This skill activates when the user triggers `/tw`, `/aegis tw`, `/aegis teamwork
 | `/tw:matrix [planId]` | Display live Antigravity subagent task status matrix | `aegis tw:matrix` | - |
 | `/tw:analyze "<obj>"` | Sub-10ms fast semantic codebase analysis and file discovery | `aegis tw:analyze "<obj>"` | `teamwork_analyze` |
 | `/tw:setup [dir]` | Export subagents manifest (.aegis/subagents.json) | `aegis tw:setup` | - |
+| `/tw:push` or `/aegis push` | Autonomous Demir Kafes pre-push gate, staging, commit & remote push | `aegis push` | `teamwork_push` |
 
 ## Flags
 - `--compact` / `-c`: Generate 85%-95% token-saving compact wire format / mission briefing.
@@ -53,3 +54,11 @@ This skill activates when the user triggers `/tw`, `/aegis tw`, `/aegis teamwork
 - Max 40 lines per function.
 - Strictly 0 `any`.
 - 100% pre-commit test pass.
+
+## Autonomous Post-Verification Push Shield
+When subagent tracks finish and pre-push quality gates (`cage:check` + monorepo tests) pass 100%, Team Lead autonomously publishes changes directly to origin:
+1. Validates non-interactive git environment (`$env:GIT_TERMINAL_PROMPT = "0"`).
+2. Verifies GitHub CLI authentication status (`gh auth status`).
+3. Automatically stages remaining untracked/modified files and creates semantic commit.
+4. Executes `npm run aegis -- push` or `git push origin master` with finite timeout (10s).
+5. Never leaves completed and verified work unpushed as orphaned local commits.

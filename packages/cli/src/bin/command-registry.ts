@@ -167,5 +167,10 @@ export const COMMAND_MAP: Record<string, CommandHandler> = {
   'tw:batch': async (a) => (await import('../commands/teamwork-mesh-command.js')).handleTeamworkBatch(a[1], ...a.slice(2)),
   'tw:doc': async (a) => (await import('../commands/teamwork-mesh-command.js')).handleTeamworkDoc(a[1], ...a.slice(2)),
   'tw:synthesize': async (a) => (await import('../commands/teamwork-mesh-command.js')).handleTeamworkDoc(a[1], ...a.slice(2)),
-  'tw:advance': async (a) => (await import('../commands/teamwork-mesh-command.js')).handleTeamworkAdvance(a[1])
+  'tw:advance': async (a) => (await import('../commands/teamwork-mesh-command.js')).handleTeamworkAdvance(a[1]),
+  push: async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
+  'git:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
+  'gh:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
+  'tw:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
+  'teamwork:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); }
 };
