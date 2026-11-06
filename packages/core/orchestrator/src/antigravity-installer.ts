@@ -8,8 +8,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
-const SKILL_NAMES: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'cage'];
-const SHIM_COMMANDS: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw'];
+const SKILL_NAMES: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'cage', 'tr'];
+const SHIM_COMMANDS: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw', 'tr'];
 
 export class AntigravityInstaller {
   public static cleanLegacy(userHome: string): void {

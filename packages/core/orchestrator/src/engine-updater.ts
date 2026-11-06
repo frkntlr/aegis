@@ -210,7 +210,7 @@ export class EngineUpdater {
     const userHome = process.env.USERPROFILE || process.env.HOME || 'C:\\Users\\Lenovo';
     const binDir = path.resolve(userHome, '.gemini', 'antigravity', 'bin');
     if (!fs.existsSync(binDir)) return [];
-    return fs.readdirSync(binDir).filter(f => f.startsWith('aegis') || f.startsWith('tw'));
+    return fs.readdirSync(binDir).filter(f => f.startsWith('aegis') || f.startsWith('tw') || f.startsWith('tr'));
   }
 
   private static countMcpTools(): number {

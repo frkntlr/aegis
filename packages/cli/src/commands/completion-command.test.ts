@@ -15,6 +15,8 @@ import {
 test('ALL_AEGIS_COMMANDS includes key subcommands and aliases', () => {
   assert.ok(ALL_AEGIS_COMMANDS.includes('tw'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('tw:plan'));
+  assert.ok(ALL_AEGIS_COMMANDS.includes('tr'));
+  assert.ok(ALL_AEGIS_COMMANDS.includes('tr:plan'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('tw:status'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('tw:compact'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('tw:clear'));

@@ -8,7 +8,7 @@ import { showBanner } from '../commands/banner.js';
 
 export const HELP_CATEGORIES: Record<string, string[]> = {
   '🤝 Antigravity Teamwork & Subagents': [
-    '  aegis teamwork | tw [status]           View active Antigravity subagents and locked tracks',
+    '  aegis teamwork | tw | tr [status]      View active Antigravity subagents and locked tracks',
     '  aegis tw:status                        Inspect active Antigravity subagents and locks',
     '  aegis tw "<objective>" [files...]      Direct subagent planning & TIP staging (--compact, --json, --dry-run)',
     '  aegis tw:plan "<objective>"            Generate Antigravity subagent plan and stage in TIP inbox',

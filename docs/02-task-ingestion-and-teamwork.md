@@ -74,7 +74,14 @@ Birden fazla ajanın aynı dosyaya eşzamanlı yazarak merge çakışması oluş
 
 ---
 
-## 4. Antigravity Subagent Teamwork Protokolü
+## 4. Antigravity Subagent Teamwork Protokolü (`/tr` & `/tw`)
+
+> [!IMPORTANT]
+> **Evrensel %100 Eşdeğerlik:** `tr`, `tw` ve `teamwork` komutları tüm alt komutlarda %100 özellik eşdeğerliğine sahiptir (`tr` ≡ `tw` ≡ `teamwork`).
+> 
+> **/tr ve /tw Otonom Koordinatör:** Kullanıcı `/tr "<hedef>"` veya `/tw "<hedef>"` komutunu verdiğinde ana ajan Team Lead rolünü üstlenir; uzman alt ajanları dinamik tanımlar (`define_subagent`) ve eşzamanlı (`invoke_subagent`, `Workspace: 'share'`) çalıştırır.
+
+### Hibrit Uzman Ajan Rolleri
 
 Aegis, monolitik tek model yaklaşımı yerine hibrit model tahsisine dayalı 4 uzman ajan rolü tanımlar:
 
@@ -85,13 +92,16 @@ Aegis, monolitik tek model yaklaşımı yerine hibrit model tahsisine dayalı 4 
 | **ui-specialist** | `🎨 [UI SPECIALIST] AKTİF` | Godot sahneleri (`.tscn`), Temalar (`.tres`), responsive anchorlar | `inherit` (Pro) | `share` / worktree |
 | **doc-architect** | `📚 [DOC ARCHITECT] AKTİF` | GitHub Yaşayan Wiki, RFC karar kayıtları, modüler belgeler | `flash` | `share` / worktree |
 
+### 3-Kademeli Paralel Dalga Yürütmesi
+1. **Wave 1 (Paralel Yürütme ⚡):** `issue-solver` ve `ui-specialist` çakışmasız batch dosya kilitleriyle (`acquireBatchLocks`) eşzamanlı çalışır, mesh'e anlık telemetri yazar (`aegis tr:post`).
+2. **Wave 2 (Kalite Kapısı 🔒):** `qa-hunter` devreye girerek regresyon testleri, mutasyon testi (%70) ve Sokratik triyajı çalıştırır (`aegis tr:advance`).
+3. **Wave 3 (Yaşayan Mimari 🏛️):** `doc-architect` yaşayan mimari brifingi (`aegis tr:doc`), Mermaid topolojisi ve ADR kararlarını derler.
+4. **Otonom GitHub Yayını:** Bütün roller `[ROLE_COMPLETE: <role>]` verdiğinde `aegis tr:push` ile uzaktaki depoya güvenli push edilir.
+
 ### Hibrit Model Tahsisinin Faydaları
 - **Maliyet ve Hız:** Dokümantasyon ve Wiki senkronizasyonu yüksek verimli `flash` modelleriyle yapılarak token maliyetinde **%70 tasarruf** sağlanır.
 - **Derin Muhakeme:** Kritik AST dönüşümleri ve mutasyon testleri yüksek akıl yürütme seviyesine sahip `pro` modellerine emanet edilir.
 - **Reaktif Uyandırma:** Ajanlar arka plan işlerini sürekli sorgulamaz (*zero busy-wait*); mesaj bildirimleriyle reaktif olarak uyanır.
-
----
-
 ## 5. 4-Aşamalı Atomik Merge Pipeline
 
 İşi biten bir ajanın kodu ana depoya aktarılırken deterministik 4 adım işletilir:

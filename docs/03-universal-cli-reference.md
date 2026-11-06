@@ -12,6 +12,8 @@ Aegis CLI, `packages/cli` altında TypeScript ile geliştirilmiş, 50'den fazla 
 # Sistem genelinde evrensel ikili
 aegis <komut> [argümanlar]
 aegist <komut> [argümanlar]
+tw <komut> [argümanlar]
+tr <komut> [argümanlar]
 
 # Monorepo içinden çalıştırma
 npm run aegis -- <komut> [argümanlar]
@@ -39,6 +41,14 @@ npm run aegis -- <komut> [argümanlar]
 | `aegis contribute` | `<issue> [agent]` | Dış katkıcı için izole worktree, hedef dosya kilitleri ve cerrahi prompt oluşturur. |
 | `aegis merge` | `<role> [branch]` | 4-aşamalı atomik merge pipeline ve dinamik kardeş worktree senkronizasyonu çalıştırır. |
 | `aegis branch:sync`| `[agent\|--all]` | Worktree dallarını master ile veri kaybı olmadan (stash korumalı) senkronize eder. |
+| `aegis tr "<obj>"` / `tw` | `<obj> [-c]` | Doğrudan hedef planlama, DAG ayrıştırma ve atomik batch kilitlerle TIP sahneleme. |
+| `aegis tr:waves` / `tw:waves` | `[obj] [-c]` | 3-fazlı paralel yürütme dalgalarını ve brifingini hesaplar (`-c` kompakt). |
+| `aegis tr:peers` / `tw:peers` | `[-c]` | Aktif kardeş subagent'ların durumunu, kilitlerini ve kontratlarını listeler. |
+| `aegis tr:radar` / `tw:radar` | Yok | Canlı dosya çakışma radarı (`tr:conflicts`). |
+| `aegis tr:doc` / `tw:doc` | `[id] [-c]` | Yaşayan mimari sentez raporu, Mermaid topolojisi ve ADR'leri derler (`tr:synthesize`). |
+| `aegis tr:advance` / `tw:advance` | `[id]` | Aktif yürütme dalgasını sonraki faz dalgasına pürüzsüzce ilerletir. |
+| `aegis tr:scale` / `tw:scale` | `"<obj>" [-n]` | 12+ subagent'a kadar %100 çakışmasız mikro-bölümleme planı oluşturur. |
+| `aegis tr:push` / `tw:push` | `[--dry-run]` | Demir Kafes kalkanı, çalışma dizini commit'leme ve GitHub'a otonom push. |
 
 ### 2.2. 5-Katmanlı Kod Tabanı Hafızası & Bağımlılıklar
 

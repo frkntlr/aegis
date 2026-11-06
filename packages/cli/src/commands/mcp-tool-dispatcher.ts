@@ -228,25 +228,26 @@ export async function executeMcpTool(name: string, args: Record<string, unknown>
   if (name === 'task_release') return await mcpTaskRelease(args);
   if (name === 'task_inbox_pull') return mcpTaskInboxPull(args);
   if (name === 'lock_status') return mcpLockStatus();
-  if (name === 'teamwork_plan') return mcpTeamworkPlan(args);
-  if (name === 'teamwork_status') return mcpTeamworkStatus();
-  if (name === 'teamwork_compact') return mcpTeamworkCompact(args);
-  if (name === 'teamwork_analyze') return mcpTeamworkAnalyze(args);
-  if (name === 'teamwork_dag') return mcpTeamworkDag(args);
-  if (name === 'teamwork_mesh_read') return mcpTeamworkMeshRead(args);
-  if (name === 'teamwork_mesh_post') return mcpTeamworkMeshPost(args);
-  if (name === 'teamwork_broadcast') return mcpTeamworkBroadcast(args);
-  if (name === 'teamwork_peers') return mcpTeamworkPeers(args);
-  if (name === 'teamwork_waves') return mcpTeamworkWaves(args);
-  if (name === 'teamwork_conflicts') return mcpTeamworkConflicts();
-  if (name === 'teamwork_scale') return mcpTeamworkScale(args);
-  if (name === 'teamwork_doc_synthesize') return mcpTeamworkDocSynthesize(args);
+  const canonical = name.replace(/^(tr|tw)_/, 'teamwork_');
+  if (canonical === 'teamwork_plan') return mcpTeamworkPlan(args);
+  if (canonical === 'teamwork_status') return mcpTeamworkStatus();
+  if (canonical === 'teamwork_compact') return mcpTeamworkCompact(args);
+  if (canonical === 'teamwork_analyze') return mcpTeamworkAnalyze(args);
+  if (canonical === 'teamwork_dag') return mcpTeamworkDag(args);
+  if (canonical === 'teamwork_mesh_read') return mcpTeamworkMeshRead(args);
+  if (canonical === 'teamwork_mesh_post') return mcpTeamworkMeshPost(args);
+  if (canonical === 'teamwork_broadcast') return mcpTeamworkBroadcast(args);
+  if (canonical === 'teamwork_peers') return mcpTeamworkPeers(args);
+  if (canonical === 'teamwork_waves') return mcpTeamworkWaves(args);
+  if (canonical === 'teamwork_conflicts') return mcpTeamworkConflicts();
+  if (canonical === 'teamwork_scale') return mcpTeamworkScale(args);
+  if (canonical === 'teamwork_doc_synthesize') return mcpTeamworkDocSynthesize(args);
   if (name === 'github_rfc_pipeline') {
     const { handleRfcPipeline } = await import('./rfc-pipeline-command.js');
     await handleRfcPipeline(String(args.rfc || ''), args.description ? String(args.description) : undefined);
     return JSON.stringify({ status: 'ok', rfc: args.rfc }, null, 2);
   }
-  if (name === 'git_push' || name === 'teamwork_push') {
+  if (name === 'git_push' || canonical === 'teamwork_push') {
     const { mcpGitPush } = await import('./git-push-command.js');
     return mcpGitPush(args);
   }

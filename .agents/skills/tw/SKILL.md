@@ -9,6 +9,18 @@ description: >-
 # Aegis Antigravity Teamwork (/tw, /aegis tw)
 
 This skill activates when the user triggers `/tw`, `/aegis tw`, `/aegis teamwork`, or requests multi-agent autonomous execution.
+`tr` is a universal first-class alias for `tw` and `teamwork` with 100% feature parity.
+
+## Antigravity Team Lead Autonomous Protocol
+Whenever the user triggers `/tw` or `/tr` or requests multi-agent teamwork:
+1. **Immediate Lead Action**: Adopt the Team Lead role. Never execute sequentially as a single agent.
+2. **Plan & Stage**: Run `aegis tw "<objective>"` or call MCP `teamwork_plan`.
+3. **Print Live Task Matrix**: Display the running subagent tracks, locked files, and models.
+4. **Define & Concurrently Invoke Subagents**:
+   - Register roles via `define_subagent` (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`).
+   - Concurrently call `invoke_subagent` for each active track using `Workspace: 'share'` and hybrid models.
+5. **Monitor & Wave Advancement**: Subagents execute in parallel, update via Dynamic Teamwork Mesh (`aegis tw:post`, `aegis tw:peers`), and report back with `[ROLE_COMPLETE: <role>]`.
+6. **Consolidation, Quality Gates & Push**: Once all tracks complete, verify via `cage:check` + monorepo tests, and autonomously publish to origin via `aegis tw:push`.
 
 ## Quick CLI Reference
 

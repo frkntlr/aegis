@@ -11,7 +11,9 @@
     "aegist": "dist/bin/aegis.js",
     "tw": "dist/bin/aegis.js",
     "aegis-tw": "dist/bin/aegis.js",
-    "aegist-tw": "dist/bin/aegis.js"
+    "aegist-tw": "dist/bin/aegis.js",
+    "tr": "dist/bin/aegis.js",
+    "aegis-tr": "dist/bin/aegis.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
