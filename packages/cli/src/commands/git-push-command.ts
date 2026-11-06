@@ -114,7 +114,9 @@ export class GitPushManager {
         cwd: this.repoRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...cleanGitEnv(), GIT_TERMINAL_PROMPT: '0' }
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: 60000,
+        env: { ...cleanGitEnv(), GCM_INTERACTIVE: 'never', GIT_TERMINAL_PROMPT: '0' }
       });
       return { success: true, message: out.trim() || `Pushed ${branch} to origin successfully.` };
     } catch (err: unknown) {
