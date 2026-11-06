@@ -15,7 +15,8 @@ test('handleJsonRpc handles tools/list request with 29 authoritative tools', asy
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 32);
+  assert.strictEqual(result.tools.length, 40);
+  assert.ok(result.tools.some(t => t.name === 'teamwork_doc_synthesize'));
 
   const names = result.tools.map(t => t.name);
   assert.ok(names.includes('teamwork_plan'));
@@ -258,5 +259,17 @@ test('handleJsonRpc executes teamwork_plan and teamwork_status tools', async () 
   const statusParsed = JSON.parse(statusContent);
   assert.strictEqual(typeof statusParsed.activeTracksCount, 'number');
   assert.strictEqual(statusParsed.profiles.length, 4);
+});
+
+test('handleJsonRpc executes teamwork_doc_synthesize tool', async () => {
+  const docRes = await handleJsonRpc({
+    jsonrpc: '2.0',
+    id: 19,
+    method: 'tools/call',
+    params: { name: 'teamwork_doc_synthesize', arguments: { compact: true } }
+  });
+  assert.ok(docRes);
+  const content = (docRes.result as { content: Array<{ type: string; text: string }> }).content[0].text;
+  assert.ok(content.startsWith('[ARCH-SYNTHESIS:'));
 
 });

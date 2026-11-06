@@ -9,9 +9,8 @@ import * as path from 'node:path';
 import { showBanner } from './banner.js';
 
 export const ALL_AEGIS_COMMANDS: readonly string[] = [
-  'tw', 'tw:plan', 'tw:status', 'tw:compact', 'tw:clear', 'tw:dag', 'tw:matrix', 'tw:analyze', 'tw:setup',
-  'aegis-tw', 'aegist-tw',
-  'teamwork', 'teamwork:status', 'teamwork:plan', 'teamwork:compact', 'teamwork:clear', 'teamwork:dag', 'teamwork:matrix', 'teamwork:analyze', 'teamwork:setup',
+  'tw', 'tw:plan', 'tw:status', 'tw:compact', 'tw:clear', 'tw:dag', 'tw:matrix', 'tw:analyze', 'tw:setup', 'tw:mesh', 'tw:peers', 'tw:post', 'tw:broadcast', 'tw:waves', 'tw:radar', 'tw:conflicts', 'tw:scale', 'tw:batch', 'tw:doc', 'tw:synthesize', 'tw:advance',
+  'teamwork', 'teamwork:status', 'teamwork:plan', 'teamwork:compact', 'teamwork:clear', 'teamwork:dag', 'teamwork:matrix', 'teamwork:analyze', 'teamwork:setup', 'teamwork:mesh', 'teamwork:peers', 'teamwork:post', 'teamwork:broadcast', 'teamwork:waves', 'teamwork:radar', 'teamwork:conflicts', 'teamwork:scale', 'teamwork:batch', 'teamwork:doc', 'teamwork:synthesize', 'teamwork:advance',
   'init', 'status', 'auto', 'prompt', 'contribute',
   'rfc', 'rfc:triage', 'rfc:create', 'rfc:approve', 'rfc:decompose', 'ideate',
   'nlm:sync', 'nlm:query', 'nlm:research', 'nlm:sources', 'nlm:poll', 'nlm:import', 'nlm:prune', 'nlm:restore', 'nlm:auth', 'nlm:switch', 'switch',
@@ -32,7 +31,7 @@ export function generatePowerShellCompletion(commands = ALL_AEGIS_COMMANDS): str
   return [
     '# Aegis PowerShell Tab Completion Block',
     `$script:aegisCommands = @(${cmdsList})`,
-    "Register-ArgumentCompleter -Native -CommandName 'aegis', 'aegis.ps1', 'aegist', 'aegist.ps1', 'tw', 'tw.ps1', 'aegis-tw', 'aegis-tw.ps1', 'aegist-tw', 'aegist-tw.ps1' -ScriptBlock {",
+    "Register-ArgumentCompleter -Native -CommandName 'aegis', 'aegis.ps1' -ScriptBlock {",
     '    param($wordToComplete, $commandAst, $cursorPosition)',
     '    $script:aegisCommands | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {',
     "        [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)",
@@ -43,12 +42,15 @@ export function generatePowerShellCompletion(commands = ALL_AEGIS_COMMANDS): str
 
 export function generateBashCompletion(commands = ALL_AEGIS_COMMANDS): string {
   const words = commands.join(' ');
+  const curVar = '$' + '{COMP_WORDS[COMP_CWORD]}';
+  const wordsVar = '$' + '{words}';
+  const curExpand = '$' + '{cur}';
   return [
     '# Aegis Bash Tab Completion',
     '_aegis_completions() {',
-    '    local cur="${COMP_WORDS[COMP_CWORD]}"',
+    `    local cur="${curVar}"`,
     `    local words="${words}"`,
-    '    COMPREPLY=($(compgen -W "${words}" -- "${cur}"))',
+    `    COMPREPLY=($(compgen -W "${wordsVar}" -- "${curExpand}"))`,
     '}',
     'complete -F _aegis_completions aegis'
   ].join('\n');
@@ -77,64 +79,31 @@ export function installToProfile(customPath?: string): boolean {
   }
 }
 
-function resolveAntigravityBinPaths(): string[] {
-  const paths: string[] = [];
-  const home = process.env.USERPROFILE || process.env.HOME;
-  if (!home) return paths;
+function resolveAntigravityBinPath(): string | null {
+  const candidates = [
+    'C:\\Users\\Lenovo\\AntigravityProfiles\\client-a\\.gemini\\antigravity\\bin\\aegis.ps1',
+    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, '.gemini', 'antigravity', 'bin', 'aegis.ps1') : null,
+    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AntigravityProfiles', 'client-a', '.gemini', 'antigravity', 'bin', 'aegis.ps1') : null
+  ].filter(Boolean) as string[];
 
-  const defaultBin = path.join(home, '.gemini', 'antigravity', 'bin', 'aegis.ps1');
-  if (fs.existsSync(defaultBin)) paths.push(defaultBin);
-
-  const profilesDir = path.join(home, 'AntigravityProfiles');
-  if (fs.existsSync(profilesDir)) {
-    try {
-      const dirs = fs.readdirSync(profilesDir);
-      for (const d of dirs) {
-        const binFile = path.join(profilesDir, d, '.gemini', 'antigravity', 'bin', 'aegis.ps1');
-        if (fs.existsSync(binFile) && !paths.includes(binFile)) {
-          paths.push(binFile);
-        }
-      }
-    } catch {
-      // ignore
-    }
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
   }
-  return paths;
+  return null;
 }
 
 export function installToBinScript(customPath?: string): boolean {
-  if (customPath) {
-    if (!fs.existsSync(customPath)) return false;
-    try {
-      const existing = fs.readFileSync(customPath, 'utf8');
-      if (existing.includes('Register-ArgumentCompleter')) return true;
-      const injected = generatePowerShellCompletion() + '\r\n\r\n' + existing;
-      fs.writeFileSync(customPath, injected, 'utf8');
-      return true;
-    } catch {
-      return false;
-    }
+  const binPath = customPath || resolveAntigravityBinPath();
+  if (!binPath || !fs.existsSync(binPath)) return false;
+  try {
+    const existing = fs.readFileSync(binPath, 'utf8');
+    if (existing.includes('Register-ArgumentCompleter')) return true;
+    const injected = generatePowerShellCompletion() + '\r\n\r\n' + existing;
+    fs.writeFileSync(binPath, injected, 'utf8');
+    return true;
+  } catch {
+    return false;
   }
-
-  const binPaths = resolveAntigravityBinPaths();
-  if (binPaths.length === 0) return false;
-
-  let anyOk = false;
-  for (const binPath of binPaths) {
-    try {
-      const existing = fs.readFileSync(binPath, 'utf8');
-      if (existing.includes('Register-ArgumentCompleter')) {
-        anyOk = true;
-        continue;
-      }
-      const injected = generatePowerShellCompletion() + '\r\n\r\n' + existing;
-      fs.writeFileSync(binPath, injected, 'utf8');
-      anyOk = true;
-    } catch {
-      // continue
-    }
-  }
-  return anyOk;
 }
 
 function runInstall(): void {

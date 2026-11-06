@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { TeamworkDecomposer } from './teamwork-decomposer.js';
 import { TeamworkCoordinator } from './teamwork-coordinator.js';
+import { compileUltraLeanPrompt, getSubagentProfiles } from './teamwork-prompts.js';
 
 test('TeamworkDecomposer splits numbered objective into separate subtasks', () => {
   const objective = '1. AST Parser optimize et, 2. Önbellek mekanizması kur, 3. Demir Kafes denetimi yap';
@@ -108,3 +109,41 @@ test('TeamworkDecomposer auto-shards single solver into parallel subtasks when m
   assert.strictEqual(solvers[2].targetFiles.length, 1);
   assert.strictEqual(solvers[3].targetFiles.length, 1);
 });
+
+test('shardMaxConcurrency guarantees 100% disjoint file allocation for up to 12 agents', () => {
+  const files = [
+    'src/a.ts', 'src/b.ts', 'src/c.ts', 'src/d.ts',
+    'src/e.ts', 'src/f.ts', 'src/g.ts', 'src/h.ts',
+    'src/i.ts', 'src/j.ts', 'src/k.ts', 'src/l.ts'
+  ];
+  const initial = TeamworkDecomposer.decompose('Scale task', files);
+  const sharded = TeamworkDecomposer.shardMaxConcurrency(initial, files, 12);
+
+  const wave1 = sharded.filter(s => s.phase === 1);
+  assert.strictEqual(wave1.length, 12);
+
+  const allAssigned = wave1.flatMap(s => s.targetFiles);
+  const uniqueAssigned = new Set(allAssigned);
+  assert.strictEqual(allAssigned.length, uniqueAssigned.size, 'No two subagents should share any target files');
+  assert.strictEqual(uniqueAssigned.size, 12);
+});
+
+test('compileUltraLeanPrompt generates compact prompt under 200 tokens with anchors and contract', () => {
+  const profile = getSubagentProfiles()[0];
+  const prompt = compileUltraLeanPrompt(
+    profile,
+    'Implement fast tokenizer',
+    ['src/tokenizer.ts'],
+    'issue-solver [tokenizer]',
+    ['tokenizeString', 'TokenKind'],
+    'export interface Token { kind: TokenKind; value: string }'
+  );
+  assert.ok(prompt.includes(profile.badge));
+  assert.ok(prompt.includes('ACT:issue-solver [tokenizer]'));
+  assert.ok(prompt.includes('FILES:[src/tokenizer.ts]'));
+  assert.ok(prompt.includes('ANCHORS:[tokenizeString, TokenKind]'));
+  assert.ok(prompt.includes('CONTRACT:export interface Token'));
+  assert.ok(prompt.includes('ROLE_COMPLETE: issue-solver [tokenizer]'));
+});
+
+

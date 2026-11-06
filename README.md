@@ -6,13 +6,15 @@
 [![Node: >=20](https://img.shields.io/badge/node->=20.0.0-blue.svg)](https://nodejs.org/)
 [![TypeScript: 5.7+](https://img.shields.io/badge/TypeScript-5.7+-3178C6.svg)](https://www.typescriptlang.org/)
 [![Monorepo: Turborepo](https://img.shields.io/badge/monorepo-turbo-EF4444.svg)](https://turbo.build/)
-[![Demir Kafes: 100% Compliant](https://img.shields.io/badge/Demir%20Kafes-100%25%20Clean-success.svg)](#-deterministik-demir-kafes-iron-cage)
-[![MCP Protocol: 19 Native Tools](https://img.shields.io/badge/MCP-19%20Native%20Tools-8A2BE2.svg)](#-yerel-model-context-protocol-mcp-sunucusu-aegis-mcp)
+[![Demir Kafes: 100% Compliant](https://img.shields.io/badge/Demir%20Kafes-100%25%20Clean%20(455%2B%20Files)-success.svg)](#-deterministik-demir-kafes-iron-cage)
+[![MCP Protocol: 40 Native Tools](https://img.shields.io/badge/MCP-40%20Native%20Tools-8A2BE2.svg)](#-yerel-model-context-protocol-mcp-sunucusu-40-araç)
+[![Tests: 812 Passing](https://img.shields.io/badge/Tests-812%20Passing%20(35s)-brightgreen.svg)](#-hızlı-başlangıç-quick-start)
+[![Turbo Replay: 86ms](https://img.shields.io/badge/Turbo%20Replay-86ms-blue.svg)](#-hızlı-başlangıç-quick-start)
 [![Living Wiki: 56 Pages Synchronized](https://img.shields.io/badge/Living%20Wiki-56%20Pages%20Synced-10B981.svg)](https://github.com/frkntlr/aegis/wiki)
 
 Aegis; yapay zeka modellerinin dikkatinin dağılması (**context bloat**), bağlam unutması (**context drop**), uydurma metod/kütüphane üretimi (**AI hallucination**), spagetti/ölü kod üretimi ve sonsuz kilitlenme (**infinite regression / stagnation**) problemlerini ortadan kaldıran yeni nesil otonom yazılım mühendisliği motorudur.
 
-Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Çakışmasız Dosya Kilitleri (Mutex)**, **19 Yerel Stdio MCP Aracı**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
+Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Otomatik Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **40 Yerel Stdio MCP Aracı**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **455+ Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **812 Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
 
 ---
 
@@ -25,7 +27,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [🏛️ Sistem Mimarisi & Akış Şeması](#️-sistem-mimarisi--akış-şeması)
 - [🧠 5-Katmanlı Kod Tabanı Hafıza Motoru](#-5-katmanlı-kod-tabanı-hafıza-motoru)
 - [📥 Çekme Tabanlı Görev Dağıtım Protokolü (TIP)](#-çekme-tabanlı-görev-dağıtım-protokolü-tip)
-- [🔌 Yerel Model Context Protocol (MCP) Sunucusu (19 Araç)](#-yerel-model-context-protocol-mcp-sunucusu-19-araç)
+- [🔌 Yerel Model Context Protocol (MCP) Sunucusu (40 Araç)](#-yerel-model-context-protocol-mcp-sunucusu-40-araç)
 - [🎮 Godot 4.x Oyun Motoru Köprüsü (`@aegis/godot-bridge`)](#-godot-4x-oyun-motoru-köprüsü-aegisgodot-bridge)
 - [🛡️ Deterministik Demir Kafes (Iron Cage)](#️-deterministik-demir-kafes-iron-cage)
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
@@ -58,6 +60,10 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 | **Oturum Kopması & Manuel Çerez Hamallığı:** NotebookLM oturumu düştüğünde sistem sessizce kilitlenir veya manuel token ister. | **Ambient Harvester, Hesap Değiştirme (`aegis nlm:switch`) & Tri-State Protokolü:** Sıfır-tıklama CDP/DPAPI keşfi ve interaktif Antigravity modalı. | **Sıfır Kesinti**, tek tıkla oturum yenileme ve sıfır sessiz düşüş. |
 | **CLI Başlangıç Gecikmesi & Yavaş Komutlar:** Monolitik statik importlar CLI başlatma süresini uzatır, hızlı görev akışını aksatır. | **Dinamik Lazy Loading & Persistent Manifest Önbelleği:** 22 komut dinamik import'a geçirildi; manifest ve git index mtime ile taranır. | **~103ms Cold-Start (2.6x Hızlanma)** ve **<2ms** dosya adayı keşfi. |
 | **Çok Ajanlı Görev Karmaşası & Kilit Yarışları:** Paralel ajanlar için görev planlamak uzun komutlar ve manuel kilit koordinasyonu gerektirir. | **Antigravity Native Teamwork UX (`aegis tw`), Atomic Batch Locks & RTK Compact:** `tw` kısayolları, tek geçişte `acquireBatchLocks()` ve `--compact` bayrağı. | **Tek Komutla Planlama**, sıfır kilit yarışması ve **%85 Token Tasarrufu**. |
+| **Çok Ajanlı Durum Yarışları (Mesh Concurrency):** Eşzamanlı çalışan alt ajanlar ortak mesh veya durum dosyalarına yazarken veri çakışmasına düşer. | **Dynamic Teamwork Mesh Store & Atomic JSON Persistence (`teamwork-mesh-store.ts`):** Benzersiz geçici dosya (`.tmp-<ts>-<rand>`), `fs.renameSync` ve 3 denemeli `Atomics.wait` senkron geri çekilme (backoff). | **Sıfır Yarış Durumu (Zero-Race Condition)**, <0.06ms bellek-içi mtime önbelleği. |
+| **Yetim Kilitler & Depo Kilitlenmesi (Deadlock):** Çöken veya durdurulan alt ajan süreçleri arkalarında bayat dosya kilidi bırakarak diğer ajanları dondurur. | **Worktree Lock Manager & Stale-Lock Pruning (`worktree-lock-manager.ts`):** `isPidAlive` ile ölü PID denetimi (`process.kill(pid, 0)`), 30 dk TTL zaman aşımı ve `.corrupt` karantina koruması. | **Sıfır Kilitlenme**, kendi kendini onaran kalıcı kilit yönetimi. |
+| **Monolitik Godot Sahne Denetimi:** Godot `.tscn` sahneleri ve GDScript kontrolcüleri ayrıştırılırken linter mantığıyla iç içe geçip şişer. | **Ayrık Godot UI AST Ayrıştırıcısı (`GodotUiParser`):** Sahne düğüm hiyerarşisi, konteyner özellikleri ve sinyal bağlantılarını linter'dan bağımsız ayrıştırır. | **Hızlı AST Analizi**, <100 satır bağımsız ayrıştırıcı, sıfır binary bağımlılığı. |
+| **Subagent İstem Şişmesi & Yavaş Testler:** Subagent'lara verilen uzun ve laf kalabalığı istemler gecikmeyi artırır; yavaş testler geliştirme döngüsünü aksatır. | **Ultra-Yalın Mikro-İstemler (<160 Token) & Turbo Build Cache:** Cerrahi sembol çapaları (`ANCHORS`), sözleşmeler (`CONTRACT`) ve 14 pakette 812 test. | **%92 Token Tasarrufu**, 35 saniyede 812 test, **86ms** Full Turbo tekrarı. |
 
 ---
 
@@ -160,13 +166,40 @@ Aegis, ajanların görevleri rastgele seçmesini önlemek için deterministik **
 3. **Kalıcı Dosya Kilitleri (`.aegis/locks.json`):** Görev üzerinde çalışılacak hedef dosyaları kilitler (`lock:<dosya>`).
 4. **Güvenli Teslim (`aegis task:release <id> [status]`):** İşlem bittiğinde dosya kilitleri serbest bırakılır ve durum güncellenir.
 
-### 🤝 Antigravity Native Teamwork Engine & Kolaylaştırılmış CLI UX (`aegis tw`)
+### 🤝 Antigravity Dynamic Teamwork Mesh & Parallel Execution Waves (`aegis tw`)
 
-Aegis, Antigravity autonomous subagent'larının (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) eşzamanlı orkestrasyonunu yüksek hızlı CLI arayüzü ile sunar:
+Aegis, Antigravity autonomous subagent'larının (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) eşzamanlı orkestrasyonunu yüksek hızlı CLI arayüzü ve gerçek zamanlı dinamik mesh (`.aegis/teamwork-mesh.json`) ile sunar:
 
-- **Doğrudan Hedef Çalıştırma:** `aegis tw "<objective>"` komutu hedefi otomatik olarak faz dalgalarına (DAG) ayırır, dosyaları semantik olarak eşler, mutex kilitlerini alır ve TIP kutusuna sahneler.
+- **Doğrudan Hedef Çalıştırma:** `aegis tw "<objective>"` komutu hedefi otomatik olarak faz dalgalarına (DAG) ayırır, dosyaları semantik olarak eşler, mutex kilitlerini atomik alır ve TIP kutusuna sahneler.
+- **3-Kademeli Paralel Yürütme Dalgaları & Pürüzsüz Geçiş (`aegis tw:waves [obj]`):**
+  - **Wave 1 (Parallel Execution Wave ⚡):** Bağımsız kod çözücüler (`issue-solver`) ve UI uzmanları (`ui-specialist`) çakışmasız kilitlerle eşzamanlı (concurrent) olarak tetiklenir.
+  - **Wave 2 (Verification Gate Wave 🔒):** Wave 1 tamamlandığında `qa-hunter` devreye girerek regresyon playtestleri, mutasyon analizi (%70 barajı) ve Sokratik triage kapısını çalıştırır (`aegis tw:advance` ile pürüzsüz geçiş).
+  - **Wave 3 (Living Architecture & Synthesis Wave 🏛️):** Doğrulama tamamlandığında `doc-architect` yaşayan mimari sentezini (`aegis tw:doc`) çalıştırarak Mermaid topolojisi, ADR ve yönetici raporunu üretir.
+- **Dinamik Mesh & Canlı Eşzamanlı Ajan Koordinasyonu:**
+  - `aegis tw:peers`: Çalışan kardeş ajanların canlı faaliyeti, kilitleri, değiştirdiği dosyalar ve yayınladığı arayüz/kontratları görüntüler (`-c` ile %95 tasarruflu tel formatı).
+  - `aegis tw:post "<activity>"`: Anlık kilometre taşı, değiştirilen dosyalar (`--files=...`) ve yayınlanan kontratı (`--contract=...`) meshe bildirir.
+  - `aegis tw:broadcast "<message>"`: Tüm kardeş ajanlara canlı koordinasyon yayını (`milestone`, `contract_update`, `completed`) yapar.
+  - `aegis tw:mesh [clear]`: Canlı dinamik durum ve olay akışını izler veya temizler (`-c` ile tel formatı).
+  - `aegis tw:radar` / `aegis tw:conflicts`: Aktif dosya çakışmalarını ve ortak dosya tahsislerini anlık tespit eden çakışma radarı.
+- **🏛️ İnsan Odaklı Yaşayan Mimari Sentezleyici & Pürüzsüz Dalga Geçişleri:**
+  - **Mimari Sentezleyici (`aegis tw:doc` / `aegis tw:synthesize`):** İnsan odaklı yönetici mimari raporu, Mermaid bileşen topolojisi (`flowchart TD`), performans metrikleri (%92 token tasarrufu, 0.06ms gecikme), Demir Kafes kalite kapısı ve ADR (Mimari Karar Kayıtları) üretir (`-c` ile kompakt özet).
+  - **Pürüzsüz Dalga Geçişleri (`aegis tw:advance`):** Dalgalar arasında (Wave 1 -> Wave 2 -> Wave 3) pürüzsüz ve dinamik geçiş sağlar; kilitleri güvenle yönetir.
+  - **Mikro-Bölümleme & Eşzamanlı Çalıştırma Paketleri (`aegis tw:scale` / `aegis tw:batch`):** Görevleri 12+ eşzamanlı ajana kadar %100 çakışmasız dosya kilitleriyle mikro-böler (`shardMaxConcurrency`) ve paralel batch listesi sunar.
+  - **%95 Token Tasarruflu Tel Formatı (`-c` / `--compact`):** `aegis tw:mesh -c`, `aegis tw:peers -c` ve `aegis tw:waves -c` telemetriyi tek satırlık yoğun tel formatına (`@peer[status]:"act"|mod:[f]|c:[c]`) sıkıştırır.
+  - **Canlı Çakışma Radarı (`aegis tw:radar`):** Çalışan kardeş ajanların değiştirdiği veya kilitlediği dosyalar arasında anlık çakışmaları tarar ve yarış durumlarını kod yazılmadan uyarır.
+  - **Bellek-İçi Mtime Önbelleği & Atomik Yazım:** 0.1ms önbellek okuma ve `fs.renameSync` ile yarışsız atomik durum kaydı.
 - **Hızlı Takma Adlar (Short Aliases):**
   - `tw` / `teamwork`: Temel komut ve doğrudan hedef çalıştırma (`aegis tw "<obj>"`).
+  - `tw:waves`: Paralel eşzamanlı çalıştırma dalgaları ve brifingi (`-c` kompakt, `aegis tw:waves [obj] [-c]`).
+  - `tw:peers`: Kardeş ajan telemetrisi ve aktif kontratlar (`-c` tel formatı, `aegis tw:peers [-c]`).
+  - `tw:radar` / `tw:conflicts`: Canlı dosya çakışma radarı (`aegis tw:radar`).
+  - `tw:doc` / `tw:synthesize`: İnsan odaklı mimari sentez raporu (`aegis tw:doc [id] [-c]`).
+  - `tw:advance`: Sonraki dalgaya pürüzsüz dinamik geçiş (`aegis tw:advance [id]`).
+  - `tw:scale`: 12+ ajana kadar çakışmasız mikro-bölümleme planı (`aegis tw:scale "<obj>"`).
+  - `tw:batch`: Eşzamanlı çalıştırma paketleri brifingi (`aegis tw:batch [id]`).
+  - `tw:post`: Anlık faaliyet ve kontrat yayını (`aegis tw:post "<act>"`).
+  - `tw:broadcast`: Tüm ajanlara canlı bildirim (`aegis tw:broadcast "<msg>"`).
+  - `tw:mesh`: Dinamik mesh durumu (`-c` tel formatı, `aegis tw:mesh [-c]`).
   - `tw:plan`: Hedefi DAG izleklerine bölme (`aegis tw:plan "<obj>"`).
   - `tw:status`: Aktif subagent'ları ve dosya kilitlerini izleme (`aegis tw:status`).
   - `tw:compact`: RTK ve AST skeleton sıkıştırmasıyla %85 token tasarruflu brifing oluşturma (`aegis tw:compact`).
@@ -183,20 +216,24 @@ Aegis, Antigravity autonomous subagent'larının (`issue-solver`, `qa-hunter`, `
   - `acquireBatchLocks()`: Tüm hedef dosya mutex'leri tek geçişte atomik olarak kazanılır, kısmi kilitlenme ve yarış durumları önlenir.
   - `FastSemanticAnalyzer`: Persistent disk caching (`.aegis/cache/fast-semantic-manifest.json` + `.git/index` mtime) ile aday dosya taraması <2ms'ye indirildi.
   - Dinamik Lazy Loading: 22 statik import dinamik hale getirilerek CLI cold-start süresi ~268ms'den ~103ms'ye (2.6x hızlanma) düşürüldü.
+  - Dynamic Teamwork Mesh Store: .aegis/teamwork-mesh.json üzerinde geçici dosya yazımı, fs.renameSync ile atomik takas ve Atomics.wait tabanlı 3 denemeli geri çekilme ile çok ajanlı sıfır yarış durumu garantisi.
+  - WorktreeLockManager & Otomatik Bayat Kilit Budama: process.kill(pid, 0) ile ölü PID temizliği, 30 dk TTL zaman aşımı denetimi ve bozuk JSON'ları .corrupt.<ts> olarak izole eden karantina mekanizması.
+  - Ultra-Yalın Mikro-İstemler: compileUltraLeanPrompt ile <160 tokenlık cerrahi görev istemi, AST sembol çapaları (ANCHORS) ve sözleşme (CONTRACT) enjeksiyonu.
 
 ---
 
-## 🔌 Yerel Model Context Protocol (MCP) Sunucusu (19 Araç)
+## 🔌 Yerel Model Context Protocol (MCP) Sunucusu (40 Araç)
 
-Aegis, bağımsız bir işlem olarak JSON-RPC stdio protokolü üzerinden **Model Context Protocol (MCP)** sunucusu sağlar. Bu sayede Antigravity, Mulgravity, Cursor, Claude Code, VS Code veya Windsurf doğrudan bu araçları çağırabilir:
+Aegis, bağımsız bir işlem olarak JSON-RPC stdio protokolü üzerinden **Model Context Protocol (MCP)** sunucusu sağlar. Bu sayede Google Antigravity, Mulgravity, Cursor, Claude Code, VS Code veya Windsurf doğrudan bu araçları çağırabilir:
 
 ```bash
 # Yerel MCP sunucusunu başlatma
 aegis mcp
 ```
 
-### Sunulan 19 Yerel MCP Aracı
+### Sunulan 40 Yerel MCP Aracı
 
+#### 🧠 5-Katmanlı Hafıza & Kod İnceleme (8 Araç)
 | MCP Aracı | Parametreler | Görev |
 | :--- | :--- | :--- |
 | `memory_query` | `symbol` (str), `worktreeId` (opt) | 5-Katmanlı hafızadan sembol tanımı, cerrahi dilim, çağıranlar, etki alanı ve token tasarrufunu döndürür. |
@@ -207,17 +244,54 @@ aegis mcp
 | `ast_replace` | `pattern` (str), `rewrite` (str), `file` (str) | Hedef dosyada yapısal AST değiştirmesi uygular. |
 | `skeleton_extract`| `filePath` (str) | Fonksiyon gövdelerini gizleyip sadece tip ve arayüz iskeletini çıkarır. |
 | `budget_inspect` | `filePath` (str) | Demir Kafes satır ve fonksiyon bütçesi kota durumunu ve modülerleşme önerilerini inceler. |
-| `cage_check` | `dir` (opt) | Belirtilen dizini Demir Kafes (300/40) kurallarına ve Fast-Stat radarına göre denetler. |
+
+#### 🛡️ Kalite Güvencesi & Sokratik Teşhis (5 Araç)
+| MCP Aracı | Parametreler | Görev |
+| :--- | :--- | :--- |
+| `cage_check` | `dir` (opt) | Belirtilen dizini Demir Kafes (300/40/0 any) kurallarına ve Fast-Stat radarına göre denetler. |
 | `triage` | `dir` (opt) | Kanıt Tabanlı Hata Tespiti çalıştırır; somut kanıtı olmayan varsayımsal bug'ları eler. |
 | `socratic_diagnose`| `rawLog` (str) | Yığın izini ayrıştırıp Sokratik hipotezler ve önceliklendirilmiş tanı üretir. |
 | `context7_query`| `library` (str), `topic` (str) | Resmi ve doğrulanmış kütüphane dokümantasyonunu ve imza bilgilerini getirir. |
 | `rtk_compress` | `text` (str) | Terminal ve test loglarındaki ANSI kodlarını, gereksiz tekrarları %90 oranında temizleyip sıkıştırır. |
+
+#### 📥 TIP Görev Protokolü & Worktree Kilitleri (6 Araç)
+| MCP Aracı | Parametreler | Görev |
+| :--- | :--- | :--- |
 | `worktree_status` | Yok | Aktif worktree dallarını ve aktif dosya kilitlerini raporlar. |
 | `task_list` | `status` (opt) | TIP kuyruğundaki görevleri listeler (ready, in_progress, blocked). |
 | `task_claim` | `issueNumber` (num), `agentRole` (str) | Görevi ilgili ajan rolü adına üstlenir ve hedef dosya kilitlerini edinir. |
 | `task_release` | `issueNumber`, `status`, `agentRole` | Görevi tamamlar/bırakır ve dosya kilitlerini serbest bırakır. |
 | `task_inbox_pull` | `agentRole` (opt) | TIP kutusundan (`.aegis/task-inbox.json`) sıradaki sahnelenmiş görevi atomik çeker. |
 | `lock_status` | Yok | Aktif dosya kilitleri matrisini ve kilidi tutan ajanları listeler. |
+
+#### 🤝 Antigravity Teamwork & Dinamik Mesh (13 Araç)
+| MCP Aracı | Parametreler | Görev |
+| :--- | :--- | :--- |
+| `teamwork_plan` | `objective` (str), `targetFiles` (opt) | Hedefi alt izleklere böler, mutex kilitlerini atomik alır ve TIP kutusuna sahneler. |
+| `teamwork_status` | Yok | Aktif subagent durumlarını, modellerini ve kilitli dosyalarını izler. |
+| `teamwork_dag` | `objective` (str), `targetFiles` (opt) | Görev bağımlılıklarının terminalde ASCII dalga grafiğini üretir. |
+| `teamwork_compact`| `objective` (opt) | Tamamlanan görevleri arşivler ve %85 token tasarruflu Antigravity Compact brifingi üretir. |
+| `teamwork_analyze`| `objective` (str), `files` (opt) | Persistent disk önbelleğiyle (<2ms) hedef dosyaları keşfeder ve semantik puanlar. |
+| `teamwork_mesh_read`| `compact` (bool), `since` (opt) | Dinamik Teamwork Mesh durumunu, çalışan subagent'ları ve olayları okur (-c destekli). |
+| `teamwork_mesh_post`| `agentId` (str), `status`, `activity`, `modifiedFiles`, `publishedContracts` | Ajan durumunu, değiştirilen dosyaları ve dışa aktarılan arayüzleri meshe yazar. |
+| `teamwork_broadcast`| `fromAgent` (str), `message` (str), `type` (opt) | Kardeş ajanlara canlı kilometre taşı veya koordinasyon yayını yapar. |
+| `teamwork_peers` | `compact` (bool) | Aktif dalgadaki kardeş ajanları, durumlarını ve kilitlerini listeler (%95 tel formatı). |
+| `teamwork_waves` | `objective` (opt), `targetFiles` (opt), `compact` (bool) | 3-fazlı paralel çalıştırma dalgalarını ve eşzamanlı çalıştırma gruplarını hesaplar. |
+| `teamwork_conflicts`| Yok | Canlı Çakışma Radarı; kardeş ajanlar arasındaki çakışan dosya tahsislerini anlık tespit eder. |
+| `teamwork_scale` | `objective` (str), `maxAgents` (opt) | 12+ subagent'a kadar %100 çakışmasız dosya kilit garantili mikro-bölümleme planı sunar. |
+| `teamwork_doc_synthesize`| `planId` (opt), `compact` (bool) | İnsan odaklı yaşayan mimari sentez raporu, Mermaid topolojisi, metrikler ve ADR derler. |
+
+#### 🎮 Godot Substrate 3.0 Paketi (8 Araç)
+| MCP Aracı | Parametreler | Görev |
+| :--- | :--- | :--- |
+| `aegis_godot_status` | Yok | Godot binary yolunu, sürümünü ve köprü bağlantı durumunu doğrular. |
+| `aegis_godot_playtest` | `projectDir` (opt), `scenarioPath` (opt) | Headless veya interaktif otomatik Godot test senaryosunu yürütür. |
+| `aegis_godot_inspect_ui` | `projectDir` (opt), `minTouchTarget` (opt) | 4 kanonik en-boy oranında (16:9, 21:9, 16:10, 9:16) sıfır-token duyarlı UI denetimi yapar. |
+| `aegis_godot_tree` | `tscnPath` (str) | Çalışan oyundan veya `.tscn` dosyasından sahne düğüm ağacı hiyerarşisini çıkarır. |
+| `aegis_godot_signals` | `className` (str) | ClassDB üzerinden Godot sınıflarının sinyal tanımlarını ve bağlantılarını listeler. |
+| `aegis_godot_screenshot` | `outputPath` (opt) | Yüksek çözünürlüklü framebuffer ekran görüntüsü yakalayıp yerel PNG kaydeder. |
+| `aegis_godot_validate` | `filePath` (str) | GDScript sözdizimini yerel derleyiciyle doğrular ve ClassDB API kullanımını denetler. |
+| `aegis_godot_eval` | `expression` (str) | Yansıma (reflection) ile çalışan oyun örneğinde GDScript ifadesi değerlendirir. |
 
 ---
 
@@ -232,6 +306,7 @@ Aegis, Godot 4.x tabanlı oyun ve simülasyon projeleri için derinlemesine öze
 - 🛡️ **Multimodal Kalite Kapısı (`aegis verify:task [file]`):** Demir Kafes AST uyumu ve Headless Playtesti tek adımda doğrulayarak Playtest-Before-PR garantisi sunar.
 - 🛠️ **Otomatik Köprü Kurulumu (`aegis godot init`):** Projeye `addons/aegis_bridge/` eklentisini kurar, `project.godot` ayarlarını yapılandırır.
 - 🔍 **GDScript Statik Doğrulama (`aegis godot validate <file>`):** Tip güvenliği, sinyal bağlantıları ve isimlendirme standartlarını AST düzeyinde denetler.
+- 🧩 **Ayrık Godot UI AST Ayrıştırıcısı (`GodotUiParser`):** Godot 4 `.tscn` sahnelerini (`[node]`, `[connection]`) ve GDScript kontrolcü fonksiyonlarını (`func ...`) motor binary'si çalıştırmadan statik AST düzeyinde ayrıştıran, linter'dan tamamen bağımsızlaştırılmış modül (< 100 satır).
 
 ---
 
@@ -247,6 +322,7 @@ Aegis, Godot 4.x tabanlı oyun ve simülasyon projeleri için derinlemesine öze
 5. **Sadece Cerrahi Unified Diff:** Modellerin bir dosyayı baştan sona silip yeniden yazması (`full-file rewrite`) yasaktır.
 6. **Ölü Kod Yasağı:** Projede çağrılmayan ölü export, gereksiz import ve atıl fonksiyonlar bırakılamaz.
 7. **Anti-Hang STDIN Güvenliği:** Asılı kalan eski `npx ast-grep` kullanımı yasaktır; yerel `aegis ast:search` zorunludur.
+8. **Monorepo Genelinde 455+ Dosya Uyum Doğrulaması:** 14 paketteki 455 kaynak dosyası taranmış, %100 tam uyum (`455 / 455 Compliant`), 0 `any` tipi ve 0 kota uyarısı ile mimari temizlik doğrulanmıştır.
 
 ```bash
 # Projeyi Demir Kafes kurallarına göre denetleme
@@ -468,6 +544,16 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>` veya 
 | `aegis search <query>` | 100+ alt komutu anahtar kelimeye göre anlık filtreler (takma ad: `aegis help <query>`). |
 | `aegis completion [--install]` | PowerShell ve Bash için tab-tamamlama betiği üretir veya profiline (`$PROFILE`) kurar. |
 | `aegis tw "<obj>"` | Doğrudan hedef çalıştırma, DAG izleklerine bölme ve atomik batch kilitlerle TIP sahneleme (`-c`, `-j`, `--dry-run`). |
+| `aegis tw:waves [obj]` | 2-aşamalı paralel yürütme dalgalarını ve brifingini hesaplar (`-c` kompakt brifing). |
+| `aegis tw:peers` | Aktif kardeş subagent'ların durumunu, kilitlerini ve kontratlarını listeler (`-c` tel formatı). |
+| `aegis tw:radar` | Canlı dosya çakışma radarı; kardeş ajanlar arasındaki çakışan dosya tahsislerini anlık tespit eder. |
+| `aegis tw:doc [id]` | İnsan odaklı mimari sentez raporu, Mermaid topolojisi ve ADR'leri derler (`-c` kompakt). |
+| `aegis tw:advance` | Aktif yürütme dalgasını sonraki faz dalgasına pürüzsüzce ilerletir. |
+| `aegis tw:scale "<obj>"` | 12+ subagent'a kadar %100 çakışmasız kilit garantili mikro-bölümleme planı oluşturur. |
+| `aegis tw:batch [id]` | Eşzamanlı çalıştırma dalga paketlerini listeler. |
+| `aegis tw:post "<act>"` | Ajan faaliyetini, değiştirilen dosyaları ve kontratları dinamik meshe yazar. |
+| `aegis tw:broadcast "<msg>"` | Kardeş subagent'lara anlık koordinasyon ve kilometre taşı yayını yapar. |
+| `aegis tw:mesh [clear]` | Dinamik gerçek zamanlı teamwork mesh durumunu görüntüler veya temizler (`-c` tel formatı). |
 | `aegis tw:status` / `teamwork` | Aktif Antigravity subagent durumlarını, modellerini ve kilitli dosyalarını listeler. |
 | `aegis tw:plan "<obj>"` | Hedefi izlek dalgalarına böler ve mutex kilitlerini atomik olarak kazanır. |
 | `aegis tw:compact [obj]` | Görev geçmişini ve logları RTK ile %85 sıkıştırıp brifing üretir ve tamamlananları arşivler. |

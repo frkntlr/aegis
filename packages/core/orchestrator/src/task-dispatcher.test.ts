@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import { TaskDispatcher, type ILoopBreaker } from './task-dispatcher.js';
+import {
+  TaskDispatcher,
+  categorizeError,
+  formatSocraticDiagnosis,
+  type ILoopBreaker
+} from './task-dispatcher.js';
 import { WorktreeManager } from './worktree-manager.js';
 import { GitHubClient, type GitHubIssue } from '@aegis/github-live';
 
@@ -165,4 +170,53 @@ test('TaskDispatcher dispatches QA/UI issues to idle ui agent', () => {
   const res = dispatcher.dispatchNextTask(['ui'], [uiIssue]);
   assert.strictEqual(res.dispatched, true);
   assert.strictEqual(res.agentName, 'ui');
+});
+
+test('TaskDispatcher categorizeError accurately identifies defect categories', () => {
+  assert.strictEqual(categorizeError('SyntaxError: Unexpected identifier at app.ts:1'), 'syntax');
+  assert.strictEqual(categorizeError('TS2304: Cannot find name "Foo"'), 'syntax');
+  assert.strictEqual(categorizeError('TypeError: Cannot read property "id" of null'), 'runtime');
+  assert.strictEqual(categorizeError('Null pointer exception in controller'), 'runtime');
+  assert.strictEqual(categorizeError('AssertionError: expected true but got false'), 'test failure');
+  assert.strictEqual(categorizeError('fail 1'), 'test failure');
+  assert.strictEqual(categorizeError('Command timed out after 30000ms'), 'timeout');
+  assert.strictEqual(categorizeError('ETIMEDOUT: Connection refused'), 'timeout');
+});
+
+test('TaskDispatcher formatSocraticDiagnosis produces concise hints with stack traces', () => {
+  const v8Trace = 'TypeError: Cannot read property "foo" of undefined\n    at Object.run (src/app.ts:25:5)';
+  const diag = formatSocraticDiagnosis(v8Trace);
+  assert.ok(diag);
+  assert.strictEqual(diag.category, 'runtime');
+  assert.ok(diag.hint.startsWith('[Socratic Diagnosis] (runtime):'));
+  assert.ok(diag.hint.includes('src/app.ts:25:5'));
+
+  const godotTrace = 'SCRIPT ERROR: Invalid get index "player"\n   At: res://scripts/hero.gd:42:take_damage()';
+  const godotDiag = formatSocraticDiagnosis(godotTrace);
+  assert.ok(godotDiag);
+  assert.ok(godotDiag.hint.includes('scripts/hero.gd:42'));
+
+  assert.strictEqual(formatSocraticDiagnosis(''), null);
+});
+
+test('TaskDispatcher handleTaskFailure formats Socratic diagnosis and appends to reason', async () => {
+  const wt = new WorktreeManager();
+  const client = new GitHubClient();
+  const issue = makeIssue(88, ['src/Solver.ts']);
+  client.registerIssue(issue);
+
+  const breaker = createCountingBreaker(88, 2);
+  const dispatcher = new TaskDispatcher(wt, breaker);
+
+  const rawError = 'TypeError: obj is undefined\n    at solve (src/Solver.ts:12:4)';
+  const res1 = await dispatcher.handleTaskFailure('solver', 88, rawError, client);
+  assert.strictEqual(res1.blocked, false);
+  assert.strictEqual(res1.category, 'runtime');
+  assert.ok(res1.diagnostic?.startsWith('[Socratic Diagnosis] (runtime):'));
+  assert.ok(res1.diagnostic?.includes('src/Solver.ts:12:4'));
+
+  const res2 = await dispatcher.handleTaskFailure('solver', 88, rawError, client);
+  assert.strictEqual(res2.blocked, true);
+  assert.ok(res2.reason?.includes('[Socratic Diagnosis] (runtime):'));
+  assert.ok(client.getIssue(88)?.status === 'blocked');
 });

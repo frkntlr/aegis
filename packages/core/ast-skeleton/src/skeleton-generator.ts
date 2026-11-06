@@ -22,6 +22,7 @@ export interface ProjectSkeletonMap {
 
 export class SkeletonGenerator {
   private registry: ExtractorRegistry;
+  private mtimeCache = new Map<string, { mtimeMs: number; size: number; result: SkeletonResult }>();
 
   constructor(customRegistry?: ExtractorRegistry) {
     if (customRegistry) {
@@ -48,6 +49,10 @@ export class SkeletonGenerator {
     return this.registry;
   }
 
+  public clearCache(): void {
+    this.mtimeCache.clear();
+  }
+
   public extractFile(relativePath: string, content: string): SkeletonResult {
     const extractor = this.registry.getExtractor(relativePath);
     if (extractor) {
@@ -62,6 +67,22 @@ export class SkeletonGenerator {
     };
   }
 
+  private resolveFileSkeleton(fullPath: string, relativePath: string): SkeletonResult | null {
+    try {
+      const stat = fs.statSync(fullPath);
+      const cached = this.mtimeCache.get(fullPath);
+      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+        return cached.result;
+      }
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const result = this.extractFile(relativePath, content);
+      this.mtimeCache.set(fullPath, { mtimeMs: stat.mtimeMs, size: stat.size, result });
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
   public generateForFiles(filePaths: string[], baseDir = process.cwd()): ProjectSkeletonMap {
     const entries = new Map<string, SkeletonResult>();
     let totalOriginalBytes = 0;
@@ -72,16 +93,13 @@ export class SkeletonGenerator {
       const fullPath = path.isAbsolute(relativePath) ? relativePath : path.join(baseDir, relativePath);
       if (!fs.existsSync(fullPath)) continue;
 
-      try {
-        const content = fs.readFileSync(fullPath, 'utf8');
-        const result = this.extractFile(relativePath, content);
+      const result = this.resolveFileSkeleton(fullPath, relativePath);
+      if (!result) continue;
 
-        entries.set(relativePath, result);
-        totalOriginalBytes += result.originalLength;
-        totalSkeletonBytes += result.skeletonLength;
-
-        combinedParts.push(`--- ${relativePath} ---\n${result.skeletonContent}\n`);
-      } catch { /* ignore */ }
+      entries.set(relativePath, result);
+      totalOriginalBytes += result.originalLength;
+      totalSkeletonBytes += result.skeletonLength;
+      combinedParts.push(`--- ${relativePath} ---\n${result.skeletonContent}\n`);
     }
 
     const overallSavingsPercent =

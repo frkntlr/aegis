@@ -144,6 +144,71 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     },
     req: ['objective']
   },
+  teamwork_mesh_read: {
+    desc: 'Read Dynamic Teamwork Mesh state, active peers, and recent events (supports compact)',
+    props: {
+      compact: { type: 'boolean', description: 'Return ultra-low token compact wire format' },
+      since: { type: 'string', description: 'Filter events newer than ISO timestamp' }
+    },
+    req: []
+  },
+  teamwork_mesh_post: {
+    desc: 'Post real-time agent status, touched files, or exported contracts to Teamwork Mesh',
+    props: {
+      agentId: { type: 'string', description: 'Agent identifier or subagent role name' },
+      status: { type: 'string', description: 'working | milestone | blocked | done' },
+      activity: { type: 'string', description: 'Brief summary of active work' },
+      modifiedFiles: { type: 'array', items: { type: 'string' }, description: 'Files modified by this agent' },
+      publishedContracts: { type: 'array', items: { type: 'string' }, description: 'Functions or interfaces exported' }
+    },
+    req: ['agentId']
+  },
+  teamwork_broadcast: {
+    desc: 'Broadcast an event or milestone message to peer subagents across the mesh',
+    props: {
+      fromAgent: { type: 'string', description: 'Originating agent name' },
+      message: { type: 'string', description: 'Broadcast message content' },
+      type: { type: 'string', description: 'heartbeat | milestone | contract_update | broadcast | completed' }
+    },
+    req: ['fromAgent', 'message']
+  },
+  teamwork_peers: {
+    desc: 'List peer subagents, current status, and locked/modified files in the active wave',
+    props: {
+      compact: { type: 'boolean', description: 'Return single-line compact summary per peer' }
+    },
+    req: []
+  },
+  teamwork_waves: {
+    desc: 'Compute and inspect parallel execution waves and simultaneous dispatch grouping',
+    props: {
+      objective: { type: 'string', description: 'Teamwork goal or high-level objective' },
+      targetFiles: { type: 'array', items: { type: 'string' }, description: 'Target files to analyze' },
+      compact: { type: 'boolean', description: 'Return ultra-low token compact wave breakdown' }
+    },
+    req: []
+  },
+  teamwork_conflicts: {
+    desc: 'Inspect Conflict Radar for active file collision warnings across peers',
+    props: {},
+    req: []
+  },
+  teamwork_scale: {
+    desc: 'Plan hyper-scale massive concurrency subtasks with 100% disjoint file lock allocation',
+    props: {
+      objective: { type: 'string', description: 'Teamwork goal or high-level objective' },
+      maxAgents: { type: 'number', description: 'Maximum concurrent subagents (default: 12)' }
+    },
+    req: ['objective']
+  },
+  teamwork_doc_synthesize: {
+    desc: 'Synthesize human-centric living architecture briefing, component topology and metrics',
+    props: {
+      planId: { type: 'string', description: 'Active teamwork mission or plan identifier' },
+      compact: { type: 'boolean', description: 'Return ultra-low token compact summary' }
+    },
+    req: []
+  },
   lock_status: {
     desc: 'Inspect active file mutex locks across worktrees',
     props: {},

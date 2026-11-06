@@ -114,6 +114,35 @@ export function getSubagentProfiles(): SubagentProfile[] {
   return [...SUBAGENT_PROFILES];
 }
 
+function buildPromptHeader(profile: SubagentProfile, roleIdentity: string, trackDesc: string, phase?: number, dependsOn?: string[]): string {
+  const phaseInfo = phase ? `**Wave Phase**: Phase ${phase}\n` : '';
+  const depInfo = dependsOn && dependsOn.length > 0 ? `**Upstream Dependencies**: [${dependsOn.join(', ')}]\n` : '';
+  return `${profile.badge}\n\n` +
+    `## Assigned Subagent Task\n` +
+    `**Track**: ${profile.title} (${roleIdentity})\n` +
+    `**Objective**: ${trackDesc}\n` +
+    phaseInfo +
+    depInfo;
+}
+
+function buildPromptFooter(roleType: string, roleIdentity: string): string {
+  return `### ⚖️ Anti-Hallucination & Codebase Invariants\n` +
+    `1. Strict Type Fidelity: Never import or call non-existent methods. Refer strictly to the AST interface contracts above.\n` +
+    `2. Surgical Diffs: Replace only the relevant blocks; preserve all existing comments, docstrings, and imports.\n` +
+    `3. Line Budget Headroom: Ensure your changes do not push any file past 300 lines (Demir Kafes).\n` +
+    `4. Zero any: All types must be explicitly typed.\n\n` +
+    `### 🌐 Dynamic Mesh & Peer Subagent Awareness (Simultaneous Execution)\n` +
+    `You are executing in parallel with other subagents within an active execution wave.\n` +
+    `- Inspect peer subagents and active file locks: \`aegis tw:peers\` or MCP \`teamwork_mesh_read\` / \`teamwork_peers\`.\n` +
+    `- Publish your activity, changed files, and contracts: \`aegis tw:post "<activity>" --files="<files>" --contract="<types>"\` or MCP \`teamwork_mesh_post\`.\n` +
+    `- Broadcast milestones to peer agents: \`aegis tw:broadcast "<message>"\` or MCP \`teamwork_broadcast\`.\n\n` +
+    `### Instructions\n` +
+    `1. Pull staged details using \`aegis task:pull ${roleType}\` or MCP \`task_inbox_pull\`.\n` +
+    `2. Execute changes within your designated workspace.\n` +
+    `3. Validate with \`aegis verify:task\` before concluding.\n` +
+    `4. Send message to Team Lead: \`[ROLE_COMPLETE: ${roleIdentity}]\` with changed files and verification summary.`;
+}
+
 export function compileTrackPrompt(
   profile: SubagentProfile,
   trackDesc: string,
@@ -126,31 +155,58 @@ export function compileTrackPrompt(
 ): string {
   const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- General codebase scope';
   const roleIdentity = subagentName ?? profile.name;
-  const phaseInfo = phase ? `**Wave Phase**: Phase ${phase}\n` : '';
-  const depInfo = dependsOn && dependsOn.length > 0
-    ? `**Upstream Dependencies**: [${dependsOn.join(', ')}]\n`
-    : '';
-
   const groundBlock = groundingContext ? `\n${groundingContext.trim()}\n` : '';
   const contractBlock = upstreamContracts ? `\n${upstreamContracts.trim()}\n` : '';
 
-  return `${profile.badge}\n\n` +
-    `## Assigned Subagent Task\n` +
-    `**Track**: ${profile.title} (${roleIdentity})\n` +
-    `**Objective**: ${trackDesc}\n` +
-    phaseInfo +
-    depInfo +
-    `\n### Target Files & Locks\n${targetStr}\n` +
+  return `${buildPromptHeader(profile, roleIdentity, trackDesc, phase, dependsOn)}\n` +
+    `### Target Files & Locks\n${targetStr}\n` +
     groundBlock +
     contractBlock +
-    `\n### ⚖️ Anti-Hallucination & Codebase Invariants\n` +
-    `1. Strict Type Fidelity: Never import or call non-existent methods. Refer strictly to the AST interface contracts above.\n` +
-    `2. Surgical Diffs: Replace only the relevant blocks; preserve all existing comments, docstrings, and imports.\n` +
-    `3. Line Budget Headroom: Ensure your changes do not push any file past 300 lines (Demir Kafes).\n` +
-    `4. Zero any: All types must be explicitly typed.\n\n` +
-    `### Instructions\n` +
-    `1. Pull staged details using \`aegis task:pull ${profile.roleType}\` or MCP \`task_inbox_pull\`.\n` +
-    `2. Execute changes within your designated workspace.\n` +
-    `3. Validate with \`aegis verify:task\` before concluding.\n` +
-    `4. Send message to Team Lead: \`[ROLE_COMPLETE: ${roleIdentity}]\` with changed files and verification summary.`;
+    `\n${buildPromptFooter(profile.roleType, roleIdentity)}`;
 }
+
+export function compileCompactTrackPrompt(
+  profile: SubagentProfile,
+  trackDesc: string,
+  files: string[],
+  subagentName?: string,
+  dependsOn?: string[],
+  phase?: number,
+  upstreamContracts?: string
+): string {
+  const roleId = subagentName ?? profile.name;
+  const deps = dependsOn?.length ? `|deps:[${dependsOn.join(',')}]` : '';
+  const ph = phase ? `|W${phase}` : '';
+  const fileStr = files.length ? files.join(',') : 'general';
+  const contractSlice = upstreamContracts ? `\nCONTRACTS:\n${upstreamContracts.trim()}` : '';
+
+  return `[${profile.badge}]\n` +
+    `TASK:${roleId}${ph}${deps}\n` +
+    `GOAL:${trackDesc}\n` +
+    `FILES:[${fileStr}]\n` +
+    `RULES:DemirKafes(<300L/file,<40L/fn,0any),SurgicalDiffs,VerifyTask` +
+    `${contractSlice}\n` +
+    `MESH:Post progress via tw:post. Conclude with [ROLE_COMPLETE: ${roleId}].`;
+}
+
+export function compileUltraLeanPrompt(
+  profile: SubagentProfile,
+  desc: string,
+  files: string[],
+  subagentName?: string,
+  targetSymbols?: string[],
+  contract?: string
+): string {
+  const roleId = subagentName ?? profile.name;
+  const targetStr = files.length > 0 ? files.join(', ') : 'general';
+  const symStr = targetSymbols?.length ? `\nANCHORS:[${targetSymbols.join(', ')}]` : '';
+  const cStr = contract ? `\nCONTRACT:${contract.trim()}` : '';
+
+  return `[${profile.badge}]\n` +
+    `ACT:${roleId} | GOAL:${desc}\n` +
+    `FILES:[${targetStr}]${symStr}${cStr}\n` +
+    `GATE:DemirKafes(<300L/file,<40L/fn,0any),SurgicalDiff,VerifyTask\n` +
+    `COMM:tw:post progress | Conclude:[ROLE_COMPLETE: ${roleId}]`;
+}
+
+

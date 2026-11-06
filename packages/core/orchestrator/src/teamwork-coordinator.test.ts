@@ -189,3 +189,25 @@ test('TeamworkCoordinator exposes lazy getters for engines and manager', () => {
   assert.strictEqual(coordinator.getSemanticAnalyzer(), coordinator.semanticAnalyzer);
   assert.strictEqual(coordinator.getCompactEngine(), coordinator.compactEngine);
 });
+
+test('TeamworkCoordinator smoothly advances waves (Wave 1 -> Wave 2 QA -> Wave 3 Doc Synthesis)', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-advance-wave-test-'));
+  try {
+    const coordinator = new TeamworkCoordinator(tmpDir);
+    const plan = coordinator.planTeamwork('Build search engine', ['src/search.ts']);
+    coordinator.mesh.initializeMesh(plan.planId, plan.objective, plan.tracks);
+
+    const step1 = coordinator.advanceWave(plan.planId);
+    assert.strictEqual(step1.advanced, true);
+    assert.strictEqual(step1.currentWave, 2);
+    assert.strictEqual(step1.nextPhase, 'QA Hunter Verification');
+
+    const step2 = coordinator.advanceWave(plan.planId);
+    assert.strictEqual(step2.advanced, true);
+    assert.strictEqual(step2.currentWave, 3);
+    assert.strictEqual(step2.nextPhase, 'Living Architecture Synthesis');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+

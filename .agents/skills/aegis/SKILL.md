@@ -21,6 +21,16 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `aegis status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `aegis auto` |
 | `/aegis tw "<obj>"` or `teamwork` | Direct plan & stage tracks (Short: `tw`, `tw:plan`, `tw:status`, `tw:dag`, `tw:matrix`, `tw:compact`, `tw:analyze`, `tw:setup`, `tw:clear`) | `aegis tw "<obj>" [-c] [-j] [--dry-run]` |
+| `/aegis tw:waves [obj]` | Compute parallel execution waves & simultaneous dispatch | `aegis tw:waves [obj] [-c]` |
+| `/aegis tw:peers` | List active peer subagents, current status, locks & modified files | `aegis tw:peers [-c]` |
+| `/aegis tw:radar` or `tw:conflicts` | Inspect Conflict Radar for active file collision warnings | `aegis tw:radar` |
+| `/aegis tw:doc [planId]` | Synthesize living architecture briefing, Mermaid DAG & metrics | `aegis tw:doc [planId] [-c]` |
+| `/aegis tw:post "<activity>"` | Post subagent status, touched files or contracts to mesh | `aegis tw:post "<act>" [flags]` |
+| `/aegis tw:broadcast "<msg>"` | Broadcast milestone or event to peer subagents across mesh | `aegis tw:broadcast "<msg>"` |
+| `/aegis tw:mesh [clear]` | Read, inspect or clear dynamic real-time teamwork mesh state | `aegis tw:mesh [clear] [-c]` |
+| `/aegis tw:advance [planId]` | Smoothly advance active wave to next execution phase | `aegis tw:advance [planId]` |
+| `/aegis tw:scale "<obj>"` | Micro-sharded hyper-scale concurrency plan (100% disjoint locks) | `aegis tw:scale "<obj>"` |
+| `/aegis tw:batch [planId]` | Group tracks into parallel execution batches ready for dispatch | `aegis tw:batch [planId]` |
 | `/aegis teamwork [status]` | View active Antigravity subagents & locked tracks (alias: `tw:status`) | `aegis tw:status` |
 | `/aegis teamwork plan "<obj>"` | Generate Antigravity subagent plan & stage TIP tracks (alias: `tw:plan`) | `aegis tw:plan "<obj>"` |
 | `/aegis teamwork compact [obj]` | Compact logs & archive completed tasks with 85% token savings (alias: `tw:compact`) | `aegis tw:compact` |

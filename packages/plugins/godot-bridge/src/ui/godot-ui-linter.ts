@@ -6,6 +6,19 @@
  */
 
 import * as fs from 'node:fs';
+import {
+  GodotUiParser,
+  type ParsedConnection,
+  type ParsedScene,
+  type ParsedUiNode
+} from './godot-ui-parser.js';
+
+export {
+  GodotUiParser,
+  type ParsedConnection,
+  type ParsedScene,
+  type ParsedUiNode
+};
 
 export interface UiLintIssue {
   severity: 'error' | 'warning' | 'info';
@@ -24,28 +37,8 @@ export interface UiLintReport {
   score: number;
 }
 
-interface ParsedUiNode {
-  name: string;
-  type: string;
-  parent: string | null;
-  properties: Map<string, string>;
-}
-
-interface ParsedConnection {
-  signal: string;
-  from: string;
-  to: string;
-  method: string;
-}
-
 export class GodotUiLinter {
-  private static readonly CONTAINER_TYPES = new Set([
-    'Container', 'BoxContainer', 'VBoxContainer', 'HBoxContainer',
-    'GridContainer', 'FlowContainer', 'HFlowContainer', 'VFlowContainer',
-    'MarginContainer', 'PanelContainer', 'CenterContainer', 'ScrollContainer',
-    'TabContainer', 'AspectRatioContainer', 'SplitContainer', 'HSplitContainer',
-    'VSplitContainer', 'SubViewportContainer'
-  ]);
+  public static readonly CONTAINER_TYPES = GodotUiParser.CONTAINER_TYPES;
 
   private static readonly INTERACTIVE_BUTTON_TYPES = new Set([
     'Button', 'TextureButton', 'CheckButton', 'CheckBox', 'OptionButton',
@@ -71,7 +64,7 @@ export class GodotUiLinter {
   }
 
   public static lintContent(content: string, scenePath = 'scene.tscn', gdScriptPath?: string): UiLintReport {
-    const { nodes, connections } = this.parseScene(content);
+    const { nodes, connections } = GodotUiParser.parseScene(content);
     const issues: UiLintIssue[] = [];
     const root = nodes[0];
 
@@ -93,51 +86,10 @@ export class GodotUiLinter {
     };
   }
 
-  private static parseScene(content: string): { nodes: ParsedUiNode[]; connections: ParsedConnection[] } {
-    const nodes: ParsedUiNode[] = [];
-    const connections: ParsedConnection[] = [];
-    let cur: ParsedUiNode | null = null;
-
-    for (const raw of content.split(/\r?\n/)) {
-      const line = raw.trim();
-      if (line.startsWith('[node ')) {
-        if (cur) nodes.push(cur);
-        cur = this.parseNodeHeader(line);
-      } else if (line.startsWith('[connection ')) {
-        if (cur) { nodes.push(cur); cur = null; }
-        const conn = this.parseConnectionHeader(line);
-        if (conn) connections.push(conn);
-      } else if (cur && line.includes('=') && !line.startsWith('[')) {
-        const idx = line.indexOf('=');
-        cur.properties.set(line.slice(0, idx).trim(), line.slice(idx + 1).trim());
-      }
-    }
-    if (cur) nodes.push(cur);
-    return { nodes, connections };
-  }
-
-  private static parseNodeHeader(line: string): ParsedUiNode {
-    const name = line.match(/name="([^"]+)"/)?.[1] || 'Unknown';
-    const type = line.match(/type="([^"]+)"/)?.[1] || 'Node';
-    const parent = line.match(/parent="([^"]+)"/)?.[1] || null;
-    return { name, type, parent, properties: new Map() };
-  }
-
-  private static parseConnectionHeader(line: string): ParsedConnection | null {
-    const sig = line.match(/signal="([^"]+)"/)?.[1];
-    const from = line.match(/from="([^"]+)"/)?.[1];
-    const to = line.match(/to="([^"]+)"/)?.[1];
-    const meth = line.match(/method="([^"]+)"/)?.[1];
-    if (!sig || !from || !to || !meth) return null;
-    return { signal: sig, from, to, method: meth };
-  }
-
   private static checkRootResponsiveness(root: ParsedUiNode, issues: UiLintIssue[]): void {
-    const isCtrl = root.type === 'Control' || root.type.endsWith('Container') || root.type === 'ColorRect';
+    const isCtrl = root.type === 'Control' || GodotUiParser.isContainerType(root.type) || root.type === 'ColorRect';
     if (!isCtrl) return;
-    const hasPreset = root.properties.has('anchors_preset');
-    const hasAnchors = root.properties.has('anchor_right') || root.properties.has('anchor_bottom');
-    if (!hasPreset && !hasAnchors) {
+    if (!GodotUiParser.isResponsiveLayout(root)) {
       issues.push({
         severity: 'warning',
         nodeName: root.name,
@@ -162,7 +114,7 @@ export class GodotUiLinter {
   private static checkContainerChildConflict(node: ParsedUiNode, map: Map<string, ParsedUiNode>, issues: UiLintIssue[]): void {
     if (!node.parent || node.parent === '.') return;
     const parent = map.get(node.parent.split('/').pop() || '');
-    if (!parent || !this.CONTAINER_TYPES.has(parent.type)) return;
+    if (!parent || !GodotUiParser.isContainerType(parent.type)) return;
 
     if (node.properties.has('position') || node.properties.has('offset_left') || node.properties.has('offset_top')) {
       issues.push({
@@ -245,14 +197,7 @@ export class GodotUiLinter {
     issues: UiLintIssue[]
   ): void {
     const nodeNames = new Set(nodes.map(n => n.name));
-    let methods: Set<string> | null = null;
-    if (scriptPath && fs.existsSync(scriptPath)) {
-      try {
-        methods = this.extractScriptMethods(fs.readFileSync(scriptPath, 'utf8'));
-      } catch {
-        methods = null;
-      }
-    }
+    const methods = this.loadScriptMethods(scriptPath);
 
     for (const c of conns) {
       const fromLeaf = c.from.split('/').pop() || c.from;
@@ -273,12 +218,12 @@ export class GodotUiLinter {
     }
   }
 
-  private static extractScriptMethods(scriptContent: string): Set<string> {
-    const methods = new Set<string>();
-    for (const line of scriptContent.split(/\r?\n/)) {
-      const m = line.match(/^func\s+([a-zA-Z0-9_]+)\s*\(/);
-      if (m) methods.add(m[1]);
+  private static loadScriptMethods(scriptPath?: string): Set<string> | null {
+    if (!scriptPath || !fs.existsSync(scriptPath)) return null;
+    try {
+      return GodotUiParser.extractScriptMethods(fs.readFileSync(scriptPath, 'utf8'));
+    } catch {
+      return null;
     }
-    return methods;
   }
 }

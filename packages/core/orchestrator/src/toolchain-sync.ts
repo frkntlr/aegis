@@ -194,14 +194,15 @@ export class UniversalToolchainSync {
   private registerAegisMcpServer(mcpJsonPath: string): void {
     if (!fs.existsSync(path.dirname(mcpJsonPath))) return;
     try {
-      const cliPath = 'packages/cli/dist/bin/aegis.js';
+      const cliPath = path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js');
+      const nodeExe = fs.existsSync('C:\\Program Files\\nodejs\\node.exe') ? 'C:\\Program Files\\nodejs\\node.exe' : 'node';
       let data: Record<string, unknown> = {};
       if (fs.existsSync(mcpJsonPath)) {
         data = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf8'));
       }
       const key = typeof data.servers === 'object' && data.servers !== null ? 'servers' : 'mcpServers';
       const map = typeof data[key] === 'object' && data[key] !== null ? (data[key] as Record<string, unknown>) : {};
-      map.aegis = { command: 'node', args: [cliPath, 'mcp'] };
+      map.aegis = { command: nodeExe, args: [cliPath, 'mcp'] };
       data[key] = map;
       fs.writeFileSync(mcpJsonPath, JSON.stringify(data, null, 2), 'utf8');
     } catch { /* ignore non-fatal */ }

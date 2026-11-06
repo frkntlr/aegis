@@ -22,9 +22,9 @@
       ]
     },
     "aegis": {
-      "command": "node",
+      "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
-        "packages/cli/dist/bin/aegis.js",
+        "C:\\Users\\Lenovo\\Documents\\work\\aegis\\packages\\cli\\dist\\bin\\aegis.js",
         "mcp"
       ]
     }

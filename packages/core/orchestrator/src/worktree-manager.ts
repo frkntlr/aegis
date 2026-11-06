@@ -3,82 +3,34 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AgentWorktree, WorktreeListResult } from '@aegis/shared';
 import { resolveSafeRepoRoot } from '@aegis/shared';
-import { WorktreeMutex, cleanGitEnv, normPath, parseWorktreePorcelainBlock } from './worktree-mutex.js';
+import { cleanGitEnv, parseWorktreePorcelainBlock } from './worktree-mutex.js';
+import { WorktreeLockManager } from './worktree-lock-manager.js';
 
 export interface WorktreeManagerOptions {
   repoRoot?: string;
   worktreePrefix?: string;
   persistLocks?: boolean;
+  staleTimeoutMs?: number;
 }
 
 export class WorktreeManager {
   private repoRoot: string;
   private worktreePrefix: string;
-  private persistLocks: boolean;
-  private activeLocks: Map<string, string> = new Map(); // filePath -> agentName
+  private lockManager: WorktreeLockManager;
   private cachedWorktrees: { timestamp: number; result: WorktreeListResult } | null = null;
   private readonly WT_CACHE_TTL_MS = 2000;
 
   constructor(options: WorktreeManagerOptions = {}) {
     this.repoRoot = resolveSafeRepoRoot(options.repoRoot);
     this.worktreePrefix = options.worktreePrefix ?? 'experimental';
-    this.persistLocks = options.persistLocks ?? false;
-    if (this.persistLocks) this.loadLocks();
+    this.lockManager = new WorktreeLockManager({
+      repoRoot: this.repoRoot,
+      persistLocks: options.persistLocks,
+      staleTimeoutMs: options.staleTimeoutMs
+    });
   }
 
-  private getLockFilePath(): string {
-    return path.resolve(this.repoRoot, '.aegis', 'locks.json');
-  }
-
-  private withLock<T>(fn: () => T): T {
-    if (!this.persistLocks) return fn();
-    const unlock = WorktreeMutex.acquire(this.getLockFilePath());
-    try {
-      this.loadLocks();
-      const res = fn();
-      this.saveLocks();
-      return res;
-    } finally {
-      unlock();
-    }
-  }
-
-  private loadLocks(): void {
-    const lockFile = this.getLockFilePath();
-    if (fs.existsSync(lockFile)) {
-      try {
-        const raw = fs.readFileSync(lockFile, 'utf8').trim();
-        if (!raw) throw new Error('Empty lock file');
-        const data = JSON.parse(raw);
-        this.activeLocks = new Map(Object.entries(data).map(([k, v]) => [normPath(k), String(v)]));
-      } catch {
-        try {
-          const corruptBackup = `${lockFile}.corrupt.${Date.now()}`;
-          fs.renameSync(lockFile, corruptBackup);
-        } catch {
-          try { fs.rmSync(lockFile, { force: true }); } catch { /* ignore */ }
-        }
-        this.activeLocks = new Map();
-      }
-    }
-  }
-
-  private saveLocks(): void {
-    if (!this.persistLocks) return;
-    try {
-      const lockFile = this.getLockFilePath();
-      fs.mkdirSync(path.dirname(lockFile), { recursive: true });
-      const tmpFile = `${lockFile}.tmp.${process.pid}.${Date.now()}`;
-      fs.writeFileSync(tmpFile, JSON.stringify(Object.fromEntries(this.activeLocks.entries()), null, 2), 'utf8');
-      try {
-        fs.renameSync(tmpFile, lockFile);
-      } catch {
-        fs.copyFileSync(tmpFile, lockFile);
-        try { fs.rmSync(tmpFile, { force: true }); } catch { /* ignore */ }
-      }
-    } catch { /* ignore */ }
-  }
-
+  public getLockManager(): WorktreeLockManager { return this.lockManager; }
   public getWorktreePath(agentName: string): string {
     return path.resolve(this.repoRoot, this.worktreePrefix, agentName);
   }
@@ -87,10 +39,7 @@ export class WorktreeManager {
     try {
       if (fs.existsSync(path.join(this.repoRoot, '.git'))) {
         const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
-          cwd: this.repoRoot,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-          env: cleanGitEnv()
+          cwd: this.repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanGitEnv()
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
@@ -105,36 +54,21 @@ export class WorktreeManager {
     const baseBranch = baseBranchArg || this.detectCurrentBranch();
 
     if (!fs.existsSync(targetDir)) {
-      try {
-        execFileSync('git', ['worktree', 'prune'], {
-          cwd: this.repoRoot,
-          stdio: 'pipe',
-          env: cleanGitEnv()
-        });
-      } catch { /* ignore */ }
+      try { execFileSync('git', ['worktree', 'prune'], { cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv() }); } catch { /* ignore */ }
       fs.mkdirSync(path.dirname(targetDir), { recursive: true });
       try {
         execFileSync('git', ['worktree', 'add', targetDir, '-B', branchName, baseBranch], {
-          cwd: this.repoRoot,
-          stdio: 'pipe',
-          env: cleanGitEnv()
+          cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv()
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!message.includes('already exists') && !message.includes('already checked out') && !message.includes('already registered')) {
-          throw err;
-        }
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('already exists') && !msg.includes('already checked out') && !msg.includes('already registered')) throw err;
       }
     }
 
     return {
-      agentName,
-      branch: branchName,
-      path: targetDir,
-      status: 'idle',
-      lockedFiles: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      agentName, branch: branchName, path: targetDir, status: 'idle', lockedFiles: [],
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
     };
   }
 
@@ -143,37 +77,18 @@ export class WorktreeManager {
     const targetDir = this.getWorktreePath(agentName);
     try {
       execFileSync('git', ['worktree', 'remove', targetDir, '--force'], {
-        cwd: this.repoRoot,
-        stdio: 'pipe',
-        env: cleanGitEnv()
+        cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv()
       });
       return true;
     } catch {
-      if (fs.existsSync(targetDir)) {
-        try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch { /* ignore */ }
-        try {
-          execFileSync('git', ['worktree', 'prune'], {
-            cwd: this.repoRoot,
-            stdio: 'pipe',
-            env: cleanGitEnv()
-          });
-        } catch { /* ignore */ }
-        return true;
-      }
-      return false;
+      if (!fs.existsSync(targetDir)) return false;
+      try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      try { execFileSync('git', ['worktree', 'prune'], { cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv() }); } catch { /* ignore */ }
+      return true;
     }
   }
-
 
   public invalidateWorktreeCache(): void { this.cachedWorktrees = null; }
-
-  private findLockOwner(file: string): string | undefined {
-    const fl = file.toLowerCase();
-    for (const [k, v] of this.activeLocks.entries()) {
-      if (k.toLowerCase() === fl) return v;
-    }
-    return undefined;
-  }
 
   public listWorktrees(forceRefresh = false): WorktreeListResult {
     const now = Date.now();
@@ -181,17 +96,11 @@ export class WorktreeManager {
       return this.cachedWorktrees.result;
     }
     try {
-      if (!fs.existsSync(path.join(this.repoRoot, '.git'))) {
-        return { worktrees: [], activeCount: 0 };
-      }
+      if (!fs.existsSync(path.join(this.repoRoot, '.git'))) return { worktrees: [], activeCount: 0 };
       const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
-        cwd: this.repoRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        env: cleanGitEnv()
+        cwd: this.repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanGitEnv()
       });
-      const worktrees = output
-        .split('\n\n')
+      const worktrees = output.split('\n\n')
         .map(b => parseWorktreePorcelainBlock(b, this.worktreePrefix))
         .filter((wt): wt is AgentWorktree => Boolean(wt));
 
@@ -203,76 +112,12 @@ export class WorktreeManager {
     }
   }
 
-  public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
-    return this.withLock(() => {
-      const conflictingFiles: string[] = [];
-      const normalized = files.map(normPath);
-      for (const file of normalized) {
-        const existingOwner = this.findLockOwner(file);
-        if (existingOwner && existingOwner !== agentName) conflictingFiles.push(file);
-      }
-      if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
-      for (const file of normalized) this.activeLocks.set(file, agentName);
-      return { success: true, conflictingFiles: [] };
-    });
-  }
-
-  public acquireBatchLocks(batch: Array<{ agentName: string; files: string[] }>): {
-    success: boolean;
-    conflictingFiles: string[];
-  } {
-    return this.withLock(() => {
-      const conflictingFiles: string[] = [];
-      const toApply: Array<{ file: string; agentName: string }> = [];
-      for (const item of batch) {
-        for (const rawFile of item.files) {
-          const file = normPath(rawFile);
-          const owner = this.findLockOwner(file);
-          if (owner && owner !== item.agentName) {
-            conflictingFiles.push(file);
-          } else {
-            toApply.push({ file, agentName: item.agentName });
-          }
-        }
-      }
-      if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
-      for (const { file, agentName } of toApply) {
-        this.activeLocks.set(file, agentName);
-      }
-      return { success: true, conflictingFiles: [] };
-    });
-  }
-
-  public releaseFileLocks(agentName: string): void {
-    this.withLock(() => {
-      const q = agentName.toLowerCase().trim();
-      for (const [file, owner] of this.activeLocks.entries()) {
-        const o = owner.toLowerCase().trim();
-        if (o === q || o.includes(`[${q}]`) || o.startsWith(q) || q.startsWith(o)) {
-          this.activeLocks.delete(file);
-        }
-      }
-    });
-  }
-
-  public releaseFiles(files: string[]): void {
-    this.withLock(() => {
-      const lowerSet = new Set(files.map(f => normPath(f).toLowerCase()));
-      for (const file of this.activeLocks.keys()) {
-        if (lowerSet.has(file.toLowerCase())) this.activeLocks.delete(file);
-      }
-    });
-  }
-
   public hasUnmergedConflicts(agentName: string): boolean {
     const wtPath = this.getWorktreePath(agentName);
     if (!fs.existsSync(wtPath)) return false;
     try {
       const output = execFileSync('git', ['ls-files', '-u'], {
-        cwd: wtPath,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-        env: cleanGitEnv()
+        cwd: wtPath, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanGitEnv()
       });
       return output.trim().length > 0;
     } catch {
@@ -280,16 +125,15 @@ export class WorktreeManager {
     }
   }
 
-  public clearAllLocks(): number {
-    return this.withLock(() => {
-      const count = this.activeLocks.size;
-      this.activeLocks.clear();
-      return count;
-    });
+  public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
+    return this.lockManager.acquireFileLocks(agentName, files);
   }
-
-  public getLockedFiles(): Map<string, string> {
-    if (this.persistLocks) this.loadLocks();
-    return new Map(this.activeLocks);
+  public acquireBatchLocks(batch: Array<{ agentName: string; files: string[] }>): { success: boolean; conflictingFiles: string[] } {
+    return this.lockManager.acquireBatchLocks(batch);
   }
+  public releaseFileLocks(agentName: string): void { this.lockManager.releaseFileLocks(agentName); }
+  public releaseFiles(files: string[]): void { this.lockManager.releaseFiles(files); }
+  public clearAllLocks(): number { return this.lockManager.clearAllLocks(); }
+  public getLockedFiles(): Map<string, string> { return this.lockManager.getLockedFiles(); }
+  public pruneStaleLocks(maxAgeMs?: number): number { return this.lockManager.pruneStaleLocks(maxAgeMs); }
 }

@@ -43,3 +43,64 @@ export interface TeamworkStatusReport {
   profiles: SubagentProfile[];
   locks: Record<string, string>;
 }
+
+export interface TeamworkPeerState {
+  agentId: string;
+  role: RoleType;
+  subagentName: string;
+  status: 'pending' | 'working' | 'milestone' | 'blocked' | 'done';
+  currentActivity: string;
+  lockedFiles: string[];
+  modifiedFiles: string[];
+  publishedContracts: string[];
+  updatedAt: string;
+}
+
+export interface TeamworkEvent {
+  id: string;
+  timestamp: string;
+  fromAgent: string;
+  type: 'heartbeat' | 'milestone' | 'contract_update' | 'broadcast' | 'completed';
+  message: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface TeamworkMeshState {
+  planId: string;
+  objective: string;
+  activeWave: number;
+  agents: Record<string, TeamworkPeerState>;
+  events: TeamworkEvent[];
+  lastUpdated: string;
+}
+
+export interface ExecutionWave {
+  waveNumber: number;
+  phaseName: string;
+  tracks: TeamworkTrack[];
+  canRunConcurrently: boolean;
+  requiredPriorWaves: number[];
+}
+
+export interface HumanArchitecturalBriefing {
+  planId: string;
+  objective: string;
+  executiveSummary: string;
+  mermaidDiagram: string;
+  metrics: {
+    tokenSavingsPercent: number;
+    meshReadLatencyMs: number;
+    concurrencyFactor: number;
+    totalFilesModified: number;
+    totalContractsPublished: number;
+  };
+  qualityGate: {
+    demirKafesCompliant: boolean;
+    maxLinesPerFile: number;
+    maxLinesPerFunction: number;
+    anyCount: number;
+    testPassRatePercent: number;
+  };
+  adrDecisions: string[];
+}
+

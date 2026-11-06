@@ -16,7 +16,8 @@
     "typecheck": "tsc --build",
     "aegis": "node packages/cli/dist/bin/aegis.js",
     "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .githooks', {stdio: 'ignore'}) } catch {}\"",
-    "aegist": "node packages/cli/dist/bin/aegis.js"
+    "aegist": "node packages/cli/dist/bin/aegis.js",
+    "tw": "node packages/cli/dist/bin/aegis.js"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",
