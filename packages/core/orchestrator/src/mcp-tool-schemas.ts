@@ -214,6 +214,20 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     props: {},
     req: []
   },
+  engine_update: {
+    desc: 'Dynamically update and reinstall Aegis across PC with zero-state clean options',
+    props: {
+      clean: { type: 'boolean', description: 'Perform clean wipe of build cache and stale locks' },
+      pull: { type: 'boolean', description: 'Pull latest commits from origin/master' },
+      force: { type: 'boolean', description: 'Force rebuild and reinstall' }
+    },
+    req: []
+  },
+  version_status: {
+    desc: 'Inspect dynamic version drift, upstream commits, and monorepo packages status',
+    props: {},
+    req: []
+  },
 
   // --- Godot Substrate 3.0 Authoritative Suite (8) ---
   aegis_godot_status: {

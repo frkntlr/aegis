@@ -21,11 +21,18 @@ export interface DecomposedSubtask {
 export class TeamworkDecomposer {
   private static readonly STOP_WORDS = new Set(['ve', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de']);
 
-  public static decompose(objective: string, targetFiles: string[] = []): DecomposedSubtask[] {
+  public static decompose(
+    objective: string,
+    targetFiles: string[] = [],
+    options?: { maxConcurrency?: number; autoScale?: boolean }
+  ): DecomposedSubtask[] {
     const rawItems = this.splitObjective(objective);
     const parsed = rawItems.map(item => this.classifyRawItem(item));
     const subtasks = this.enrichSubtasks(parsed);
     this.ensureRequiredTracks(subtasks, objective, targetFiles);
+    if (options?.maxConcurrency && options.maxConcurrency > 1) {
+      return this.shardMaxConcurrency(subtasks, targetFiles, options.maxConcurrency);
+    }
     TeamworkSharder.shardSolversByFiles(subtasks, targetFiles, objective);
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
@@ -52,6 +59,11 @@ export class TeamworkDecomposer {
       if (lines.length > 1) return lines;
     }
 
+    if (/[.!?]\s+/.test(trimmed)) {
+      const sentences = trimmed.split(/[.!?]\s+/).map(s => s.trim()).filter(s => s.length >= 8);
+      if (sentences.length > 1) return sentences;
+    }
+
     if (trimmed.includes(',')) {
       const items = trimmed.split(',').map(s => s.trim()).filter(p => p.length >= 3);
       if (items.length >= 3) return items;
@@ -62,7 +74,10 @@ export class TeamworkDecomposer {
 
   private static splitCompoundSentence(text: string): string[] {
     const lower = text.toLowerCase();
-    const splitPoints = [' ve ', ' and ', ' hem de ', ' as well as '];
+    const splitPoints = [
+      ' ve ', ' and ', ' hem de ', ' as well as ',
+      ' aynı zamanda ', ' bunun yanında ', ' ayrıca '
+    ];
     for (const sp of splitPoints) {
       if (lower.includes(sp)) {
         const parts = text.split(new RegExp(sp, 'i')).map(p => p.trim()).filter(p => p.length >= 3);

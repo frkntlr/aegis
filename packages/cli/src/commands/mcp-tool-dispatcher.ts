@@ -11,7 +11,7 @@ import { Context7Bridge } from '@aegis/github-live';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import { IronCageValidator, EvidenceBasedTriageGate, LineBudgetRadar } from '@aegis/iron-cage';
 import { PolyglotStackTraceParser, SymptomClassifier, SymbioticDiagnosticTriangulator, DynamicHypothesisGenerator } from '@aegis/dialogue-engine';
-import { WorktreeManager } from '@aegis/orchestrator';
+import { WorktreeManager, EngineUpdater } from '@aegis/orchestrator';
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { GodotMcpProvider } from '@aegis/godot-bridge';
 import { getSharedMemoryEngine } from './memory-command.js';
@@ -67,7 +67,9 @@ export const CORE_MCP_TOOLS = [
   { name: 'teamwork_waves', description: 'Compute and inspect parallel execution waves and simultaneous dispatch grouping', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, targetFiles: { type: 'array', items: { type: 'string' } } } } },
   { name: 'teamwork_conflicts', description: 'Inspect Conflict Radar for active file collision warnings', inputSchema: { type: 'object', properties: {} } },
   { name: 'teamwork_scale', description: 'Plan hyper-scale massive concurrency subtasks with disjoint file allocation', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, maxAgents: { type: 'number' } }, required: ['objective'] } },
-  { name: 'teamwork_doc_synthesize', description: 'Synthesize human-centric living architecture briefing, component topology and metrics', inputSchema: { type: 'object', properties: { planId: { type: 'string' }, compact: { type: 'boolean' } } } }
+  { name: 'teamwork_doc_synthesize', description: 'Synthesize human-centric living architecture briefing, component topology and metrics', inputSchema: { type: 'object', properties: { planId: { type: 'string' }, compact: { type: 'boolean' } } } },
+  { name: 'engine_update', description: 'Dynamically update and reinstall Aegis across PC with zero-state clean options', inputSchema: { type: 'object', properties: { clean: { type: 'boolean' }, pull: { type: 'boolean' }, force: { type: 'boolean' } } } },
+  { name: 'version_status', description: 'Inspect dynamic version drift, upstream commits, and monorepo packages status', inputSchema: { type: 'object', properties: {} } }
 ];
 
 export const MCP_TOOLS = [
@@ -200,6 +202,14 @@ function executeUtilityTool(name: string, args: Record<string, unknown>): string
     const list = wm.listWorktrees();
     const locks = Object.fromEntries(wm.getLockedFiles().entries());
     return JSON.stringify({ worktrees: list.worktrees, lockedFiles: locks, activeCount: list.activeCount }, null, 2);
+  }
+  if (name === 'engine_update') {
+    const res = EngineUpdater.runUpdate({ clean: args.clean === true, pull: args.pull === true, force: args.force === true });
+    return JSON.stringify(res, null, 2);
+  }
+  if (name === 'version_status') {
+    const rep = EngineUpdater.getVersionReport();
+    return JSON.stringify(rep, null, 2);
   }
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }

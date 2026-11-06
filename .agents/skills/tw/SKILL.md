@@ -39,6 +39,8 @@ This skill activates when the user triggers `/tw`, `/aegis tw`, `/aegis teamwork
 - `--compact` / `-c`: Generate 85%-95% token-saving compact wire format / mission briefing.
 - `--json` / `-j`: Output machine-readable JSON for programmatic pipelines.
 - `--dry-run`: Validate execution plan and AST bindings without acquiring mutex locks.
+- `--max-agents=<n>` / `-n=<n>`: Hyper-scale dynamic concurrency (e.g. `--max-agents=8`, up to 12 parallel subagents with 100% disjoint locks).
+- `--scale` / `-s`: Auto-scale solver & UI tracks across all discovered domain files in parallel Wave 1.
 
 ## Subagent Roles & Badges
 - `issue-solver` -> `🛠️ [ISSUE SOLVER] AKTİF | İzole Çözücü ve Geliştirici`

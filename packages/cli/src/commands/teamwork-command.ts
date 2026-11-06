@@ -78,6 +78,7 @@ interface PlanFlags {
   compact: boolean;
   json: boolean;
   dryRun: boolean;
+  maxConcurrency?: number;
 }
 
 function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
@@ -87,6 +88,8 @@ function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
     if (a === '--compact' || a === '-c') flags.compact = true;
     else if (a === '--json' || a === '-j') flags.json = true;
     else if (a === '--dry-run') flags.dryRun = true;
+    else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
+    else if (a.startsWith('--max-agents=') || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
     else if (a && !a.startsWith('-')) files.push(a);
   }
   return { files, flags };
@@ -124,7 +127,8 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
   const coordinator = new TeamworkCoordinator();
   const plan = coordinator.planTeamwork(objectiveArg.trim(), files, {
     stage: !flags.dryRun,
-    acquireLocks: !flags.dryRun
+    acquireLocks: !flags.dryRun,
+    maxConcurrency: flags.maxConcurrency
   });
 
   if (flags.json) {
@@ -236,7 +240,8 @@ export function mcpTeamworkPlan(args: Record<string, unknown> = {}): string {
   }
   const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, targetFiles);
+  const maxConcurrency = typeof args.maxConcurrency === 'number' ? args.maxConcurrency : undefined;
+  const plan = coordinator.planTeamwork(objective, targetFiles, { maxConcurrency });
   return JSON.stringify(plan, null, 2);
 }
 

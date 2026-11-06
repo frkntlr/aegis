@@ -129,38 +129,46 @@ export class TeamworkCoordinator {
   public planTeamwork(
     objective: string,
     targetFiles: string[] = [],
-    options?: { deterministic?: boolean; stage?: boolean; acquireLocks?: boolean }
+    options?: {
+      deterministic?: boolean;
+      stage?: boolean;
+      acquireLocks?: boolean;
+      maxConcurrency?: number;
+      autoScale?: boolean;
+    }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
     const shouldStage = options?.stage ?? true;
     const shouldLock = options?.acquireLocks ?? shouldStage;
-    const effectiveFiles = (targetFiles && targetFiles.length > 0)
-      ? targetFiles
-      : this.semanticAnalyzer.analyze(objective).targetFiles;
-    const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, effectiveFiles)}` : `tw-${Date.now().toString(36)}`;
-    const profiles = this.listProfiles();
-    const subtasks = TeamworkDecomposer.decompose(objective, effectiveFiles);
-    const tracks: TeamworkTrack[] = [];
-    const upstreamFilesMap = new Map<string, string[]>();
-
-    for (const sub of subtasks) {
-      const track = TeamworkTrackBuilder.buildSubtaskTrack(sub, profiles, upstreamFilesMap, isDet, this.groundingEngine);
-      tracks.push(track);
-      upstreamFilesMap.set(sub.label, sub.targetFiles);
-    }
+    const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
+    const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, files)}` : `tw-${Date.now().toString(36)}`;
+    const subtasks = TeamworkDecomposer.decompose(objective, files, {
+      maxConcurrency: options?.maxConcurrency,
+      autoScale: options?.autoScale
+    });
+    const tracks = this.buildTracks(subtasks, isDet);
 
     if (shouldStage) {
       this.stageTracksIntoInbox(planId, objective, tracks, shouldLock);
       this.mesh.initializeMesh(planId, objective, tracks);
     }
     return {
-      planId,
-      objective,
-      createdAt: new Date().toISOString(),
-      tracks,
+      planId, objective, createdAt: new Date().toISOString(), tracks,
       summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}).`,
-      discoveredFiles: effectiveFiles
+      discoveredFiles: files
     };
+  }
+
+  private buildTracks(subtasks: ReturnType<typeof TeamworkDecomposer.decompose>, isDet: boolean): TeamworkTrack[] {
+    const profiles = this.listProfiles();
+    const tracks: TeamworkTrack[] = [];
+    const upstreamFilesMap = new Map<string, string[]>();
+    for (const sub of subtasks) {
+      const track = TeamworkTrackBuilder.buildSubtaskTrack(sub, profiles, upstreamFilesMap, isDet, this.groundingEngine);
+      tracks.push(track);
+      upstreamFilesMap.set(sub.label, sub.targetFiles);
+    }
+    return tracks;
   }
 
   public compactTeamwork(plan?: TeamworkPlan): string {

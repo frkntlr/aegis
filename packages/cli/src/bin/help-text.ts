@@ -94,6 +94,8 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis nlm:sync                         Export and synchronize architecture with NotebookLM'
   ],
   '⚡ Core Workflow & Autocompletion': [
+    '  aegis update [--clean] [--pull]        Dynamic Aegis update and PC-wide zero-state reinstallation',
+    '  aegis version:status                   Inspect dynamic version drift, upstream commits, and shims',
     '  aegis init                             Initialize worktrees and environment',
     '  aegis status                           View worktrees and active file locks',
     '  aegis auto                             Run autonomous task queue & dispatcher',

@@ -23,3 +23,4 @@ export * from './teamwork-mesh-store.js';
 export * from './teamwork-waves.js';
 export * from './teamwork-doc-synthesizer.js';
 export * from './antigravity-installer.js';
+export * from './engine-updater.js';

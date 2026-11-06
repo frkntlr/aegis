@@ -19,7 +19,7 @@ export class TeamworkSharder {
     const sourceFiles = allFiles.filter(
       f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/') && !f.includes('.test.') && !f.includes('.spec.')
     );
-    if (sourceFiles.length < 3) return;
+    if (sourceFiles.length < 2) return;
 
     const solverIndex = subtasks.findIndex(t => t.roleType === 'solver');
     subtasks.splice(solverIndex, 1);

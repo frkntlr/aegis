@@ -3,6 +3,8 @@
 ## `/aegist` and `/aegis` Slash Command Protocol
 When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegist <cmd>` or `/aegis <cmd>`, immediately interpret and execute the corresponding Aegis CLI command in PowerShell:
 
+- `/aegis update [--clean] [--pull]`: Run `npm run aegis -- update` to dynamically update, rebuild, and cleanly reinstall Aegis across the PC.
+- `/aegis version:status`: Run `npm run aegis -- version:status` to inspect dynamic version drift, upstream commits, and monorepo packages.
 - `/aegis` or `/aegis status`: Run `npm run aegis -- status` and display worktrees and file locks.
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.
 - `/aegis teamwork [status]`: View active Antigravity subagents and locked tracks.
@@ -122,6 +124,10 @@ When the user sends `/tw`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamwork`, s
    - Team Lead emits an updated status in chat marking that role `✅ Tamamlandı` with its surgical diff / verification summary.
    - Team Lead releases the task lock via `aegis task:release <id> done`.
 8. **Final Consolidation**: Once all tracks complete, Team Lead presents the final consolidated review card with Demir Kafes and test verification status.
+9. **Hyper-Scale Concurrency & Dynamic Scaling (`--max-agents`, `--scale`)**:
+   - When an objective involves multiple components, sentences, or files, or when the user invokes `--max-agents=<n>` / `--scale`:
+   - Teamwork automatically shards work across up to 12 parallel, conflict-free subagents with 100% disjoint file locks.
+   - Multiple issue-solvers (`issue-solver [ModuleA]`, `issue-solver [ModuleB]`) and UI specialists run concurrently in Phase 1 (Wave 1), accelerating completion without lock contention.
 
 ## Godot 4 UI Architecture & Engineering Protocol (Demir Kafes for UI)
 When editing, scaffolding, or polishing Godot UI:
