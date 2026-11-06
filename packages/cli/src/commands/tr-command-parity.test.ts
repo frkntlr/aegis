@@ -17,7 +17,7 @@ const PARITY_SUBCOMMANDS = [
   'status', 'plan', 'setup', 'matrix', 'dag', 'analyze',
   'compact', 'clear', 'mesh', 'peers', 'post', 'broadcast',
   'waves', 'conflicts', 'radar', 'scale', 'batch', 'doc',
-  'synthesize', 'advance', 'push'
+  'synthesize', 'advance', 'tools', 'push'
 ] as const;
 
 beforeEach(() => {
@@ -58,7 +58,7 @@ test('COMMAND_MAP[tr:plan] exists and executes plan staging', async () => {
 });
 
 test('essential tr mesh and push subcommands exist and are callable', async () => {
-  const essentialCmds = ['tr:waves', 'tr:peers', 'tr:mesh', 'tr:doc', 'tr:push'] as const;
+  const essentialCmds = ['tr:waves', 'tr:peers', 'tr:mesh', 'tr:doc', 'tr:tools', 'tr:push'] as const;
   for (const cmd of essentialCmds) {
     assert.strictEqual(typeof COMMAND_MAP[cmd], 'function', `Expected ${cmd} to be a function`);
   }
@@ -68,6 +68,7 @@ test('essential tr mesh and push subcommands exist and are callable', async () =
     await COMMAND_MAP['tr:peers'](['tr:peers', '--compact']);
     await COMMAND_MAP['tr:mesh'](['tr:mesh', '--compact']);
     await COMMAND_MAP['tr:doc'](['tr:doc', '--compact']);
+    await COMMAND_MAP['tr:tools'](['tr:tools', 'solver']);
     await COMMAND_MAP['tr:push'](['tr:push', '--dry-run']);
   });
 });

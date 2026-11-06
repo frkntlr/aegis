@@ -8,12 +8,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
-const SKILL_NAMES: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'cage', 'tr'];
+const SKILL_NAMES: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'cage'];
 const SHIM_COMMANDS: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw', 'tr'];
 
 export class AntigravityInstaller {
   public static cleanLegacy(userHome: string): void {
-    const list = ['.gemini/config/skills.json', '.gemini/config/plugins.json'];
+    const list = [
+      '.gemini/config/skills.json',
+      '.gemini/config/plugins.json',
+      '.gemini/config/skills/tr',
+      '.gemini/config/plugins/aegis/skills/tr'
+    ];
     for (const rel of list) {
       const p = path.resolve(userHome, rel);
       if (fs.existsSync(p)) {

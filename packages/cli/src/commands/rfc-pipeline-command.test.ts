@@ -10,6 +10,9 @@ test('handleRfcPipeline decomposes RFC into issue and stages in task-inbox', asy
   const root = resolveSafeRepoRoot();
   const rfcDir = path.resolve(root, 'docs', 'rfc');
   fs.mkdirSync(rfcDir, { recursive: true });
+  for (const f of fs.readdirSync(rfcDir).filter(f => f.includes('test-autonomous-dynamic-pipeline'))) {
+    try { fs.unlinkSync(path.join(rfcDir, f)); } catch { /* ignore */ }
+  }
 
   const testTitle = 'Test Autonomous Dynamic Pipeline';
   const testDesc = 'Verify end-to-end discussion, issue cross-linking and TIP task staging';

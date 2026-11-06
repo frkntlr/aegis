@@ -9,6 +9,7 @@ import {
   TeamworkCoordinator,
   TeamworkDecomposer,
   TeamworkDocSynthesizer,
+  formatAegisToolMatrix,
   computeExecutionWaves,
   formatCompactWaveBriefing,
   formatParallelDispatchBriefing
@@ -88,3 +89,9 @@ export function mcpTeamworkDocSynthesize(args: Record<string, unknown> = {}): st
   if (args.compact) return synthesizer.synthesizeCompact(planId);
   return synthesizer.synthesize(planId);
 }
+
+export function mcpTeamworkTools(args: Record<string, unknown> = {}): string {
+  const role = typeof args.role === 'string' ? args.role : undefined;
+  return formatAegisToolMatrix(role);
+}
+

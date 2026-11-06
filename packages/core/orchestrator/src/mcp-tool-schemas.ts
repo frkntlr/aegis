@@ -209,6 +209,13 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     },
     req: []
   },
+  teamwork_tools: {
+    desc: 'Inspect or display assigned intelligent Aegis tools for each Antigravity subagent role',
+    props: {
+      role: { type: 'string', description: 'Filter tools by subagent role (solver, qa, ui, docs)' }
+    },
+    req: []
+  },
   lock_status: {
     desc: 'Inspect active file mutex locks across worktrees',
     props: {},

@@ -25,6 +25,7 @@ export interface TeamworkTrack {
   invocationPayload: AntigravityInvocationPayload;
   dependsOn: string[];
   phase: number;
+  assignedAegisTools?: string[];
 }
 
 export interface TeamworkPlan {

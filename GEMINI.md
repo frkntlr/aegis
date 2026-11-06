@@ -1,4 +1,4 @@
-# Aegis Autonomous Vibe Coding Engine Rules
+﻿# Aegis Autonomous Vibe Coding Engine Rules
 
 ## `/aegist` and `/aegis` Slash Command Protocol
 When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegist <cmd>` or `/aegis <cmd>`, immediately interpret and execute the corresponding Aegis CLI command in PowerShell:
@@ -115,11 +115,11 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
      - `qa-hunter`: `Model: 'inherit'`
      - `ui-specialist`: `Model: 'inherit'`
      - `doc-architect`: `Model: 'flash'`
-5. **Role Specialization for Godot**:
-   - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`).
-   - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions.
-   - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests, UI layout bounding box sweeps (`aegis godot inspect`), and regression audits.
-   - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki, architecture blueprints, and issue specifications.
+5. **Role Specialization & Intelligent Aegis Tool Arsenal**:
+   - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`). Uses `godot ui:lint`, `aegis godot inspect` (`aegis_godot_inspect_ui`), `godot ui:scaffold`, `aegis_godot_tree`, and `aegis_godot_signals`.
+   - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions. Uses 5-layer Codebase Memory (`find_symbol`, `memory_query`), AST search/replace (`ast_search`, `ast_replace`), relational trace (`trace_relational`), official docs (`context7_query`), and Socratic debugging (`socratic_diagnose`).
+   - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests (`aegis_godot_playtest`), UI layout sweeps (`aegis godot inspect`), evidence-based bug triage (`triage`), Demir Kafes audits (`cage_check`), RTK output compression (`rtk_compress`), and mutation/oracle trust verification (`mutate`, `audit`).
+   - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki (`wiki_sync`), living architecture blueprints (`teamwork_doc_synthesize` / `aegis tw:doc`), NotebookLM grounding (`nlm:query`, `nlm:research`), and RFC lifecycle (`rfc:create`, `rfc:decompose`).
 6. **Autonomous Subagent Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules (<300 lines/file, <40 lines/function), run `aegis verify:task`, and report completion back to Team Lead with `[ROLE_COMPLETE: <role>]`.
 7. **Live Progress Reporting & Lock Release**:
    - As each subagent message arrives, Team Lead receives a reactive wakeup.

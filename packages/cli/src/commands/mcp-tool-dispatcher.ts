@@ -32,7 +32,8 @@ import {
   mcpTeamworkWaves,
   mcpTeamworkConflicts,
   mcpTeamworkScale,
-  mcpTeamworkDocSynthesize
+  mcpTeamworkDocSynthesize,
+  mcpTeamworkTools
 } from './teamwork-mesh-mcp.js';
 
 export const CORE_MCP_TOOLS = [
@@ -68,6 +69,7 @@ export const CORE_MCP_TOOLS = [
   { name: 'teamwork_conflicts', description: 'Inspect Conflict Radar for active file collision warnings', inputSchema: { type: 'object', properties: {} } },
   { name: 'teamwork_scale', description: 'Plan hyper-scale massive concurrency subtasks with disjoint file allocation', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, maxAgents: { type: 'number' } }, required: ['objective'] } },
   { name: 'teamwork_doc_synthesize', description: 'Synthesize human-centric living architecture briefing, component topology and metrics', inputSchema: { type: 'object', properties: { planId: { type: 'string' }, compact: { type: 'boolean' } } } },
+  { name: 'teamwork_tools', description: 'Inspect or display assigned intelligent Aegis tools for each Antigravity subagent role', inputSchema: { type: 'object', properties: { role: { type: 'string' } } } },
   { name: 'engine_update', description: 'Dynamically update and reinstall Aegis across PC with zero-state clean options', inputSchema: { type: 'object', properties: { clean: { type: 'boolean' }, pull: { type: 'boolean' }, force: { type: 'boolean' } } } },
   { name: 'version_status', description: 'Inspect dynamic version drift, upstream commits, and monorepo packages status', inputSchema: { type: 'object', properties: {} } },
   { name: 'github_rfc_pipeline', description: 'Execute end-to-end GitHub RFC lifecycle: Discussion <-> Issue cross-link and TIP staging', inputSchema: { type: 'object', properties: { rfc: { type: 'string' }, description: { type: 'string' } }, required: ['rfc'] } },
@@ -242,6 +244,7 @@ export async function executeMcpTool(name: string, args: Record<string, unknown>
   if (canonical === 'teamwork_conflicts') return mcpTeamworkConflicts();
   if (canonical === 'teamwork_scale') return mcpTeamworkScale(args);
   if (canonical === 'teamwork_doc_synthesize') return mcpTeamworkDocSynthesize(args);
+  if (canonical === 'teamwork_tools') return mcpTeamworkTools(args);
   if (name === 'github_rfc_pipeline') {
     const { handleRfcPipeline } = await import('./rfc-pipeline-command.js');
     await handleRfcPipeline(String(args.rfc || ''), args.description ? String(args.description) : undefined);

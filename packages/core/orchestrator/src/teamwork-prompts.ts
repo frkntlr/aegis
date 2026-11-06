@@ -5,6 +5,7 @@
  */
 
 import type { RoleType } from './role-classifier.js';
+import { buildIntelligentToolGuidance, getAssignedAegisToolNames } from './teamwork-tools-catalog.js';
 
 export interface SubagentProfile {
   name: string;
@@ -17,6 +18,7 @@ export interface SubagentProfile {
   enableWriteTools: boolean;
   enableMcpTools: boolean;
   defaultModel?: 'inherit' | 'flash_lite' | 'flash' | 'pro';
+  aegisTools?: string[];
 }
 
 export const SOLVER_SYSTEM_PROMPT = `You are the Aegis Issue Solver subagent.
@@ -70,7 +72,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
-    defaultModel: 'inherit'
+    defaultModel: 'inherit',
+    aegisTools: getAssignedAegisToolNames('solver')
   },
   {
     name: 'qa-hunter',
@@ -82,7 +85,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
-    defaultModel: 'inherit'
+    defaultModel: 'inherit',
+    aegisTools: getAssignedAegisToolNames('qa')
   },
   {
     name: 'ui-specialist',
@@ -94,7 +98,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
-    defaultModel: 'inherit'
+    defaultModel: 'inherit',
+    aegisTools: getAssignedAegisToolNames('ui')
   },
   {
     name: 'doc-architect',
@@ -106,7 +111,8 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     workspaceMode: 'inherit',
     enableWriteTools: true,
     enableMcpTools: true,
-    defaultModel: 'flash'
+    defaultModel: 'flash',
+    aegisTools: getAssignedAegisToolNames('docs')
   }
 ];
 
@@ -125,12 +131,16 @@ function buildPromptHeader(profile: SubagentProfile, roleIdentity: string, track
     depInfo;
 }
 
-function buildPromptFooter(roleType: string, roleIdentity: string): string {
+function buildPromptFooter(roleType: RoleType, roleIdentity: string): string {
+  const toolGuidance = buildIntelligentToolGuidance(roleType);
+  const toolSection = toolGuidance ? `${toolGuidance}\n\n` : '';
+
   return `### ⚖️ Anti-Hallucination & Codebase Invariants\n` +
     `1. Strict Type Fidelity: Never import or call non-existent methods. Refer strictly to the AST interface contracts above.\n` +
     `2. Surgical Diffs: Replace only the relevant blocks; preserve all existing comments, docstrings, and imports.\n` +
     `3. Line Budget Headroom: Ensure your changes do not push any file past 300 lines (Demir Kafes).\n` +
     `4. Zero any: All types must be explicitly typed.\n\n` +
+    toolSection +
     `### 🌐 Dynamic Mesh & Peer Subagent Awareness (Simultaneous Execution)\n` +
     `You are executing in parallel with other subagents within an active execution wave.\n` +
     `- Inspect peer subagents and active file locks: \`aegis tw:peers\` or MCP \`teamwork_mesh_read\` / \`teamwork_peers\`.\n` +

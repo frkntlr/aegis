@@ -16,8 +16,11 @@ import {
   handleTeamworkScale,
   handleTeamworkBatch,
   handleTeamworkDoc,
-  handleTeamworkAdvance
+  handleTeamworkAdvance,
+  handleTeamworkTools
 } from './teamwork-mesh-command.js';
+
+export { handleTeamworkTools };
 import {
   TeamworkCoordinator,
   type TeamworkPlan,
@@ -67,6 +70,9 @@ export function handleTeamworkClear(flag?: string): void {
 function printTrackPayload(track: TeamworkTrack): void {
   console.log(`\n🔹 [${track.roleType.toUpperCase()}] Track: "${track.title}" (Phase ${track.phase})`);
   console.log(`   Target Files: ${track.targetFiles.join(', ') || 'Codebase-wide'}`);
+  if (track.assignedAegisTools && track.assignedAegisTools.length > 0) {
+    console.log(`   🛠️ Assigned Aegis Tools: [${track.assignedAegisTools.join(', ')}]`);
+  }
   if (track.dependsOn.length > 0) {
     console.log(`   Dependencies: [${track.dependsOn.join(', ')}]`);
   }
@@ -176,6 +182,7 @@ function routeMeshSubcommands(norm: string, all: string[]): boolean {
   if (norm === 'batch') { handleTeamworkBatch(all[1], ...all.slice(2)); return true; }
   if (norm === 'doc' || norm === 'synthesize') { handleTeamworkDoc(all[1], ...all.slice(2)); return true; }
   if (norm === 'advance') { handleTeamworkAdvance(all[1]); return true; }
+  if (norm === 'tools' || norm === 'tool' || norm === 'arsenal') { handleTeamworkTools(all[1], ...all.slice(2)); return true; }
   return false;
 }
 

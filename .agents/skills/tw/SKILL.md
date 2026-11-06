@@ -3,23 +3,25 @@ name: tw
 description: >-
   Aegis Antigravity Teamwork autonomous orchestration command (/tw, /aegis tw).
   Use whenever the user invokes /tw, /aegis tw, /teamwork, tw:plan, tw:status, tw:compact,
-  tw:waves, tw:peers, tw:radar, tw:doc, tw:clear, or requests multi-agent teamwork, subagent planning, DAG waves, or task staging.
+  tw:waves, tw:peers, tw:radar, tw:tools, tw:doc, tw:clear, or requests multi-agent teamwork, subagent planning, DAG waves, or task staging.
 ---
 
 # Aegis Antigravity Teamwork (/tw, /aegis tw)
 
 This skill activates when the user triggers `/tw`, `/aegis tw`, `/aegis teamwork`, or requests multi-agent autonomous execution.
-`tr` is a universal first-class alias for `tw` and `teamwork` with 100% feature parity.
+`tw` is the canonical primary skill for orchestrating Antigravity subagents (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) with intelligent Aegis tool dispatch.
 
 ## Antigravity Team Lead Autonomous Protocol
-Whenever the user triggers `/tw` or `/tr` or requests multi-agent teamwork:
+Whenever the user triggers `/tw` or requests multi-agent teamwork:
 1. **Immediate Lead Action**: Adopt the Team Lead role. Never execute sequentially as a single agent.
 2. **Plan & Stage**: Run `aegis tw "<objective>"` or call MCP `teamwork_plan`.
-3. **Print Live Task Matrix**: Display the running subagent tracks, locked files, and models.
+3. **Print Live Task Matrix**: Display running subagent tracks, locked files, and assigned Aegis tools.
 4. **Define & Concurrently Invoke Subagents**:
    - Register roles via `define_subagent` (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`).
    - Concurrently call `invoke_subagent` for each active track using `Workspace: 'share'` and hybrid models.
-5. **Monitor & Wave Advancement**: Subagents execute in parallel, update via Dynamic Teamwork Mesh (`aegis tw:post`, `aegis tw:peers`), and report back with `[ROLE_COMPLETE: <role>]`.
+5. **Intelligent Aegis Tool Orchestration**:
+   - Subagents execute with role-tailored Aegis tools (AST search, Socratic diagnostics, Iron Cage, Godot bridge, living wiki).
+   - Subagents communicate in real-time via Dynamic Mesh (`aegis tw:post`, `aegis tw:peers`) and report completion back to Team Lead with `[ROLE_COMPLETE: <role>]`.
 6. **Consolidation, Quality Gates & Push**: Once all tracks complete, verify via `cage:check` + monorepo tests, and autonomously publish to origin via `aegis tw:push`.
 
 ## Quick CLI Reference
@@ -32,6 +34,7 @@ Whenever the user triggers `/tw` or `/tr` or requests multi-agent teamwork:
 | `/tw:waves [objective]` | Compute parallel execution waves & simultaneous dispatch | `aegis tw:waves [objective]` | `teamwork_waves` |
 | `/tw:peers` | List active peer subagents, status, locks & modified files | `aegis tw:peers [--compact]` | `teamwork_peers` |
 | `/tw:radar` or `/tw:conflicts`| Inspect Conflict Radar for active file collision warnings | `aegis tw:radar` | `teamwork_conflicts` |
+| `/tw:tools [role]` | Inspect assigned intelligent Aegis tools per subagent role | `aegis tw:tools [role]` | `teamwork_tools` |
 | `/tw:doc [planId]` | Synthesize living architecture briefing, Mermaid DAG & metrics | `aegis tw:doc [planId]` | `teamwork_doc_synthesize` |
 | `/tw:mesh [clear]` | Read, inspect or clear dynamic real-time teamwork mesh state | `aegis tw:mesh [clear]` | `teamwork_mesh_read` |
 | `/tw:post "<activity>"` | Post subagent status, touched files or contracts to mesh | `aegis tw:post "<activity>"` | `teamwork_mesh_post` |
@@ -48,18 +51,43 @@ Whenever the user triggers `/tw` or `/tr` or requests multi-agent teamwork:
 | `/tw:setup [dir]` | Export subagents manifest (.aegis/subagents.json) | `aegis tw:setup` | - |
 | `/tw:push` or `/aegis push` | Autonomous Demir Kafes pre-push gate, staging, commit & remote push | `aegis push` | `teamwork_push` |
 
+## 🛠️ Subagent Intelligent Aegis Tool Arsenal
+Subagents dispatched by `/tw` are equipped with role-specialized Aegis tools:
+
+- `issue-solver` (`🛠️ [ISSUE SOLVER]`):
+  - **Memory & Symbol Lookup**: `aegis find <symbol>` / MCP `memory_query` / `skeleton_extract`
+  - **AST Structural Search**: `aegis ast:search "<pat>" [dir]` / MCP `ast_search`
+  - **Structural Surgical Replace**: `aegis ast:replace "<pat>" "<rep>" <file>` / MCP `ast_replace`
+  - **Relational Signal & Caller Trace**: `aegis trace <target>` / MCP `trace_relational`
+  - **Official Docs Grounding**: `aegis context7:query <library> <topic>` / MCP `context7_query`
+  - **Socratic Evidence Diagnostics**: `aegis debug "<error>"` / MCP `socratic_diagnose`
+
+- `qa-hunter` (`🎯 [QA HUNTER]`):
+  - **Evidence-Based Bug Triage**: `aegis triage [dir]` / MCP `triage`
+  - **Demir Kafes Compliance Audit**: `aegis cage:check` / MCP `cage_check` (<300L, <40L/fn, 0 any)
+  - **RTK Output Compression**: `aegis rtk:compress [file]` / MCP `rtk_compress`
+  - **Multimodal Godot Playtest**: `aegis godot playtest` / MCP `aegis_godot_playtest` / `aegis_godot_validate`
+  - **Layout & Visual Inspection**: `aegis godot inspect` / MCP `aegis_godot_inspect_ui`
+  - **Test Suite Trust Verification**: `aegis mutate <file>` & `aegis audit <testFiles>`
+
+- `ui-specialist` (`🎨 [UI SPECIALIST]`):
+  - **Godot 4 UI Static Linter**: `aegis godot ui:lint <scene.tscn>`
+  - **Multi-Aspect Ratio Inspector**: `aegis godot inspect` / MCP `aegis_godot_inspect_ui`
+  - **Responsive UI Scaffolder**: `aegis godot ui:scaffold <type> <name>`
+  - **Live Node & Signal Explorer**: MCP `aegis_godot_tree` and `aegis_godot_signals`
+
+- `doc-architect` (`📚 [DOC ARCHITECT]`):
+  - **Living Architecture Synthesis**: `aegis tw:doc [planId]` / MCP `teamwork_doc_synthesize`
+  - **NotebookLM Grounding & Research**: `aegis nlm:query "<q>"` / `nlm:research` / MCP `notebook_query`
+  - **Git Wiki Synchronization**: `aegis wiki:sync`
+  - **RFC Lifecycle & Decomposition**: `aegis rfc:create` and `aegis rfc:decompose`
+
 ## Flags
 - `--compact` / `-c`: Generate 85%-95% token-saving compact wire format / mission briefing.
 - `--json` / `-j`: Output machine-readable JSON for programmatic pipelines.
 - `--dry-run`: Validate execution plan and AST bindings without acquiring mutex locks.
 - `--max-agents=<n>` / `-n=<n>`: Hyper-scale dynamic concurrency (e.g. `--max-agents=8`, up to 12 parallel subagents with 100% disjoint locks).
 - `--scale` / `-s`: Auto-scale solver & UI tracks across all discovered domain files in parallel Wave 1.
-
-## Subagent Roles & Badges
-- `issue-solver` -> `🛠️ [ISSUE SOLVER] AKTİF | İzole Çözücü ve Geliştirici`
-- `qa-hunter` -> `🎯 [QA HUNTER] AKTİF | Teşhis, Oynanış ve Görsel UI Denetçisi`
-- `ui-specialist` -> `🎨 [UI SPECIALIST] AKTİF | Arayüz, Tema ve Görsel Cilalama Uzmanı`
-- `doc-architect` -> `📚 [DOC ARCHITECT] AKTİF | GitHub Dokümantasyon ve Proje Mimarı`
 
 ## Demir Kafes Invariants
 - Max 300 lines per file.

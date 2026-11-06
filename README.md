@@ -553,8 +553,8 @@ aegis completion --install
 
 ### 3. Antigravity Modüler Slash Komutları & Kardeş Beceriler (Skills)
 Google Antigravity ve Mulgravity içinde doğrudan slash komutu olarak çağrılabilen modüler beceriler:
-- `/tr "<hedef>"` veya `/tw "<hedef>"`: Antigravity Teamwork otonom çoklu ajan koordinatörü. Alt ajanları (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) dinamik olarak tanımlar (`define_subagent`) ve eşzamanlı (`invoke_subagent`) olarak tetikler ([.agents/skills/tr/SKILL.md](.agents/skills/tr/SKILL.md), [.agents/skills/tw/SKILL.md](.agents/skills/tw/SKILL.md)).
-- `/aegis tr` veya `/aegis tw`: Evrensel CLI üzerinden tam özellik eşdeğerliğine sahip otonom çoklu ajan koordinasyon komutları.
+- `/tw "<hedef>"`: Antigravity Teamwork otonom çoklu ajan koordinatörü. Alt ajanları (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) akıllı Aegis araçlarıyla donatıp dinamik olarak tanımlar (`define_subagent`) ve eşzamanlı (`invoke_subagent`) olarak tetikler ([.agents/skills/tw/SKILL.md](.agents/skills/tw/SKILL.md)).
+- `/aegis tw`: Evrensel CLI üzerinden tam yetenekli otonom çoklu ajan koordinasyon komutu.
 - `/aegis-tw`: Hızlı Teamwork durumu ve görev inceleme takma adı ([.agents/skills/aegis-tw/SKILL.md](.agents/skills/aegis-tw/SKILL.md)).
 - `/cage`: Anlık Demir Kafes (300 satır / 40 satır) denetimi ve proaktif kota radarı ([.agents/skills/cage/SKILL.md](.agents/skills/cage/SKILL.md)).
 - `/aegis` veya `/aegist`: Evrensel motor komuta merkezi ve çok ajanlı orkestrasyon ([.agents/skills/aegis/SKILL.md](.agents/skills/aegis/SKILL.md)).

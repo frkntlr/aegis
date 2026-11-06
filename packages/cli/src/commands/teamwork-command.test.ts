@@ -8,9 +8,11 @@ import {
   handleTeamworkPlan,
   handleTeamworkSetup,
   handleTeamwork,
+  handleTeamworkTools,
   mcpTeamworkPlan,
   mcpTeamworkStatus
 } from './teamwork-command.js';
+import { mcpTeamworkTools } from './teamwork-mesh-mcp.js';
 
 let testTmpDir: string;
 
@@ -88,4 +90,13 @@ test('handleTeamwork auto-routes objective and supports flags', () => {
   assert.doesNotThrow(() => handleTeamwork('Direct objective dry-run', '--dry-run'));
   assert.doesNotThrow(() => handleTeamwork('Direct objective json', '--json'));
   assert.doesNotThrow(() => handleTeamwork('clear'));
+});
+
+test('handleTeamworkTools and mcpTeamworkTools format tool arsenal table', () => {
+  assert.doesNotThrow(() => handleTeamworkTools());
+  assert.doesNotThrow(() => handleTeamworkTools('solver'));
+  assert.doesNotThrow(() => handleTeamworkTools('--json'));
+  const mcpTable = mcpTeamworkTools({ role: 'solver' });
+  assert.ok(mcpTable.includes('| `solver` |'));
+  assert.ok(mcpTable.includes('find_symbol'));
 });

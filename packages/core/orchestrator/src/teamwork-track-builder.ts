@@ -75,6 +75,7 @@ export class TeamworkTrackBuilder {
       prompt,
       dependsOn,
       phase,
+      assignedAegisTools: profile.aegisTools ?? [],
       invocationPayload: {
         TypeName: profile.name,
         Role: `${profile.title} - ${label}`,

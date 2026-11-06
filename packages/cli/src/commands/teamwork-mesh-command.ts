@@ -10,6 +10,8 @@ import {
   TeamworkCoordinator,
   TeamworkDecomposer,
   TeamworkDocSynthesizer,
+  formatAegisToolMatrix,
+  ROLE_AEGIS_TOOLS,
   computeExecutionWaves,
   getConcurrentExecutionBatches,
   formatParallelDispatchBriefing,
@@ -234,4 +236,22 @@ export function handleTeamworkAdvance(planId?: string): void {
   console.log(`🌊 Wave Advanced: Wave ${res.currentWave} -> Next Phase: ${res.nextPhase}`);
   console.log(`👥 Unlocked subagents in active batch: ${res.nextBatchPayload.length}`);
 }
+
+export function handleTeamworkTools(roleOrFlag?: string, ...flags: string[]): void {
+  const isJson = roleOrFlag === '--json' || roleOrFlag === '-j' || flags.includes('--json') || flags.includes('-j');
+  const role = roleOrFlag && !roleOrFlag.startsWith('-') ? roleOrFlag : undefined;
+  if (isJson) {
+    const tools = role ? (ROLE_AEGIS_TOOLS[role as keyof typeof ROLE_AEGIS_TOOLS] ?? []) : ROLE_AEGIS_TOOLS;
+    console.log(JSON.stringify(tools, null, 2));
+    return;
+  }
+  showBanner();
+  console.log(formatAegisToolMatrix(role));
+}
+
+export function mcpTeamworkTools(args: Record<string, unknown> = {}): string {
+  const role = typeof args.role === 'string' ? args.role : undefined;
+  return formatAegisToolMatrix(role);
+}
+
 
