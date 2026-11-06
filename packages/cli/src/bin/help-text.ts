@@ -82,6 +82,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis rfc:create "<title>" [desc]      Create architectural RFC & publish Ideation Discussion',
     '  aegis rfc:approve <rfcId>              Approve RFC and synthesize clean-room Wiki architecture',
     '  aegis rfc:decompose <rfcId>            Decompose accepted RFC into atomic GitHub Issues',
+    '  aegis rfc:pipeline "<title>" [desc]    End-to-end Discussion <-> Issue cross-link and TIP staging',
     '  aegis gh:status [token]                Inspect live GitHub API connectivity & rate limits',
     '  aegis gh:sync [token]                  Fetch ready issues from GitHub and dispatch to agents',
     '  aegis gh:comment <issue> "<body>"      Post evidence comment to GitHub Issue',

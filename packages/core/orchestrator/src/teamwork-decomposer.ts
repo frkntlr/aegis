@@ -30,8 +30,9 @@ export class TeamworkDecomposer {
     const parsed = rawItems.map(item => this.classifyRawItem(item));
     const subtasks = this.enrichSubtasks(parsed);
     this.ensureRequiredTracks(subtasks, objective, targetFiles);
-    if (options?.maxConcurrency && options.maxConcurrency > 1) {
-      return this.shardMaxConcurrency(subtasks, targetFiles, options.maxConcurrency);
+    if (options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1)) {
+      const maxC = options.maxConcurrency ?? 12;
+      return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
     }
     TeamworkSharder.shardSolversByFiles(subtasks, targetFiles, objective);
     TeamworkSharder.partitionFiles(subtasks, targetFiles);

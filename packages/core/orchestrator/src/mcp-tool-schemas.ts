@@ -228,6 +228,14 @@ export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
     props: {},
     req: []
   },
+  github_rfc_pipeline: {
+    desc: 'Execute end-to-end GitHub RFC lifecycle: Discussion <-> Issue cross-link and TIP staging',
+    props: {
+      rfc: { type: 'string', description: 'RFC ID, slug, or title' },
+      description: { type: 'string', description: 'RFC problem definition or concept' }
+    },
+    req: ['rfc']
+  },
 
   // --- Godot Substrate 3.0 Authoritative Suite (8) ---
   aegis_godot_status: {

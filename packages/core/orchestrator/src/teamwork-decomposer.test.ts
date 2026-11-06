@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import { TeamworkDecomposer } from './teamwork-decomposer.js';
+import { TeamworkDecomposer, TeamworkSharder } from './teamwork-decomposer.js';
 import { TeamworkCoordinator } from './teamwork-coordinator.js';
 import { compileUltraLeanPrompt, getSubagentProfiles } from './teamwork-prompts.js';
 
@@ -145,5 +145,54 @@ test('compileUltraLeanPrompt generates compact prompt under 200 tokens with anch
   assert.ok(prompt.includes('CONTRACT:export interface Token'));
   assert.ok(prompt.includes('ROLE_COMPLETE: issue-solver [tokenizer]'));
 });
+
+test('TeamworkSharder clusters sibling tests and implementation files together', () => {
+  const files = [
+    'packages/core/orchestrator/src/parser.ts',
+    'packages/core/orchestrator/src/parser.test.ts',
+    'packages/cli/src/commands/build.ts',
+    'packages/cli/src/commands/build.test.ts'
+  ];
+  const clusters = TeamworkSharder.clusterFilesBySubsystem(files);
+  assert.strictEqual(clusters.size, 2);
+  const keys = Array.from(clusters.keys());
+  assert.ok(keys.includes('Core-orchestrator'));
+  assert.ok(keys.includes('Cli-commands'));
+
+  const coreFiles = clusters.get('Core-orchestrator') || [];
+  assert.strictEqual(coreFiles.length, 2);
+  assert.ok(coreFiles.includes('packages/core/orchestrator/src/parser.ts'));
+  assert.ok(coreFiles.includes('packages/core/orchestrator/src/parser.test.ts'));
+});
+
+test('TeamworkSharder calculates optimal concurrency K* without idle agent waste', () => {
+  assert.strictEqual(TeamworkSharder.calculateOptimalConcurrency(1, 10, 12), 1);
+  assert.strictEqual(TeamworkSharder.calculateOptimalConcurrency(3, 10, 12), 3);
+  assert.strictEqual(TeamworkSharder.calculateOptimalConcurrency(8, 20, 12), 8);
+  assert.strictEqual(TeamworkSharder.calculateOptimalConcurrency(15, 30, 12), 12);
+});
+
+test('TeamworkDecomposer with autoScale creates optimal conflict-free clusters', () => {
+  const files = [
+    'src/auth/login.ts',
+    'src/auth/login.test.ts',
+    'src/db/repo.ts',
+    'src/db/repo.test.ts'
+  ];
+  const subtasks = TeamworkDecomposer.decompose('Build auth and database', files, { autoScale: true });
+  const solvers = subtasks.filter(s => s.roleType === 'solver');
+  assert.strictEqual(solvers.length, 2, 'Should scale to exactly 2 solvers for 2 distinct subsystems');
+
+  const authSolver = solvers.find(s => s.targetFiles.some(f => f.includes('auth')));
+  assert.ok(authSolver);
+  assert.ok(authSolver?.targetFiles.includes('src/auth/login.ts'));
+  assert.ok(authSolver?.targetFiles.includes('src/auth/login.test.ts'));
+
+  const dbSolver = solvers.find(s => s.targetFiles.some(f => f.includes('db')));
+  assert.ok(dbSolver);
+  assert.ok(dbSolver?.targetFiles.includes('src/db/repo.ts'));
+  assert.ok(dbSolver?.targetFiles.includes('src/db/repo.test.ts'));
+});
+
 
 
