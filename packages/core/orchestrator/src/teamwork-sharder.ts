@@ -185,6 +185,27 @@ export class TeamworkSharder {
     return [...solvers, ...others];
   }
 
+  private static shardGeneralScopeSections(
+    subtasks: DecomposedSubtask[],
+    objective: string,
+    maxConcurrency: number
+  ): DecomposedSubtask[] {
+    const solvers = subtasks.filter(t => t.roleType === 'solver');
+    if (solvers.length !== 1) return subtasks;
+
+    const baseTitle = solvers[0]?.title || objective;
+    const shardedSolvers: DecomposedSubtask[] = [
+      { roleType: 'solver', label: 'Logic', title: `${baseTitle} [Logic]: Core algorithms & calculations`, targetFiles: [], phase: 1, dependsOn: [] },
+      { roleType: 'solver', label: 'Adapter', title: `${baseTitle} [Adapter]: Pipeline, CLI & interface routing`, targetFiles: [], phase: 1, dependsOn: [] }
+    ];
+    if (maxConcurrency >= 3) {
+      shardedSolvers.push({ roleType: 'solver', label: 'State', title: `${baseTitle} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
+    }
+
+    const others = subtasks.filter(t => t.roleType !== 'solver');
+    return [...shardedSolvers, ...others];
+  }
+
   public static shardSmartClusters(
     subtasks: DecomposedSubtask[],
     allFiles: string[],
@@ -194,8 +215,11 @@ export class TeamworkSharder {
     const sourceFiles = allFiles.filter(
       f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/')
     );
-    if (sourceFiles.length === 1 && maxConcurrency > 1) {
+    if (allFiles.length === 1 && sourceFiles.length === 1 && maxConcurrency > 1) {
       return this.shardSingleFileSections(subtasks, sourceFiles[0], objective);
+    }
+    if (sourceFiles.length === 0 && maxConcurrency > 1) {
+      return this.shardGeneralScopeSections(subtasks, objective, maxConcurrency);
     }
     if (sourceFiles.length <= 1) return subtasks;
 

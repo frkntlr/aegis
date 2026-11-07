@@ -28,7 +28,7 @@ export interface DecomposeOptions {
 }
 
 export class TeamworkDecomposer {
-  private static readonly STOP_WORDS = new Set(['ve', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de']);
+  private static readonly STOP_WORDS = new Set(['ve', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de', 'hala', 'başka', 'daha', 'cok', 'çok', 'ise', 'gibi']);
 
   public static decompose(
     objective: string,
@@ -54,9 +54,11 @@ export class TeamworkDecomposer {
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
 
-    const shouldScale = options?.autoScale ||
+    const shouldScale = Boolean(
+      options?.autoScale ||
       (options?.maxConcurrency && options.maxConcurrency > 4) ||
-      (targetFiles.length === 1 && (isTree || (options?.maxConcurrency && options.maxConcurrency > 1)));
+      (targetFiles.length === 1 && (isTree || options?.autoScale))
+    );
     if (shouldScale) {
       const maxC = options?.maxConcurrency ?? 12;
       return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
@@ -127,11 +129,11 @@ export class TeamworkDecomposer {
     const title = raw.replace(/^(\d+[\.\)]|\*|-|•)\s*/, '').trim();
     const lower = title.toLowerCase();
     let roleType: RoleType = 'solver';
-    if (lower.includes('audit') || lower.includes('triage') || lower.includes('kafes') || lower.includes('denetim') || lower.startsWith('test')) {
+    if (lower.includes('audit') || lower.includes('triage') || lower.includes('kafes') || lower.includes('denetim') || lower.includes('test') || lower.includes('doğrula') || lower.includes('dogrula')) {
       roleType = 'qa';
-    } else if (lower.includes('ui') || lower.includes('theme') || lower.includes('hud') || lower.includes('pause menu') || lower.includes('layout')) {
+    } else if (lower.includes('ui') || lower.includes('theme') || lower.includes('hud') || lower.includes('pause menu') || lower.includes('layout') || lower.includes('arayüz') || lower.includes('arayuz') || lower.includes('tema') || lower.includes('görsel') || lower.includes('gorsel') || lower.includes('ekran')) {
       roleType = 'ui';
-    } else if (lower.startsWith('doc') || lower.includes('wiki') || lower.includes('rfc') || lower.includes('dokümantasyon') || lower.includes('document')) {
+    } else if (lower.startsWith('doc') || lower.includes('wiki') || lower.includes('rfc') || lower.includes('dokümantasyon') || lower.includes('dokumantasyon') || lower.includes('document') || lower.includes('belge')) {
       roleType = 'docs';
     }
     const label = this.extractLabel(title, roleType);
@@ -165,14 +167,19 @@ export class TeamworkDecomposer {
     if (isAllowed('solver') && !subtasks.some(t => t.roleType === 'solver')) {
       subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [] });
     }
-    if (isAllowed('ui') && allFiles.some(f => RoleClassifier.isUiFile(f)) && !subtasks.some(t => t.roleType === 'ui')) {
+    const hasUiSignal = allFiles.some(f => RoleClassifier.isUiFile(f)) || /ui|arayüz|arayuz|theme|hud|tasarım|tasarim|ekran|görsel/i.test(objective);
+    if (isAllowed('ui') && hasUiSignal && !subtasks.some(t => t.roleType === 'ui')) {
       subtasks.push({ roleType: 'ui', label: 'UI', title: `Refine UI layouts: ${objective}`, targetFiles: [] });
     }
-    if (isAllowed('docs') && allFiles.some(f => f.endsWith('.md') || f.includes('docs/')) && !subtasks.some(t => t.roleType === 'docs')) {
+    const hasDocSignal = allFiles.some(f => f.endsWith('.md') || f.includes('docs/')) || /doc|wiki|rfc|dokümantasyon|belge/i.test(objective);
+    if (isAllowed('docs') && hasDocSignal && !subtasks.some(t => t.roleType === 'docs')) {
       subtasks.push({ roleType: 'docs', label: 'Docs', title: `Document specs: ${objective}`, targetFiles: [] });
     }
     if (isAllowed('qa') && !subtasks.some(t => t.roleType === 'qa')) {
       subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
+    }
+    if (subtasks.length === 0) {
+      subtasks.push({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [] });
     }
   }
 

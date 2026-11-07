@@ -64,7 +64,7 @@ export class TeamworkHierarchicalTree {
 
   public static isHierarchicalRequested(objective: string): boolean {
     const lower = objective.toLowerCase();
-    return /\b(?:\d+\s+ajan|subagents?|tree|specialists?|hiyerarşi|mikro|kendi\s+altında)\b/.test(lower);
+    return /\b(?:\d+\s+ajan|subagents?|tree|specialists?|hiyerarşi|hiyerarsi|ağaç|agac|mikro|kendi\s+altında|kendi\s+altinda|alt\s+ajan)\b/.test(lower);
   }
 
   public static expandHierarchicalRoles(

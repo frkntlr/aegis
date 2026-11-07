@@ -21,25 +21,29 @@ export interface ComplexityAnalysisResult {
 const TRIVIAL_KEYWORDS = ['typo', 'rename', 'comment', 'docstring', 'readme', 'format', 'lint', 'yazım', 'formatla'];
 const HYPER_KEYWORDS = [
   'monorepo', 'overhaul', 'massive', 'migration', 'hierarchical', 'swarm', 'hyper', 'complete rewrite',
-  'çoklu ajan', 'coklu ajan', 'hiyerarşik', 'hiyerarsik', 'sürü', 'suru', 'ölçek', 'olcek', 'tüm proje'
+  'çoklu ajan', 'coklu ajan', 'hiyerarşik', 'hiyerarsik', 'sürü', 'suru', 'ölçek', 'olcek', 'tüm proje',
+  'kendi altında', 'kendi altinda', 'mikro ajan'
 ];
 const COMPLEX_KEYWORDS = [
   'feature', 'pipeline', 'integrate', 'controller', 'bridge', 'state', 'worker', 'scanner', 'adapter',
-  'analiz', 'araştırma', 'arastirma', 'eş zamanlı', 'es zamanli', 'paralel', 'optimizasyon', 'geliştirme',
-  'dinamik ajan', 'çoklu'
+  'analiz', 'araştırma', 'arastirma', 'eş zamanlı', 'es zamanli', 'paralel', 'optimizasyon', 'optimize',
+  'performans', 'geliştirme', 'dinamik ajan', 'çoklu', 'coklu', 'görevlere böl', 'gorevlere bol', 'bölüp',
+  'bolup', 'çalışılamıyor', 'calisilamiyor', 'sorunlar', 'buglar', 'hata', 'eksiklik', 'tamamla', 'motor',
+  'düzelt', 'güncelle', 'yenile'
 ];
 
 export class TaskComplexityAnalyzer {
   private static scoreObjective(objective: string): { score: number; reasons: string[]; isTrivial: boolean } {
     const lower = objective.toLowerCase();
     const reasons: string[] = [];
-    let score = 20;
 
     const trivialMatch = TRIVIAL_KEYWORDS.find(k => lower.includes(k));
     if (trivialMatch && lower.split(/\s+/).length < 8) {
       reasons.push(`Basit/Tekil işlem anahtar kelimesi: '${trivialMatch}'`);
       return { score: 10, reasons, isTrivial: true };
     }
+
+    let score = 35;
 
     const hyperMatch = HYPER_KEYWORDS.filter(k => lower.includes(k));
     if (hyperMatch.length > 0) {
@@ -119,7 +123,7 @@ export class TaskComplexityAnalyzer {
       return ['solver'];
     }
     if (tier === 'MODERATE') {
-      return hasUi ? ['ui', 'qa'] : ['solver', 'qa'];
+      return ['solver', 'ui', 'qa', 'docs'];
     }
     return ['solver', 'ui', 'qa', 'docs'];
   }
@@ -130,8 +134,10 @@ export class TaskComplexityAnalyzer {
     const rawScore = objScore.isTrivial && files.length <= 1 ? 15 : Math.min(100, objScore.score + fileScore.score);
     const reasons = [...objScore.reasons, ...fileScore.reasons];
 
+    const hasUi = fileScore.domains.includes('ui') || /ui|arayüz|arayuz|theme|hud/i.test(objective);
+
     let tier: ComplexityTier = 'MODERATE';
-    let optimalAgentCount = 2;
+    let optimalAgentCount = hasUi ? 3 : 2;
     let shouldEnableHierarchicalTree = false;
 
     if (rawScore <= 25) {
@@ -139,7 +145,7 @@ export class TaskComplexityAnalyzer {
       optimalAgentCount = 1;
     } else if (rawScore <= 50) {
       tier = 'MODERATE';
-      optimalAgentCount = 2;
+      optimalAgentCount = hasUi ? 3 : 2;
     } else if (rawScore <= 75) {
       tier = 'COMPLEX';
       optimalAgentCount = 4;

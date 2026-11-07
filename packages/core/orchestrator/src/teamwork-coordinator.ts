@@ -135,10 +135,11 @@ export class TeamworkCoordinator {
     complexity: ReturnType<typeof TaskComplexityAnalyzer.analyze>,
     options?: { maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[]; explicitRole?: string; treeSpecialists?: boolean }
   ): ReturnType<typeof TeamworkDecomposer.decompose> {
+    const isScaling = Boolean((options?.maxConcurrency && options.maxConcurrency > 1) || options?.autoScale || options?.treeSpecialists);
     return TeamworkDecomposer.decompose(objective, files, {
       maxConcurrency: options?.maxConcurrency ?? complexity.optimalAgentCount,
       autoScale: options?.autoScale ?? (complexity.tier === 'HYPER_SCALE'),
-      selectedRoles: options?.selectedRoles ?? (complexity.tier === 'TRIVIAL' && !options?.explicitRole ? complexity.suggestedRoles : undefined),
+      selectedRoles: options?.selectedRoles ?? (complexity.tier === 'TRIVIAL' && !options?.explicitRole && !isScaling ? complexity.suggestedRoles : undefined),
       explicitRole: options?.explicitRole,
       treeSpecialists: options?.treeSpecialists ?? complexity.shouldEnableHierarchicalTree
     });
