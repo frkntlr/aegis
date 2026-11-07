@@ -18,8 +18,9 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 
 | Command | Action | Execution |
 | :--- | :--- | :--- |
-| `/aegis update [--clean] [--pull]` | Dynamically update, rebuild and cleanly reinstall Aegis across PC | `aegis update [--clean] [--pull]` |
-| `/aegis version:status` | Inspect dynamic version drift, upstream commits & monorepo packages | `aegis version:status` |
+| `/aegis update [--clean] [--pull] [--bump <patch|minor|major>]` | Automatically bump versions across monorepo packages, rebuild & reinstall | `aegis update [--bump <type>]` |
+| `/aegis version:status` | Version grade diagnostics, drift against origin/master, git tags & upgrade availability | `aegis version:status` |
+| `/aegis ci:audit` or `ci:check` | Deterministically verify all 10 GitHub Actions CI gates locally before pushing code | `aegis ci:audit` |
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `aegis status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `aegis auto` |
 | `/aegis tw "<obj>"` or `teamwork` | Direct plan & stage tracks (Short: `tw`, `tw:plan`, `tw:status`, `tw:dag`, `tw:matrix`, `tw:compact`, `tw:analyze`, `tw:setup`, `tw:clear`) | `aegis tw "<obj>" [-c] [-j] [--dry-run]` |

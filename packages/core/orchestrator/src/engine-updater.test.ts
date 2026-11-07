@@ -49,6 +49,9 @@ test('EngineUpdater getVersionReport returns complete diagnostics', () => {
   assert.ok(Array.isArray(rep.monorepoPackages));
   assert.ok(rep.monorepoPackages.length >= 10);
   assert.ok(typeof rep.mcpToolCount === 'number');
+  assert.ok(rep.latestTag === null || typeof rep.latestTag === 'string');
+  assert.strictEqual(typeof rep.upgradeAvailable, 'boolean');
+  assert.ok(rep.nextRecommendedVersion && typeof rep.nextRecommendedVersion === 'string');
 });
 
 test('EngineUpdater safeExec handles valid commands and invalid commands gracefully', () => {

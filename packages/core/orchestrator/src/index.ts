@@ -28,6 +28,7 @@ export * from './teamwork-hierarchical-tree.js';
 export * from './task-complexity-analyzer.js';
 export * from './teamwork-research-swarm.js';
 export * from './antigravity-installer.js';
+export * from './version-manager.js';
 export * from './engine-updater.js';
 export * from './teamwork-analysis-types.js';
 export * from './teamwork-analysis-mesh.js';

@@ -18,6 +18,24 @@ interface UpdateFlags {
   force: boolean;
   check: boolean;
   json: boolean;
+  bump?: 'patch' | 'minor' | 'major';
+}
+
+function parseBump(args: string[]): 'patch' | 'minor' | 'major' | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i] || '';
+    if (a === '--bump') {
+      const next = (args[i + 1] || '').toLowerCase();
+      if (next === 'minor' || next === 'major' || next === 'patch') return next;
+      return 'patch';
+    }
+    if (a.startsWith('--bump=')) {
+      const val = a.slice(7).toLowerCase();
+      if (val === 'minor' || val === 'major' || val === 'patch') return val;
+      return 'patch';
+    }
+  }
+  return undefined;
 }
 
 function parseUpdateFlags(args: string[]): UpdateFlags {
@@ -26,7 +44,8 @@ function parseUpdateFlags(args: string[]): UpdateFlags {
     pull: args.includes('--pull') || args.includes('-p'),
     force: args.includes('--force') || args.includes('-f'),
     check: args.includes('--check') || args.includes('--dry-run'),
-    json: args.includes('--json') || args.includes('-j')
+    json: args.includes('--json') || args.includes('-j'),
+    bump: parseBump(args)
   };
 }
 
@@ -46,10 +65,22 @@ export function handleVersionStatus(flag?: string): void {
   console.log(` • Remote Commit: ${report.remoteCommit}`);
 
   printDriftStatus(report);
+  printVersionGrade(report);
   console.log(` • Monorepo:      ${report.monorepoPackages.length} packages loaded`);
   console.log(` • MCP Tools:     ${report.mcpToolCount} authoritative tools active`);
   console.log(` • Global Shims:  ${report.installedShims.length} shims active in bin`);
   console.log(` • Worktrees:     ${report.worktreesCount} active git worktrees`);
+}
+
+function printVersionGrade(report: EngineVersionReport): void {
+  const tagStr = report.latestTag ? `v${report.latestTag.replace(/^v/, '')}` : 'none';
+  const upgradeStr = report.upgradeAvailable ? '⚠️ Upgrade available!' : '✅ Up to date';
+  console.log(` • Version Grade: ${upgradeStr} (Latest Tag: ${tagStr})`);
+  if (report.nextPatch && report.nextMinor) {
+    console.log(` • Next Semver:   patch -> v${report.nextPatch} | minor -> v${report.nextMinor}`);
+  } else {
+    console.log(` • Next Semver:   recommended -> v${report.nextRecommendedVersion}`);
+  }
 }
 
 function printDriftStatus(report: EngineVersionReport): void {
@@ -79,12 +110,14 @@ export function handleEngineUpdate(...args: string[]): EngineUpdateResult | null
     console.log('🔄 Aegis Dynamic Engine Update & Full Reinstallation Initiated...');
     if (flags.clean) console.log('🧹 Clean Mode Active: Wiping build caches and stale locks.');
     if (flags.pull) console.log('🐙 Remote Pull: Checking for latest commits on origin/master.');
+    if (flags.bump) console.log(`🏷️  Version Bump Active: Upgrading semver (${flags.bump}) across monorepo.`);
   }
 
   const opts: EngineUpdateOptions = {
     clean: flags.clean,
     pull: flags.pull,
-    force: flags.force
+    force: flags.force,
+    bump: flags.bump
   };
 
   const result = EngineUpdater.runUpdate(opts);

@@ -23,6 +23,7 @@ test('ALL_AEGIS_COMMANDS includes key subcommands and aliases', () => {
   assert.ok(ALL_AEGIS_COMMANDS.includes('status'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('task:list'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('completion'));
+  assert.ok(ALL_AEGIS_COMMANDS.includes('ci:audit'));
   assert.ok(ALL_AEGIS_COMMANDS.includes('search'));
 });
 

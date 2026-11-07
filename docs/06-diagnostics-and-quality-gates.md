@@ -86,6 +86,30 @@ Ajanların testleri gevşeterek veya silerek hile yapmasını engellemek için i
 
 ---
 
+## 4.3. Yerel CI/CD Pipeline Denetim Koşucusu (`aegis ci:audit` / `aegis ci:check`)
+
+GitHub Actions CI/CD ortamında koşturulan tüm doğrulama kapıları, kod uzak depoya gönderilmeden önce yerel ortamda tek bir komutla deterministik olarak doğrulanır:
+
+```bash
+aegis ci:audit
+# veya
+aegis ci:check
+```
+
+### Denetlenen 10 GitHub Actions CI Kapısı
+1. **Monorepo Build:** TypeScript derleme bütünlüğü (`npm run build`).
+2. **Monorepo Typecheck:** Sıkı tip denetimi (`npm run typecheck`).
+3. **Monorepo Lint:** Kod stili ve sözdizimi analizi (`npm run lint`).
+4. **Topological Drift Radar (RFC-036):** Kilit dosyaları ve sözleşme kayması (`aegis deps:drift`).
+5. **Deterministic Demir Kafes Audit:** Satır ve fonksiyon sınırları denetimi (`aegis cage:check`).
+6. **Demir Kafes Doğrulaması:** Dosya seviyesi kurallar (`aegis verify`).
+7. **Monorepo Unit Test Suite:** Paralel ve önbellekli test süiti (`npm test`).
+8. **Zero-Token UI Inspection:** Arayüz düzen denetimi (`aegis inspect`).
+9. **Godot Bridge & UI Verification:** Godot durumu ve sahne ağacı denetimi (`aegis godot status` & `inspect`).
+10. **Mutation Testing Gate:** Değişiklik toleransı ve güvenilirlik barajı (`aegis mutate`, %70 barajı).
+
+---
+
 ## 5. 3-Fazlı Adaptif Watchdog & Devre Kesici (Circuit Breaker)
 
 Uzun süren işlemler veya sonsuz döngüye giren testler için akıllı izleme katmanı devrededir:

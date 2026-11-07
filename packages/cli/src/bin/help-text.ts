@@ -47,6 +47,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis lock:clear                       Release all active mutex locks across all worktrees'
   ],
   '🛡️ Quality Gates & Demir Kafes': [
+    '  aegis ci:audit [--fast] [--json]       Run full CI pipeline simulation & quality gates',
     '  aegis verify <file>                    Validate single file against Demir Kafes',
     '  aegis cage:check [dir]                 Audit codebase against Deterministik Demir Kafes',
     '  aegis skeleton:scan [dir]              Compute global AST skeleton map & token savings',

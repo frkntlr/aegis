@@ -30,6 +30,8 @@ npm run aegis -- <komut> [argümanlar]
 | `aegis init` | Yok | Rol tabanlı worktree'leri (`solver`, `qa`, `docs`, `ui`) ve IDE kural dosyalarını hazırlar. |
 | `aegis status` | Yok | Aktif worktree'leri, bağlı IDE oturumlarını ve aktif dosya mutex kilitlerini listeler. |
 | `aegis auto` | Yok | Otonom görev dağıtım kuyruğunu (TIP) tetikler. |
+| `aegis update` | `[--clean] [--pull] [--bump <type>]` | Monorepo paket sürümlerini otomatik yükseltir (patch/minor/major), yeniden derler ve PC çapında kurar. |
+| `aegis version:status` | `[flag]` | Versiyon seviye teşhisi, origin/master drifti, git etiketleri ve güncelleme uygunluk raporu. |
 | `aegis task:list` | `[status]` | TIP görev kuyruğundaki görevleri listeler (`ready`, `in_progress`, `blocked`). |
 | `aegis task:claim` | `<id> [agent]` | Görevi ajan rolü adına üstlenir ve hedef dosya kilitlerini edinir. |
 | `aegis task:release`| `<id> [status]` | Görevi tamamlar/bırakır ve dosya kilitlerini çözer. |
@@ -81,6 +83,7 @@ npm run aegis -- <komut> [argümanlar]
 | Komut | Parametreler | Açıklama |
 | :--- | :--- | :--- |
 | `aegis cage:check` | `[dir]` | Projeyi Demir Kafes (300/40) ve Fast-Stat radarıyla anında denetler. |
+| `aegis ci:audit` | Yok | 10 GitHub Actions CI kapısını yerelde deterministik doğrular (takma ad: `aegis ci:check`). |
 | `aegis verify` | `<filepath>` | Tek bir dosyanın Demir Kafes kurallarına uyumunu test eder. |
 | `aegis verify:task` | `[file]` | Multimodal Kalite Kapısını (Demir Kafes + Godot Playtest) çalıştırır. |
 | `aegis skeleton` | `<filepath>` | Dosyanın AST iskelet haritasını ve token tasarrufunu çıkarır. |

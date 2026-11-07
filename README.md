@@ -14,7 +14,7 @@
 
 Aegis; yapay zeka modellerinin dikkatinin dağılması (**context bloat**), bağlam unutması (**context drop**), uydurma metod/kütüphane üretimi (**AI hallucination**), spagetti/ölü kod üretimi ve sonsuz kilitlenme (**infinite regression / stagnation**) problemlerini ortadan kaldıran yeni nesil otonom yazılım mühendisliği motorudur.
 
-Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`, `aegist`, `tw`, `tr`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Otomatik Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **40 Yerel Stdio MCP Aracı**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **455+ Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **812 Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
+Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`, `aegist`, `tw`, `tr`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Otomatik Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **Yerel CI/CD Kapı Koşucusu (`aegis ci:audit`) & Otomatik Versiyonlama (`aegis update --bump`)**, **40 Yerel Stdio MCP Aracı**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **455+ Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **812 Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
 
 ---
 
@@ -64,6 +64,8 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 | **Yetim Kilitler & Depo Kilitlenmesi (Deadlock):** Çöken veya durdurulan alt ajan süreçleri arkalarında bayat dosya kilidi bırakarak diğer ajanları dondurur. | **Worktree Lock Manager & Stale-Lock Pruning (`worktree-lock-manager.ts`):** `isPidAlive` ile ölü PID denetimi (`process.kill(pid, 0)`), 30 dk TTL zaman aşımı ve `.corrupt` karantina koruması. | **Sıfır Kilitlenme**, kendi kendini onaran kalıcı kilit yönetimi. |
 | **Monolitik Godot Sahne Denetimi:** Godot `.tscn` sahneleri ve GDScript kontrolcüleri ayrıştırılırken linter mantığıyla iç içe geçip şişer. | **Ayrık Godot UI AST Ayrıştırıcısı (`GodotUiParser`):** Sahne düğüm hiyerarşisi, konteyner özellikleri ve sinyal bağlantılarını linter'dan bağımsız ayrıştırır. | **Hızlı AST Analizi**, <100 satır bağımsız ayrıştırıcı, sıfır binary bağımlılığı. |
 | **Subagent İstem Şişmesi & Yavaş Testler:** Subagent'lara verilen uzun ve laf kalabalığı istemler gecikmeyi artırır; yavaş testler geliştirme döngüsünü aksatır. | **Ultra-Yalın Mikro-İstemler (<160 Token) & Turbo Build Cache:** Cerrahi sembol çapaları (`ANCHORS`), sözleşmeler (`CONTRACT`) ve 14 pakette 812 test. | **%92 Token Tasarrufu**, 35 saniyede 812 test, **86ms** Full Turbo tekrarı. |
+| **Bozuk CI / Uzak Pipeline Sürprizleri:** Kod yerelde çalışır görünür ama GitHub Actions'a push edildiğinde 10 farklı kapıdan birinde patlar. | **Yerel CI/CD Pipeline Koşucusu (`aegis ci:audit` / `aegis ci:check`):** GitHub Actions'ın tüm 10 kapısını (build, lint, typecheck, drift, cage, verify, tests, inspect, godot, mutate) kod push edilmeden önce yerelde deterministik doğrular. | **Sıfır Kırık CI**, GitHub kota israfını önleme ve deterministik yeşil pipeline. |
+| **Monorepo Sürüm Uyumsuzluğu:** Monorepo paketlerinin versiyonlarını elle senkronize etmek yorucudur ve bayat derlemelere yol açar. | **Otomatik Sürüm Yükseltme & Seviye Teşhisi (`aegis update --bump`, `aegis version:status`):** Tüm paketleri otomatik yükseltir (patch/minor/major), package.json'ları senkronize eder, derler ve PC geneli shim'leri günceller. | **Tek Komutla Versiyonlama**, tam paket tutarlılığı ve sıfır bayat shim. |
 
 ---
 
@@ -569,8 +571,9 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | `aegis init` | Rol tabanlı worktree'leri (`solver`, `qa`, `docs`, `ui`) ve IDE kural dosyalarını hazırlar. |
 | `aegis status` | Aktif worktree'leri, bağlı IDE oturumlarını ve aktif dosya kilitlerini listeler. |
 | `aegis auto` | Otonom görev dağıtım kuyruğunu tetikler. |
-| `aegis update [--clean] [--pull]` | Dinamik sıfır-durum güncelleme, paketleri yeniden derleme ve PC çapında shim kurulumu. |
-| `aegis version:status` | Upstream commit farkı, paket sürüm drifti ve kurulu global/yerel shim sağlık denetimi. |
+| `aegis update [--clean] [--pull] [--bump <patch|minor|major>]` | Monorepo paket sürümlerini otomatik yükseltir, paketleri derler ve PC genelinde temiz kurulum yapar. |
+| `aegis version:status` | Versiyon seviye teşhisi, origin/master drifti, git etiketleri ve güncelleme uygunluğunu denetler. |
+| `aegis ci:audit` / `ci:check` | 10 GitHub Actions CI kapısını (derleme, lint, typecheck, drift, kafes, test, playtest, mutasyon) yerelde deterministik doğrular. |
 | `aegis search <query>` | 100+ alt komutu anahtar kelimeye göre anlık filtreler (takma ad: `aegis help <query>`). |
 | `aegis completion [--install]` | PowerShell ve Bash için tab-tamamlama betiği üretir veya profiline (`$PROFILE`) kurar. |
 | `aegis tr "<obj>"` / `tw` | Doğrudan hedef çalıştırma, DAG izleklerine bölme ve atomik batch kilitlerle TIP sahneleme (`-c`, `-j`, `--dry-run`). |
@@ -641,6 +644,7 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | Komut | Açıklama |
 | :--- | :--- |
 | `aegis cage:check [dir]` | Tüm proje kodunu Demir Kafes (300/40) ve Fast-Stat radarıyla anında denetler. |
+| `aegis ci:audit` / `ci:check` | 10 GitHub Actions CI kapısını kod remote'a gitmeden önce yerelde deterministik doğrular. |
 | `aegis verify <filepath>` | Tek bir dosyanın Demir Kafes kurallarına uyumunu test eder. |
 | `aegis verify:task [file]` | Multimodal Kalite Kapısını (Demir Kafes + Godot Headless Playtest) çalıştırır. |
 | `aegis skeleton <filepath>` | Tek dosyanın AST iskelet haritasını ve token tasarrufunu çıkarır. |
@@ -753,6 +757,7 @@ Projeye katkı sunan insan geliştiriciler ve yapay zeka ajanları aşağıdaki 
    - Adım 1: Deterministik Demir Kafes AST Doğrulaması (`cage:check`).
    - Adım 2: Monorepo Birim Testleri (`npm test`).
    - Adım 3: Mutasyon Testi Kapısı (`aegis mutate`, %70 barajı).
+   - Adım 4: Yerel CI/CD Pipeline Kapı Doğrulaması (`aegis ci:audit`, 10 GitHub Actions kapısının tamamı).
 5. **Multimodal Kalite Kapısı (Playtest-Before-PR):** Oyun sahnelerinde runtime headless playtesti başarıyla geçmeden PR açılamaz.
 6. **Sokratik Teşhis Kapısı:** Hata durumunda kod yazmaya başlamadan önce `aegis debug` ile yığın izi ve hipotezler doğrulanmalıdır.
 7. **Anti-Hang & STDIN Güvenliği:** Asılı kalan paketler (`npx ast-grep`) yasaktır. Daima yerel `aegis ast:search` kullanılır.

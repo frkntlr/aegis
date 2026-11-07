@@ -3,8 +3,9 @@
 ## `/aegist` and `/aegis` Slash Command Protocol
 When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegist <cmd>` or `/aegis <cmd>`, immediately interpret and execute the corresponding Aegis CLI command in PowerShell:
 
-- `/aegis update [--clean] [--pull]`: Run `npm run aegis -- update` to dynamically update, rebuild, and cleanly reinstall Aegis across the PC.
-- `/aegis version:status`: Run `npm run aegis -- version:status` to inspect dynamic version drift, upstream commits, and monorepo packages.
+- `/aegis update [--clean] [--pull] [--bump <patch|minor|major>]`: Run `npm run aegis -- update` to dynamically update, bump monorepo package versions, rebuild, and cleanly reinstall Aegis across the PC.
+- `/aegis version:status`: Run `npm run aegis -- version:status` to inspect version grade diagnostics, drift against origin/master, latest git tags, and upgrade availability.
+- `/aegis ci:audit` or `/aegis ci:check`: Run `npm run aegis -- ci:audit` to deterministically verify all 10 GitHub Actions CI gates locally before pushing code.
 - `/aegis` or `/aegis status`: Run `npm run aegis -- status` and display worktrees and file locks.
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.
 - `/aegis teamwork [status]`: View active Antigravity subagents and locked tracks.
@@ -86,7 +87,7 @@ Whenever any `/aegis nlm:*` command or NotebookLM tool call encounters an authen
 To prevent indefinite command hangs during git remote operations:
 1. **Non-Interactive Flag**: Always prefix git network calls with `$env:GIT_TERMINAL_PROMPT=0` (or set in session). Git must fail fast rather than hanging on credential/passphrase prompts.
 2. **No Background Remote Hangs**: Remote operations (`git push`, `git fetch`, `git clone`) must NEVER run as indefinite background daemons. Use finite timeout (e.g. `WaitMsBeforeAsync: 10000`).
-3. **Pre-Push Auth Pre-check & Quality Gate**: Verify `gh auth status` or remote connectivity before pushing. Direct pushes to `master`/`main` must have passing pre-push gates (`cage:check` + monorepo tests).
+3. **Pre-Push Auth Pre-check & Quality Gate**: Verify `gh auth status` or remote connectivity before pushing. Direct pushes to `master`/`main` must have passing pre-push gates (`aegis ci:audit`, `cage:check` + monorepo tests).
 4. **Anti-Hang & STDIN Safeguard**: NEVER run `npx ast-grep` (outdated 2018 package that hangs waiting on STDIN). Always use `npm run aegis -- ast:search <pat> [dir]` or `aegis ast:search`. Headless background commands must never wait on STDIN.
 5. **Autonomous Post-Verification Push**: When running an autonomous workflow, goal, or `/tw` teamwork session, once all tasks and quality gates (`cage:check` + unit tests) pass 100%, Aegis MUST automatically commit staged changes and push to GitHub remote (`npm run aegis -- push` or `git push origin master`) rather than leaving completed work unpushed as local commits.
 

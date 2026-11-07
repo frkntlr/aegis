@@ -12,6 +12,7 @@ import { AntigravityInstaller } from './antigravity-installer.js';
 import { UniversalToolchainSync } from './toolchain-sync.js';
 import { BranchReconciler } from './branch-reconciler.js';
 import { WorktreeLockManager } from './worktree-lock-manager.js';
+import { VersionManager, type BumpType } from './version-manager.js';
 
 export interface MonorepoPackageInfo {
   name: string;
@@ -30,6 +31,11 @@ export interface EngineVersionReport {
   monorepoPackages: MonorepoPackageInfo[];
   installedShims: string[];
   mcpToolCount: number;
+  latestTag: string | null;
+  upgradeAvailable: boolean;
+  nextRecommendedVersion: string;
+  nextPatch?: string;
+  nextMinor?: string;
   timestamp: string;
 }
 
@@ -39,6 +45,7 @@ export interface EngineUpdateOptions {
   force?: boolean;
   checkOnly?: boolean;
   repoRoot?: string;
+  bump?: BumpType;
 }
 
 export interface EngineUpdateResult {
@@ -114,11 +121,17 @@ export class EngineUpdater {
     const mcpToolCount = this.countMcpTools();
     const wtOutput = this.safeExec('git worktree list', root);
     const worktreesCount = wtOutput ? wtOutput.split('\n').filter(Boolean).length : 1;
+    const grade = VersionManager.checkVersionGrade(currentVersion, root);
+    const nextRecommended = grade.upgradeAvailable && grade.latestTag
+      ? grade.latestTag.replace(/^v/, '')
+      : grade.nextPatch;
 
     return {
       currentVersion, localCommit, remoteCommit, branch, driftStatus,
       behindCount, aheadCount, worktreesCount, monorepoPackages,
-      installedShims, mcpToolCount, timestamp: new Date().toISOString()
+      installedShims, mcpToolCount, latestTag: grade.latestTag,
+      upgradeAvailable: grade.upgradeAvailable, nextRecommendedVersion: nextRecommended,
+      nextPatch: grade.nextPatch, nextMinor: grade.nextMinor, timestamp: new Date().toISOString()
     };
   }
 
@@ -225,12 +238,14 @@ export class EngineUpdater {
     const preRep = this.getVersionReport(repoRoot);
     let cleaned = false;
 
-    if (options.clean === true) {
+    if (options.bump) {
+      VersionManager.syncMonorepoVersions(repoRoot, VersionManager.bumpSemver(preRep.currentVersion, options.bump));
+    }
+    if (options.clean) {
       this.cleanWorkspace(repoRoot);
       cleaned = true;
     }
-
-    if (options.pull === true && preRep.driftStatus === 'behind') {
+    if (options.pull && preRep.driftStatus === 'behind') {
       this.pullLatest(repoRoot);
     }
 
@@ -246,7 +261,6 @@ export class EngineUpdater {
 
     const { shimsCount, idesSynced, worktreesSynced } = this.reinstallPC(repoRoot);
     const postRep = this.getVersionReport(repoRoot);
-
     return {
       success: true, previousVersion: preRep.currentVersion, newVersion: postRep.currentVersion,
       commitHash: postRep.localCommit, cleaned, built: true, reinstalledShims: shimsCount,

@@ -17,7 +17,7 @@ export const ALL_AEGIS_COMMANDS: readonly string[] = [
   'nlm:sync', 'nlm:query', 'nlm:research', 'nlm:sources', 'nlm:poll', 'nlm:import', 'nlm:prune', 'nlm:restore', 'nlm:auth', 'nlm:switch', 'switch',
   'task:list', 'task:claim', 'task:release', 'task:inject', 'task:pull', 'task:clear', 'task:reset', 'task:verify', 'verify:task',
   'lock:status', 'lock:clear', 'lock:reset',
-  'cage:check', 'skeleton', 'skeleton:scan', 'diff', 'inspect', 'mutate', 'audit', 'estimate', 'verify',
+  'cage:check', 'ci', 'ci:audit', 'ci:check', 'ci:verify', 'ci:run', 'skeleton', 'skeleton:scan', 'diff', 'inspect', 'mutate', 'audit', 'estimate', 'verify',
   'find', 'triage', 'trace', 'graph:scan', 'ast:search', 'ast-grep', 'sg', 'ast:replace', 'rtk:compress', 'context7:query',
   'memory:query', 'memory:stats', 'memory:cold-start', 'memory:refresh', 'memory:prune', 'memory:verify', 'memory:watch',
   'godot', 'godot:init', 'godot:status', 'godot:inspect', 'godot:validate', 'godot:query', 'godot:run', 'godot:doctool', 'godot:playtest', 'godot:test', 'godot:ui', 'godot:ui:lint', 'godot:ui:scaffold',
