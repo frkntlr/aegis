@@ -220,7 +220,8 @@ Concurrent write collisions are eradicated using an atomic temp-file swap combin
 4. **Mtime In-Memory Cache**: `loadState()` compares `stat.mtimeMs` against the memory buffer. Unmodified reads resolve in **< 0.06ms**.
 
 ### Dynamic Mesh Capabilities
-- **Living Architecture Synthesizer (`aegis tw:doc` / `tw:synthesize`)**: Generates executive briefings, Mermaid component topologies (`flowchart TD`), performance metrics (92% token frugality, 0.06ms latency, concurrency factor), Demir Kafes compliance (100% pass, 0 any), and ADR records. Supports `-c` for compact synthesis (`[ARCH-SYNTHESIS: ...]`).
+- **High-Performance Reporting Engine (`aegis tw:report`)**: Generates ground-truth, high-signal teamwork execution reports in <10ms. Supports `--compact` / `-c` for a token-frugal 5-10 line summary (<120 tokens) preventing terminal and chat context overload, and `--save` / `-s` to persist markdown reports to `.aegis/reports/report-<planId>.md`.
+- **Living Architecture Synthesizer (`aegis tw:doc` / `tw:synthesize`)**: Generates executive briefings, real-time quality gate metrics, Mermaid component topologies (`flowchart TD`), performance metrics (92% token frugality, 0.06ms latency, concurrency factor), Demir Kafes compliance (100% pass, 0 any), and ADR records. Supports `-c` for compact synthesis (`[ARCH-SYNTHESIS: ...]`).
 - **Smooth Wave Progression (`aegis tw:advance`)**: Transition smoothly from Wave 1 (Solvers & UI) to Wave 2 (QA Hunter Gate), and to Wave 3 (Living Architecture Synthesis) without orphaned locks.
 - **Micro-Sharded Concurrency (`aegis tw:scale`)**: Scales up to 12+ subagents with 100% disjoint file lock guarantees (`shardMaxConcurrency`).
 - **Concurrent Execution Batches (`aegis tw:batch`)**: Groups subtasks into sequential wave batches for optimal parallel dispatch.
@@ -362,7 +363,8 @@ Aegis enforces complete architectural decomposition across all 14 monorepo packa
 | **Execution Waves** | `aegis tw:waves [obj]` | `tw:waves [-c]` (Wave 1 parallel, Wave 2 QA) | `aegis:teamwork_waves` |
 | **Inspect Peers** | `aegis tw:peers` | `tw:peers [-c]` (%95 token wire format) | `aegis:teamwork_peers` |
 | **Conflict Radar** | `aegis tw:radar` | `tw:radar` / `tw:conflicts` (collision radar) | `aegis:teamwork_conflicts` |
-| **Living Architecture** | `aegis tw:doc [id]` | `tw:doc` / `tw:synthesize` (Mermaid, ADR, -c) | `aegis:teamwork_doc_synthesize` |
+| **Execution Report** | `aegis tw:report [id]` | `tw:report [-c] [-s] [-j]` (<10ms, <120 tok compact) | - |
+| **Living Architecture** | `aegis tw:doc [id]` | `tw:doc` / `tw:synthesize` (Real-time metrics, Mermaid, -c) | `aegis:teamwork_doc_synthesize` |
 | **Advance Wave** | `aegis tw:advance` | `tw:advance` (smooth wave transition) | - |
 | **Scale Concurrency** | `aegis tw:scale "<obj>"`| `tw:scale` (12+ agents disjoint locks) | `aegis:teamwork_scale` |
 | **Execution Batches** | `aegis tw:batch [id]` | `tw:batch` (parallel batch grouping) | - |

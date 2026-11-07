@@ -1,4 +1,4 @@
-﻿# Aegis Autonomous Vibe Coding Engine Rules
+# Aegis Autonomous Vibe Coding Engine Rules
 
 ## `/aegist` and `/aegis` Slash Command Protocol
 When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegist <cmd>` or `/aegis <cmd>`, immediately interpret and execute the corresponding Aegis CLI command in PowerShell:
@@ -10,6 +10,8 @@ When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegi
 - `/aegis auto`: Run `npm run aegis -- auto` and report autonomous task claims.
 - `/aegis teamwork [status]`: View active Antigravity subagents and locked tracks.
 - `/aegis teamwork plan "<objective>" [files...]`: Generate Antigravity subagent plan and stage in TIP inbox.
+- `/aegis tw:report [planId] [--compact] [--json] [--save]`: Run `npm run aegis -- tw:report` to generate <10ms ground-truth execution report (--compact for <120 tokens, --save to .aegis/reports/).
+- `/aegis tw:doc [planId] [--compact] [--readme]`: Run `npm run aegis -- tw:doc` for real-time living architecture synthesis and quality gate metrics.
 - `/aegis teamwork setup [outDir]`: Export Antigravity subagents manifest (.aegis/subagents.json).
 - `/aegis task:list [status]`: List ready, in_progress, or blocked tasks in TIP queue.
 - `/aegis task:claim <id> [agent]`: Claim task for role, acquire file locks, set in_progress.
@@ -124,13 +126,13 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
    - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`). Uses `godot ui:lint`, `aegis godot inspect` (`aegis_godot_inspect_ui`), `godot ui:scaffold`, `aegis_godot_tree`, and `aegis_godot_signals`.
    - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions. Uses 5-layer Codebase Memory (`find_symbol`, `memory_query`), AST search/replace (`ast_search`, `ast_replace`), relational trace (`trace_relational`), official docs (`context7_query`), and Socratic debugging (`socratic_diagnose`).
    - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests (`aegis_godot_playtest`), UI layout sweeps (`aegis godot inspect`), evidence-based bug triage (`triage`), Demir Kafes audits (`cage_check`), RTK output compression (`rtk_compress`), and mutation/oracle trust verification (`mutate`, `audit`).
-   - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki (`wiki_sync`), living architecture blueprints (`teamwork_doc_synthesize` / `aegis tw:doc`), NotebookLM grounding (`nlm:query`, `nlm:research`), and RFC lifecycle (`rfc:create`, `rfc:decompose`).
+   - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki (`wiki_sync`), living architecture blueprints & reports (`teamwork_doc_synthesize` / `aegis tw:doc`, `aegis tw:report`), NotebookLM grounding (`nlm:query`, `nlm:research`), and RFC lifecycle (`rfc:create`, `rfc:decompose`).
 6. **Autonomous Subagent Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules (<300 lines/file, <40 lines/function), run `aegis verify:task`, and report completion back to Team Lead with `[ROLE_COMPLETE: <role>]`.
 7. **Live Progress Reporting & Lock Release**:
    - As each subagent message arrives, Team Lead receives a reactive wakeup.
    - Team Lead emits an updated status in chat marking that role `✅ Tamamlandı` with its surgical diff / verification summary.
    - Team Lead releases the task lock via `aegis task:release <id> done`.
-8. **Final Consolidation**: Once all tracks complete, Team Lead presents the final consolidated review card with Demir Kafes and test verification status.
+8. **Final Consolidation**: Once all tracks complete, Team Lead triggers `aegis tw:report [planId] --compact` (or `--save`) for sub-10ms ground-truth metrics (<120 tokens) and presents the final consolidated review card with Demir Kafes and test verification status.
 9. **Hyper-Scale Concurrency & Dynamic Scaling (`--max-agents`, `--scale`)**:
    - When an objective involves multiple components, sentences, or files, or when the user invokes `--max-agents=<n>` / `--scale`:
    - Teamwork automatically shards work across up to 12 parallel, conflict-free subagents with 100% disjoint file locks.

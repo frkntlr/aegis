@@ -96,7 +96,7 @@ Aegis, monolitik tek model yaklaşımı yerine hibrit model tahsisine dayalı 4 
 1. **Wave 1 (Paralel Yürütme ⚡):** `issue-solver` ve `ui-specialist` çakışmasız batch dosya kilitleriyle (`acquireBatchLocks`) eşzamanlı çalışır, mesh'e anlık telemetri yazar (`aegis tr:post`).
 2. **Wave 2 (Kalite Kapısı 🔒):** `qa-hunter` devreye girerek regresyon testleri, mutasyon testi (%70) ve Sokratik triyajı çalıştırır (`aegis tr:advance`).
 3. **Wave 3 (Yaşayan Mimari 🏛️):** `doc-architect` yaşayan mimari brifingi (`aegis tr:doc`), Mermaid topolojisi ve ADR kararlarını derler.
-4. **Otonom GitHub Yayını:** Bütün roller `[ROLE_COMPLETE: <role>]` verdiğinde `aegis tr:push` ile uzaktaki depoya güvenli push edilir.
+4. **Otonom GitHub Yayını & Raporlama:** Bütün roller `[ROLE_COMPLETE: <role>]` verdiğinde `aegis tr:report --compact` (<10ms, <120 token) ile zemin-gerçeklik yürütme raporu alınır (veya `--save` ile `.aegis/reports/` dizinine kaydedilir), ardından `aegis tr:push` ile uzaktaki depoya güvenli push edilir.
 
 ### Hibrit Model Tahsisinin Faydaları
 - **Maliyet ve Hız:** Dokümantasyon ve Wiki senkronizasyonu yüksek verimli `flash` modelleriyle yapılarak token maliyetinde **%70 tasarruf** sağlanır.

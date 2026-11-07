@@ -47,7 +47,8 @@ npm run aegis -- <komut> [argümanlar]
 | `aegis tr:waves` / `tw:waves` | `[obj] [-c]` | 3-fazlı paralel yürütme dalgalarını ve brifingini hesaplar (`-c` kompakt). |
 | `aegis tr:peers` / `tw:peers` | `[-c]` | Aktif kardeş subagent'ların durumunu, kilitlerini ve kontratlarını listeler. |
 | `aegis tr:radar` / `tw:radar` | Yok | Canlı dosya çakışma radarı (`tr:conflicts`). |
-| `aegis tr:doc` / `tw:doc` | `[id] [-c]` | Yaşayan mimari sentez raporu, Mermaid topolojisi ve ADR'leri derler (`tr:synthesize`). |
+| `aegis tr:report` / `tw:report` | `[id] [-c] [-s]` | <10ms'de yüksek sinyalli zemin-gerçeklik yürütme raporu üretir (`-c` <120 token, `-s` kaydet). |
+| `aegis tr:doc` / `tw:doc` | `[id] [-c]` | Yaşayan mimari sentez raporu, Mermaid topolojisi ve kalite metrikleri derler (`tr:synthesize`). |
 | `aegis tr:advance` / `tw:advance` | `[id]` | Aktif yürütme dalgasını sonraki faz dalgasına pürüzsüzce ilerletir. |
 | `aegis tr:scale` / `tw:scale` | `"<obj>" [-n]` | 12+ subagent'a kadar %100 çakışmasız mikro-bölümleme planı oluşturur. |
 | `aegis tr:push` / `tw:push` | `[--dry-run]` | Demir Kafes kalkanı, çalışma dizini commit'leme ve GitHub'a otonom push. |

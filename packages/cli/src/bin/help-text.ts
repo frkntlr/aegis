@@ -27,6 +27,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis tw:scale "<obj>" [--max-agents]  Micro-sharded hyper-scale concurrency plan (100% disjoint locks)',
     '  aegis tw:batch [planId]                Print parallel execution batches ready for simultaneous dispatch',
     '  aegis tw:doc [planId] [--compact]      Synthesize human-centric living architecture report & metrics',
+    '  aegis tw:report [planId] [--compact] [--json] [--save] Instant high-signal teamwork mission report',
     '  aegis tw:advance [planId]              Smoothly advance active wave to next execution phase',
     '  aegis tw:deliberate "<obj>"            Multi-agent blackboard deliberation & semantic AI decomposition',
     '  aegis tw:reflect [planId]              Reflective evaluation of mission completeness & gaps',

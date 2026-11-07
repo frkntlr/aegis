@@ -49,14 +49,19 @@ test('TeamworkCompactEngine archives done tasks and compacts inbox', () => {
 });
 
 test('TeamworkCompactEngine generates Antigravity-ready compact briefing', () => {
-  const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork('Build compact module');
-  const engine = coordinator.getCompactEngine();
-  const briefing = engine.generateCompactBriefing(plan);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-compact-test-'));
+  try {
+    const coordinator = new TeamworkCoordinator(tmpDir);
+    const plan = coordinator.planTeamwork('Build compact module');
+    const engine = coordinator.getCompactEngine();
+    const briefing = engine.generateCompactBriefing(plan);
 
-  assert.ok(briefing.includes('Antigravity Compact Mission Briefing'));
-  assert.ok(briefing.includes('Build compact module'));
-  assert.ok(briefing.includes('Demir Kafes'));
+    assert.ok(briefing.includes('Antigravity Compact Mission Briefing'));
+    assert.ok(briefing.includes('Build compact module'));
+    assert.ok(briefing.includes('Demir Kafes'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('TeamworkCompactEngine compacts excessive grounding text', () => {
@@ -69,8 +74,13 @@ test('TeamworkCompactEngine compacts excessive grounding text', () => {
 });
 
 test('TeamworkCoordinator compactTeamwork delegates cleanly', () => {
-  const coordinator = new TeamworkCoordinator();
-  const briefing = coordinator.compactTeamwork();
-  assert.ok(briefing.includes('Antigravity Compact Mission Briefing'));
-  assert.ok(coordinator.getSemanticAnalyzer() !== undefined);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-compact-del-test-'));
+  try {
+    const coordinator = new TeamworkCoordinator(tmpDir);
+    const briefing = coordinator.compactTeamwork();
+    assert.ok(briefing.includes('Antigravity Compact Mission Briefing'));
+    assert.ok(coordinator.getSemanticAnalyzer() !== undefined);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

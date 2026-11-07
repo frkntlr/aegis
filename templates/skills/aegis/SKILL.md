@@ -23,11 +23,12 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis ci:audit` or `ci:check` | Deterministically verify all 10 GitHub Actions CI gates locally before pushing code | `aegis ci:audit` |
 | `/aegis` or `/aegis status` | Inspect active worktrees & persistent locks | `aegis status` |
 | `/aegis auto` | Run autonomous task queue & dispatcher | `aegis auto` |
-| `/aegis tw "<obj>"` or `teamwork` | Direct plan & stage tracks (Short: `tw`, `tw:plan`, `tw:status`, `tw:dag`, `tw:matrix`, `tw:compact`, `tw:analyze`, `tw:setup`, `tw:clear`) | `aegis tw "<obj>" [-c] [-j] [--dry-run]` |
+| `/aegis tw "<obj>"` or `teamwork` | Direct plan & stage tracks (Short: `tw`, `tw:plan`, `tw:report`, `tw:doc`, `tw:status`, `tw:dag`, `tw:matrix`, `tw:compact`, `tw:analyze`, `tw:setup`, `tw:clear`) | `aegis tw "<obj>" [-c] [-j] [--dry-run]` |
+| `/aegis tw:report [planId]` | Ground-truth high-signal execution report in <10ms (-c compact <120 tokens, -s save) | `aegis tw:report [planId] [-c] [-s]` |
 | `/aegis tw:waves [obj]` | Compute parallel execution waves & simultaneous dispatch | `aegis tw:waves [obj] [-c]` |
 | `/aegis tw:peers` | List active peer subagents, current status, locks & modified files | `aegis tw:peers [-c]` |
 | `/aegis tw:radar` or `tw:conflicts` | Inspect Conflict Radar for active file collision warnings | `aegis tw:radar` |
-| `/aegis tw:doc [planId]` | Synthesize living architecture briefing, Mermaid DAG & metrics | `aegis tw:doc [planId] [-c]` |
+| `/aegis tw:doc [planId]` | Real-time living architecture synthesis, Mermaid DAG & quality metrics | `aegis tw:doc [planId] [-c]` |
 | `/aegis tw:post "<activity>"` | Post subagent status, touched files or contracts to mesh | `aegis tw:post "<act>" [flags]` |
 | `/aegis tw:broadcast "<msg>"` | Broadcast milestone or event to peer subagents across mesh | `aegis tw:broadcast "<msg>"` |
 | `/aegis tw:mesh [clear]` | Read, inspect or clear dynamic real-time teamwork mesh state | `aegis tw:mesh [clear] [-c]` |
@@ -146,7 +147,7 @@ When the user triggers `/aegis tw <objective>`, `/aegis teamwork <objective>`, `
      - `--compact` / `-c`: RTK and AST skeleton briefing (saves 85% tokens).
      - `--json` / `-j`: Structured machine-readable JSON output.
      - `--dry-run`: Plan simulation without locking files or mutating inbox.
-   - Shortcut commands: `tw`, `tw:plan`, `tw:status`, `tw:compact`, `tw:dag`, `tw:matrix`, `tw:analyze`, `tw:setup`, `tw:clear`.
+   - Shortcut commands: `tw`, `tw:plan`, `tw:report`, `tw:doc`, `tw:status`, `tw:compact`, `tw:dag`, `tw:matrix`, `tw:analyze`, `tw:setup`, `tw:clear`.
    - `FastSemanticAnalyzer` uses persistent disk cache to score and discover target files in <2ms.
    - Acquires mutex file locks atomically in one pass via `acquireBatchLocks()` (`.aegis/locks.json`).
    - Ingests the objective and identifies target tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`).
@@ -172,7 +173,7 @@ When the user triggers `/aegis tw <objective>`, `/aegis teamwork <objective>`, `
    - `issue-solver`: Demir Kafes, surgical diffs, pre-commit tests.
    - `qa-hunter`: Evidence-based triage, Socratic debugging, mutation score >= 70%.
    - `ui-specialist`: Godot 4 UI scenes (.tscn), container-first layouts, responsive anchors (anchors_preset=15), touch targets (>=44px), themes (.tres), and decoupled GDScript controllers (<300 lines).
-   - `doc-architect`: Living wiki sync (`<repo>.wiki.git`), RFC ideation, zero premature coding.
+   - `doc-architect`: Living wiki sync (`<repo>.wiki.git`), RFC ideation, living architecture & reports (`aegis tw:report`, `tw:doc`), zero premature coding.
 
 4. **Spawn Subagents with Shared Workspace & Hybrid Models**:
    Call `invoke_subagent` for each staged track concurrently:

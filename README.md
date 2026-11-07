@@ -66,6 +66,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 | **Subagent İstem Şişmesi & Yavaş Testler:** Subagent'lara verilen uzun ve laf kalabalığı istemler gecikmeyi artırır; yavaş testler geliştirme döngüsünü aksatır. | **Ultra-Yalın Mikro-İstemler (<160 Token) & Turbo Build Cache:** Cerrahi sembol çapaları (`ANCHORS`), sözleşmeler (`CONTRACT`) ve 14 pakette 812 test. | **%92 Token Tasarrufu**, 35 saniyede 812 test, **86ms** Full Turbo tekrarı. |
 | **Bozuk CI / Uzak Pipeline Sürprizleri:** Kod yerelde çalışır görünür ama GitHub Actions'a push edildiğinde 10 farklı kapıdan birinde patlar. | **Yerel CI/CD Pipeline Koşucusu (`aegis ci:audit` / `aegis ci:check`):** GitHub Actions'ın tüm 10 kapısını (build, lint, typecheck, drift, cage, verify, tests, inspect, godot, mutate) kod push edilmeden önce yerelde deterministik doğrular. | **Sıfır Kırık CI**, GitHub kota israfını önleme ve deterministik yeşil pipeline. |
 | **Monorepo Sürüm Uyumsuzluğu:** Monorepo paketlerinin versiyonlarını elle senkronize etmek yorucudur ve bayat derlemelere yol açar. | **Otomatik Sürüm Yükseltme & Seviye Teşhisi (`aegis update --bump`, `aegis version:status`):** Tüm paketleri otomatik yükseltir (patch/minor/major), package.json'ları senkronize eder, derler ve PC geneli shim'leri günceller. | **Tek Komutla Versiyonlama**, tam paket tutarlılığı ve sıfır bayat shim. |
+| **Ajan Raporlama Kirliliği & Yavaş Brifing:** Çoklu ajan yürütmesi tamamlandığında logların elle taranması zaman alır ve chat bağlamını yüzlerce gereksiz tokenla doldurur. | **Sub-10ms Yüksek Sinyalli Raporlama Motoru (`aegis tw:report`, `tw:doc`):** Gerçek zamanlı kanıt tabanlı çalışma özeti (<10ms), `--compact` bayrağı ile <120 tokenlık cerrahi özet ve `--save` ile kalıcı `.aegis/reports/report-<id>.md` arşivleme. | **<10ms Yürütme Hızı**, **%95 Token Tasarrufu (<120 Token)** ve sıfır bağlam kirliliği. |
 
 ---
 
@@ -556,7 +557,7 @@ aegis completion --install
 ### 3. Antigravity Modüler Slash Komutları & Entegre Beceri (Skill)
 Google Antigravity içinde doğrudan `/aegis` ve `/tw` slash komutlarıyla çağrılan tekil, temiz entegre beceri:
 - `/aegis`: Evrensel motor komuta merkezi, çok ajanlı orkestrasyon, Demir Kafes ve durum paneli ([templates/skills/aegis/SKILL.md](templates/skills/aegis/SKILL.md)).
-- `/aegis tw` veya `/tw`: Antigravity Teamwork otonom çoklu ajan koordinatörü. Alt ajanları (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) akıllı Aegis araçlarıyla donatıp dinamik olarak tanımlar (`define_subagent`) ve eşzamanlı (`invoke_subagent`) olarak tetikler.
+- `/aegis tw` veya `/tw`: Antigravity Teamwork otonom çoklu ajan koordinatörü. Alt ajanları (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) akıllı Aegis araçlarıyla donatıp dinamik olarak tanımlar (`define_subagent`) ve eşzamanlı (`invoke_subagent`) olarak tetikler. `tw:report` (<10ms, <120 token) ile anında zemin-gerçeklik yürütme raporu sağlar.
 - `/aegis cage:check`: Anlık Demir Kafes (300 satır / 40 satır) denetimi ve proaktif kota radarı.
 
 ---
@@ -580,7 +581,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | `aegis tr:waves [obj]` / `tw:waves` | 3-aşamalı paralel yürütme dalgalarını ve brifingini hesaplar (`-c` kompakt brifing). |
 | `aegis tr:peers` / `tw:peers` | Aktif kardeş subagent'ların durumunu, kilitlerini ve kontratlarını listeler (`-c` tel formatı). |
 | `aegis tr:radar` / `tw:radar` | Canlı dosya çakışma radarı; kardeş ajanlar arasındaki çakışan dosya tahsislerini anlık tespit eder (`tr:conflicts`). |
-| `aegis tr:doc [id]` / `tw:doc` | İnsan odaklı mimari sentez raporu, Mermaid topolojisi ve ADR'leri derler (`-c` kompakt, `tr:synthesize`). |
+| `aegis tr:report [id]` / `tw:report` | <10ms'de yüksek sinyalli zemin-gerçeklik yürütme raporu üretir (`-c` <120 token kompakt, `-s` kalıcı markdown kaydı, `-j` JSON). |
+| `aegis tr:doc [id]` / `tw:doc` | Gerçek zamanlı yaşayan mimari sentez raporu, Mermaid topolojisi ve kalite kapısı metrikleri derler (`-c` kompakt, `tr:synthesize`). |
 | `aegis tr:advance` / `tw:advance` | Aktif yürütme dalgasını sonraki faz dalgasına pürüzsüzce ilerletir. |
 | `aegis tr:scale "<obj>"` / `tw:scale` | 12+ subagent'a kadar %100 çakışmasız kilit garantili mikro-bölümleme planı oluşturur. |
 | `aegis tr:batch [id]` / `tw:batch` | Eşzamanlı çalıştırma dalga paketlerini listeler. |

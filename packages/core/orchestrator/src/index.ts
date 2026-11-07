@@ -40,3 +40,6 @@ export * from './semantic-ai-decomposer.js';
 export * from './teamwork-deliberation.js';
 export * from './teamwork-reflection.js';
 export * from './project-bootstrap.js';
+export * from './teamwork-report-types.js';
+export * from './teamwork-report-formatter.js';
+export * from './teamwork-report-generator.js';
