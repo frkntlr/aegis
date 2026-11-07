@@ -33,7 +33,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
 - [🩺 Sokratik Teşhis & Kanıt Tabanlı Anti-Halüsinasyon](#-sokratik-teşhis--kanıt-tabanlı-anti-halüsinasyon)
 - [📡 Gerçek Zamanlı SSE Web Komuta Merkezi (`localhost:3000`)](#-gerçek-zamanlı-sse-web-komuta-merkezi-localhost3000)
-- [🌐 Yaşayan GitHub, RFC (46 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
+- [🌐 Yaşayan GitHub, RFC (47 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
 - [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
@@ -426,7 +426,7 @@ aegis dashboard 3000
 
 ---
 
-## 🌐 Yaşayan GitHub, RFC (46 Adet) & NotebookLM Döngüsü
+## 🌐 Yaşayan GitHub, RFC (47 Adet) & NotebookLM Döngüsü
 
 Aegis, statik dokümanların unutulması sorununu çözmek için yaşayan bir bellek köprüsü kurar:
 
@@ -469,7 +469,7 @@ aegis/
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
 │   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
-├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-046 Arşivi
+├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-047 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
 └── turbo.json                   # Monorepo Pipeline ve Önbellek Yapılandırması
 ```
@@ -590,7 +590,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | `aegis tr:compact [obj]` / `tw:compact` | Görev geçmişini ve logları RTK ile %85 sıkıştırıp brifing üretir ve tamamlananları arşivler. |
 | `aegis tr:dag [obj]` / `tw:dag` | Çok ajanlı yürütmenin 3-fazlı bağımlılık DAG'ını terminalde ASCII olarak çizer. |
 | `aegis tr:matrix [obj]` / `tw:matrix` | Subagent canlı yürütme ve kilit matrisini raporlar. |
-| `aegis tr:analyze "<obj>"` / `tw:analyze` | Persistent disk önbelleğiyle (<2ms) hedef dosyaları semantik puanlar. |
+| `aegis tr:analyze "<obj>"` / `tw:analyze` | Persistent disk önbelleğiyle (<2ms) hedef dosyaları semantik puanlar (`--swarm` ile eşzamanlı çoklu ajan sürüsü). |
+| `aegis tr:analyze:swarm "<obj>"` / `tw:analyze:swarm` | 4 lensli (AST, Triage, Relation, Grounding) eşzamanlı analiz sürüsü ve paylaşımlı çalışma belleği matrisi (`tw:swarm`). |
 | `aegis tr:clear` / `tw:clear` | TIP görev kutusunu ve aktif dosya mutex kilitlerini güvenle temizler. |
 | `aegis tr:setup [dir]` / `tw:setup` | Antigravity ajan manifestosunu (`.aegis/subagents.json`) dışa aktarır. |
 | `aegis tr:push` / `tw:push` | Demir Kafes ön-push kalkanı, çalışma dizini commit'leme ve GitHub'a otonom push (`aegis push`). |

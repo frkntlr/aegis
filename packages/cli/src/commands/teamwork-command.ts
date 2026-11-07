@@ -192,6 +192,7 @@ function routeMeshSubcommands(norm: string, all: string[]): boolean {
   if (norm === 'advance') { handleTeamworkAdvance(all[1]); return true; }
   if (norm === 'tools' || norm === 'tool' || norm === 'arsenal') { handleTeamworkTools(all[1], ...all.slice(2)); return true; }
   if (norm === 'gh' || norm === 'github') { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); return true; }
+  if (norm === 'swarm') { void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(all[1], ...all.slice(2))); return true; }
   return false;
 }
 
@@ -233,19 +234,17 @@ export function handleTeamworkCompact(objectiveArg?: string): void {
 }
 
 export function handleTeamworkAnalyze(objectiveArg?: string, ...files: string[]): void {
-  showBanner();
-  if (!objectiveArg || objectiveArg.trim().length === 0) {
-    console.error('❌ Usage: aegis teamwork analyze "<objective>" [explicitFiles...]');
+  if (files.includes('--swarm') || files.includes('-s')) {
+    void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(objectiveArg, ...files.filter(f => f !== '--swarm' && f !== '-s')));
     return;
   }
-  const coordinator = new TeamworkCoordinator();
-  const res = coordinator.getSemanticAnalyzer().analyze(objectiveArg.trim(), files);
-  console.log('⚡ Aegis Fast Semantic Analysis Result:');
-  console.log(` • Objective: "${res.objective}"`);
-  console.log(` • Duration: ${res.durationMs}ms (Sub-10ms fast path)`);
-  console.log(` • Confidence: ${Math.round(res.confidence * 100)}%`);
-  console.log(` • Keywords: [${res.keywords.join(', ')}]`);
-  console.log(` • Discovered Target Files (${res.targetFiles.length}):`);
+  showBanner();
+  if (!objectiveArg?.trim()) {
+    console.error('❌ Usage: aegis teamwork analyze "<objective>" [explicitFiles...] [--swarm]');
+    return;
+  }
+  const res = new TeamworkCoordinator().getSemanticAnalyzer().analyze(objectiveArg.trim(), files);
+  console.log(`⚡ Aegis Fast Semantic Analysis Result:\n • Objective: "${res.objective}"\n • Duration: ${res.durationMs}ms\n • Target Files (${res.targetFiles.length}):`);
   for (const f of res.targetFiles) console.log(`    📁 ${f}`);
 }
 
