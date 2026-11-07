@@ -101,3 +101,62 @@ test('FastSemanticAnalyzer expands Turkish multi-agent and task synonyms', () =>
   assert.ok(kw.includes('performance'));
 });
 
+test('FastSemanticAnalyzer penalizes test files and boosts packages/*/src/ implementation files', () => {
+  const analyzer = new FastSemanticAnalyzer();
+  const implFile = 'packages/core/orchestrator/src/branch-reconciler.ts';
+  const testFile1 = 'packages/core/orchestrator/src/branch-reconciler.test.ts';
+  const specFile = 'packages/core/orchestrator/src/branch-reconciler.spec.ts';
+  const testsDirFile = 'packages/core/orchestrator/__tests__/branch-reconciler.ts';
+
+  const kw = ['branch', 'reconciler'];
+
+  // Without test intent: implementation file receives +15 boost, test files penalized by -15
+  const implScore = analyzer.scoreCandidate(implFile, kw, false);
+  const testScore1 = analyzer.scoreCandidate(testFile1, kw, false);
+  const specScore = analyzer.scoreCandidate(specFile, kw, false);
+  const testsDirScore = analyzer.scoreCandidate(testsDirFile, kw, false);
+
+  assert.ok(implScore > testScore1, `Expected implScore (${implScore}) > testScore1 (${testScore1})`);
+  assert.ok(implScore > specScore, `Expected implScore (${implScore}) > specScore (${specScore})`);
+  assert.ok(implScore > testsDirScore, `Expected implScore (${implScore}) > testsDirScore (${testsDirScore})`);
+  assert.strictEqual(implScore - testScore1, 30, 'Implementation file should have 30 points advantage over test file');
+
+  // With test intent: test penalty is waived
+  for (const intent of ['test', 'spec', 'audit', 'triage', 'qa']) {
+    const scoredWithIntent = analyzer.scoreCandidate(testFile1, kw, true);
+    assert.strictEqual(scoredWithIntent, testScore1 + 15, `Test penalty should be waived for intent ${intent}`);
+    assert.strictEqual(analyzer.hasTestIntent(`run ${intent} on reconciler`), true);
+  }
+});
+
+test('FastSemanticAnalyzer memoizes extractKeywords across calls', () => {
+  const analyzer = new FastSemanticAnalyzer();
+  const query = 'optimize session cache and auth token flow';
+  const first = analyzer.extractKeywords(query);
+  const second = analyzer.extractKeywords(query);
+  assert.deepStrictEqual(first, second);
+  assert.ok(first.includes('session'));
+  assert.ok(first.includes('token'));
+});
+
+test('FastSemanticAnalyzer analyze prioritizes implementation file over test file unless test intent is present', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fast-analyzer-ranking-'));
+  const pkgSrcDir = path.join(tmpDir, 'packages', 'auth', 'src');
+  fs.mkdirSync(pkgSrcDir, { recursive: true });
+
+  fs.writeFileSync(path.join(pkgSrcDir, 'authenticator.ts'), 'export class Authenticator {}', 'utf8');
+  fs.writeFileSync(path.join(pkgSrcDir, 'authenticator.test.ts'), 'test("auth", () => {})', 'utf8');
+
+  try {
+    const analyzer = new FastSemanticAnalyzer(tmpDir);
+    const resultImpl = analyzer.analyze('Improve authenticator token verification');
+    assert.strictEqual(resultImpl.targetFiles[0], 'packages/auth/src/authenticator.ts');
+
+    const resultTest = analyzer.analyze('Run unit test for authenticator', [], 2);
+    assert.ok(resultTest.targetFiles.includes('packages/auth/src/authenticator.test.ts'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+

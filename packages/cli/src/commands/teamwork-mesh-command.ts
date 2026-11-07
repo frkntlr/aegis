@@ -213,7 +213,8 @@ export {
   mcpTeamworkConflicts,
   mcpTeamworkWaves,
   mcpTeamworkScale,
-  mcpTeamworkDocSynthesize
+  mcpTeamworkDocSynthesize,
+  mcpTeamworkTools
 } from './teamwork-mesh-mcp.js';
 
 export function handleTeamworkDoc(planId?: string, ...flags: string[]): void {
@@ -253,11 +254,6 @@ export function handleTeamworkTools(roleOrFlag?: string, ...flags: string[]): vo
   }
   showBanner();
   console.log(formatAegisToolMatrix(role));
-}
-
-export function mcpTeamworkTools(args: Record<string, unknown> = {}): string {
-  const role = typeof args.role === 'string' ? args.role : undefined;
-  return formatAegisToolMatrix(role);
 }
 
 export function handleTeamworkReflect(planId?: string, ...flags: string[]): void {

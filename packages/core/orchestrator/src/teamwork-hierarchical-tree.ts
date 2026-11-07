@@ -92,7 +92,7 @@ export class TeamworkHierarchicalTree {
       const specialists = ROLE_SPECIALISTS[role] ?? [];
       for (const spec of specialists) {
         const matched = this.filterFilesForSpecialist(role, spec.label, targetFiles, assigned);
-        matched.forEach(f => assigned.add(f));
+        for (const f of matched) assigned.add(f);
         expanded.push({
           roleType: role,
           label: spec.label,

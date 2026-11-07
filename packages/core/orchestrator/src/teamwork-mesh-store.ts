@@ -23,11 +23,16 @@ export interface MeshConflict {
   agents: string[];
 }
 
+interface ProcessMeshCache {
+  state: TeamworkMeshState;
+  mtimeMs: number;
+  size: number;
+}
+
 export class TeamworkMeshStore {
+  private static processCache = new Map<string, ProcessMeshCache>();
   private repoRoot: string;
   private meshFile: string;
-  private cachedState?: TeamworkMeshState;
-  private cachedMtimeMs = 0;
 
   constructor(repoRoot?: string) {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
@@ -47,64 +52,117 @@ export class TeamworkMeshStore {
     }
   }
 
-  public loadState(): TeamworkMeshState {
-    if (!fs.existsSync(this.meshFile)) {
-      this.cachedState = undefined;
-      this.cachedMtimeMs = 0;
-      return this.createEmptyState();
-    }
+  public invalidateCache(): void {
+    TeamworkMeshStore.processCache.delete(this.meshFile);
+  }
+
+  public getCachedState(): TeamworkMeshState | undefined {
+    const entry = TeamworkMeshStore.processCache.get(this.meshFile);
+    return entry ? this.cloneSnapshot(entry.state) : undefined;
+  }
+
+  public loadMesh(force = false): TeamworkMeshState {
     try {
       const stat = fs.statSync(this.meshFile);
-      if (this.cachedState && stat.mtimeMs === this.cachedMtimeMs) return this.cachedState;
+      const cached = TeamworkMeshStore.processCache.get(this.meshFile);
+      if (!force && cached && stat.mtimeMs === cached.mtimeMs && stat.size === cached.size) {
+        return this.cloneSnapshot(cached.state);
+      }
       const raw = fs.readFileSync(this.meshFile, 'utf8');
-      const p = JSON.parse(raw) as Partial<TeamworkMeshState>;
-      const state: TeamworkMeshState = {
-        planId: typeof p.planId === 'string' ? p.planId : 'default',
-        objective: typeof p.objective === 'string' ? p.objective : '',
-        activeWave: typeof p.activeWave === 'number' ? p.activeWave : 1,
-        agents: p.agents && typeof p.agents === 'object' ? p.agents : {},
-        events: Array.isArray(p.events) ? p.events : [],
-        lastUpdated: typeof p.lastUpdated === 'string' ? p.lastUpdated : new Date().toISOString()
-      };
-      this.cachedState = state;
-      this.cachedMtimeMs = stat.mtimeMs;
-      return state;
+      const state = this.parseMeshPayload(raw);
+      TeamworkMeshStore.processCache.set(this.meshFile, {
+        state: this.cloneSnapshot(state),
+        mtimeMs: stat.mtimeMs,
+        size: stat.size
+      });
+      return this.cloneSnapshot(state);
     } catch {
+      TeamworkMeshStore.processCache.delete(this.meshFile);
       return this.createEmptyState();
     }
+  }
+
+  public loadState(force = false): TeamworkMeshState {
+    return this.loadMesh(force);
+  }
+
+  public saveMesh(state: TeamworkMeshState): void {
+    this.saveState(state);
   }
 
   public saveState(state: TeamworkMeshState): void {
     const dir = path.dirname(this.meshFile);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const tmp = `${this.meshFile}.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const payload = JSON.stringify(state, null, 2);
+    const maxRetries = 5;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const nonce = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      const tmp = `${this.meshFile}.tmp-${nonce}`;
       try {
-        fs.writeFileSync(tmp, payload, 'utf8');
+        fs.writeFileSync(tmp, payload, { encoding: 'utf8', flush: true });
         try {
           fs.renameSync(tmp, this.meshFile);
         } catch {
           fs.copyFileSync(tmp, this.meshFile);
           try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
         }
-        this.cachedState = state;
-        try { this.cachedMtimeMs = fs.statSync(this.meshFile).mtimeMs; } catch { this.cachedMtimeMs = Date.now(); }
+        const stat = fs.statSync(this.meshFile);
+        TeamworkMeshStore.processCache.set(this.meshFile, {
+          state: this.cloneSnapshot(state),
+          mtimeMs: stat.mtimeMs,
+          size: stat.size
+        });
         return;
       } catch (err) {
-        if (attempt === 2) throw err;
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, (attempt + 1) * 10);
+        try { if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+        if (attempt === maxRetries - 1) throw err;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, (attempt + 1) * 15);
       }
     }
   }
 
+  public clearMesh(): void {
+    this.clearState();
+  }
+
   public clearState(): void {
-    this.cachedState = undefined;
-    this.cachedMtimeMs = 0;
+    TeamworkMeshStore.processCache.delete(this.meshFile);
     if (fs.existsSync(this.meshFile)) {
       try { fs.unlinkSync(this.meshFile); } catch { /* ignore */ }
     }
+  }
+
+  private parseMeshPayload(raw: string): TeamworkMeshState {
+    const p = JSON.parse(raw) as Partial<TeamworkMeshState>;
+    return {
+      planId: typeof p.planId === 'string' ? p.planId : 'default',
+      objective: typeof p.objective === 'string' ? p.objective : '',
+      activeWave: typeof p.activeWave === 'number' ? p.activeWave : 1,
+      agents: p.agents && typeof p.agents === 'object' ? p.agents : {},
+      events: Array.isArray(p.events) ? p.events : [],
+      lastUpdated: typeof p.lastUpdated === 'string' ? p.lastUpdated : new Date().toISOString()
+    };
+  }
+
+  private cloneSnapshot(state: TeamworkMeshState): TeamworkMeshState {
+    const clonedAgents: Record<string, TeamworkPeerState> = {};
+    for (const [key, peer] of Object.entries(state.agents)) {
+      clonedAgents[key] = {
+        ...peer,
+        lockedFiles: [...peer.lockedFiles],
+        modifiedFiles: [...peer.modifiedFiles],
+        publishedContracts: [...peer.publishedContracts]
+      };
+    }
+    return {
+      planId: state.planId,
+      objective: state.objective,
+      activeWave: state.activeWave,
+      agents: clonedAgents,
+      events: state.events.map(e => ({ ...e, payload: e.payload ? { ...e.payload } : undefined })),
+      lastUpdated: state.lastUpdated
+    };
   }
 
   public createEmptyState(): TeamworkMeshState {

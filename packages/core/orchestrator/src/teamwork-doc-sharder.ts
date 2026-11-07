@@ -27,21 +27,21 @@ export class TeamworkDocSharder {
       const n = f.replace(/\\/g, '/').toLowerCase();
       return n.includes('wiki/') || n.includes('.wiki.') || n.startsWith('wiki/');
     });
-    wiki.forEach(f => assigned.add(f));
+    for (const f of wiki) assigned.add(f);
 
     const readme = docFiles.filter(f => {
       if (assigned.has(f)) return false;
       const n = f.replace(/\\/g, '/').toLowerCase();
       return n.endsWith('readme.md') || n === 'readme.md' || n.endsWith('readme');
     });
-    readme.forEach(f => assigned.add(f));
+    for (const f of readme) assigned.add(f);
 
     const rfc = docFiles.filter(f => {
       if (assigned.has(f)) return false;
       const n = f.replace(/\\/g, '/').toLowerCase();
       return n.includes('docs/rfc') || n.includes('/rfc/') || n.includes('docs/adr') || n.includes('/adr/') || n.includes('rfc-') || n.includes('adr-');
     });
-    rfc.forEach(f => assigned.add(f));
+    for (const f of rfc) assigned.add(f);
 
     const arch = docFiles.filter(f => !assigned.has(f));
     return { wiki, readme, rfc, arch };

@@ -8,22 +8,42 @@ import { RoleClassifier } from './role-classifier.js';
 import type { DecomposedSubtask } from './teamwork-decomposer.js';
 
 export class TeamworkSharder {
+  public static isSourceFile(file: string): boolean {
+    const norm = file.replace(/\\/g, '/').toLowerCase();
+    return !RoleClassifier.isUiFile(file) && !norm.endsWith('.md') && !norm.includes('docs/');
+  }
+
   public static getSubsystemKey(file: string): string {
-    const parts = file.replace(/\\/g, '/').replace(/\.(test|spec)\.[jt]sx?$/, '').split('/').filter(Boolean);
+    const clean = file.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\.(test|spec)\.[jt]sx?$/, '');
+    const segments = clean.split('/').filter(p => Boolean(p) && p !== '.');
+    const pkgIdx = segments.indexOf('packages');
+    const rootIdx = segments.findIndex(s => ['src', 'lib', 'test', 'tests', 'scenes', 'scripts'].includes(s));
+    const parts = pkgIdx >= 0 ? segments.slice(pkgIdx) : (rootIdx >= 0 ? segments.slice(rootIdx) : segments);
+
     if (parts.length >= 4 && parts[0] === 'packages') {
-      const seg2 = parts[2] === 'src' ? parts[3] : parts[2];
+      const seg2 = (parts[2] === 'src' ? parts[3] : parts[2])?.replace(/\.[^/.]+$/, '');
       const raw = seg2 ? `${parts[1]}-${seg2}` : parts[1];
       return raw.charAt(0).toUpperCase() + raw.slice(1);
     }
-    if (parts.length >= 3 && parts[0] === 'packages') return parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
-    if (parts.length >= 2 && (parts[0] === 'src' || parts[0] === 'lib')) return parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+    if (parts.length >= 3 && parts[0] === 'packages') {
+      const pkg = parts[1].replace(/\.[^/.]+$/, '');
+      return pkg.charAt(0).toUpperCase() + pkg.slice(1);
+    }
+    if (parts.length >= 2 && ['src', 'lib', 'test', 'tests', 'scenes', 'scripts'].includes(parts[0])) {
+      const seg = parts[1].replace(/\.[^/.]+$/, '');
+      return seg.charAt(0).toUpperCase() + seg.slice(1);
+    }
     const base = parts.pop()?.replace(/\.[^/.]+$/, '') || 'Module';
     return base.charAt(0).toUpperCase() + base.slice(1);
   }
 
   public static clusterFilesBySubsystem(files: string[]): Map<string, string[]> {
     const clusters = new Map<string, string[]>();
+    const seen = new Set<string>();
     for (const f of files) {
+      const norm = f.replace(/\\/g, '/');
+      if (seen.has(norm)) continue;
+      seen.add(norm);
       const key = this.getSubsystemKey(f);
       const list = clusters.get(key) || [];
       list.push(f);
@@ -40,68 +60,56 @@ export class TeamworkSharder {
   public static shardSolversByFiles(subtasks: DecomposedSubtask[], allFiles: string[], objective: string): void {
     const solvers = subtasks.filter(t => t.roleType === 'solver');
     if (solvers.length !== 1) return;
-    const sourceFiles = allFiles.filter(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'));
+    const sourceFiles = allFiles.filter(f => this.isSourceFile(f));
     if (sourceFiles.length < 2) return;
     const clusterMap = this.clusterFilesBySubsystem(sourceFiles);
     if (clusterMap.size < 2) return;
 
     const solverIndex = subtasks.findIndex(t => t.roleType === 'solver');
-    subtasks.splice(solverIndex, 1);
-    for (const [key, files] of clusterMap.entries()) {
-      const label = key.charAt(0).toUpperCase() + key.slice(1).slice(0, 15);
-      subtasks.splice(solverIndex, 0, {
-        roleType: 'solver', label, title: `${objective}: ${key}`, targetFiles: files
-      });
-    }
+    const newSolvers = Array.from(clusterMap.entries()).map(([key, files]) => ({
+      roleType: 'solver' as const,
+      label: key.slice(0, 15),
+      title: `${objective}: ${key}`,
+      targetFiles: files
+    }));
+    subtasks.splice(solverIndex, 1, ...newSolvers);
   }
 
-  public static shardQaByDimensions(
-    subtasks: DecomposedSubtask[],
-    objective: string,
-    companionTest?: string
-  ): void {
+  public static shardQaByDimensions(subtasks: DecomposedSubtask[], objective: string, companionTest?: string): void {
     const qaIndex = subtasks.findIndex(t => t.roleType === 'qa');
     if (qaIndex === -1) return;
     const baseTitle = subtasks[qaIndex].title || objective;
     const testFile = companionTest ? [companionTest] : [];
-    subtasks.splice(qaIndex, 1);
     const dims = [
       { label: 'StaticAudit', title: `${baseTitle} [StaticAudit]: Linting, AST patterns & conventions`, files: testFile },
       { label: 'TypeSafety', title: `${baseTitle} [TypeSafety]: TypeScript checks & contract integrity`, files: [] as string[] },
       { label: 'SafetyGate', title: `${baseTitle} [SafetyGate]: Cage compliance & boundary safety`, files: [] as string[] }
     ];
-    dims.reverse().forEach(d => subtasks.splice(qaIndex, 0, { roleType: 'qa', label: d.label, title: d.title, targetFiles: d.files, phase: 2, dependsOn: [] }));
+    subtasks.splice(qaIndex, 1, ...dims.map(d => ({ roleType: 'qa' as const, label: d.label, title: d.title, targetFiles: d.files, phase: 2, dependsOn: [] })));
   }
 
   private static resolveQaFiles(existing: DecomposedSubtask, allFiles: string[]): string[] {
     if (existing.targetFiles.length > 0) return existing.targetFiles;
-    const testFiles = allFiles.filter(f => f.includes('.test.') || f.includes('.spec.'));
-    if (testFiles.length >= 2) return testFiles;
-    return allFiles.filter(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'));
+    const testFiles = allFiles.filter(f => {
+      const norm = f.replace(/\\/g, '/').toLowerCase();
+      return norm.includes('.test.') || norm.includes('.spec.');
+    });
+    return testFiles.length >= 2 ? testFiles : allFiles.filter(f => this.isSourceFile(f));
   }
 
-  public static shardQaByFiles(
-    subtasks: DecomposedSubtask[],
-    allFiles: string[],
-    objective: string,
-    allowDimensions = true
-  ): void {
+  public static shardQaByFiles(subtasks: DecomposedSubtask[], allFiles: string[], objective: string, allowDimensions = true): void {
     const qas = subtasks.filter(t => t.roleType === 'qa');
     if (qas.length !== 1) return;
     const qaIndex = subtasks.findIndex(t => t.roleType === 'qa');
     const qaFiles = this.resolveQaFiles(qas[0], allFiles);
-
     if (qaFiles.length >= 2) {
       const clusterMap = this.clusterFilesBySubsystem(qaFiles);
       if (clusterMap.size >= 2) {
-        subtasks.splice(qaIndex, 1);
-        for (const [key, files] of clusterMap.entries()) {
-          const label = key.charAt(0).toUpperCase() + key.slice(1).slice(0, 15);
-          subtasks.splice(qaIndex, 0, {
-            roleType: 'qa', label, title: `${objective} [QA-${label}]: ${files.slice(0, 2).join(', ')}`,
-            targetFiles: files, phase: 2, dependsOn: []
-          });
-        }
+        const newQas = Array.from(clusterMap.entries()).map(([key, files]) => ({
+          roleType: 'qa' as const, label: key.slice(0, 15), title: `${objective} [QA-${key.slice(0, 15)}]: ${files.slice(0, 2).join(', ')}`,
+          targetFiles: files, phase: 2, dependsOn: []
+        }));
+        subtasks.splice(qaIndex, 1, ...newQas);
         return;
       }
     }
@@ -114,23 +122,30 @@ export class TeamworkSharder {
 
   public static partitionFiles(subtasks: DecomposedSubtask[], allFiles: string[]): void {
     const assigned = new Set<string>();
-    subtasks.forEach(t => t.targetFiles.forEach(f => assigned.add(f)));
+    for (const t of subtasks) {
+      for (const f of t.targetFiles) assigned.add(f.replace(/\\/g, '/'));
+    }
     for (const task of subtasks) {
       if (task.targetFiles.length > 0) continue;
       if (task.roleType === 'ui') {
-        task.targetFiles = allFiles.filter(f => RoleClassifier.isUiFile(f) && !assigned.has(f));
+        task.targetFiles = allFiles.filter(f => RoleClassifier.isUiFile(f) && !assigned.has(f.replace(/\\/g, '/')));
       } else if (task.roleType === 'docs') {
         const l = task.label.toLowerCase();
-        task.targetFiles = allFiles.filter(f => !assigned.has(f) && (
-          (l === 'wiki' && (f.includes('wiki/') || f.includes('.wiki.'))) ||
-          (l === 'readme' && f.toLowerCase().endsWith('readme.md')) ||
-          (l === 'rfc' && (f.includes('rfc') || f.includes('adr'))) ||
-          (!['wiki', 'readme', 'rfc'].includes(l) && (f.endsWith('.md') || f.includes('docs/')))
-        ));
+        task.targetFiles = allFiles.filter(f => {
+          const norm = f.replace(/\\/g, '/').toLowerCase();
+          if (assigned.has(f.replace(/\\/g, '/'))) return false;
+          if (l === 'wiki') return norm.includes('wiki/') || norm.includes('.wiki.');
+          if (l === 'readme') return norm.endsWith('readme.md');
+          if (l === 'rfc') return norm.includes('rfc') || norm.includes('adr');
+          return norm.endsWith('.md') || norm.includes('docs/');
+        });
       } else if (task.roleType === 'qa') {
-        task.targetFiles = allFiles.filter(f => (f.includes('.test.') || f.includes('.spec.')) && !assigned.has(f));
+        task.targetFiles = allFiles.filter(f => {
+          const norm = f.replace(/\\/g, '/').toLowerCase();
+          return (norm.includes('.test.') || norm.includes('.spec.')) && !assigned.has(f.replace(/\\/g, '/'));
+        });
       }
-      task.targetFiles.forEach(f => assigned.add(f));
+      for (const f of task.targetFiles) assigned.add(f.replace(/\\/g, '/'));
     }
     this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver' && t.targetFiles.length === 0), allFiles, assigned);
   }
@@ -142,26 +157,28 @@ export class TeamworkSharder {
   ): void {
     if (solvers.length === 0) return;
     const remaining = allFiles.filter(
-      f => !assigned.has(f) && !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/')
+      f => !assigned.has(f.replace(/\\/g, '/')) && this.isSourceFile(f)
     );
     for (const solver of solvers) {
       const labelLower = solver.label.toLowerCase();
-      const matched = remaining.filter(f => !assigned.has(f) && f.toLowerCase().includes(labelLower));
-      matched.forEach(f => { solver.targetFiles.push(f); assigned.add(f); });
+      const matched = remaining.filter(
+        f => !assigned.has(f.replace(/\\/g, '/')) && f.toLowerCase().replace(/\\/g, '/').includes(labelLower)
+      );
+      for (const f of matched) {
+        solver.targetFiles.push(f);
+        assigned.add(f.replace(/\\/g, '/'));
+      }
     }
-    const unassigned = remaining.filter(f => !assigned.has(f));
+    const unassigned = remaining.filter(f => !assigned.has(f.replace(/\\/g, '/')));
     unassigned.forEach((f, idx) => {
       const targetSolver = solvers[idx % solvers.length];
       targetSolver.targetFiles.push(f);
-      assigned.add(f);
+      assigned.add(f.replace(/\\/g, '/'));
     });
   }
 
-  private static distributeClustersToBuckets(
-    clusterMap: Map<string, string[]>,
-    optimalK: number
-  ): Array<{ name: string; files: string[] }> {
-    const buckets: Array<{ name: string; files: string[] }> = Array.from({ length: optimalK }, () => ({ name: '', files: [] }));
+  private static distributeClustersToBuckets(clusterMap: Map<string, string[]>, optimalK: number): Array<{ name: string; files: string[] }> {
+    const buckets = Array.from({ length: optimalK }, () => ({ name: '', files: [] as string[] }));
     const sorted = Array.from(clusterMap.entries()).sort((a, b) => b[1].length - a[1].length);
     for (const [key, files] of sorted) {
       const bucket = buckets.reduce((min, b) => (b.files.length < min.files.length ? b : min), buckets[0]);
@@ -171,12 +188,7 @@ export class TeamworkSharder {
     return buckets;
   }
 
-  private static resolveCompanionSubtasks(
-    subtasks: DecomposedSubtask[],
-    companionTest: string,
-    companionDoc: string,
-    objective: string
-  ): DecomposedSubtask[] {
+  private static resolveCompanionSubtasks(subtasks: DecomposedSubtask[], companionTest: string, companionDoc: string, objective: string): DecomposedSubtask[] {
     const others: DecomposedSubtask[] = [];
     let hasDocs = false;
     for (const t of subtasks) {
@@ -191,57 +203,41 @@ export class TeamworkSharder {
       }
     }
     if (!hasDocs) {
-      others.push({
-        roleType: 'docs', label: 'Docs', title: `${objective} [Spec]: ${companionDoc}`,
-        targetFiles: [companionDoc], phase: 3, dependsOn: ['Audit']
-      });
+      others.push({ roleType: 'docs', label: 'Docs', title: `${objective} [Spec]: ${companionDoc}`, targetFiles: [companionDoc], phase: 3, dependsOn: ['Audit'] });
     }
     return others;
   }
 
-  private static shardSingleFileSections(
-    subtasks: DecomposedSubtask[],
-    singleFile: string,
-    objective: string
-  ): DecomposedSubtask[] {
+  private static shardSingleFileSections(subtasks: DecomposedSubtask[], singleFile: string, objective: string): DecomposedSubtask[] {
     const solvers: DecomposedSubtask[] = [
       { roleType: 'solver', label: 'Logic', title: `${objective} [Logic]: ${singleFile}`, targetFiles: [`${singleFile}#logic`], phase: 1, dependsOn: [] },
       { roleType: 'solver', label: 'Contract', title: `${objective} [Contract]: ${singleFile}`, targetFiles: [`${singleFile}#contract`], phase: 1, dependsOn: [] },
       { roleType: 'solver', label: 'Safety', title: `${objective} [Safety]: ${singleFile}`, targetFiles: [`${singleFile}#safety`], phase: 1, dependsOn: [] }
     ];
-    const baseName = singleFile.replace(/\.[^/.]+$/, '');
+    const baseName = singleFile.replace(/\\/g, '/').replace(/\.[^/.]+$/, '');
     const base = baseName.split('/').pop() || baseName;
     const others = this.resolveCompanionSubtasks(subtasks, `${baseName}.test.ts`, `docs/${base}.md`, objective);
     this.shardQaByDimensions(others, objective, `${baseName}.test.ts`);
     return [...solvers, ...others];
   }
 
-  private static shardGeneralScopeSections(
-    subtasks: DecomposedSubtask[],
-    objective: string,
-    maxConcurrency: number
-  ): DecomposedSubtask[] {
+  private static shardGeneralScopeSections(subtasks: DecomposedSubtask[], objective: string, maxConcurrency: number): DecomposedSubtask[] {
     const solvers = subtasks.filter(t => t.roleType === 'solver');
     if (solvers.length !== 1) return subtasks;
-
     const baseTitle = solvers[0]?.title || objective;
     const shardedSolvers: DecomposedSubtask[] = [
       { roleType: 'solver', label: 'Logic', title: `${baseTitle} [Logic]: Core algorithms & calculations`, targetFiles: [], phase: 1, dependsOn: [] },
       { roleType: 'solver', label: 'Adapter', title: `${baseTitle} [Adapter]: Pipeline, CLI & interface routing`, targetFiles: [], phase: 1, dependsOn: [] }
     ];
-    if (maxConcurrency >= 3) shardedSolvers.push({ roleType: 'solver', label: 'State', title: `${baseTitle} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
-
+    if (maxConcurrency >= 3) {
+      shardedSolvers.push({ roleType: 'solver', label: 'State', title: `${baseTitle} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
+    }
     const others = subtasks.filter(t => t.roleType !== 'solver');
     this.shardQaByDimensions(others, objective);
     return [...shardedSolvers, ...others];
   }
 
-  private static shardMultiSolvers(
-    subtasks: DecomposedSubtask[],
-    allFiles: string[],
-    objective: string,
-    maxConcurrency: number
-  ): DecomposedSubtask[] {
+  private static shardMultiSolvers(subtasks: DecomposedSubtask[], allFiles: string[], objective: string, maxConcurrency: number): DecomposedSubtask[] {
     const solvers = subtasks.filter(t => t.roleType === 'solver');
     if (!subtasks.some(s => s.label === 'State') && subtasks.length < maxConcurrency) {
       subtasks.splice(solvers.length, 0, { roleType: 'solver', label: 'State', title: `${objective} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
@@ -257,7 +253,7 @@ export class TeamworkSharder {
     objective: string,
     maxConcurrency = 12
   ): DecomposedSubtask[] {
-    const sourceFiles = allFiles.filter(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'));
+    const sourceFiles = allFiles.filter(f => this.isSourceFile(f));
     if (allFiles.length === 1 && sourceFiles.length === 1 && maxConcurrency > 1) {
       return this.shardSingleFileSections(subtasks, sourceFiles[0], objective);
     }

@@ -18,62 +18,43 @@ export interface SemanticAnalysisResult {
   fromCache: boolean;
 }
 
+interface CandidateMeta {
+  lowerPath: string; basename: string; ext: string;
+  isCode: boolean; isTest: boolean; isPkgSrc: boolean;
+}
+
 const STOP_WORDS = new Set([
   'the', 'and', 'with', 'for', 'this', 'that', 'from', 'into', 'over', 'after',
   'bir', 've', 'ile', 'icin', 'olan', 'gibi', 'daha', 'tam', 'bunu', 'buna',
   'make', 'build', 'create', 'update', 'fix', 'refactor', 'test', 'check'
 ]);
 
-const TURKISH_SYNONYMS: Record<string, string[]> = {
-  'sağlık': ['health', 'hp'],
-  'saglik': ['health', 'hp'],
-  'oyuncu': ['player'],
-  'karakter': ['player', 'character'],
-  'dövüş': ['combat', 'battle', 'fight'],
-  'dovus': ['combat', 'battle', 'fight'],
-  'savaş': ['combat', 'battle'],
-  'savas': ['combat', 'battle'],
-  'envanter': ['inventory'],
-  'arayüz': ['ui', 'hud', 'interface', 'menu'],
-  'arayuz': ['ui', 'hud', 'interface', 'menu'],
-  'tema': ['theme'],
-  'denetim': ['audit', 'triage', 'test'],
-  'görev': ['task', 'mission', 'quest'],
-  'gorev': ['task', 'mission', 'quest'],
-  'ayarlar': ['settings', 'config'],
-  'ayar': ['setting', 'config'],
-  'ses': ['audio', 'sound'],
-  'kamera': ['camera'],
-  'düşman': ['enemy'],
-  'dusman': ['enemy'],
-  'harita': ['map', 'tilemap'],
-  'yönetici': ['manager', 'controller'],
-  'yonetici': ['manager', 'controller'],
-  'silah': ['weapon'],
-  'doküman': ['doc', 'wiki'],
-  'dokuman': ['doc', 'wiki'],
-  'dokümantasyon': ['doc', 'docs', 'wiki'],
-  'dokumantasyon': ['doc', 'docs', 'wiki'],
-  'hafıza': ['memory', 'cache'],
-  'bellek': ['memory', 'cache'],
-  'çoklu': ['multi', 'teamwork', 'parallel'],
-  'coklu': ['multi', 'teamwork', 'parallel'],
-  'ajan': ['agent', 'subagent', 'teamwork'],
-  'dağıt': ['shard', 'dispatch', 'distribute'],
-  'dagit': ['shard', 'dispatch', 'distribute'],
-  'böl': ['decompose', 'shard', 'split'],
-  'bol': ['decompose', 'shard', 'split'],
-  'performans': ['performance', 'speed', 'optimization']
-};
+const TEST_INTENT_WORDS = new Set(['test', 'spec', 'audit', 'triage', 'qa']);
+const TEST_INTENT_RE = /\b(test|spec|audit|triage|qa)\b/i;
+const CODE_EXTS = new Set(['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cs', '.cpp']);
+const ALLOWED_EXTS = new Set(['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cpp', '.cs', '.tscn', '.tres', '.json', '.md']);
+const CAMEL_SPLIT_RE = /([a-z])([A-Z])/g;
+const CLEAN_TOKEN_RE = /[^\p{L}\p{N}\s_-]/gu;
 
-const ALLOWED_EXTS = new Set([
-  '.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cpp', '.cs',
-  '.tscn', '.tres', '.json', '.md'
-]);
+const TURKISH_SYNONYMS: Record<string, string[]> = {
+  'sağlık': ['health', 'hp'], 'saglik': ['health', 'hp'], 'oyuncu': ['player'], 'karakter': ['player', 'character'],
+  'dövüş': ['combat', 'battle', 'fight'], 'dovus': ['combat', 'battle', 'fight'], 'savaş': ['combat', 'battle'], 'savas': ['combat', 'battle'],
+  'envanter': ['inventory'], 'arayüz': ['ui', 'hud', 'interface', 'menu'], 'arayuz': ['ui', 'hud', 'interface', 'menu'], 'tema': ['theme'],
+  'denetim': ['audit', 'triage', 'test'], 'görev': ['task', 'mission', 'quest'], 'gorev': ['task', 'mission', 'quest'],
+  'ayarlar': ['settings', 'config'], 'ayar': ['setting', 'config'], 'ses': ['audio', 'sound'], 'kamera': ['camera'],
+  'düşman': ['enemy'], 'dusman': ['enemy'], 'harita': ['map', 'tilemap'], 'yönetici': ['manager', 'controller'], 'yonetici': ['manager', 'controller'],
+  'silah': ['weapon'], 'doküman': ['doc', 'wiki'], 'dokuman': ['doc', 'wiki'], 'dokümantasyon': ['doc', 'docs', 'wiki'], 'dokumantasyon': ['doc', 'docs', 'wiki'],
+  'hafıza': ['memory', 'cache'], 'bellek': ['memory', 'cache'], 'çoklu': ['multi', 'teamwork', 'parallel'], 'coklu': ['multi', 'teamwork', 'parallel'],
+  'ajan': ['agent', 'subagent', 'teamwork'], 'dağıt': ['shard', 'dispatch', 'distribute'], 'dagit': ['shard', 'dispatch', 'distribute'],
+  'böl': ['decompose', 'shard', 'split'], 'bol': ['decompose', 'shard', 'split'], 'performans': ['performance', 'speed', 'optimization']
+};
 
 export class FastSemanticAnalyzer {
   private repoRoot: string;
   private cachedFiles: { files: string[]; timestamp: number } | null = null;
+  private keywordCache = new Map<string, string[]>();
+  private metaCache = new Map<string, CandidateMeta>();
+  private testIntentCache = new Map<string, boolean>();
   private static readonly FILE_CACHE_TTL_MS = 10000;
 
   constructor(repoRoot?: string) {
@@ -91,16 +72,21 @@ export class FastSemanticAnalyzer {
   }
 
   public extractKeywords(text: string): string[] {
-    const rawTokens = text.replace(/[^\p{L}\p{N}\s_-]/gu, ' ').split(/\s+/);
+    const cached = this.keywordCache.get(text);
+    if (cached) return [...cached];
+
+    const rawTokens = text.replace(CLEAN_TOKEN_RE, ' ').split(/\s+/);
     const keywords: string[] = [];
 
     for (const token of rawTokens) {
       if (!token || token.length < 3) continue;
-      const subTokens = token.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ').toLowerCase().split(' ');
+      const subTokens = token.replace(CAMEL_SPLIT_RE, '$1 $2').replace(/[_-]/g, ' ').toLowerCase().split(' ');
       for (const st of subTokens) {
         this.appendKeyword(st.trim(), keywords);
       }
     }
+    if (this.keywordCache.size >= 500) this.keywordCache.clear();
+    this.keywordCache.set(text, keywords);
     return keywords;
   }
 
@@ -151,8 +137,7 @@ export class FastSemanticAnalyzer {
         return fs.existsSync(idx) ? idx : null;
       }
       if (stat.isFile()) {
-        const content = fs.readFileSync(dotGit, 'utf8').trim();
-        const match = content.match(/^gitdir:\s*(.+)$/m);
+        const match = fs.readFileSync(dotGit, 'utf8').trim().match(/^gitdir:\s*(.+)$/m);
         if (match) {
           const rawDir = match[1].trim();
           const gitDir = path.isAbsolute(rawDir) ? rawDir : path.resolve(this.repoRoot, rawDir);
@@ -166,17 +151,12 @@ export class FastSemanticAnalyzer {
 
   private readDiskManifest(): string[] | null {
     const gitIndexPath = this.resolveGitIndexPath();
-    if (!gitIndexPath) return null;
     const manifestPath = this.getManifestPath();
-    if (!fs.existsSync(manifestPath)) return null;
-
+    if (!gitIndexPath || !fs.existsSync(manifestPath)) return null;
     try {
       const gitMtime = fs.statSync(gitIndexPath).mtimeMs;
-      const raw = fs.readFileSync(manifestPath, 'utf8');
-      const data = JSON.parse(raw) as { gitIndexMtime?: number; files?: string[] };
-      if (typeof data.gitIndexMtime === 'number' && data.gitIndexMtime === gitMtime && Array.isArray(data.files)) {
-        return data.files;
-      }
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { gitIndexMtime?: number; files?: string[] };
+      if (data.gitIndexMtime === gitMtime && Array.isArray(data.files)) return data.files;
     } catch { /* ignore corrupted disk cache */ }
     return null;
   }
@@ -184,7 +164,6 @@ export class FastSemanticAnalyzer {
   private saveDiskManifest(files: string[]): void {
     const gitIndexPath = this.resolveGitIndexPath();
     if (!gitIndexPath) return;
-
     try {
       const gitMtime = fs.statSync(gitIndexPath).mtimeMs;
       const manifestPath = this.getManifestPath();
@@ -216,11 +195,42 @@ export class FastSemanticAnalyzer {
     return accumulator;
   }
 
-  private scoreCandidate(filePath: string, keywords: string[]): number {
+  private getCandidateMeta(filePath: string): CandidateMeta {
+    let meta = this.metaCache.get(filePath);
+    if (!meta) {
+      const lower = filePath.toLowerCase().replace(/\\/g, '/');
+      const lastSlash = lower.lastIndexOf('/');
+      const basename = lastSlash === -1 ? lower : lower.slice(lastSlash + 1);
+      const dotIdx = basename.lastIndexOf('.');
+      const ext = dotIdx === -1 ? '' : basename.slice(dotIdx);
+      const isTest = basename.includes('.test.') || basename.includes('.spec.') ||
+                     lower.includes('__tests__') || basename.endsWith('.test') ||
+                     basename.endsWith('.spec');
+      const isPkgSrc = !isTest && ((lower.includes('packages/') && lower.includes('/src/')) || lower.startsWith('src/'));
+      const isCode = CODE_EXTS.has(ext);
+      meta = { lowerPath: lower, basename, ext, isCode, isTest, isPkgSrc };
+      if (this.metaCache.size < 10000) this.metaCache.set(filePath, meta);
+    }
+    return meta;
+  }
+
+  public hasTestIntent(objective: string, keywords?: string[]): boolean {
+    const cached = this.testIntentCache.get(objective);
+    if (cached !== undefined) return cached;
+    const lower = objective.toLowerCase();
+    let hasIntent = TEST_INTENT_RE.test(lower);
+    if (!hasIntent && keywords) {
+      hasIntent = keywords.some(k => TEST_INTENT_WORDS.has(k));
+    }
+    if (this.testIntentCache.size >= 500) this.testIntentCache.clear();
+    this.testIntentCache.set(objective, hasIntent);
+    return hasIntent;
+  }
+
+  public scoreCandidate(filePath: string, keywords: string[], hasTestIntent?: boolean): number {
     let score = 0;
-    const lowerPath = filePath.toLowerCase();
-    const basename = path.basename(lowerPath);
-    const ext = path.extname(lowerPath);
+    const meta = this.getCandidateMeta(filePath);
+    const { lowerPath, basename, ext, isCode, isTest, isPkgSrc } = meta;
 
     for (const kw of keywords) {
       if (basename === `${kw}${ext}` || basename.startsWith(`${kw}.`)) {
@@ -232,12 +242,18 @@ export class FastSemanticAnalyzer {
       }
     }
 
-    const isCode = ['.ts', '.tsx', '.gd', '.py', '.rs', '.go', '.cs', '.cpp'].includes(ext);
     if (isCode && score > 0) {
       score += 12;
-      if (lowerPath.includes('src/') || lowerPath.includes('packages/')) {
+      if (isPkgSrc) {
+        score += 15;
+      } else if (!isTest && (lowerPath.includes('src/') || lowerPath.includes('packages/'))) {
         score += 8;
       }
+    }
+
+    const testIntent = hasTestIntent ?? keywords.some(k => TEST_INTENT_WORDS.has(k));
+    if (isTest && !testIntent) {
+      score -= 15;
     }
 
     return score;
@@ -247,11 +263,12 @@ export class FastSemanticAnalyzer {
     const start = Date.now();
     const fromCache = this.cachedFiles !== null;
     const keywords = this.extractKeywords(objective);
+    const hasIntent = this.hasTestIntent(objective, keywords);
     const candidates = this.listCandidateFiles();
 
     const scored: Array<{ file: string; score: number }> = [];
     for (const file of candidates) {
-      const score = this.scoreCandidate(file, keywords);
+      const score = this.scoreCandidate(file, keywords, hasIntent);
       if (score > 0) scored.push({ file, score });
     }
 

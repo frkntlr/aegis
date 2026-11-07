@@ -91,3 +91,56 @@ test('shardSmartClusters creates multi-agent QA hunters across clusters', () => 
   assert.ok(qaLabels.includes('Db'));
   assert.ok(qas.every(q => q.phase === 2));
 });
+
+test('TeamworkSharder.getSubsystemKey normalizes Windows backslashes and prefixes consistently', () => {
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('packages\\core\\orchestrator\\src\\parser.ts'), 'Core-orchestrator');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('.\\packages\\core\\orchestrator\\src\\parser.test.ts'), 'Core-orchestrator');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('C:\\repo\\packages\\core\\orchestrator\\src\\parser.ts'), 'Core-orchestrator');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('packages\\core\\src\\parser.ts'), 'Core-parser');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('packages\\core\\src\\parser.test.ts'), 'Core-parser');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('src\\auth\\login.ts'), 'Auth');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('.\\src\\auth\\login.test.ts'), 'Auth');
+  assert.strictEqual(TeamworkSharder.getSubsystemKey('C:\\work\\src\\db\\repo.ts'), 'Db');
+});
+
+test('TeamworkSharder clusters Windows and POSIX paths together without duplicate or degraded clusters', () => {
+  const files = [
+    'packages\\core\\orchestrator\\src\\parser.ts',
+    'packages/core/orchestrator/src/parser.test.ts',
+    '.\\packages\\cli\\src\\commands\\build.ts',
+    'packages/cli/src/commands/build.test.ts'
+  ];
+  const clusters = TeamworkSharder.clusterFilesBySubsystem(files);
+  assert.strictEqual(clusters.size, 2);
+  assert.ok(clusters.has('Core-orchestrator'));
+  assert.ok(clusters.has('Cli-commands'));
+  assert.strictEqual(clusters.get('Core-orchestrator')?.length, 2);
+  assert.strictEqual(clusters.get('Cli-commands')?.length, 2);
+});
+
+test('shardSmartClusters guarantees disjoint file allocations across sharded agents with Windows paths', () => {
+  const files = [
+    'packages\\core\\src\\auth.ts',
+    'packages\\core\\src\\auth.test.ts',
+    'packages\\cli\\src\\command.ts',
+    'packages\\cli\\src\\command.test.ts'
+  ];
+  const initial: DecomposedSubtask[] = [
+    { roleType: 'solver', label: 'Core', title: 'Implement feature', targetFiles: [] },
+    { roleType: 'qa', label: 'Audit', title: 'Audit feature', targetFiles: [] }
+  ];
+  const sharded = TeamworkSharder.shardSmartClusters(initial, files, 'Multi subsystem Windows task', 8);
+
+  const solvers = sharded.filter(s => s.roleType === 'solver');
+  assert.strictEqual(solvers.length, 2);
+  const solverFiles = solvers.flatMap(s => s.targetFiles);
+  const uniqueSolverFiles = new Set(solverFiles.map(f => f.replace(/\\/g, '/')));
+  assert.strictEqual(solverFiles.length, uniqueSolverFiles.size, 'Solver target files must be strictly disjoint');
+  assert.strictEqual(uniqueSolverFiles.size, 4);
+
+  const qas = sharded.filter(s => s.roleType === 'qa');
+  assert.strictEqual(qas.length, 2);
+  const qaFiles = qas.flatMap(q => q.targetFiles);
+  const uniqueQaFiles = new Set(qaFiles.map(f => f.replace(/\\/g, '/')));
+  assert.strictEqual(qaFiles.length, uniqueQaFiles.size, 'QA target files must be strictly disjoint');
+});
