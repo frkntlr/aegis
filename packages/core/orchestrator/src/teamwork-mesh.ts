@@ -142,8 +142,10 @@ export class TeamworkMesh {
   }
 
   private checkWaveProgression(state: TeamworkMeshState): void {
-    const prefix = `Wave ${state.activeWave}`;
-    const peers = Object.values(state.agents).filter(p => p.currentActivity.includes(prefix));
+    const currentWave = state.activeWave;
+    const peers = Object.values(state.agents).filter(p =>
+      (p.phase ?? (p.currentActivity.includes(`Wave ${currentWave}`) ? currentWave : undefined)) === currentWave
+    );
     if (peers.length > 0 && peers.every(p => p.status === 'done')) {
       const oldWave = state.activeWave;
       state.activeWave += 1;

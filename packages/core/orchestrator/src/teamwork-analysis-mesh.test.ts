@@ -1,5 +1,8 @@
 import test from 'node:test';
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { TeamworkAnalysisMesh } from './teamwork-analysis-mesh.js';
 
 test('TeamworkAnalysisMesh posts and queries insights with filters', () => {
@@ -60,4 +63,37 @@ test('TeamworkAnalysisMesh batch posts insights', () => {
 
   assert.strictEqual(results.length, 2);
   assert.strictEqual(mesh.query().length, 2);
+});
+
+test('TeamworkAnalysisMesh safely merges insights across multiple instances without state loss', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-analysis-merge-'));
+  try {
+    const meshA = new TeamworkAnalysisMesh(tmpDir, true);
+    const meshB = new TeamworkAnalysisMesh(tmpDir, true);
+
+    meshA.postInsight({
+      lens: 'ast',
+      agent: 'ast-architect',
+      category: 'bottleneck',
+      severity: 'high',
+      target: 'src/a.ts',
+      finding: 'Finding from Agent A'
+    });
+
+    meshB.postInsight({
+      lens: 'ui',
+      agent: 'ui-specialist',
+      category: 'ui_defect',
+      severity: 'medium',
+      target: 'src/b.tscn',
+      finding: 'Finding from Agent B'
+    });
+
+    const finalQuery = meshA.query();
+    assert.strictEqual(finalQuery.length, 2, 'Should contain both insights from Agent A and Agent B');
+    assert.ok(meshA.getHotspots().includes('src/a.ts'));
+    assert.ok(meshA.getHotspots().includes('src/b.tscn'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

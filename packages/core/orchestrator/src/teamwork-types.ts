@@ -57,6 +57,7 @@ export interface TeamworkPeerState {
   modifiedFiles: string[];
   publishedContracts: string[];
   updatedAt: string;
+  phase?: number;
 }
 
 export interface TeamworkEvent {

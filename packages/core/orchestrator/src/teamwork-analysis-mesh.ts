@@ -66,6 +66,7 @@ export class TeamworkAnalysisMesh {
   }
 
   public postInsight(data: Omit<AnalysisInsight, 'id' | 'timestamp'>): AnalysisInsight {
+    if (this.persist) this.reloadLatest();
     const id = `ins-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const insight: AnalysisInsight = {
       ...data,
@@ -77,6 +78,21 @@ export class TeamworkAnalysisMesh {
     this.state.lastUpdated = insight.timestamp;
     if (this.persist) this.saveState();
     return insight;
+  }
+
+  private reloadLatest(): void {
+    const filePath = this.getMeshFilePath();
+    if (!fs.existsSync(filePath)) return;
+    try {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const loaded = JSON.parse(raw) as AnalysisMeshState;
+      if (loaded && loaded.insights) {
+        this.state.insights = { ...loaded.insights, ...this.state.insights };
+        this.state.hotspots = Array.from(new Set([...loaded.hotspots, ...this.state.hotspots]));
+        this.state.objective = loaded.objective || this.state.objective;
+        this.state.swarmId = loaded.swarmId || this.state.swarmId;
+      }
+    } catch { /* ignore parse error */ }
   }
 
   public batchPost(list: Array<Omit<AnalysisInsight, 'id' | 'timestamp'>>): AnalysisInsight[] {
@@ -95,6 +111,7 @@ export class TeamworkAnalysisMesh {
   }
 
   public query(filter?: AnalysisMeshFilter): AnalysisInsight[] {
+    if (this.persist) this.reloadLatest();
     const all = Object.values(this.state.insights);
     if (!filter) return all;
 
@@ -112,10 +129,12 @@ export class TeamworkAnalysisMesh {
   }
 
   public getHotspots(): string[] {
+    if (this.persist) this.reloadLatest();
     return [...this.state.hotspots];
   }
 
   public getMeshState(): AnalysisMeshState {
+    if (this.persist) this.reloadLatest();
     return { ...this.state };
   }
 
@@ -133,7 +152,15 @@ export class TeamworkAnalysisMesh {
     try {
       const aegisDir = path.join(this.repoRoot, '.aegis');
       if (!fs.existsSync(aegisDir)) fs.mkdirSync(aegisDir, { recursive: true });
-      fs.writeFileSync(this.getMeshFilePath(), JSON.stringify(this.state, null, 2), 'utf8');
+      const filePath = this.getMeshFilePath();
+      const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+      fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2), 'utf8');
+      try {
+        fs.renameSync(tmp, filePath);
+      } catch {
+        fs.copyFileSync(tmp, filePath);
+        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+      }
     } catch {
       /* ignore file system errors in restricted test environments */
     }

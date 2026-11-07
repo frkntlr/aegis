@@ -55,7 +55,14 @@ export function writeTaskInbox(data: TaskInboxData, baseDir?: string): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   data.updatedAt = new Date().toISOString();
-  fs.writeFileSync(filePath, JSON.stringify(data.tasks, null, 2), 'utf8');
+  const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(data.tasks, null, 2), 'utf8');
+  try {
+    fs.renameSync(tmp, filePath);
+  } catch {
+    fs.copyFileSync(tmp, filePath);
+    try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+  }
 }
 
 export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskInboxItem[]): boolean {

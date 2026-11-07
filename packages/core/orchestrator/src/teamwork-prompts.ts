@@ -155,7 +155,7 @@ function buildPromptFooter(roleType: RoleType, roleIdentity: string): string {
     `- Publish your activity, changed files, and contracts: \`aegis tw:post "<activity>" --files="<files>" --contract="<types>"\` or MCP \`teamwork_mesh_post\`.\n` +
     `- Broadcast milestones to peer agents: \`aegis tw:broadcast "<message>"\` or MCP \`teamwork_broadcast\`.\n\n` +
     `### Instructions\n` +
-    `1. Pull staged details using \`aegis task:pull ${roleType}\` or MCP \`task_inbox_pull\`.\n` +
+    `1. Pull staged details using \`aegis task:pull "${roleIdentity}"\` or MCP \`task_inbox_pull\`.\n` +
     `2. Execute changes within your designated workspace.\n` +
     `3. Validate with \`aegis verify:task\` before concluding.\n` +
     `4. Send message to Team Lead: \`[ROLE_COMPLETE: ${roleIdentity}]\` with changed files and verification summary.`;

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { WorktreeManager } from '@aegis/orchestrator';
+import { WorktreeManager, TeamworkMesh } from '@aegis/orchestrator';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { GodotLocator } from '@aegis/godot-bridge';
 import { GitHubTokenResolver, GitHubClient } from '@aegis/github-live';
@@ -98,11 +98,15 @@ export async function handleTaskRelease(issueArg?: string, statusArg?: string, r
     ? tasks.filter(t => t.issueNumber === parsedNum)
     : tasks.filter(t => (t.trackId && t.trackId.toLowerCase() === issueArg.toLowerCase()) || matchesTaskRole(t.role, issueArg, t.issueNumber, t.trackId) || (t.title && t.title.toLowerCase().includes(issueArg.toLowerCase())));
 
+  const mesh = new TeamworkMesh();
   for (const t of matched) {
     if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
     if (t.role) wtManager.releaseFileLocks(t.role);
     if (t.claimedBy) wtManager.releaseFileLocks(t.claimedBy);
     updateTaskInboxStatus(t.issueNumber, status);
+    if (status === 'done' || status === 'blocked') {
+      try { mesh.postActivity(t.claimedBy || t.role, { status, activity: `Task #${t.issueNumber} marked ${status}` }); } catch { /* ignore */ }
+    }
     if (status === 'done' && t.isGitHubIssue === true) await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
   }
 

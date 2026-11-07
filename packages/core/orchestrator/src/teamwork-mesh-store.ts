@@ -110,7 +110,8 @@ export class TeamworkMeshStore {
         lockedFiles: [...track.targetFiles],
         modifiedFiles: [],
         publishedContracts: [],
-        updatedAt: now
+        updatedAt: now,
+        phase: track.phase
       };
     }
     const initEvent: TeamworkEvent = {

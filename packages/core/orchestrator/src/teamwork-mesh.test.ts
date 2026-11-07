@@ -148,16 +148,16 @@ test('TeamworkMesh detects file collisions and triggers conflict warning event',
   }
 });
 
-test('TeamworkMesh advances activeWave when current wave peers report done', () => {
+test('TeamworkMesh advances activeWave when current wave peers report done with custom activity text', () => {
   const tmp = createTempDir();
   try {
     const mesh = new TeamworkMesh(tmp);
-    mesh.initializeMesh('plan-wave', 'Wave progression', [
+    mesh.initializeMesh('plan-wave-custom', 'Custom wave progression', [
       {
         id: 'w1',
         roleType: 'solver',
-        subagentName: 'solver-1',
-        title: 'Core',
+        subagentName: 'solver-custom',
+        title: 'Core Parser',
         targetFiles: [],
         prompt: 'p',
         invocationPayload: { TypeName: 'solver', Role: 'c', Prompt: 'p', Workspace: 'inherit', Model: 'flash' },
@@ -167,7 +167,8 @@ test('TeamworkMesh advances activeWave when current wave peers report done', () 
     ]);
 
     assert.strictEqual(mesh.getMeshState().activeWave, 1);
-    mesh.postActivity('solver-1', { status: 'done', activity: 'Wave 1 finished' });
+    // Custom activity text without the string "Wave 1"
+    mesh.postActivity('solver-custom', { status: 'done', activity: 'Refactored AST and verified Demir Kafes' });
 
     assert.strictEqual(mesh.getMeshState().activeWave, 2);
     const events = mesh.getEvents();
