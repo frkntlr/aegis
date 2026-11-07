@@ -6,7 +6,7 @@
 
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeManager } from './worktree-manager.js';
-import { RoleClassifier } from './role-classifier.js';
+import { RoleClassifier, type RoleType } from './role-classifier.js';
 import {
   type SubagentProfile,
   getSubagentProfiles
@@ -135,6 +135,9 @@ export class TeamworkCoordinator {
       acquireLocks?: boolean;
       maxConcurrency?: number;
       autoScale?: boolean;
+      selectedRoles?: RoleType[];
+      explicitRole?: string;
+      treeSpecialists?: boolean;
     }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
@@ -144,7 +147,10 @@ export class TeamworkCoordinator {
     const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, files)}` : `tw-${Date.now().toString(36)}`;
     const subtasks = TeamworkDecomposer.decompose(objective, files, {
       maxConcurrency: options?.maxConcurrency,
-      autoScale: options?.autoScale
+      autoScale: options?.autoScale,
+      selectedRoles: options?.selectedRoles,
+      explicitRole: options?.explicitRole,
+      treeSpecialists: options?.treeSpecialists
     });
     const tracks = this.buildTracks(subtasks, isDet);
 

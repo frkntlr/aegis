@@ -13,6 +13,7 @@ import {
 import type { DecomposedSubtask } from './teamwork-decomposer.js';
 import type { TeamworkGroundingEngine } from './teamwork-grounding.js';
 import type { TeamworkTrack } from './teamwork-types.js';
+import { ROLE_SPECIALISTS } from './teamwork-hierarchical-tree.js';
 
 export class TeamworkTrackBuilder {
   public static hashPlan(objective: string, files: string[]): string {
@@ -66,6 +67,8 @@ export class TeamworkTrackBuilder {
       ? `${roleType}-${label.toLowerCase()}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 6)}`
       : `${roleType}-${label.toLowerCase()}-${Date.now().toString(36)}`;
     const prompt = compileTrackPrompt(profile, desc, files, subagentName, dependsOn, phase, groundingContext, upstreamContracts);
+    const spec = ROLE_SPECIALISTS[roleType]?.find(s => s.label.toLowerCase() === label.toLowerCase());
+    const assignedAegisTools = spec ? spec.assignedTools : (profile.aegisTools ?? []);
     return {
       id,
       roleType,
@@ -75,7 +78,7 @@ export class TeamworkTrackBuilder {
       prompt,
       dependsOn,
       phase,
-      assignedAegisTools: profile.aegisTools ?? [],
+      assignedAegisTools,
       invocationPayload: {
         TypeName: profile.name,
         Role: `${profile.title} - ${label}`,

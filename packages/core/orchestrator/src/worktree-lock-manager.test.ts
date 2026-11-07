@@ -41,21 +41,21 @@ test('WorktreeLockManager handles batch locks atomically', () => {
 test('WorktreeLockManager automatically prunes stale locks older than staleTimeoutMs', () => {
   const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-stale-prune-'));
   try {
-    const manager = new WorktreeLockManager({ repoRoot: tmpRepo, persistLocks: true, staleTimeoutMs: 100 });
+    const manager = new WorktreeLockManager({ repoRoot: tmpRepo, persistLocks: true, staleTimeoutMs: 2000 });
     manager.acquireFileLocks('alice', ['src/old.ts']);
     assert.strictEqual(manager.getLockedFiles().get('src/old.ts'), 'alice');
 
-    // Simulate lock age > 100ms
+    // Simulate lock age > 2000ms
     const metaFile = manager.getMetaFilePath();
     const metaData = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
-    metaData['src/old.ts'].acquiredAt = Date.now() - 500;
+    metaData['src/old.ts'].acquiredAt = Date.now() - 5000;
     fs.writeFileSync(metaFile, JSON.stringify(metaData), 'utf8');
 
     // Re-instantiate or prune
-    const manager2 = new WorktreeLockManager({ repoRoot: tmpRepo, persistLocks: true, staleTimeoutMs: 100 });
+    const manager2 = new WorktreeLockManager({ repoRoot: tmpRepo, persistLocks: true, staleTimeoutMs: 2000 });
     assert.strictEqual(manager2.getLockedFiles().has('src/old.ts'), false);
 
-    const prunedCount = manager.pruneStaleLocks(100);
+    const prunedCount = manager.pruneStaleLocks(2000);
     assert.ok(prunedCount >= 0);
   } finally {
     fs.rmSync(tmpRepo, { recursive: true, force: true });

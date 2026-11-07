@@ -85,6 +85,8 @@ interface PlanFlags {
   json: boolean;
   dryRun: boolean;
   maxConcurrency?: number;
+  explicitRole?: string;
+  treeSpecialists?: boolean;
 }
 
 function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
@@ -95,7 +97,9 @@ function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
     else if (a === '--json' || a === '-j') flags.json = true;
     else if (a === '--dry-run') flags.dryRun = true;
     else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
-    else if (a.startsWith('--max-agents=') || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
+    else if (a === "--tree" || a === "--specialists") flags.treeSpecialists = true;
+    else if (a.startsWith("--role=") || a.startsWith("-r=") || a.startsWith("--only=")) flags.explicitRole = a.split("=")[1];
+    else if (a.startsWith("--max-agents=") || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
     else if (a && !a.startsWith('-')) files.push(a);
   }
   return { files, flags };
@@ -134,7 +138,9 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
   const plan = coordinator.planTeamwork(objectiveArg.trim(), files, {
     stage: !flags.dryRun,
     acquireLocks: !flags.dryRun,
-    maxConcurrency: flags.maxConcurrency
+    maxConcurrency: flags.maxConcurrency,
+    explicitRole: flags.explicitRole,
+    treeSpecialists: flags.treeSpecialists
   });
 
   if (flags.json) {
@@ -247,8 +253,10 @@ export function mcpTeamworkPlan(args: Record<string, unknown> = {}): string {
   }
   const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
   const coordinator = new TeamworkCoordinator();
-  const maxConcurrency = typeof args.maxConcurrency === 'number' ? args.maxConcurrency : undefined;
-  const plan = coordinator.planTeamwork(objective, targetFiles, { maxConcurrency });
+  const maxConcurrency = typeof args.maxConcurrency === "number" ? args.maxConcurrency : undefined;
+  const explicitRole = typeof args.role === "string" ? args.role : undefined;
+  const treeSpecialists = typeof args.treeSpecialists === "boolean" ? args.treeSpecialists : undefined;
+  const plan = coordinator.planTeamwork(objective, targetFiles, { maxConcurrency, explicitRole, treeSpecialists });
   return JSON.stringify(plan, null, 2);
 }
 

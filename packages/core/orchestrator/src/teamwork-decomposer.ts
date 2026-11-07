@@ -6,8 +6,9 @@
 
 import { RoleClassifier, type RoleType } from './role-classifier.js';
 import { TeamworkSharder } from './teamwork-sharder.js';
+import { TeamworkHierarchicalTree } from './teamwork-hierarchical-tree.js';
 
-export { TeamworkSharder };
+export { TeamworkSharder, TeamworkHierarchicalTree };
 
 export interface DecomposedSubtask {
   roleType: RoleType;
@@ -18,18 +19,38 @@ export interface DecomposedSubtask {
   phase?: number;
 }
 
+export interface DecomposeOptions {
+  maxConcurrency?: number;
+  autoScale?: boolean;
+  selectedRoles?: RoleType[];
+  explicitRole?: string;
+  treeSpecialists?: boolean;
+}
+
 export class TeamworkDecomposer {
   private static readonly STOP_WORDS = new Set(['ve', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de']);
 
   public static decompose(
     objective: string,
     targetFiles: string[] = [],
-    options?: { maxConcurrency?: number; autoScale?: boolean }
+    options?: DecomposeOptions
   ): DecomposedSubtask[] {
-    const rawItems = this.splitObjective(objective);
-    const parsed = rawItems.map(item => this.classifyRawItem(item));
-    const subtasks = this.enrichSubtasks(parsed);
-    this.ensureRequiredTracks(subtasks, objective, targetFiles);
+    const selectedRoles = options?.selectedRoles ?? TeamworkHierarchicalTree.detectSelectedRoles(objective, options?.explicitRole);
+    const isTree = options?.treeSpecialists || TeamworkHierarchicalTree.isHierarchicalRequested(objective);
+
+    let subtasks: DecomposedSubtask[];
+    if (isTree) {
+      subtasks = TeamworkHierarchicalTree.expandHierarchicalRoles([], selectedRoles, objective, targetFiles);
+    } else {
+      const rawItems = this.splitObjective(objective);
+      const parsed = rawItems.map(item => this.classifyRawItem(item));
+      subtasks = this.enrichSubtasks(parsed);
+      if (selectedRoles && selectedRoles.length > 0) {
+        subtasks = subtasks.filter(t => selectedRoles.includes(t.roleType));
+      }
+      this.ensureRequiredTracks(subtasks, objective, targetFiles, selectedRoles);
+    }
+
     if (options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1)) {
       const maxC = options.maxConcurrency ?? 12;
       return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
@@ -134,39 +155,21 @@ export class TeamworkDecomposer {
   private static ensureRequiredTracks(
     subtasks: DecomposedSubtask[],
     objective: string,
-    allFiles: string[]
+    allFiles: string[],
+    selectedRoles?: RoleType[] | null
   ): void {
-    if (!subtasks.some(t => t.roleType === 'solver')) {
-      subtasks.unshift({
-        roleType: 'solver',
-        label: 'Core',
-        title: `Implement core logic for: ${objective}`,
-        targetFiles: []
-      });
+    const isAllowed = (role: RoleType): boolean => !selectedRoles || selectedRoles.includes(role);
+    if (isAllowed('solver') && !subtasks.some(t => t.roleType === 'solver')) {
+      subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [] });
     }
-    if (allFiles.some(f => RoleClassifier.isUiFile(f)) && !subtasks.some(t => t.roleType === 'ui')) {
-      subtasks.push({
-        roleType: 'ui',
-        label: 'UI',
-        title: `Refine UI layouts and themes for: ${objective}`,
-        targetFiles: []
-      });
+    if (isAllowed('ui') && allFiles.some(f => RoleClassifier.isUiFile(f)) && !subtasks.some(t => t.roleType === 'ui')) {
+      subtasks.push({ roleType: 'ui', label: 'UI', title: `Refine UI layouts: ${objective}`, targetFiles: [] });
     }
-    if (allFiles.some(f => f.endsWith('.md') || f.includes('docs/')) && !subtasks.some(t => t.roleType === 'docs')) {
-      subtasks.push({
-        roleType: 'docs',
-        label: 'Docs',
-        title: `Document specifications for: ${objective}`,
-        targetFiles: []
-      });
+    if (isAllowed('docs') && allFiles.some(f => f.endsWith('.md') || f.includes('docs/')) && !subtasks.some(t => t.roleType === 'docs')) {
+      subtasks.push({ roleType: 'docs', label: 'Docs', title: `Document specs: ${objective}`, targetFiles: [] });
     }
-    if (!subtasks.some(t => t.roleType === 'qa')) {
-      subtasks.push({
-        roleType: 'qa',
-        label: 'Audit',
-        title: `Audit, triage, and test: ${objective}`,
-        targetFiles: []
-      });
+    if (isAllowed('qa') && !subtasks.some(t => t.roleType === 'qa')) {
+      subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
     }
   }
 
