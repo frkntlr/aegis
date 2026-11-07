@@ -55,7 +55,15 @@ const TURKISH_SYNONYMS: Record<string, string[]> = {
   'dokümantasyon': ['doc', 'docs', 'wiki'],
   'dokumantasyon': ['doc', 'docs', 'wiki'],
   'hafıza': ['memory', 'cache'],
-  'bellek': ['memory', 'cache']
+  'bellek': ['memory', 'cache'],
+  'çoklu': ['multi', 'teamwork', 'parallel'],
+  'coklu': ['multi', 'teamwork', 'parallel'],
+  'ajan': ['agent', 'subagent', 'teamwork'],
+  'dağıt': ['shard', 'dispatch', 'distribute'],
+  'dagit': ['shard', 'dispatch', 'distribute'],
+  'böl': ['decompose', 'shard', 'split'],
+  'bol': ['decompose', 'shard', 'split'],
+  'performans': ['performance', 'speed', 'optimization']
 };
 
 const ALLOWED_EXTS = new Set([

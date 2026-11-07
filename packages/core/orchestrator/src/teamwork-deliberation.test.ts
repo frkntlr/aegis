@@ -47,6 +47,21 @@ test('SemanticAIDecomposer detects architectural domains accurately', () => {
   assert.ok(domains5.includes('ui_presentation'));
 });
 
+test('SemanticAIDecomposer detects bilingual domains and complex multi-agent goals accurately', () => {
+  const domainsTR = SemanticAIDecomposer.detectDomains('Çoklu ajan koordinasyonunu sağla ve iletişim protokolünü optimize et');
+  assert.ok(domainsTR.includes('state_machine'));
+  assert.ok(domainsTR.includes('data_flow'));
+  assert.ok(domainsTR.includes('infrastructure'));
+
+  const domainsTw = SemanticAIDecomposer.detectDomains('TW komut dağıtımı ve denetim dogrulamasi yap');
+  assert.ok(domainsTw.includes('api_surface'));
+  assert.ok(domainsTw.includes('validation_safety'));
+
+  const domainsComplex = SemanticAIDecomposer.detectDomains('Multi-agent coordination and concurrent state transition');
+  assert.ok(domainsComplex.includes('state_machine'));
+  assert.ok(domainsComplex.includes('data_flow'));
+});
+
 test('SemanticAIDecomposer infers state machine transitions and data flow pipelines', () => {
   const domains = SemanticAIDecomposer.detectDomains('State machine pipeline and safety validation');
   const transitions = SemanticAIDecomposer.inferStateTransitions('State machine workflow', domains);

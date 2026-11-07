@@ -11,7 +11,7 @@ import {
   type SubagentProfile,
   getSubagentProfiles
 } from './teamwork-prompts.js';
-import { TeamworkDecomposer, TeamworkSharder, type DecomposedSubtask } from './teamwork-decomposer.js';
+import { TeamworkDecomposer, TeamworkSharder, TeamworkHierarchicalTree, type DecomposedSubtask } from './teamwork-decomposer.js';
 import { TeamworkTrackBuilder } from './teamwork-track-builder.js';
 import { TeamworkVisualizer } from './teamwork-visualizer.js';
 import { TeamworkGroundingEngine } from './teamwork-grounding.js';
@@ -30,10 +30,9 @@ import type { TeamworkTrack, TeamworkPlan, TeamworkStatusReport, ExecutionWave }
 
 export * from './teamwork-types.js';
 export {
-  TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer,
-  TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer,
-  TeamworkResearchSwarm, TeamworkAnalysisSwarm, TeamworkDeliberationEngine,
-  SemanticAIDecomposer, TeamworkReflectionEngine
+  TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine,
+  TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm, TeamworkAnalysisSwarm,
+  TeamworkDeliberationEngine, SemanticAIDecomposer, TeamworkReflectionEngine
 };
 
 export class TeamworkCoordinator {
@@ -112,6 +111,50 @@ export class TeamworkCoordinator {
     return this.cachedProfiles;
   }
 
+  private scaleSemanticSubtasks(
+    subtasks: DecomposedSubtask[],
+    files: string[],
+    objective: string,
+    target: number
+  ): DecomposedSubtask[] {
+    const solvers = subtasks.filter(t => t.roleType === 'solver');
+    TeamworkSharder.shardSolversByFiles(subtasks, files, objective);
+    TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
+    const scaled = (solvers.length <= 1 && subtasks.length < target)
+      ? TeamworkSharder.shardMaxConcurrency(subtasks, files, target)
+      : subtasks;
+    this.alignSubtaskPhases(scaled, files);
+    return scaled;
+  }
+
+  private alignSubtaskPhases(subtasks: DecomposedSubtask[], files: string[]): void {
+    for (const t of subtasks) {
+      if (t.roleType === 'ui' || t.roleType === 'solver') {
+        t.phase = 1;
+        t.dependsOn = [];
+      } else if (t.roleType === 'qa') {
+        t.phase = 2;
+        if (!t.dependsOn?.length) t.dependsOn = subtasks.filter(s => s.phase === 1).map(s => s.label);
+      } else if (t.roleType === 'docs') {
+        t.phase = 3;
+        const qaDeps = subtasks.filter(s => s.phase === 2).map(s => s.label);
+        t.dependsOn = qaDeps.length > 0 ? qaDeps : subtasks.filter(s => s.phase === 1).map(s => s.label);
+      }
+    }
+    if (files.length > 0) TeamworkSharder.partitionFiles(subtasks, files);
+  }
+
+  private reconcileSemanticSubtasks(subtasks: DecomposedSubtask[], files: string[], objective: string): void {
+    if (!subtasks.some(t => t.roleType === 'solver') && files.some(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'))) {
+      subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [], phase: 1, dependsOn: [] });
+    }
+    if (!subtasks.some(t => t.roleType === 'qa')) {
+      subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
+    }
+    TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
+    this.alignSubtaskPhases(subtasks, files);
+  }
+
   private resolveSubtasks(
     objective: string,
     files: string[],
@@ -128,13 +171,16 @@ export class TeamworkCoordinator {
   ): DecomposedSubtask[] {
     const isSemantic = Boolean(options?.semantic || options?.deliberate);
     if (isSemantic) {
-      const items = SemanticAIDecomposer.decompose(objective, files);
-      let subtasks = SemanticAIDecomposer.toDecomposedSubtasks(items);
+      let subtasks = SemanticAIDecomposer.toDecomposedSubtasks(SemanticAIDecomposer.decompose(objective, files));
       this.reconcileSemanticSubtasks(subtasks, files, objective);
-      if (options?.selectedRoles?.length) {
-        subtasks = subtasks.filter(t => options.selectedRoles!.includes(t.roleType));
+      const isScaling = Boolean(
+        complexity.tier === 'COMPLEX' || complexity.tier === 'HYPER_SCALE' ||
+        options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1)
+      );
+      if (isScaling) {
+        subtasks = this.scaleSemanticSubtasks(subtasks, files, objective, options?.maxConcurrency ?? complexity.optimalAgentCount);
       }
-      return subtasks;
+      return options?.selectedRoles?.length ? subtasks.filter(t => options.selectedRoles!.includes(t.roleType)) : subtasks;
     }
     const isScaling = Boolean((options?.maxConcurrency && options.maxConcurrency > 1) || options?.autoScale || options?.treeSpecialists);
     return TeamworkDecomposer.decompose(objective, files, {
@@ -142,32 +188,8 @@ export class TeamworkCoordinator {
       autoScale: options?.autoScale ?? (complexity.tier === 'HYPER_SCALE'),
       selectedRoles: options?.selectedRoles ?? (complexity.tier === 'TRIVIAL' && !options?.explicitRole && !isScaling ? complexity.suggestedRoles : undefined),
       explicitRole: options?.explicitRole,
-      treeSpecialists: options?.treeSpecialists ?? complexity.shouldEnableHierarchicalTree
+      treeSpecialists: options?.treeSpecialists ?? (complexity.shouldEnableHierarchicalTree && TeamworkHierarchicalTree.isHierarchicalRequested(objective))
     });
-  }
-
-  private reconcileSemanticSubtasks(subtasks: DecomposedSubtask[], files: string[], objective: string): void {
-    if (!subtasks.some(t => t.roleType === 'solver') && files.some(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'))) {
-      subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [], phase: 1, dependsOn: [] });
-    }
-    if (!subtasks.some(t => t.roleType === 'qa')) {
-      subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
-    }
-    TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
-    for (const t of subtasks) {
-      if (t.roleType === 'ui') {
-        t.phase = 1;
-        t.dependsOn = [];
-      } else if (t.roleType === 'qa') {
-        t.phase = 2;
-        if (!t.dependsOn?.length) t.dependsOn = subtasks.filter(s => s.phase === 1).map(s => s.label);
-      } else if (t.roleType === 'docs') {
-        t.phase = 3;
-        const qaDeps = subtasks.filter(s => s.phase === 2).map(s => s.label);
-        t.dependsOn = qaDeps.length > 0 ? qaDeps : subtasks.filter(s => s.phase === 1).map(s => s.label);
-      }
-    }
-    if (files.length > 0) TeamworkSharder.partitionFiles(subtasks, files);
   }
 
   public planTeamwork(
@@ -199,14 +221,10 @@ export class TeamworkCoordinator {
       this.stageTracksIntoInbox(planId, objective, allTracks, options?.acquireLocks ?? shouldStage);
       this.mesh.initializeMesh(planId, objective, allTracks);
     }
-    const baseSummary = `Teamwork Plan (${allTracks.length} tracks: ${allTracks.map(t => t.subagentName).join(', ')}).`;
-    const delibSummary = delibResult
-      ? ` Deliberation [${delibResult.consensus.status.toUpperCase()}]: ${delibResult.consensus.agreedStrategy} (Score: ${delibResult.consensus.consensusScore}%)`
-      : '';
-    const summary = `${baseSummary}${delibSummary}`;
+    const delibSummary = delibResult ? ` Deliberation [${delibResult.consensus.status.toUpperCase()}]: ${delibResult.consensus.agreedStrategy} (Score: ${delibResult.consensus.consensusScore}%)` : '';
+    const summary = `Teamwork Plan (${allTracks.length} tracks: ${allTracks.map(t => t.subagentName).join(', ')}).${delibSummary}`;
     return {
-      planId, objective, createdAt: new Date().toISOString(), tracks: allTracks,
-      summary, discoveredFiles: files, complexity,
+      planId, objective, createdAt: new Date().toISOString(), tracks: allTracks, summary, discoveredFiles: files, complexity,
       ...(delibResult ? { deliberation: delibResult, deliberationSummary: delibSummary.trim() } : {})
     };
   }
@@ -248,30 +266,17 @@ export class TeamworkCoordinator {
 
   public advanceWave(planId?: string): { advanced: boolean; currentWave: number; nextPhase: string; nextBatchPayload: unknown[] } {
     const meshRes = this.mesh.advanceWave(planId);
-    const nextPhase = meshRes.nextWave === 2
-      ? 'QA Hunter Verification'
-      : (meshRes.nextWave === 3 ? 'Living Architecture Synthesis' : 'Final Delivery');
+    const nextPhase = meshRes.nextWave === 2 ? 'QA Hunter Verification' : (meshRes.nextWave === 3 ? 'Living Architecture Synthesis' : 'Final Delivery');
     const nextBatchPayload = this.mesh.listPeers().filter(p => p.currentActivity.includes(`Wave ${meshRes.nextWave}`));
-    return {
-      advanced: meshRes.advanced,
-      currentWave: meshRes.nextWave,
-      nextPhase,
-      nextBatchPayload
-    };
+    return { advanced: meshRes.advanced, currentWave: meshRes.nextWave, nextPhase, nextBatchPayload };
   }
 
   public getTeamworkStatus(): TeamworkStatusReport {
-    const locksMap = this.worktreeManager.getLockedFiles();
-    const locks: Record<string, string> = {};
-    for (const [k, v] of locksMap.entries()) locks[k] = v;
+    const locks: Record<string, string> = Object.fromEntries(this.worktreeManager.getLockedFiles().entries());
     const pendingCount = countPendingInboxHelper(this.repoRoot);
-
     return {
-      activeTracksCount: pendingCount,
-      lockedFilesCount: Object.keys(locks).length,
-      pendingInboxCount: pendingCount,
-      profiles: this.listProfiles(),
-      locks
+      activeTracksCount: pendingCount, lockedFilesCount: Object.keys(locks).length,
+      pendingInboxCount: pendingCount, profiles: this.listProfiles(), locks
     };
   }
 }

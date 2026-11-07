@@ -89,3 +89,15 @@ test('FastSemanticAnalyzer creates and utilizes persistent disk cache with git i
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('FastSemanticAnalyzer expands Turkish multi-agent and task synonyms', () => {
+  const analyzer = new FastSemanticAnalyzer();
+  const kw = analyzer.extractKeywords('çoklu ajan mimarisinde görevleri dağıt, parçalara böl ve performans optimizasyonu sağla');
+  assert.ok(kw.includes('multi'));
+  assert.ok(kw.includes('teamwork'));
+  assert.ok(kw.includes('agent'));
+  assert.ok(kw.includes('shard'));
+  assert.ok(kw.includes('decompose'));
+  assert.ok(kw.includes('performance'));
+});
+

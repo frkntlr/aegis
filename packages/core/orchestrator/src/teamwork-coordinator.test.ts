@@ -233,3 +233,20 @@ test('TeamworkCoordinator integrates SemanticAIDecomposer and embeds deliberatio
   }
 });
 
+test('TeamworkCoordinator scales semantic subtasks in parallel for complex and autoScale missions', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-sem-scale-test-'));
+  try {
+    const coordinator = new TeamworkCoordinator(tmpDir);
+    const plan = coordinator.planTeamwork(
+      'Aegis teamwork çoklu ajan mimarisini dağıt ve haberleşmeyi optimize et',
+      ['packages/core/orchestrator/src/a.ts', 'packages/cli/src/b.ts'],
+      { semantic: true, autoScale: true, maxConcurrency: 6 }
+    );
+    assert.ok(plan.tracks.length >= 4);
+    assert.ok(plan.tracks.some(t => t.roleType === 'solver'));
+    assert.ok(plan.tracks.some(t => t.roleType === 'qa'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+

@@ -20,53 +20,108 @@ interface DomainKeywordRule {
 const DOMAIN_RULES: DomainKeywordRule[] = [
   {
     domain: 'state_machine',
-    keywords: ['state', 'durum', 'transition', 'gecis', 'fsm', 'lifecycle', 'workflow', 'phase', 'wave', 'stage', 'lock', 'mutex'],
-    fileExtensions: ['-mutex.ts', '-lock-', '-lifecycle', '-waves.ts']
+    keywords: [
+      'state', 'durum', 'transition', 'gecis', 'geçiş', 'fsm', 'lifecycle',
+      'workflow', 'phase', 'wave', 'stage', 'lock', 'mutex', 'dağıt', 'dagit',
+      'böl', 'bol', 'shard', 'paralel', 'parallel', 'concurrency', 'eş zamanlı',
+      'es zamanli', 'çoklu', 'coklu', 'multi-agent', 'koordinasyon', 'coordination',
+      'orkestrasyon', 'orchestration'
+    ],
+    fileExtensions: ['-mutex.ts', '-lock-', '-lifecycle', '-waves.ts', '-fsm.ts', '-state.ts']
   },
   {
     domain: 'data_flow',
-    keywords: ['data', 'flow', 'pipeline', 'stream', 'store', 'mesh', 'event', 'bus', 'transform', 'verı', 'akış', 'persist', 'inbox'],
-    fileExtensions: ['-mesh.ts', '-store.ts', '-inbox.ts', '-stream.ts']
+    keywords: [
+      'data', 'flow', 'pipeline', 'stream', 'store', 'mesh', 'event', 'bus',
+      'transform', 'verı', 'veri', 'akış', 'akis', 'persist', 'inbox', 'bağlam',
+      'baglam', 'haberleşme', 'haberlesme', 'iletişim', 'iletisim', 'mesaj',
+      'senkronizasyon', 'message', 'sync', 'context', 'channel', 'kanal', 'ileti'
+    ],
+    fileExtensions: ['-mesh.ts', '-store.ts', '-inbox.ts', '-stream.ts', '-event.ts']
   },
   {
     domain: 'api_surface',
-    keywords: ['api', 'cli', 'command', 'endpoint', 'interface', 'komut', 'mcp', 'router', 'tool', 'handler', 'route'],
-    fileExtensions: ['-command.ts', 'commands/', '-adapter.ts', '-launcher.ts']
+    keywords: [
+      'api', 'cli', 'command', 'endpoint', 'interface', 'komut', 'mcp', 'router',
+      'tool', 'handler', 'route', 'tw', 'teamwork', 'aegis', 'dağıtım', 'dagitim',
+      'dispatch', 'gateway', 'controller', 'entrypoint', 'arayuz', 'surface'
+    ],
+    fileExtensions: ['-command.ts', 'commands/', '-adapter.ts', '-launcher.ts', '-router.ts']
   },
   {
     domain: 'validation_safety',
-    keywords: ['audit', 'test', 'validate', 'dogrula', 'doğrula', 'safety', 'guard', 'güvenlik', 'kafes', 'cage', 'invariant', 'check', 'risk'],
-    fileExtensions: ['.test.ts', '.spec.ts', '-validator.ts', '-rules.ts']
+    keywords: [
+      'audit', 'test', 'validate', 'dogrula', 'doğrula', 'safety', 'guard',
+      'güvenlik', 'guvenlik', 'kafes', 'cage', 'invariant', 'check', 'risk',
+      'qa', 'hunter', 'denetim', 'kalite', 'bug', 'kusur', 'hata', 'dogrulama',
+      'doğrulama', 'triage', 'teftis', 'teftiş', 'verification'
+    ],
+    fileExtensions: ['.test.ts', '.spec.ts', '-validator.ts', '-rules.ts', '-safety.ts']
   },
   {
     domain: 'ui_presentation',
-    keywords: ['ui', 'theme', 'hud', 'view', 'ekran', 'matrix', 'visual', 'görsel', 'format', 'ascii', 'display', 'table', 'dag', 'render', 'dashboard'],
+    keywords: [
+      'ui', 'theme', 'hud', 'view', 'ekran', 'matrix', 'visual', 'görsel',
+      'gorsel', 'format', 'ascii', 'display', 'table', 'dag', 'render',
+      'dashboard', 'tema', 'paneli', 'sunum', 'arayüz'
+    ],
     fileExtensions: ['.tres', '.theme', 'ui/', '-visualizer.ts']
   },
   {
     domain: 'infrastructure',
-    keywords: ['worktree', 'git', 'fs', 'io', 'process', 'daemon', 'timer', 'sync', 'file', 'altyapı', 'dosya', 'toolchain'],
-    fileExtensions: ['worktree-', '-sync.ts', 'scripts/']
+    keywords: [
+      'worktree', 'git', 'fs', 'io', 'process', 'daemon', 'timer', 'sync',
+      'file', 'altyapı', 'altyapi', 'dosya', 'toolchain', 'performans',
+      'performance', 'optimizasyon', 'optimization', 'optimize', 'hız', 'hiz',
+      'kaynak', 'resource', 'memory', 'bellek', 'cpu', 'cache'
+    ],
+    fileExtensions: ['worktree-', '-sync.ts', 'scripts/', '-cache.ts']
   },
   {
     domain: 'documentation',
-    keywords: ['doc', 'spec', 'wiki', 'rfc', 'rehber', 'belge', 'markdown', 'dokuman', 'doküman', 'readme'],
+    keywords: [
+      'doc', 'spec', 'wiki', 'rfc', 'rehber', 'belge', 'markdown', 'dokuman',
+      'doküman', 'readme', 'kılavuz', 'kilavuz', 'açıklama', 'aciklama'
+    ],
     fileExtensions: ['.md', 'docs/', 'wiki/']
   }
 ];
 
 export class SemanticAIDecomposer {
+  public static normalizeText(text: string): string {
+    return text.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ı/g, 'i')
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c');
+  }
+
   public static detectDomains(objective: string, files: string[] = []): ArchitecturalDomain[] {
     const lowerObj = objective.toLowerCase();
+    const normObj = this.normalizeText(lowerObj);
+    const words = new Set(normObj.split(/[\s,.;:!?()[\]{}"'`\\/+-]+/).filter(Boolean));
+    const origWords = new Set(lowerObj.split(/[\s,.;:!?()[\]{}"'`\\/+-]+/).filter(Boolean));
     const normalizedFiles = files.map(f => f.toLowerCase().replace(/\\/g, '/'));
     const matched = new Set<ArchitecturalDomain>();
 
     for (const rule of DOMAIN_RULES) {
-      const textMatch = rule.keywords.some(kw => lowerObj.includes(kw));
+      const textMatch = rule.keywords.some(kw => {
+        const normKw = this.normalizeText(kw);
+        return kw.length <= 3 ? (origWords.has(kw) || words.has(normKw)) : (lowerObj.includes(kw) || normObj.includes(normKw));
+      });
       const fileMatch = normalizedFiles.some(f => rule.fileExtensions.some(ext => f.includes(ext)));
-      if (textMatch || fileMatch) {
-        matched.add(rule.domain);
-      }
+      if (textMatch || fileMatch) matched.add(rule.domain);
+    }
+
+    const isCoordination = normObj.includes('multi-agent') || normObj.includes('coklu') ||
+      normObj.includes('koordinasyon') || normObj.includes('coordination') || normObj.includes('orkestrasyon');
+    if (isCoordination) {
+      matched.add('state_machine');
+      matched.add('data_flow');
     }
 
     if (matched.size === 0) {
@@ -148,12 +203,9 @@ export class SemanticAIDecomposer {
     targetFiles: string[] = [],
     forcedDomains?: ArchitecturalDomain[]
   ): SemanticDecompositionItem[] {
-    const domains = forcedDomains && forcedDomains.length > 0
-      ? forcedDomains
-      : this.detectDomains(objective, targetFiles);
+    const domains = forcedDomains && forcedDomains.length > 0 ? forcedDomains : this.detectDomains(objective, targetFiles);
     const stateTransitions = this.inferStateTransitions(objective, domains);
     const dataFlows = this.inferDataFlows(objective, domains);
-
     const foundationLabels: string[] = [];
     const items: SemanticDecompositionItem[] = [];
 
@@ -163,24 +215,19 @@ export class SemanticAIDecomposer {
       const isFoundation = role === 'solver';
       const phase = isFoundation ? 1 : (role === 'docs' ? 3 : 2);
       const dependsOn = isFoundation ? [] : (role === 'docs' ? ['SafetyGate'] : [...foundationLabels]);
-
       if (isFoundation) foundationLabels.push(label);
 
       items.push({
         id: `sem-${domain}-${Math.random().toString(36).slice(2, 6)}`,
-        domain,
-        role,
-        label,
+        domain, role, label,
         title: `${label}: Implement and align ${domain.replace('_', ' ')} for "${objective}"`,
         rationale: `Architectural domain ${domain} isolated for non-conflicting parallel execution.`,
         stateTransitions: stateTransitions.slice(0, 2),
         dataFlows: dataFlows.slice(0, 2),
         targetFiles: this.partitionFilesForDomain(domain, targetFiles),
-        dependsOn,
-        phase
+        dependsOn, phase
       });
     }
-
     return items;
   }
 

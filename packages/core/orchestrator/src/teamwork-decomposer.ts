@@ -28,7 +28,44 @@ export interface DecomposeOptions {
 }
 
 export class TeamworkDecomposer {
-  private static readonly STOP_WORDS = new Set(['ve', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de', 'hala', 'başka', 'daha', 'cok', 'çok', 'ise', 'gibi']);
+  private static readonly STOP_WORDS = new Set([
+    've', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de',
+    'hala', 'hâlâ', 'başka', 'daha', 'cok', 'çok', 'ise', 'gibi',
+    'tam', 'bununla', 'buna', 'bunu', 'ilgili', 'görevi', 'gorevi',
+    'görev', 'gorev', 'üzerine', 'uzerine', 'çalışma', 'calisma',
+    'çalış', 'calis', 'duruyor', 'zorluk', 'olan', 'olarak', 'için', 'icin'
+  ]);
+
+  private static readonly FALLBACK_LABELS = [
+    'MultiAgent',
+    'TaskSharder',
+    'PerformanceRadar',
+    'MeshProtocol',
+    'GateAudit'
+  ] as const;
+
+  private static resolveDomainWord(word: string): string | null {
+    const lower = word.toLowerCase();
+    if (/^(multi|ajan|agent|paralel|team|coklu|çoklu)$/.test(lower)) return 'MultiAgent';
+    if (/^(shard|bolmekte|bölmekte|dagitmakta|dağıtmakta|sharder)$/.test(lower)) return 'TaskSharder';
+    if (/^(bug|radar|speed)$/.test(lower)) return 'PerformanceRadar';
+    return null;
+  }
+
+  private static resolveFallbackLabel(title: string): string {
+    const lower = title.toLowerCase();
+    if (/multi|ajan|agent|paralel|team/.test(lower)) return 'MultiAgent';
+    if (/shard|böl|bol|dağıt|dagit|part|parça|parca/.test(lower)) return 'TaskSharder';
+    if (/performans|hız|hiz|radar|optimi|speed|bug/.test(lower)) return 'PerformanceRadar';
+    if (/mesh|protokol|protocol|iletisim|iletişim|sync/.test(lower)) return 'MeshProtocol';
+    if (/audit|gate|kafes|cage|denetim|test/.test(lower)) return 'GateAudit';
+    let hash = 0;
+    for (let i = 0; i < title.length; i++) {
+      hash = ((hash << 5) - hash) + title.charCodeAt(i);
+      hash |= 0;
+    }
+    return this.FALLBACK_LABELS[Math.abs(hash) % this.FALLBACK_LABELS.length];
+  }
 
   public static decompose(
     objective: string,
@@ -138,9 +175,14 @@ export class TeamworkDecomposer {
     if (role === 'ui') return 'UI';
     if (role === 'docs') return 'Docs';
     if (role === 'qa') return 'Audit';
-    if (words.length === 0) return 'Core';
+    if (words.length === 0) return this.resolveFallbackLabel(title);
     const candidate = words[0].replace(/[^a-zA-Z0-9_\u00C0-\u017F]/g, '');
-    return candidate ? candidate.charAt(0).toUpperCase() + candidate.slice(1).slice(0, 15) : 'Core';
+    if (!candidate || candidate.length < 3 || this.STOP_WORDS.has(candidate.toLowerCase())) {
+      return this.resolveFallbackLabel(title);
+    }
+    const domainWord = this.resolveDomainWord(candidate);
+    if (domainWord) return domainWord;
+    return candidate.charAt(0).toUpperCase() + candidate.slice(1).slice(0, 15);
   }
 
   private static classifyRawItem(raw: string): { roleType: RoleType; label: string; title: string } {

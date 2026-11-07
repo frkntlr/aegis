@@ -43,8 +43,8 @@ export const ROLE_SPECIALISTS: Record<RoleType, MicroSpecialistDef[]> = {
 export class TeamworkHierarchicalTree {
   public static detectSelectedRoles(objective: string, explicitRole?: string): RoleType[] | null {
     if (explicitRole) {
-      const norm = explicitRole.toLowerCase().trim() as RoleType;
-      if (norm === 'qa' || norm === 'solver' || norm === 'ui' || norm === 'docs') return [norm];
+      const norm = this.normalizeRoleName(explicitRole);
+      if (norm) return [norm];
     }
 
     const lower = objective.toLowerCase();
@@ -54,10 +54,16 @@ export class TeamworkHierarchicalTree {
       if (parsed) return [parsed];
     }
 
-    if (/\b(?:qa-hunter|qa\s+hunter|yalnızca\s+qa|sadece\s+qa|only\s+qa)\b/.test(lower)) return ['qa'];
-    if (/\b(?:issue-solver|issue\s+solver|yalnızca\s+solver|sadece\s+solver|only\s+solver)\b/.test(lower)) return ['solver'];
-    if (/\b(?:ui-specialist|ui\s+specialist|yalnızca\s+ui|sadece\s+ui|only\s+ui)\b/.test(lower)) return ['ui'];
-    if (/\b(?:doc-architect|doc\s+architect|yalnızca\s+doc|sadece\s+doc|only\s+doc)\b/.test(lower)) return ['docs'];
+    const rolePattern = '(?:qa(?:[- ]hunter)?|issue[- ]solver|solver|ui(?:[- ]specialist)?|docs?|doc[- ]architect)';
+    const restrictiveRegex = new RegExp(`(?:\\b(?:sadece|yalnızca|only)\\s+(${rolePattern})\\b)|(?:\\b(${rolePattern})\\s+(?:only|altında|altinda)\\b)|(?:\\bunder\\s+(${rolePattern})\\b)`);
+    const match = lower.match(restrictiveRegex);
+    if (match) {
+      const captured = match[1] ?? match[2] ?? match[3];
+      if (captured) {
+        const parsed = this.normalizeRoleName(captured);
+        if (parsed) return [parsed];
+      }
+    }
 
     return null;
   }
@@ -110,10 +116,11 @@ export class TeamworkHierarchicalTree {
   }
 
   private static normalizeRoleName(raw: string): RoleType | null {
-    if (raw.includes('qa')) return 'qa';
-    if (raw.includes('solver') || raw.includes('issue')) return 'solver';
-    if (raw.includes('ui')) return 'ui';
-    if (raw.includes('doc')) return 'docs';
+    const norm = raw.trim().toLowerCase().replace(/\s+/g, '-');
+    if (norm === 'qa' || norm === 'qa-hunter') return 'qa';
+    if (norm === 'solver' || norm === 'issue-solver') return 'solver';
+    if (norm === 'ui' || norm === 'ui-specialist') return 'ui';
+    if (norm === 'doc' || norm === 'docs' || norm === 'doc-architect') return 'docs';
     return null;
   }
 
