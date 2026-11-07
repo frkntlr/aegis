@@ -23,6 +23,7 @@ import { stageTracksIntoInboxHelper, exportSubagentManifestHelper, countPendingI
 import { TaskComplexityAnalyzer } from './task-complexity-analyzer.js';
 import { TeamworkResearchSwarm } from './teamwork-research-swarm.js';
 import { TeamworkAnalysisSwarm } from './teamwork-analysis-swarm.js';
+import { TeamworkDeliberationEngine, type DeliberationResult, type DeliberationOptions } from './teamwork-deliberation.js';
 import type {
   TeamworkTrack,
   TeamworkPlan,
@@ -31,7 +32,7 @@ import type {
 } from './teamwork-types.js';
 
 export * from './teamwork-types.js';
-export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm, TeamworkAnalysisSwarm };
+export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm, TeamworkAnalysisSwarm, TeamworkDeliberationEngine };
 
 export class TeamworkCoordinator {
   private repoRoot: string;
@@ -41,6 +42,7 @@ export class TeamworkCoordinator {
   private _semanticAnalyzer?: FastSemanticAnalyzer;
   private _compactEngine?: TeamworkCompactEngine;
   private _mesh?: TeamworkMesh;
+  private _deliberationEngine?: TeamworkDeliberationEngine;
   private cachedProfiles?: SubagentProfile[];
 
   constructor(repoRoot?: string, wtManager?: WorktreeManager, roleClassifier?: RoleClassifier, grounding?: TeamworkGroundingEngine) {
@@ -124,6 +126,21 @@ export class TeamworkCoordinator {
     return this.compactEngine;
   }
 
+  public get deliberationEngine(): TeamworkDeliberationEngine {
+    if (!this._deliberationEngine) {
+      this._deliberationEngine = new TeamworkDeliberationEngine(this.repoRoot);
+    }
+    return this._deliberationEngine;
+  }
+
+  public getDeliberationEngine(): TeamworkDeliberationEngine {
+    return this.deliberationEngine;
+  }
+
+  public deliberate(objective: string, files: string[] = [], options?: DeliberationOptions): DeliberationResult {
+    return this.deliberationEngine.deliberate(objective, files, options);
+  }
+
   public listProfiles(): SubagentProfile[] {
     if (!this.cachedProfiles) this.cachedProfiles = getSubagentProfiles();
     return this.cachedProfiles;
@@ -152,12 +169,15 @@ export class TeamworkCoordinator {
       deterministic?: boolean; stage?: boolean; acquireLocks?: boolean;
       maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[];
       explicitRole?: string; treeSpecialists?: boolean; research?: boolean;
-      deepAnalyze?: boolean;
+      deepAnalyze?: boolean; deliberate?: boolean;
     }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
     const shouldStage = options?.stage ?? true;
     const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
+    if (options?.deliberate) {
+      this.deliberate(objective, files);
+    }
     if (options?.deepAnalyze || TeamworkAnalysisSwarm.isDeepAnalysisRequested(objective)) {
       new TeamworkAnalysisSwarm(this.repoRoot).runAnalysisSwarmSync(objective, files);
     }

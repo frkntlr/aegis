@@ -11,6 +11,8 @@ import {
   handleTeamworkBatch,
   handleTeamworkDoc,
   handleTeamworkAdvance,
+  handleTeamworkReflect,
+  handleTeamworkIterate,
   mcpTeamworkMeshRead,
   mcpTeamworkMeshPost,
   mcpTeamworkBroadcast,
@@ -121,5 +123,9 @@ test('CLI mesh handlers run without exceptions', () => {
   assert.doesNotThrow(() => handleTeamworkDoc());
   assert.doesNotThrow(() => handleTeamworkDoc('--compact'));
   assert.doesNotThrow(() => handleTeamworkAdvance());
+  assert.doesNotThrow(() => handleTeamworkReflect());
+  assert.doesNotThrow(() => handleTeamworkReflect('--json'));
+  assert.doesNotThrow(() => handleTeamworkIterate());
+  assert.doesNotThrow(() => handleTeamworkIterate('--json'));
   assert.doesNotThrow(() => handleTeamworkMesh('clear'));
 });

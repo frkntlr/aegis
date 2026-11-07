@@ -32,10 +32,7 @@ export function handleTeamworkStatus(flag?: string): void {
   const coordinator = new TeamworkCoordinator();
   const status = coordinator.getTeamworkStatus();
 
-  if (isJson) {
-    console.log(JSON.stringify(status, null, 2));
-    return;
-  }
+  if (isJson) { console.log(JSON.stringify(status, null, 2)); return; }
 
   showBanner();
   console.log('🤝 Aegis Antigravity Teamwork Status:');
@@ -59,10 +56,7 @@ export function handleTeamworkClear(flag?: string): void {
   const coordinator = new TeamworkCoordinator();
   const locksCleared = coordinator.worktreeManager.clearAllLocks();
   const tasksCleared = clearInboxTasks();
-  if (isJson) {
-    console.log(JSON.stringify({ success: true, tasksCleared, locksCleared }, null, 2));
-    return;
-  }
+  if (isJson) { console.log(JSON.stringify({ success: true, tasksCleared, locksCleared }, null, 2)); return; }
   showBanner();
   console.log(`🧹 Teamwork reset: Cleared ${tasksCleared} task(s) and released ${locksCleared} lock(s).`);
 }
@@ -138,23 +132,13 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
 
   const coordinator = new TeamworkCoordinator();
   const plan = coordinator.planTeamwork(objectiveArg.trim(), files, {
-    stage: !flags.dryRun,
-    acquireLocks: !flags.dryRun,
-    maxConcurrency: flags.maxConcurrency,
-    explicitRole: flags.explicitRole,
-    treeSpecialists: flags.treeSpecialists,
-    research: flags.research,
-    deepAnalyze: flags.deepAnalyze
+    stage: !flags.dryRun, acquireLocks: !flags.dryRun,
+    maxConcurrency: flags.maxConcurrency, explicitRole: flags.explicitRole,
+    treeSpecialists: flags.treeSpecialists, research: flags.research, deepAnalyze: flags.deepAnalyze
   });
 
-  if (flags.json) {
-    console.log(JSON.stringify(plan, null, 2));
-    return plan;
-  }
-  if (flags.compact) {
-    console.log(coordinator.compactTeamwork(plan));
-    return plan;
-  }
+  if (flags.json) { console.log(JSON.stringify(plan, null, 2)); return plan; }
+  if (flags.compact) { console.log(coordinator.compactTeamwork(plan)); return plan; }
 
   printPlanSummary(plan, files, flags, coordinator);
   return plan;
@@ -195,6 +179,7 @@ function routeMeshSubcommands(norm: string, all: string[]): boolean {
   if (norm === 'tools' || norm === 'tool' || norm === 'arsenal') { handleTeamworkTools(all[1], ...all.slice(2)); return true; }
   if (norm === 'gh' || norm === 'github') { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); return true; }
   if (norm === 'swarm') { void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(all[1], ...all.slice(2))); return true; }
+  if (norm === 'deliberate' || norm === 'deliberation') { void import('./teamwork-deliberate-command.js').then(m => m.handleTeamworkDeliberate(all[1], ...all.slice(2))); return true; }
   return false;
 }
 
@@ -252,14 +237,12 @@ export function handleTeamworkAnalyze(objectiveArg?: string, ...files: string[])
 
 export function mcpTeamworkPlan(args: Record<string, unknown> = {}): string {
   const objective = String(args.objective || '');
-  if (!objective) {
-    return JSON.stringify({ error: 'Missing required argument: objective' });
-  }
+  if (!objective) return JSON.stringify({ error: 'Missing required argument: objective' });
   const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
   const coordinator = new TeamworkCoordinator();
-  const maxConcurrency = typeof args.maxConcurrency === "number" ? args.maxConcurrency : undefined;
-  const explicitRole = typeof args.role === "string" ? args.role : undefined;
-  const treeSpecialists = typeof args.treeSpecialists === "boolean" ? args.treeSpecialists : undefined;
+  const maxConcurrency = typeof args.maxConcurrency === 'number' ? args.maxConcurrency : undefined;
+  const explicitRole = typeof args.role === 'string' ? args.role : undefined;
+  const treeSpecialists = typeof args.treeSpecialists === 'boolean' ? args.treeSpecialists : undefined;
   const plan = coordinator.planTeamwork(objective, targetFiles, { maxConcurrency, explicitRole, treeSpecialists });
   return JSON.stringify(plan, null, 2);
 }

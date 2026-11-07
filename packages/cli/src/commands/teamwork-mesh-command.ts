@@ -10,6 +10,7 @@ import {
   TeamworkCoordinator,
   TeamworkDecomposer,
   TeamworkDocSynthesizer,
+  TeamworkReflectionEngine,
   formatAegisToolMatrix,
   ROLE_AEGIS_TOOLS,
   computeExecutionWaves,
@@ -198,14 +199,8 @@ export function handleTeamworkWaves(objectiveArg?: string, ...filesOrFlags: stri
   const plan = coordinator.planTeamwork(objectiveArg || 'Active Mission', files, { stage: false, acquireLocks: false });
   const waves = computeExecutionWaves(plan.tracks);
 
-  if (isJson) {
-    console.log(JSON.stringify(waves, null, 2));
-    return;
-  }
-  if (isCompact) {
-    console.log(formatCompactWaveBriefing(waves));
-    return;
-  }
+  if (isJson) { console.log(JSON.stringify(waves, null, 2)); return; }
+  if (isCompact) { console.log(formatCompactWaveBriefing(waves)); return; }
   showBanner();
   console.log(formatParallelDispatchBriefing(waves));
 }
@@ -254,4 +249,22 @@ export function mcpTeamworkTools(args: Record<string, unknown> = {}): string {
   return formatAegisToolMatrix(role);
 }
 
+export function handleTeamworkReflect(planId?: string, ...flags: string[]): void {
+  const isJson = flags.includes('--json') || flags.includes('-j') || planId === '--json' || planId === '-j';
+  const pid = planId && !planId.startsWith('-') ? planId : undefined;
+  const engine = new TeamworkReflectionEngine();
+  const res = engine.evaluateCompleteness(pid);
+  if (isJson) { console.log(JSON.stringify(res, null, 2)); return; }
+  showBanner();
+  console.log(engine.formatReflectionReport(res));
+}
 
+export function handleTeamworkIterate(planId?: string, ...flags: string[]): void {
+  const isJson = flags.includes('--json') || flags.includes('-j') || planId === '--json' || planId === '-j';
+  const pid = planId && !planId.startsWith('-') ? planId : undefined;
+  const engine = new TeamworkReflectionEngine();
+  const res = engine.runFeedbackLoop(pid);
+  if (isJson) { console.log(JSON.stringify(res, null, 2)); return; }
+  showBanner();
+  console.log(engine.formatIterationReport(res));
+}

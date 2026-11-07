@@ -28,6 +28,9 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis tw:batch [planId]                Print parallel execution batches ready for simultaneous dispatch',
     '  aegis tw:doc [planId] [--compact]      Synthesize human-centric living architecture report & metrics',
     '  aegis tw:advance [planId]              Smoothly advance active wave to next execution phase',
+    '  aegis tw:deliberate "<obj>"            Multi-agent blackboard deliberation & semantic AI decomposition',
+    '  aegis tw:reflect [planId]              Reflective evaluation of mission completeness & gaps',
+    '  aegis tw:iterate [planId]              Self-correction feedback loop: inject tasks & advance wave',
     '  aegis tw:push [--dry-run]              Autonomously push verified teamwork changes to GitHub',
     '  aegis prompt [role|id] [id]            Compile surgical AST prompt caching context',
     '  aegis contribute <issue> [agent]       Prepare isolated worktree & prompt for contribution'

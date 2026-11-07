@@ -17,7 +17,7 @@ const PARITY_SUBCOMMANDS = [
   'status', 'plan', 'setup', 'matrix', 'dag', 'analyze',
   'compact', 'clear', 'mesh', 'peers', 'post', 'broadcast',
   'waves', 'conflicts', 'radar', 'scale', 'batch', 'doc',
-  'synthesize', 'advance', 'tools', 'push'
+  'synthesize', 'advance', 'tools', 'deliberate', 'push'
 ] as const;
 
 beforeEach(() => {
@@ -107,6 +107,7 @@ test('all remaining tr subcommands execute without exception', async () => {
     await COMMAND_MAP['tr:analyze'](['tr:analyze', 'Analyze objective']);
     await COMMAND_MAP['tr:compact'](['tr:compact', 'Compact objective']);
     await COMMAND_MAP['tr:synthesize'](['tr:synthesize', '--compact']);
+    await COMMAND_MAP['tr:deliberate'](['tr:deliberate', 'Parity test objective', '--no-mesh']);
     await COMMAND_MAP['tr:advance'](['tr:advance']);
     await COMMAND_MAP['tr:clear'](['tr:clear']);
   });

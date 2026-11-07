@@ -34,3 +34,7 @@ export * from './teamwork-analysis-mesh.js';
 export * from './teamwork-analysis-lenses.js';
 export * from './teamwork-ui-lens.js';
 export * from './teamwork-analysis-swarm.js';
+export * from './teamwork-deliberation-types.js';
+export * from './semantic-ai-decomposer.js';
+export * from './teamwork-deliberation.js';
+export * from './teamwork-reflection.js';
