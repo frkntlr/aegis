@@ -7,6 +7,7 @@ import { handleRfcPipeline } from './rfc-pipeline-command.js';
 import { readTaskInbox, writeTaskInbox } from './task-inbox.js';
 
 test('handleRfcPipeline decomposes RFC into issue and stages in task-inbox', async () => {
+  process.env.AEGIS_TEST = '1';
   const root = resolveSafeRepoRoot();
   const rfcDir = path.resolve(root, 'docs', 'rfc');
   fs.mkdirSync(rfcDir, { recursive: true });

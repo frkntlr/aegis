@@ -114,6 +114,9 @@ function printPlanSummary(
   console.log(`🎯 Aegis Teamwork Plan Created: ${plan.planId}`);
   console.log(` • Objective: "${plan.objective}"`);
   console.log(` • Summary: ${plan.summary}`);
+  if (plan.complexity) {
+    console.log(` • ⚡ Complexity Radar: [${plan.complexity.tier}] (${plan.complexity.score}/100) -> Auto-allocated: ${plan.complexity.optimalAgentCount} agents`);
+  }
   if (plan.discoveredFiles && plan.discoveredFiles.length > 0 && files.length === 0) {
     console.log(` • ⚡ Fast Semantic Discovery: ${plan.discoveredFiles.length} file(s) auto-bound: [${plan.discoveredFiles.join(', ')}]`);
   }

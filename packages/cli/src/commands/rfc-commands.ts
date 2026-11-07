@@ -82,8 +82,12 @@ interface CreateDiscussionData {
   };
 }
 
+function isTestEnv(): boolean {
+  return process.env.NODE_ENV === 'test' || Boolean(process.env.AEGIS_TEST) || Boolean(process.env.VITEST) || Boolean(process.env.NODE_TEST_CONTEXT);
+}
+
 async function publishDiscussion(auth: { token?: string; owner?: string; repo?: string }, title: string, body: string): Promise<string | undefined> {
-  if (!auth.token || !auth.owner || !auth.repo) return undefined;
+  if (isTestEnv() || !auth.token || !auth.owner || !auth.repo) return undefined;
   const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
   try {
     const repoData = await adapter.graphqlQuery<RepoDiscussionData>(
@@ -210,7 +214,7 @@ async function dispatchLiveIssue(
   issue: { title: string; body: string; labels: string[] },
   fileSlug: string
 ): Promise<boolean> {
-  if (!auth.hasCredentials || !auth.token || !auth.owner || !auth.repo) return false;
+  if (isTestEnv() || !auth.hasCredentials || !auth.token || !auth.owner || !auth.repo) return false;
   const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
   console.log(`🚀 Creating GitHub Issue from ${fileSlug}...`);
   try {

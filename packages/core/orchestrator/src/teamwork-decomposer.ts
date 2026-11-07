@@ -38,26 +38,26 @@ export class TeamworkDecomposer {
     const selectedRoles = options?.selectedRoles ?? TeamworkHierarchicalTree.detectSelectedRoles(objective, options?.explicitRole);
     const isTree = options?.treeSpecialists || TeamworkHierarchicalTree.isHierarchicalRequested(objective);
 
-    let subtasks: DecomposedSubtask[];
+    const rawItems = this.splitObjective(objective);
+    const parsed = rawItems.map(item => this.classifyRawItem(item));
+    let subtasks = this.enrichSubtasks(parsed);
+    if (selectedRoles && selectedRoles.length > 0) {
+      subtasks = subtasks.filter(t => selectedRoles.includes(t.roleType));
+    }
+    this.ensureRequiredTracks(subtasks, objective, targetFiles, selectedRoles);
+
     if (isTree) {
-      subtasks = TeamworkHierarchicalTree.expandHierarchicalRoles([], selectedRoles, objective, targetFiles);
-    } else {
-      const rawItems = this.splitObjective(objective);
-      const parsed = rawItems.map(item => this.classifyRawItem(item));
-      subtasks = this.enrichSubtasks(parsed);
-      if (selectedRoles && selectedRoles.length > 0) {
-        subtasks = subtasks.filter(t => selectedRoles.includes(t.roleType));
-      }
-      this.ensureRequiredTracks(subtasks, objective, targetFiles, selectedRoles);
+      subtasks = TeamworkHierarchicalTree.expandHierarchicalRoles(subtasks, selectedRoles, objective, targetFiles);
     }
 
-    if (options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1)) {
-      const maxC = options.maxConcurrency ?? 12;
-      return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
-    }
     TeamworkSharder.shardSolversByFiles(subtasks, targetFiles, objective);
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
+
+    if (options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 4)) {
+      const maxC = options.maxConcurrency ?? 12;
+      return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
+    }
     return subtasks;
   }
 

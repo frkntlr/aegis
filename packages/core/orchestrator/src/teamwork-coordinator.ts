@@ -20,6 +20,7 @@ import { TeamworkCompactEngine } from './teamwork-compact.js';
 import { TeamworkMesh } from './teamwork-mesh.js';
 import { computeExecutionWaves, formatParallelDispatchBriefing, formatCompactWaveBriefing } from './teamwork-waves.js';
 import { stageTracksIntoInboxHelper, exportSubagentManifestHelper, countPendingInboxHelper } from './teamwork-staging.js';
+import { TaskComplexityAnalyzer } from './task-complexity-analyzer.js';
 import type {
   TeamworkTrack,
   TeamworkPlan,
@@ -28,7 +29,7 @@ import type {
 } from './teamwork-types.js';
 
 export * from './teamwork-types.js';
-export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh };
+export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer };
 
 export class TeamworkCoordinator {
   private repoRoot: string;
@@ -144,13 +145,14 @@ export class TeamworkCoordinator {
     const shouldStage = options?.stage ?? true;
     const shouldLock = options?.acquireLocks ?? shouldStage;
     const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
+    const complexity = TaskComplexityAnalyzer.analyze(objective, files);
     const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, files)}` : `tw-${Date.now().toString(36)}`;
     const subtasks = TeamworkDecomposer.decompose(objective, files, {
-      maxConcurrency: options?.maxConcurrency,
-      autoScale: options?.autoScale,
-      selectedRoles: options?.selectedRoles,
+      maxConcurrency: options?.maxConcurrency ?? complexity.optimalAgentCount,
+      autoScale: options?.autoScale ?? (complexity.tier === 'HYPER_SCALE'),
+      selectedRoles: options?.selectedRoles ?? (complexity.tier === 'TRIVIAL' && !options?.explicitRole ? complexity.suggestedRoles : undefined),
       explicitRole: options?.explicitRole,
-      treeSpecialists: options?.treeSpecialists
+      treeSpecialists: options?.treeSpecialists ?? complexity.shouldEnableHierarchicalTree
     });
     const tracks = this.buildTracks(subtasks, isDet);
 
@@ -161,7 +163,8 @@ export class TeamworkCoordinator {
     return {
       planId, objective, createdAt: new Date().toISOString(), tracks,
       summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}).`,
-      discoveredFiles: files
+      discoveredFiles: files,
+      complexity
     };
   }
 

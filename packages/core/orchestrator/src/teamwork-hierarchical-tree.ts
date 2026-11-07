@@ -76,7 +76,9 @@ export class TeamworkHierarchicalTree {
     const isTree = this.isHierarchicalRequested(objective);
     if (!isTree && !selectedRoles) return subtasks;
 
-    const rolesToExpand = selectedRoles ?? Array.from(new Set(subtasks.map(s => s.roleType)));
+    const rolesToExpand = (selectedRoles && selectedRoles.length > 0)
+      ? selectedRoles
+      : (subtasks.length > 0 ? Array.from(new Set(subtasks.map(s => s.roleType))) : (['solver', 'ui', 'qa', 'docs'] as RoleType[]));
     const expanded: DecomposedSubtask[] = [];
     const assigned = new Set<string>();
 

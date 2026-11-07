@@ -66,12 +66,19 @@ function buildInitialRfc(num: number, title: string, desc: string): string {
     `- [ ] Demir Kafes AST doğrulaması sağlandı.\n- [ ] Birim testler (%100) geçti.\n`;
 }
 
+function isTestEnv(): boolean {
+  return process.env.NODE_ENV === 'test' ||
+    process.env.AEGIS_TEST === '1' ||
+    Boolean(process.env.VITEST) ||
+    Boolean(process.env.NODE_TEST_CONTEXT);
+}
+
 async function publishDiscussion(
   auth: { token?: string; owner?: string; repo?: string },
   title: string,
   body: string
 ): Promise<DiscussionResult | undefined> {
-  if (!auth.token || !auth.owner || !auth.repo) return undefined;
+  if (isTestEnv() || !auth.token || !auth.owner || !auth.repo) return undefined;
   const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
   try {
     const repoData = await adapter.graphqlQuery<RepoDiscussionData>(
@@ -210,7 +217,7 @@ async function createLiveIssueIfOnline(
   let issueNum = 100 + parseInt(padNum, 10);
   let issueUrl = '';
 
-  if (auth.hasCredentials && auth.token && auth.owner && auth.repo) {
+  if (!isTestEnv() && auth.hasCredentials && auth.token && auth.owner && auth.repo) {
     console.log(`🚀 Creating GitHub Issue for RFC-${padNum}...`);
     try {
       const adapter = new GitHubLiveAdapter({ token: auth.token, owner: auth.owner, repo: auth.repo });
