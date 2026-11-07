@@ -38,3 +38,4 @@ export * from './teamwork-deliberation-types.js';
 export * from './semantic-ai-decomposer.js';
 export * from './teamwork-deliberation.js';
 export * from './teamwork-reflection.js';
+export * from './project-bootstrap.js';

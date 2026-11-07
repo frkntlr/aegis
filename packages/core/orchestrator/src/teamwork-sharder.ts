@@ -113,22 +113,26 @@ export class TeamworkSharder {
   }
 
   public static partitionFiles(subtasks: DecomposedSubtask[], allFiles: string[]): void {
-    const assignedFiles = new Set<string>();
+    const assigned = new Set<string>();
+    subtasks.forEach(t => t.targetFiles.forEach(f => assigned.add(f)));
     for (const task of subtasks) {
-      if (task.targetFiles.length > 0) {
-        task.targetFiles.forEach(f => assignedFiles.add(f));
-        continue;
-      }
+      if (task.targetFiles.length > 0) continue;
       if (task.roleType === 'ui') {
-        task.targetFiles = allFiles.filter(f => RoleClassifier.isUiFile(f) && !assignedFiles.has(f));
+        task.targetFiles = allFiles.filter(f => RoleClassifier.isUiFile(f) && !assigned.has(f));
       } else if (task.roleType === 'docs') {
-        task.targetFiles = allFiles.filter(f => (f.endsWith('.md') || f.includes('docs/') || f.includes('wiki/')) && !assignedFiles.has(f));
+        const l = task.label.toLowerCase();
+        task.targetFiles = allFiles.filter(f => !assigned.has(f) && (
+          (l === 'wiki' && (f.includes('wiki/') || f.includes('.wiki.'))) ||
+          (l === 'readme' && f.toLowerCase().endsWith('readme.md')) ||
+          (l === 'rfc' && (f.includes('rfc') || f.includes('adr'))) ||
+          (!['wiki', 'readme', 'rfc'].includes(l) && (f.endsWith('.md') || f.includes('docs/')))
+        ));
       } else if (task.roleType === 'qa') {
-        task.targetFiles = allFiles.filter(f => (f.includes('.test.') || f.includes('.spec.')) && !assignedFiles.has(f));
+        task.targetFiles = allFiles.filter(f => (f.includes('.test.') || f.includes('.spec.')) && !assigned.has(f));
       }
-      task.targetFiles.forEach(f => assignedFiles.add(f));
+      task.targetFiles.forEach(f => assigned.add(f));
     }
-    this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver' && t.targetFiles.length === 0), allFiles, assignedFiles);
+    this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver' && t.targetFiles.length === 0), allFiles, assigned);
   }
 
   public static partitionSolverFiles(

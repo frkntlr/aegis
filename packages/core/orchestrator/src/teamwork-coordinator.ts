@@ -7,10 +7,8 @@
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeManager } from './worktree-manager.js';
 import { RoleClassifier, type RoleType } from './role-classifier.js';
-import {
-  type SubagentProfile,
-  getSubagentProfiles
-} from './teamwork-prompts.js';
+import { type SubagentProfile, getSubagentProfiles } from './teamwork-prompts.js';
+import { ProjectBootstrapEngine, type BootstrapResult, type BootstrapOptions } from './project-bootstrap.js';
 import { TeamworkDecomposer, TeamworkSharder, TeamworkHierarchicalTree, type DecomposedSubtask } from './teamwork-decomposer.js';
 import { TeamworkTrackBuilder } from './teamwork-track-builder.js';
 import { TeamworkVisualizer } from './teamwork-visualizer.js';
@@ -32,8 +30,9 @@ export * from './teamwork-types.js';
 export {
   TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine,
   TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm, TeamworkAnalysisSwarm,
-  TeamworkDeliberationEngine, SemanticAIDecomposer, TeamworkReflectionEngine
+  TeamworkDeliberationEngine, SemanticAIDecomposer, TeamworkReflectionEngine, ProjectBootstrapEngine
 };
+export type { BootstrapResult, BootstrapOptions };
 
 export class TeamworkCoordinator {
   private repoRoot: string;
@@ -52,6 +51,11 @@ export class TeamworkCoordinator {
     this._worktreeManager = wtManager;
     this._roleClassifier = roleClassifier;
     this._groundingEngine = grounding;
+    try { ProjectBootstrapEngine.bootstrap(this.repoRoot); } catch { /* safe */ }
+  }
+
+  public bootstrap(options?: BootstrapOptions): BootstrapResult {
+    return ProjectBootstrapEngine.bootstrap(this.repoRoot, options);
   }
 
   public get worktreeManager(): WorktreeManager {
@@ -202,6 +206,7 @@ export class TeamworkCoordinator {
       deepAnalyze?: boolean; deliberate?: boolean; semantic?: boolean;
     }
   ): TeamworkPlan {
+    try { ProjectBootstrapEngine.bootstrap(this.repoRoot); } catch { /* safe */ }
     const isDet = options?.deterministic === true;
     const shouldStage = options?.stage ?? true;
     const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;

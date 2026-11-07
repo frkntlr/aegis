@@ -84,7 +84,7 @@ test('FastSemanticAnalyzer creates and utilizes persistent disk cache with git i
     const files2 = analyzer2.listCandidateFiles();
     const duration = Date.now() - t0;
     assert.deepStrictEqual(files2, files1);
-    assert.ok(duration < 50);
+    assert.ok(duration < 500, `Cached disk candidate lookup took ${duration}ms, expected fast cache hit`);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

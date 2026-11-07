@@ -218,8 +218,19 @@ export {
 
 export function handleTeamworkDoc(planId?: string, ...flags: string[]): void {
   const isCompact = flags.includes('--compact') || flags.includes('-c') || planId === '--compact' || planId === '-c';
+  const isReadme = flags.includes('--readme') || planId === '--readme';
   const effectivePlanId = planId && !planId.startsWith('-') ? planId : undefined;
   const synthesizer = new TeamworkDocSynthesizer();
+  if (isReadme) {
+    const updated = TeamworkDocSynthesizer.updateReadme(effectivePlanId);
+    showBanner();
+    if (updated) {
+      console.log(`📄 README.md successfully updated with Living Architecture report [Plan: ${effectivePlanId ?? 'latest'}].`);
+    } else {
+      console.log('⚠️ Could not update README.md (file not found or update failed).');
+    }
+    return;
+  }
   if (isCompact) { console.log(synthesizer.synthesizeCompact(effectivePlanId)); return; }
   showBanner();
   console.log(synthesizer.synthesize(effectivePlanId));

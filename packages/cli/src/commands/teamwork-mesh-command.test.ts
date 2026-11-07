@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   handleTeamworkMesh,
   handleTeamworkPeers,
@@ -128,4 +131,20 @@ test('CLI mesh handlers run without exceptions', () => {
   assert.doesNotThrow(() => handleTeamworkIterate());
   assert.doesNotThrow(() => handleTeamworkIterate('--json'));
   assert.doesNotThrow(() => handleTeamworkMesh('clear'));
+});
+
+test('handleTeamworkDoc supports --readme flag in isolated workspace', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-cli-readme-test-'));
+  fs.writeFileSync(path.join(tmp, 'README.md'), '# Temp Project\n<!-- AEGIS_ARCHITECTURE_START -->\n<!-- AEGIS_ARCHITECTURE_END -->\n');
+  const prev = process.env.AEGIS_WORKSPACE;
+  try {
+    process.env.AEGIS_WORKSPACE = tmp;
+    assert.doesNotThrow(() => handleTeamworkDoc('--readme'));
+    assert.doesNotThrow(() => handleTeamworkDoc('tw-test-plan', '--readme'));
+    const content = fs.readFileSync(path.join(tmp, 'README.md'), 'utf8');
+    assert.ok(content.includes('Aegis Living Architecture'));
+  } finally {
+    process.env.AEGIS_WORKSPACE = prev;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });

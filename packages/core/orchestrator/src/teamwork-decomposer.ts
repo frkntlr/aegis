@@ -7,8 +7,9 @@
 import { RoleClassifier, type RoleType } from './role-classifier.js';
 import { TeamworkSharder } from './teamwork-sharder.js';
 import { TeamworkHierarchicalTree } from './teamwork-hierarchical-tree.js';
+import { TeamworkDocSharder } from './teamwork-doc-sharder.js';
 
-export { TeamworkSharder, TeamworkHierarchicalTree };
+export { TeamworkSharder, TeamworkHierarchicalTree, TeamworkDocSharder };
 
 export interface DecomposedSubtask {
   roleType: RoleType;
@@ -90,12 +91,12 @@ export class TeamworkDecomposer {
     if (rawItems.length <= 1) {
       this.shardSolversAndQa(subtasks, targetFiles, objective, options);
     }
+    TeamworkDocSharder.shardDocsBySpecialists(subtasks, targetFiles, objective, options?.maxConcurrency ?? 12);
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
 
     const shouldScale = !isTree && Boolean(
-      options?.autoScale ||
-      (options?.maxConcurrency && options.maxConcurrency > 4) ||
+      options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 4) ||
       (targetFiles.length === 0 && options?.maxConcurrency && options.maxConcurrency > 1) ||
       (targetFiles.length === 1 && options?.autoScale) ||
       (targetFiles.length >= 2 && options?.maxConcurrency && options.maxConcurrency > 1)
@@ -281,4 +282,3 @@ export class TeamworkDecomposer {
     return sharded;
   }
 }
-

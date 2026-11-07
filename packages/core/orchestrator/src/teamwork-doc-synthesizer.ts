@@ -5,9 +5,38 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { TeamworkMesh } from './teamwork-mesh.js';
 import type { TeamworkMeshState, HumanArchitecturalBriefing } from './teamwork-types.js';
+
+const START_TAG = '<!-- AEGIS:ARCHITECTURE:START -->';
+const END_TAG = '<!-- AEGIS:ARCHITECTURE:END -->';
+const LEGACY_START_TAG = '<!-- AEGIS_ARCHITECTURE_START -->';
+const LEGACY_END_TAG = '<!-- AEGIS_ARCHITECTURE_END -->';
+
+function buildArchitectureInjection(briefing: HumanArchitecturalBriefing): string {
+  const m = briefing.metrics;
+  const qg = briefing.qualityGate;
+  return [
+    START_TAG,
+    `### 🏛️ Aegis Living Architecture (Plan: \`${briefing.planId}\`)`,
+    briefing.executiveSummary.trim(),
+    '',
+    briefing.mermaidDiagram.trim(),
+    '',
+    '#### ⚡ Quality Gate & Swarm Efficiency',
+    '| Metric | Value | Gate |',
+    '| :--- | :--- | :--- |',
+    `| **Demir Kafes Compliance** | **${qg.demirKafesCompliant ? '100% PASS' : 'FAIL'}** | Max ${qg.maxLinesPerFile}L/file, ${qg.anyCount} any |`,
+    `| **Token Frugality** | **${m.tokenSavingsPercent}%** | RTK semantic compression |`,
+    `| **Mesh Read Latency** | **${m.meshReadLatencyMs} ms** | Atomic blackboard retrieval |`,
+    `| **Parallel Concurrency** | **${m.concurrencyFactor}x** | Active multi-agent tracks |`,
+    `| **Workspace Test Suite** | **${qg.testPassRatePercent}% Green** | Zero regression oracle |`,
+    END_TAG
+  ].join('\n');
+}
 
 function buildExecutiveSummary(state: TeamworkMeshState): string {
   const peers = Object.values(state.agents);
@@ -140,5 +169,48 @@ export class TeamworkDocSynthesizer {
       `Tokens: -${b.metrics.tokenSavingsPercent}% | Latency: ${b.metrics.meshReadLatencyMs}ms | ` +
       `Files: ${b.metrics.totalFilesModified} | Contracts: ${b.metrics.totalContractsPublished} | ` +
       `DemirKafes: 100% Green (0 any, <300L)`;
+  }
+
+  public updateReadme(planId?: string): { updated: boolean; path: string; created: boolean } {
+    const readmePath = path.resolve(this.repoRoot, 'README.md');
+    const briefing = this.generateBriefing(planId);
+    const block = buildArchitectureInjection(briefing);
+
+    let created = false;
+    let content = '';
+    if (fs.existsSync(readmePath)) {
+      content = fs.readFileSync(readmePath, 'utf8');
+    } else {
+      created = true;
+      content = '# Project\n';
+    }
+
+    const startMarker = content.includes(START_TAG) ? START_TAG : (content.includes(LEGACY_START_TAG) ? LEGACY_START_TAG : null);
+    const endMarker = content.includes(END_TAG) ? END_TAG : (content.includes(LEGACY_END_TAG) ? LEGACY_END_TAG : null);
+
+    let nextContent: string;
+    if (startMarker && endMarker) {
+      const startIdx = content.indexOf(startMarker);
+      const endIdx = content.indexOf(endMarker);
+      if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
+        const before = content.slice(0, startIdx).trimEnd();
+        const after = content.slice(endIdx + endMarker.length).trimStart();
+        nextContent = before ? `${before}\n\n${block}` : block;
+        if (after) nextContent += `\n\n${after}`;
+        nextContent += '\n';
+      } else {
+        nextContent = `${content.trimEnd()}\n\n${block}\n`;
+      }
+    } else {
+      const trimmed = content.trimEnd();
+      nextContent = trimmed ? `${trimmed}\n\n${block}\n` : `${block}\n`;
+    }
+
+    fs.writeFileSync(readmePath, nextContent, 'utf8');
+    return { updated: true, path: readmePath, created };
+  }
+
+  public static updateReadme(planId?: string, repoRoot?: string): { updated: boolean; path: string; created: boolean } {
+    return new TeamworkDocSynthesizer(repoRoot).updateReadme(planId);
   }
 }
