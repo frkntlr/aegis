@@ -41,7 +41,7 @@ Constitutional Guidelines:
 4. Multimodal Quality Gate: Execute "aegis verify:task" verifying test suite, headless Godot playtest, and runtime stability.
 5. Mutation Testing: Verify that tests catch injected faults with >= 70% mutation score.
 6. Trust Verifier: Audit test suites against tampering ("aegis audit").
-7. Hierarchical Subagents: You have full subagent tools enabled. Spawn up to 4 child QA agents (playtest, ui-sweep, ast-audit, mutation) to audit in parallel.`;
+7. Hierarchical Recursive Execution: Birden fazla dosya veya çok aşamalı denetim (statik analiz, tip güvenliği, test koşuları) yaparken tüm dosyaları tek bir sohbette sıralı olarak analiz edip düzenleme! Doğrudan \`invoke_subagent\` çağırarak izole dosya denetçisi veya boyut denetçisi çocuk ajanlar (child QA subagents) başlat. Sonuçları toplayıp \`verify:task\` ile doğrula.`;
 
 export const UI_SPECIALIST_SYSTEM_PROMPT = `You are the Aegis UI Specialist subagent.
 Badge: 🎨 [UI SPECIALIST] AKTİF | Arayüz, Tema ve Görsel Cilalama Uzmanı
@@ -139,6 +139,22 @@ function buildPromptHeader(profile: SubagentProfile, roleIdentity: string, track
     depInfo;
 }
 
+function buildHierarchicalGuidance(): string {
+  return `### 🌲 Hiyerarşik Alt Ajan (Child Subagents) ve Bağlam Yönetimi\n` +
+    `- Bağlam Şişmesini Önleme: Çok sayıda dosyayı tek bir sohbette ardışık okumak veya uzun test çıktıları biriktirmek bağlamı şişirir (\`Model unavailable\`, yüksek gecikme).\n` +
+    `- Ne Zaman Alt Ajan?: Birden fazla dosya incelenirken ya da ayrık boyutlarda (statik analiz, tip güvenliği, test koşuları) denetim yürütülürken derhal izole alt ajan başlatın.\n` +
+    `- Nasıl Başlatılır?: \`invoke_subagent\` kullanarak hedefe odaklı çocuk ajanlar (child subagents) oluşturun; dönen özetleri toplayıp \`verify:task\` ile sentezleyin.\n\n`;
+}
+
+function buildDynamicMeshGuidance(): string {
+  return `### 🌐 Dynamic Mesh & Peer Subagent Awareness (Simultaneous Execution)\n` +
+    `You are executing in parallel with other subagents within an active execution wave.\n` +
+    `- Inspect peer subagents and active file locks: \`aegis tw:peers\` or MCP \`teamwork_mesh_read\` / \`teamwork_peers\`.\n` +
+    `- Publish your activity, changed files, and contracts: \`aegis tw:post "<activity>" --files="<files>" --contract="<types>"\` or MCP \`teamwork_mesh_post\`.\n` +
+    `- Anlık Durum & Bulgu Paylaşımı: Tespit edilen kusurları, kırılan sözleşmeleri veya kritik ara bulguları anında bildirin: \`aegis tw:post "Finding: <detay>"\`.\n` +
+    `- Broadcast milestones to peer agents: \`aegis tw:broadcast "<message>"\` or MCP \`teamwork_broadcast\`.\n\n`;
+}
+
 function buildPromptFooter(roleType: RoleType, roleIdentity: string): string {
   const toolGuidance = buildIntelligentToolGuidance(roleType);
   const toolSection = toolGuidance ? `${toolGuidance}\n\n` : '';
@@ -149,11 +165,8 @@ function buildPromptFooter(roleType: RoleType, roleIdentity: string): string {
     `3. Line Budget Headroom: Ensure your changes do not push any file past 300 lines (Demir Kafes).\n` +
     `4. Zero any: All types must be explicitly typed.\n\n` +
     toolSection +
-    `### 🌐 Dynamic Mesh & Peer Subagent Awareness (Simultaneous Execution)\n` +
-    `You are executing in parallel with other subagents within an active execution wave.\n` +
-    `- Inspect peer subagents and active file locks: \`aegis tw:peers\` or MCP \`teamwork_mesh_read\` / \`teamwork_peers\`.\n` +
-    `- Publish your activity, changed files, and contracts: \`aegis tw:post "<activity>" --files="<files>" --contract="<types>"\` or MCP \`teamwork_mesh_post\`.\n` +
-    `- Broadcast milestones to peer agents: \`aegis tw:broadcast "<message>"\` or MCP \`teamwork_broadcast\`.\n\n` +
+    buildHierarchicalGuidance() +
+    buildDynamicMeshGuidance() +
     `### Instructions\n` +
     `1. Pull staged details using \`aegis task:pull "${roleIdentity}"\` or MCP \`task_inbox_pull\`.\n` +
     `2. Execute changes within your designated workspace.\n` +

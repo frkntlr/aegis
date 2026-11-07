@@ -50,7 +50,9 @@ export class TeamworkDecomposer {
       subtasks = TeamworkHierarchicalTree.expandHierarchicalRoles(subtasks, selectedRoles, objective, targetFiles);
     }
 
-    TeamworkSharder.shardSolversByFiles(subtasks, targetFiles, objective);
+    if (rawItems.length <= 1) {
+      this.shardSolversAndQa(subtasks, targetFiles, objective, options);
+    }
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
 
@@ -66,6 +68,21 @@ export class TeamworkDecomposer {
       return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
     }
     return subtasks;
+  }
+
+  private static shardSolversAndQa(
+    subtasks: DecomposedSubtask[],
+    targetFiles: string[],
+    objective: string,
+    options?: DecomposeOptions
+  ): void {
+    TeamworkSharder.shardSolversByFiles(subtasks, targetFiles, objective);
+    const allowDimensions = Boolean(
+      options?.autoScale ||
+      (options?.maxConcurrency && options.maxConcurrency > 1) ||
+      (!options?.explicitRole && targetFiles.length === 0)
+    );
+    TeamworkSharder.shardQaByFiles(subtasks, targetFiles, objective, allowDimensions);
   }
 
   public static splitObjective(objective: string): string[] {

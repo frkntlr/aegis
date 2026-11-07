@@ -126,8 +126,7 @@ export class TeamworkCoordinator {
       semantic?: boolean;
     }
   ): DecomposedSubtask[] {
-    const isTreeOrExplicit = Boolean(options?.treeSpecialists || options?.explicitRole);
-    const isSemantic = Boolean(options?.semantic || options?.deliberate || (!isTreeOrExplicit && (complexity.tier === 'COMPLEX' || complexity.tier === 'HYPER_SCALE')));
+    const isSemantic = Boolean(options?.semantic || options?.deliberate);
     if (isSemantic) {
       const items = SemanticAIDecomposer.decompose(objective, files);
       let subtasks = SemanticAIDecomposer.toDecomposedSubtasks(items);
@@ -151,6 +150,10 @@ export class TeamworkCoordinator {
     if (!subtasks.some(t => t.roleType === 'solver') && files.some(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'))) {
       subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [], phase: 1, dependsOn: [] });
     }
+    if (!subtasks.some(t => t.roleType === 'qa')) {
+      subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
+    }
+    TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
     for (const t of subtasks) {
       if (t.roleType === 'ui') {
         t.phase = 1;
@@ -160,7 +163,8 @@ export class TeamworkCoordinator {
         if (!t.dependsOn?.length) t.dependsOn = subtasks.filter(s => s.phase === 1).map(s => s.label);
       } else if (t.roleType === 'docs') {
         t.phase = 3;
-        if (!t.dependsOn?.length) t.dependsOn = subtasks.filter(s => s.phase === 2).map(s => s.label);
+        const qaDeps = subtasks.filter(s => s.phase === 2).map(s => s.label);
+        t.dependsOn = qaDeps.length > 0 ? qaDeps : subtasks.filter(s => s.phase === 1).map(s => s.label);
       }
     }
     if (files.length > 0) TeamworkSharder.partitionFiles(subtasks, files);
