@@ -129,8 +129,6 @@ test('TeamworkMesh detects file collisions and triggers conflict warning event',
     const mesh = new TeamworkMesh(tmp);
     mesh.initializeMesh('plan-conflict', 'Conflict test', createMockTracks());
 
-    // Agent 1 locks src/parser.ts
-    // Agent 2 attempts to modify src/parser.ts
     mesh.postActivity('ui-specialist [UI]', {
       status: 'working',
       activity: 'Injecting UI parser bridge',
@@ -167,7 +165,6 @@ test('TeamworkMesh advances activeWave when current wave peers report done with 
     ]);
 
     assert.strictEqual(mesh.getMeshState().activeWave, 1);
-    // Custom activity text without the string "Wave 1"
     mesh.postActivity('solver-custom', { status: 'done', activity: 'Refactored AST and verified Demir Kafes' });
 
     assert.strictEqual(mesh.getMeshState().activeWave, 2);
@@ -186,7 +183,6 @@ test('TeamworkMesh deduplicates redundant heartbeats and suppresses unnecessary 
     const initial = mesh.postActivity('issue-solver [Core]', { status: 'working', activity: 'Working on AST' });
     const stat1 = fs.statSync(mesh.getMeshPath());
 
-    // Send identical update
     const second = mesh.postActivity('issue-solver [Core]', { status: 'working', activity: 'Working on AST' });
     const stat2 = fs.statSync(mesh.getMeshPath());
 
@@ -197,3 +193,59 @@ test('TeamworkMesh deduplicates redundant heartbeats and suppresses unnecessary 
   }
 });
 
+test('TeamworkMesh detects AST section collisions with full file targets', () => {
+  const tmp = createTempDir();
+  try {
+    const mesh = new TeamworkMesh(tmp);
+    mesh.initializeMesh('plan-ast-conflict', 'AST Conflict test', [
+      {
+        id: 'track-1',
+        roleType: 'solver',
+        subagentName: 'solver-logic',
+        title: 'Logic',
+        targetFiles: ['src/feature.ts#logic'],
+        prompt: 'p',
+        invocationPayload: { TypeName: 'solver', Role: 'l', Prompt: 'p', Workspace: 'inherit', Model: 'flash' },
+        dependsOn: [],
+        phase: 1
+      },
+      {
+        id: 'track-2',
+        roleType: 'solver',
+        subagentName: 'solver-full',
+        title: 'Full',
+        targetFiles: ['src/feature.ts'],
+        prompt: 'p',
+        invocationPayload: { TypeName: 'solver', Role: 'f', Prompt: 'p', Workspace: 'inherit', Model: 'flash' },
+        dependsOn: [],
+        phase: 1
+      }
+    ]);
+
+    const conflicts = mesh.detectConflicts();
+    assert.ok(conflicts.length > 0);
+    assert.ok(conflicts.some(c => c.agents.includes('solver-logic') && c.agents.includes('solver-full')));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('TeamworkMesh synchronizes concurrent posts across multiple instances atomically', () => {
+  const tmp = createTempDir();
+  try {
+    const meshA = new TeamworkMesh(tmp);
+    const meshB = new TeamworkMesh(tmp);
+    meshA.initializeMesh('plan-concurrent', 'Concurrent test', []);
+
+    meshA.postActivity('agent-A', { status: 'working', activity: 'Task A' });
+    meshB.postActivity('agent-B', { status: 'working', activity: 'Task B' });
+
+    const state = meshA.getMeshState();
+    assert.ok(state.agents['agent-A']);
+    assert.ok(state.agents['agent-B']);
+    assert.strictEqual(state.agents['agent-A'].currentActivity, 'Task A');
+    assert.strictEqual(state.agents['agent-B'].currentActivity, 'Task B');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

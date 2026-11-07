@@ -249,6 +249,21 @@ test('TeamworkCoordinator plans hierarchical tree tracks with specialized tools 
   assert.strictEqual(mutationTrack?.phase, 1);
 });
 
+test('TeamworkDecomposer splits 2 comma items, short sentences, and Turkish conjunctions', () => {
+  const commaItems = TeamworkDecomposer.splitObjective('auth servisini yap, login ekranını hazırla');
+  assert.strictEqual(commaItems.length, 2);
+  assert.strictEqual(commaItems[0], 'auth servisini yap');
+
+  const shortSentences = TeamworkDecomposer.splitObjective('Fix bug. Add test.');
+  assert.strictEqual(shortSentences.length, 2);
+
+  const ileItems = TeamworkDecomposer.splitObjective('auth servisini yap ile login ekranını hazırla');
+  assert.strictEqual(ileItems.length, 2);
+
+  const veDeItems = TeamworkDecomposer.splitObjective('auth servisini yap ve de login ekranını hazırla');
+  assert.strictEqual(veDeItems.length, 2);
+});
+
 
 
 

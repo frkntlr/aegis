@@ -1,3 +1,4 @@
+export * from './worktree-mutex.js';
 export * from './worktree-manager.js';
 export * from './worktree-lock-manager.js';
 export * from './task-dispatcher.js';

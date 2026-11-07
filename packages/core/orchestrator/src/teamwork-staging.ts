@@ -10,6 +10,7 @@ import * as crypto from 'node:crypto';
 import type { TeamworkTrack } from './teamwork-types.js';
 import type { SubagentProfile } from './teamwork-prompts.js';
 import type { WorktreeManager } from './worktree-manager.js';
+import { WorktreeMutex } from './worktree-mutex.js';
 
 function buildTrackInboxItem(
   track: TeamworkTrack,
@@ -29,8 +30,32 @@ function buildTrackInboxItem(
     status: track.dependsOn.length > 0 ? 'blocked' : 'pending',
     dependsOn: track.dependsOn,
     phase: track.phase,
+    trackId: track.id,
     stagedAt: new Date().toISOString()
   };
+}
+
+function readExistingInboxArray(inboxPath: string): unknown[] {
+  if (!fs.existsSync(inboxPath)) return [];
+  try {
+    const raw = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown[] }).tasks)) {
+      return (raw as { tasks: unknown[] }).tasks;
+    }
+  } catch { /* ignore */ }
+  return [];
+}
+
+function writeInboxFile(inboxPath: string, data: unknown[]): void {
+  const tmp = `${inboxPath}.tmp.${process.pid}.${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+  try {
+    fs.renameSync(tmp, inboxPath);
+  } catch {
+    fs.copyFileSync(tmp, inboxPath);
+    try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+  }
 }
 
 export function stageTracksIntoInboxHelper(
@@ -43,33 +68,28 @@ export function stageTracksIntoInboxHelper(
 ): void {
   const inboxPath = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
   try { fs.mkdirSync(path.dirname(inboxPath), { recursive: true }); } catch { return; }
-  let existing: unknown = null;
-  if (fs.existsSync(inboxPath)) {
-    try { existing = JSON.parse(fs.readFileSync(inboxPath, 'utf8')); } catch { existing = null; }
-  }
-  const inboxArray: unknown[] = Array.isArray(existing) ? existing
-    : (existing && typeof existing === 'object' && Array.isArray((existing as { tasks?: unknown[] }).tasks))
-      ? (existing as { tasks: unknown[] }).tasks : [];
 
-  const numBase = planId.startsWith('tw-det-')
-    ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
-    : parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10);
-
-  if (shouldLock) {
-    const lockBatch = tracks
-      .filter(t => t.targetFiles.length > 0)
-      .map(t => ({ agentName: t.subagentName, files: t.targetFiles }));
-    if (lockBatch.length > 0) {
-      worktreeManager.acquireBatchLocks(lockBatch);
-    }
-  }
-
-  for (let i = 0; i < tracks.length; i++) {
-    inboxArray.push(buildTrackInboxItem(tracks[i], numBase, i, objective));
-  }
+  const unlock = WorktreeMutex.acquire(inboxPath);
   try {
-    fs.writeFileSync(inboxPath, JSON.stringify(inboxArray, null, 2), 'utf8');
-  } catch { /* ignore */ }
+    const inboxArray = readExistingInboxArray(inboxPath);
+    const numBase = planId.startsWith('tw-det-')
+      ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
+      : parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10);
+
+    if (shouldLock) {
+      const lockBatch = tracks
+        .filter(t => t.targetFiles.length > 0)
+        .map(t => ({ agentName: t.subagentName, files: t.targetFiles }));
+      if (lockBatch.length > 0) worktreeManager.acquireBatchLocks(lockBatch);
+    }
+
+    for (let i = 0; i < tracks.length; i++) {
+      inboxArray.push(buildTrackInboxItem(tracks[i], numBase, i, objective));
+    }
+    writeInboxFile(inboxPath, inboxArray);
+  } catch { /* ignore */ } finally {
+    unlock();
+  }
 }
 
 export function exportSubagentManifestHelper(
@@ -110,4 +130,3 @@ export function countPendingInboxHelper(repoRoot: string): number {
     return 0;
   }
 }
-

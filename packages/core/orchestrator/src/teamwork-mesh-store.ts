@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { resolveSafeRepoRoot } from '@aegis/shared';
+import { WorktreeMutex } from './worktree-mutex.js';
 import type { TeamworkTrack, TeamworkPeerState, TeamworkEvent, TeamworkMeshState } from './teamwork-types.js';
 
 export interface ActivityUpdate {
@@ -35,6 +36,15 @@ export class TeamworkMeshStore {
 
   public getMeshPath(): string {
     return this.meshFile;
+  }
+
+  public withLock<T>(fn: () => T): T {
+    const unlock = WorktreeMutex.acquire(this.meshFile);
+    try {
+      return fn();
+    } finally {
+      unlock();
+    }
   }
 
   public loadState(): TeamworkMeshState {
@@ -73,7 +83,12 @@ export class TeamworkMeshStore {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         fs.writeFileSync(tmp, payload, 'utf8');
-        fs.renameSync(tmp, this.meshFile);
+        try {
+          fs.renameSync(tmp, this.meshFile);
+        } catch {
+          fs.copyFileSync(tmp, this.meshFile);
+          try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+        }
         this.cachedState = state;
         try { this.cachedMtimeMs = fs.statSync(this.meshFile).mtimeMs; } catch { this.cachedMtimeMs = Date.now(); }
         return;

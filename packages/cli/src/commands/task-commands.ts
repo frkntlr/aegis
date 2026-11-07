@@ -82,21 +82,40 @@ export async function closeGitHubIssueIfConfigured(issueNum: number, agent?: str
   } catch { /* soft-fail */ }
 }
 
-export async function handleTaskRelease(issueArg?: string, statusArg?: string, reasonArg?: string): Promise<void> {
+function parseReleaseArgs(args: string[]): { issueArg: string; status: 'pending' | 'in_progress' | 'done' | 'blocked'; reasonArg?: string } {
+  const statusIdx = args.findIndex(a => {
+    const l = a.toLowerCase();
+    return l === 'done' || l === 'blocked' || l === 'ready' || l === 'pending';
+  });
+  if (statusIdx >= 0) {
+    const issueArg = args.slice(0, statusIdx).join(' ').trim();
+    const rawStatus = args[statusIdx].toLowerCase();
+    const status = (rawStatus === 'done' || rawStatus === 'blocked') ? rawStatus : 'pending';
+    const reasonArg = args.slice(statusIdx + 1).join(' ').trim() || undefined;
+    return { issueArg, status, reasonArg };
+  }
+  const issueArg = args[0];
+  const status = (args[1] === 'done' || args[1] === 'blocked') ? args[1] : 'pending';
+  const reasonArg = args.slice(2).join(' ').trim() || undefined;
+  return { issueArg, status, reasonArg };
+}
+
+export async function handleTaskRelease(...args: string[]): Promise<void> {
   showBanner();
-  if (!issueArg) {
+  if (args.length === 0 || !args[0]) {
     console.error('❌ Usage: aegis task:release <issueNumber|role|trackId> [done|blocked|ready] [reason]');
     process.exit(1);
   }
-  const status = (statusArg === 'done' || statusArg === 'blocked') ? statusArg : 'pending';
+  const { issueArg, status, reasonArg } = parseReleaseArgs(args);
   const wtManager = new WorktreeManager({ persistLocks: true });
   const tasks = listInboxTasks();
   const parsedNum = parseInt(issueArg, 10);
   const hasNum = Number.isFinite(parsedNum) && parsedNum > 0;
 
-  const matched = hasNum
+  const rawMatched = hasNum
     ? tasks.filter(t => t.issueNumber === parsedNum)
     : tasks.filter(t => (t.trackId && t.trackId.toLowerCase() === issueArg.toLowerCase()) || matchesTaskRole(t.role, issueArg, t.issueNumber, t.trackId) || (t.title && t.title.toLowerCase().includes(issueArg.toLowerCase())));
+  const matched = (!hasNum && rawMatched.some(t => t.status === 'in_progress')) ? rawMatched.filter(t => t.status === 'in_progress') : rawMatched;
 
   const mesh = new TeamworkMesh();
   for (const t of matched) {

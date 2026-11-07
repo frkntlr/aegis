@@ -54,10 +54,12 @@ export class TeamworkDecomposer {
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
 
-    const shouldScale = Boolean(
+    const shouldScale = !isTree && Boolean(
       options?.autoScale ||
       (options?.maxConcurrency && options.maxConcurrency > 4) ||
-      (targetFiles.length === 1 && (isTree || options?.autoScale))
+      (targetFiles.length === 0 && options?.maxConcurrency && options.maxConcurrency > 1) ||
+      (targetFiles.length === 1 && options?.autoScale) ||
+      (targetFiles.length >= 2 && options?.maxConcurrency && options.maxConcurrency > 1)
     );
     if (shouldScale) {
       const maxC = options?.maxConcurrency ?? 12;
@@ -86,14 +88,12 @@ export class TeamworkDecomposer {
       if (lines.length > 1) return lines;
     }
 
-    if (/[.!?]\s+/.test(trimmed)) {
-      const sentences = trimmed.split(/[.!?]\s+/).map(s => s.trim()).filter(s => s.length >= 8);
-      if (sentences.length > 1) return sentences;
-    }
+    const sentences = trimmed.split(/[.!?]+(?:\s+|$)/).map(s => s.trim()).filter(s => s.length >= 3);
+    if (sentences.length > 1) return sentences;
 
     if (trimmed.includes(',')) {
-      const items = trimmed.split(',').map(s => s.trim()).filter(p => p.length >= 3);
-      if (items.length >= 3) return items;
+      const items = trimmed.split(',').map(s => s.trim().replace(/[.!?]+$/, '')).filter(p => p.length >= 3);
+      if (items.length >= 2) return items;
     }
 
     return this.splitCompoundSentence(trimmed);
@@ -102,8 +102,9 @@ export class TeamworkDecomposer {
   private static splitCompoundSentence(text: string): string[] {
     const lower = text.toLowerCase();
     const splitPoints = [
-      ' ve ', ' and ', ' hem de ', ' as well as ',
-      ' aynı zamanda ', ' bunun yanında ', ' ayrıca '
+      ' ve de ', ' hem de ', ' as well as ',
+      ' aynı zamanda ', ' bunun yanında ', ' ayrıca ',
+      ' ve ', ' and ', ' ile ', ' & '
     ];
     for (const sp of splitPoints) {
       if (lower.includes(sp)) {

@@ -27,6 +27,18 @@ export function parseWorktreePorcelainBlock(block: string, worktreePrefix: strin
 export const normPath = (p: string): string => p.replace(/\\/g, '/').replace(/^\.\//, '').trim();
 export { WorktreeMutexShield, type ActiveLockInfo, cleanGitEnv } from '@aegis/shared';
 
+export function matchesLockOwner(owner: string, query: string): boolean {
+  const o = owner.toLowerCase().trim();
+  const q = query.toLowerCase().trim();
+  if (o === q) return true;
+  const oBracket = o.match(/\[(.*?)\]/)?.[1]?.toLowerCase().trim();
+  const qBracket = q.match(/\[(.*?)\]/)?.[1]?.toLowerCase().trim();
+  if (oBracket && qBracket) return oBracket === qBracket;
+  if (oBracket && !qBracket) return oBracket === q;
+  if (!oBracket && qBracket) return qBracket === o;
+  return false;
+}
+
 export class WorktreeMutex {
   public static safeUnlock(lockDir: string): () => void {
     return () => {

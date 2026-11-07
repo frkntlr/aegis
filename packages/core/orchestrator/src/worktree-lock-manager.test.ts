@@ -125,3 +125,32 @@ test('WorktreeLockManager supports non-conflicting intra-file AST section mutex 
   assert.strictEqual(daveRes.success, false);
   assert.ok(daveRes.conflictingFiles.includes('src/service.ts'));
 });
+
+test('WorktreeLockManager releaseFileLocks strictly isolates locks without prefix leakage across agents', () => {
+  const manager = new WorktreeLockManager();
+  manager.acquireFileLocks('alice', ['src/1.ts']);
+  manager.acquireFileLocks('alice-2', ['src/2.ts']);
+  manager.acquireFileLocks('agent-1', ['src/3.ts']);
+  manager.acquireFileLocks('agent-10', ['src/4.ts']);
+  manager.acquireFileLocks('issue-solver [Logic]', ['src/5.ts']);
+  manager.acquireFileLocks('issue-solver [Contract]', ['src/6.ts']);
+
+  // Releasing 'alice' should only release alice, not alice-2
+  manager.releaseFileLocks('alice');
+  assert.strictEqual(manager.getLockedFiles().has('src/1.ts'), false);
+  assert.strictEqual(manager.getLockedFiles().has('src/2.ts'), true);
+
+  // Releasing 'agent-1' should only release agent-1, not agent-10
+  manager.releaseFileLocks('agent-1');
+  assert.strictEqual(manager.getLockedFiles().has('src/3.ts'), false);
+  assert.strictEqual(manager.getLockedFiles().has('src/4.ts'), true);
+
+  // Releasing 'Logic' should only release [Logic], not [Contract]
+  manager.releaseFileLocks('Logic');
+  assert.strictEqual(manager.getLockedFiles().has('src/5.ts'), false);
+  assert.strictEqual(manager.getLockedFiles().has('src/6.ts'), true);
+
+  // Releasing exact 'issue-solver [Contract]' releases [Contract]
+  manager.releaseFileLocks('issue-solver [Contract]');
+  assert.strictEqual(manager.getLockedFiles().has('src/6.ts'), false);
+});

@@ -5,6 +5,7 @@
  */
 
 import type { TeamworkTrack, TeamworkPeerState, TeamworkEvent, TeamworkMeshState } from './teamwork-types.js';
+import { isLockConflict } from './worktree-lock-manager.js';
 import {
   TeamworkMeshStore,
   type ActivityUpdate,
@@ -29,58 +30,77 @@ export class TeamworkMesh {
   }
 
   public initializeMesh(planId: string, objective: string, tracks: TeamworkTrack[]): TeamworkMeshState {
-    const state = this.store.createInitialState(planId, objective, tracks);
-    this.store.saveState(state);
-    return state;
+    return this.store.withLock(() => {
+      const state = this.store.createInitialState(planId, objective, tracks);
+      this.store.saveState(state);
+      return state;
+    });
   }
 
   public postActivity(agentId: string, update: ActivityUpdate): TeamworkPeerState {
-    const state = this.store.loadState();
-    const existing = state.agents[agentId] ?? this.store.createDefaultPeer(agentId);
-    if (state.agents[agentId] && this.store.isNoopUpdate(existing, update)) return existing;
+    return this.store.withLock(() => {
+      const state = this.store.loadState();
+      const existing = state.agents[agentId] ?? this.store.createDefaultPeer(agentId);
+      if (state.agents[agentId] && this.store.isNoopUpdate(existing, update)) return existing;
 
-    const now = new Date().toISOString();
-    const newContracts = (update.publishedContracts ?? []).filter(c => !existing.publishedContracts.includes(c));
-    const updatedPeer = this.store.mergePeerUpdate(existing, update, now);
+      const now = new Date().toISOString();
+      const newContracts = (update.publishedContracts ?? []).filter(c => !existing.publishedContracts.includes(c));
+      const updatedPeer = this.store.mergePeerUpdate(existing, update, now);
 
-    state.agents[agentId] = updatedPeer;
-    state.lastUpdated = now;
+      state.agents[agentId] = updatedPeer;
+      state.lastUpdated = now;
 
-    if (update.modifiedFiles?.length) this.checkConflictWarning(state, agentId, update.modifiedFiles);
-    if (update.activity || update.status) {
-      const isM = update.status === 'milestone' || update.status === 'done';
-      const eventType = isM ? (update.status === 'done' ? 'completed' : 'milestone') : 'heartbeat';
-      this.store.appendEvent(state, agentId, eventType, update.activity ?? `Status: ${update.status}`);
-    }
-    if (newContracts.length > 0) {
-      this.store.appendEvent(state, agentId, 'contract_update', `📜 Contract published: [${newContracts.join(', ')}]`, { contracts: newContracts });
-    }
-    if (update.status === 'done') this.checkWaveProgression(state);
+      if (update.modifiedFiles?.length) this.checkConflictWarning(state, agentId, update.modifiedFiles);
+      if (update.activity || update.status) {
+        const isM = update.status === 'milestone' || update.status === 'done';
+        const eventType = isM ? (update.status === 'done' ? 'completed' : 'milestone') : 'heartbeat';
+        this.store.appendEvent(state, agentId, eventType, update.activity ?? `Status: ${update.status}`);
+      }
+      if (newContracts.length > 0) {
+        this.store.appendEvent(state, agentId, 'contract_update', `📜 Contract published: [${newContracts.join(', ')}]`, { contracts: newContracts });
+      }
+      if (update.status === 'done') this.checkWaveProgression(state);
 
-    this.store.saveState(state);
-    return updatedPeer;
+      this.store.saveState(state);
+      return updatedPeer;
+    });
   }
 
   public broadcastEvent(fromAgent: string, message: string, type: TeamworkEvent['type'] = 'broadcast', payload?: Record<string, unknown>): TeamworkEvent {
-    const state = this.store.loadState();
-    const event = this.store.appendEvent(state, fromAgent, type, message, payload);
-    state.lastUpdated = new Date().toISOString();
-    this.store.saveState(state);
-    return event;
+    return this.store.withLock(() => {
+      const state = this.store.loadState();
+      const event = this.store.appendEvent(state, fromAgent, type, message, payload);
+      state.lastUpdated = new Date().toISOString();
+      this.store.saveState(state);
+      return event;
+    });
   }
 
   public detectConflicts(): MeshConflict[] {
-    const owners = new Map<string, Set<string>>();
-    for (const peer of Object.values(this.store.loadState().agents)) {
-      for (const f of new Set([...peer.lockedFiles, ...peer.modifiedFiles])) {
-        const set = owners.get(f) ?? new Set<string>();
-        set.add(peer.subagentName);
-        owners.set(f, set);
+    const peers = Object.values(this.store.loadState().agents);
+    const peerEntries: Array<{ agent: string; file: string }> = [];
+    for (const p of peers) {
+      for (const f of new Set([...p.lockedFiles, ...p.modifiedFiles])) {
+        peerEntries.push({ agent: p.subagentName, file: f });
       }
     }
-    return Array.from(owners.entries())
-      .filter(([, o]) => o.size > 1)
-      .map(([file, o]) => ({ file, agents: Array.from(o) }));
+    const conflicts: MeshConflict[] = [];
+    const handledFiles = new Set<string>();
+
+    for (const entry of peerEntries) {
+      if (handledFiles.has(entry.file)) continue;
+      const clashingAgents = new Set<string>([entry.agent]);
+      for (const other of peerEntries) {
+        if (other.agent !== entry.agent && isLockConflict(entry.file, other.file)) {
+          clashingAgents.add(other.agent);
+        }
+      }
+      if (clashingAgents.size > 1) {
+        handledFiles.add(entry.file);
+        conflicts.push({ file: entry.file, agents: Array.from(clashingAgents) });
+      }
+    }
+    return conflicts;
   }
 
   public getCompactMeshState(sinceTimestamp?: string): string {
@@ -108,33 +128,37 @@ export class TeamworkMesh {
   }
 
   public clearMesh(): void {
-    this.store.clearState();
+    this.store.withLock(() => {
+      this.store.clearState();
+    });
   }
 
   public advanceWave(planId?: string): { advanced: boolean; currentWave: number; nextWave: number; message: string } {
-    const state = this.store.loadState();
-    const oldWave = state.activeWave;
-    state.activeWave += 1;
-    state.lastUpdated = new Date().toISOString();
-    const phaseNames: Record<number, string> = { 2: 'QA Hunter Verification', 3: 'Living Architecture Synthesis' };
-    const nextPhase = phaseNames[state.activeWave] ?? 'Final Delivery';
-    const msg = `🌊 Wave ${oldWave} completed! Wave ${state.activeWave} (${nextPhase}) unlocked.`;
-    this.store.appendEvent(state, 'coordinator', 'milestone', msg, {
-      eventName: 'WAVE_COMPLETED',
-      fromWave: oldWave,
-      toWave: state.activeWave,
-      nextPhase,
-      planId: planId ?? state.planId
+    return this.store.withLock(() => {
+      const state = this.store.loadState();
+      const oldWave = state.activeWave;
+      state.activeWave += 1;
+      state.lastUpdated = new Date().toISOString();
+      const phaseNames: Record<number, string> = { 2: 'QA Hunter Verification', 3: 'Living Architecture Synthesis' };
+      const nextPhase = phaseNames[state.activeWave] ?? 'Final Delivery';
+      const msg = `🌊 Wave ${oldWave} completed! Wave ${state.activeWave} (${nextPhase}) unlocked.`;
+      this.store.appendEvent(state, 'coordinator', 'milestone', msg, {
+        eventName: 'WAVE_COMPLETED',
+        fromWave: oldWave,
+        toWave: state.activeWave,
+        nextPhase,
+        planId: planId ?? state.planId
+      });
+      this.store.saveState(state);
+      return { advanced: true, currentWave: oldWave, nextWave: state.activeWave, message: msg };
     });
-    this.store.saveState(state);
-    return { advanced: true, currentWave: oldWave, nextWave: state.activeWave, message: msg };
   }
 
   private checkConflictWarning(state: TeamworkMeshState, agentId: string, modified: string[]): void {
-    const modSet = new Set(modified);
     for (const [otherId, peer] of Object.entries(state.agents)) {
       if (otherId === agentId || peer.status === 'done') continue;
-      const clash = Array.from(modSet).filter(f => new Set([...peer.lockedFiles, ...peer.modifiedFiles]).has(f));
+      const peerFiles = [...peer.lockedFiles, ...peer.modifiedFiles];
+      const clash = modified.filter(f => peerFiles.some(pf => isLockConflict(f, pf)));
       if (clash.length > 0) {
         this.store.appendEvent(state, 'radar', 'milestone', `⚠️ CONFLICT_WARNING: @${agentId} touched [${clash.join(',')}] active on @${otherId}`);
       }

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { resolveSafeRepoRoot } from '@aegis/shared';
-import { WorktreeMutex, normPath } from './worktree-mutex.js';
+import { WorktreeMutex, normPath, matchesLockOwner } from './worktree-mutex.js';
 
 export interface LockMetadata {
   acquiredAt: number;
@@ -174,7 +174,7 @@ export class WorktreeLockManager {
 
   private findLockOwner(file: string, agentName?: string): string | undefined {
     for (const [k, v] of this.activeLocks.entries()) {
-      if (agentName && v === agentName) continue;
+      if (agentName && matchesLockOwner(v, agentName)) continue;
       if (isLockConflict(k, file)) return v;
     }
     return undefined;
@@ -209,7 +209,7 @@ export class WorktreeLockManager {
         for (const rawFile of item.files) {
           const file = normPath(rawFile);
           const owner = this.findLockOwner(file, item.agentName);
-          const inBatch = toApply.find(a => a.agentName !== item.agentName && isLockConflict(a.file, file));
+          const inBatch = toApply.find(a => !matchesLockOwner(a.agentName, item.agentName) && isLockConflict(a.file, file));
           if (owner || inBatch) conflictingFiles.push(file);
           else toApply.push({ file, agentName: item.agentName });
         }
@@ -226,10 +226,8 @@ export class WorktreeLockManager {
 
   public releaseFileLocks(agentName: string): void {
     this.withLock(() => {
-      const q = agentName.toLowerCase().trim();
       for (const [file, owner] of this.activeLocks.entries()) {
-        const o = owner.toLowerCase().trim();
-        if (o === q || o.includes(`[${q}]`) || o.startsWith(q) || q.startsWith(o)) {
+        if (matchesLockOwner(owner, agentName)) {
           this.activeLocks.delete(file);
           this.lockMeta.delete(file);
         }
