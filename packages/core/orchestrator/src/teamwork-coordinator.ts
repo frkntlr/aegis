@@ -21,6 +21,7 @@ import { TeamworkMesh } from './teamwork-mesh.js';
 import { computeExecutionWaves, formatParallelDispatchBriefing, formatCompactWaveBriefing } from './teamwork-waves.js';
 import { stageTracksIntoInboxHelper, exportSubagentManifestHelper, countPendingInboxHelper } from './teamwork-staging.js';
 import { TaskComplexityAnalyzer } from './task-complexity-analyzer.js';
+import { TeamworkResearchSwarm } from './teamwork-research-swarm.js';
 import type {
   TeamworkTrack,
   TeamworkPlan,
@@ -29,7 +30,7 @@ import type {
 } from './teamwork-types.js';
 
 export * from './teamwork-types.js';
-export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer };
+export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm };
 
 export class TeamworkCoordinator {
   private repoRoot: string;
@@ -127,44 +128,49 @@ export class TeamworkCoordinator {
     return this.cachedProfiles;
   }
 
-  public planTeamwork(
+  private resolveSubtasks(
     objective: string,
-    targetFiles: string[] = [],
-    options?: {
-      deterministic?: boolean;
-      stage?: boolean;
-      acquireLocks?: boolean;
-      maxConcurrency?: number;
-      autoScale?: boolean;
-      selectedRoles?: RoleType[];
-      explicitRole?: string;
-      treeSpecialists?: boolean;
-    }
-  ): TeamworkPlan {
-    const isDet = options?.deterministic === true;
-    const shouldStage = options?.stage ?? true;
-    const shouldLock = options?.acquireLocks ?? shouldStage;
-    const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
-    const complexity = TaskComplexityAnalyzer.analyze(objective, files);
-    const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, files)}` : `tw-${Date.now().toString(36)}`;
-    const subtasks = TeamworkDecomposer.decompose(objective, files, {
+    files: string[],
+    complexity: ReturnType<typeof TaskComplexityAnalyzer.analyze>,
+    options?: { maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[]; explicitRole?: string; treeSpecialists?: boolean }
+  ): ReturnType<typeof TeamworkDecomposer.decompose> {
+    return TeamworkDecomposer.decompose(objective, files, {
       maxConcurrency: options?.maxConcurrency ?? complexity.optimalAgentCount,
       autoScale: options?.autoScale ?? (complexity.tier === 'HYPER_SCALE'),
       selectedRoles: options?.selectedRoles ?? (complexity.tier === 'TRIVIAL' && !options?.explicitRole ? complexity.suggestedRoles : undefined),
       explicitRole: options?.explicitRole,
       treeSpecialists: options?.treeSpecialists ?? complexity.shouldEnableHierarchicalTree
     });
+  }
+
+  public planTeamwork(
+    objective: string,
+    targetFiles: string[] = [],
+    options?: {
+      deterministic?: boolean; stage?: boolean; acquireLocks?: boolean;
+      maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[];
+      explicitRole?: string; treeSpecialists?: boolean; research?: boolean;
+    }
+  ): TeamworkPlan {
+    const isDet = options?.deterministic === true;
+    const shouldStage = options?.stage ?? true;
+    const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
+    const complexity = TaskComplexityAnalyzer.analyze(objective, files);
+    const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, files)}` : `tw-${Date.now().toString(36)}`;
+    const subtasks = this.resolveSubtasks(objective, files, complexity, options);
     const tracks = this.buildTracks(subtasks, isDet);
+    const resTracks = (options?.research || TeamworkResearchSwarm.isResearchRequested(objective))
+      ? TeamworkResearchSwarm.buildResearchTracks(objective, planId) : [];
+    const allTracks = [...resTracks, ...tracks];
 
     if (shouldStage) {
-      this.stageTracksIntoInbox(planId, objective, tracks, shouldLock);
-      this.mesh.initializeMesh(planId, objective, tracks);
+      this.stageTracksIntoInbox(planId, objective, allTracks, options?.acquireLocks ?? shouldStage);
+      this.mesh.initializeMesh(planId, objective, allTracks);
     }
     return {
-      planId, objective, createdAt: new Date().toISOString(), tracks,
-      summary: `Teamwork Plan (${tracks.length} tracks: ${tracks.map(t => t.subagentName).join(', ')}).`,
-      discoveredFiles: files,
-      complexity
+      planId, objective, createdAt: new Date().toISOString(), tracks: allTracks,
+      summary: `Teamwork Plan (${allTracks.length} tracks: ${allTracks.map(t => t.subagentName).join(', ')}).`,
+      discoveredFiles: files, complexity
     };
   }
 

@@ -140,6 +140,51 @@ export class TeamworkSharder {
     return buckets;
   }
 
+  private static resolveCompanionSubtasks(
+    subtasks: DecomposedSubtask[],
+    companionTest: string,
+    companionDoc: string,
+    objective: string
+  ): DecomposedSubtask[] {
+    const others: DecomposedSubtask[] = [];
+    let hasDocs = false;
+    for (const t of subtasks) {
+      if (t.roleType === 'solver') continue;
+      if (t.roleType === 'qa') {
+        others.push({ ...t, targetFiles: t.targetFiles.length > 0 ? t.targetFiles : [companionTest] });
+      } else if (t.roleType === 'docs') {
+        hasDocs = true;
+        others.push({ ...t, targetFiles: t.targetFiles.length > 0 ? t.targetFiles : [companionDoc] });
+      } else {
+        others.push(t);
+      }
+    }
+    if (!hasDocs) {
+      others.push({
+        roleType: 'docs', label: 'Docs', title: `${objective} [Spec]: ${companionDoc}`,
+        targetFiles: [companionDoc], phase: 3, dependsOn: ['Audit']
+      });
+    }
+    return others;
+  }
+
+  private static shardSingleFileSections(
+    subtasks: DecomposedSubtask[],
+    singleFile: string,
+    objective: string
+  ): DecomposedSubtask[] {
+    const solvers: DecomposedSubtask[] = [
+      { roleType: 'solver', label: 'Logic', title: `${objective} [Logic]: ${singleFile}`, targetFiles: [`${singleFile}#logic`], phase: 1, dependsOn: [] },
+      { roleType: 'solver', label: 'Contract', title: `${objective} [Contract]: ${singleFile}`, targetFiles: [`${singleFile}#contract`], phase: 1, dependsOn: [] },
+      { roleType: 'solver', label: 'Safety', title: `${objective} [Safety]: ${singleFile}`, targetFiles: [`${singleFile}#safety`], phase: 1, dependsOn: [] }
+    ];
+    const baseName = singleFile.replace(/\.[^/.]+$/, '');
+    const lastSlash = baseName.lastIndexOf('/');
+    const base = lastSlash >= 0 ? baseName.slice(lastSlash + 1) : baseName;
+    const others = this.resolveCompanionSubtasks(subtasks, `${baseName}.test.ts`, `docs/${base}.md`, objective);
+    return [...solvers, ...others];
+  }
+
   public static shardSmartClusters(
     subtasks: DecomposedSubtask[],
     allFiles: string[],
@@ -149,6 +194,9 @@ export class TeamworkSharder {
     const sourceFiles = allFiles.filter(
       f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/')
     );
+    if (sourceFiles.length === 1 && maxConcurrency > 1) {
+      return this.shardSingleFileSections(subtasks, sourceFiles[0], objective);
+    }
     if (sourceFiles.length <= 1) return subtasks;
 
     const clusterMap = this.clusterFilesBySubsystem(sourceFiles);

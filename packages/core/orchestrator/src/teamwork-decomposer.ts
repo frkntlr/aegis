@@ -54,8 +54,11 @@ export class TeamworkDecomposer {
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
 
-    if (options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 4)) {
-      const maxC = options.maxConcurrency ?? 12;
+    const shouldScale = options?.autoScale ||
+      (options?.maxConcurrency && options.maxConcurrency > 4) ||
+      (targetFiles.length === 1 && (isTree || (options?.maxConcurrency && options.maxConcurrency > 1)));
+    if (shouldScale) {
+      const maxC = options?.maxConcurrency ?? 12;
       return this.shardMaxConcurrency(subtasks, targetFiles, maxC);
     }
     return subtasks;

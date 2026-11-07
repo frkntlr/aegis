@@ -105,3 +105,23 @@ test('WorktreeLockManager normalizes paths and releases files correctly', () => 
   manager.releaseFiles(['dir/sub/file.ts']);
   assert.strictEqual(manager.getLockedFiles().size, 0);
 });
+
+test('WorktreeLockManager supports non-conflicting intra-file AST section mutex locks', () => {
+  const manager = new WorktreeLockManager();
+  const aliceRes = manager.acquireFileLocks('alice', ['src/service.ts#logic']);
+  assert.strictEqual(aliceRes.success, true);
+
+  // Bob can concurrently lock a different section of the EXACT same file
+  const bobRes = manager.acquireFileLocks('bob', ['src/service.ts#contract']);
+  assert.strictEqual(bobRes.success, true);
+
+  // Charlie cannot lock the same section that Alice owns
+  const charlieRes = manager.acquireFileLocks('charlie', ['src/service.ts#logic']);
+  assert.strictEqual(charlieRes.success, false);
+  assert.ok(charlieRes.conflictingFiles.includes('src/service.ts#logic'));
+
+  // Dave cannot lock the whole file while sections are held
+  const daveRes = manager.acquireFileLocks('dave', ['src/service.ts']);
+  assert.strictEqual(daveRes.success, false);
+  assert.ok(daveRes.conflictingFiles.includes('src/service.ts'));
+});

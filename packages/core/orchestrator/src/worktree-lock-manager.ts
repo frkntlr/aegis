@@ -45,6 +45,22 @@ function parseLockEntry(val: unknown): { agent: string; metadata?: LockMetadata 
   return null;
 }
 
+function parseLockKey(key: string): { filePath: string; section?: string } {
+  const norm = normPath(key);
+  const hashIdx = norm.indexOf('#');
+  return hashIdx >= 0
+    ? { filePath: norm.slice(0, hashIdx).toLowerCase(), section: norm.slice(hashIdx + 1).toLowerCase() }
+    : { filePath: norm.toLowerCase() };
+}
+
+export function isLockConflict(keyA: string, keyB: string): boolean {
+  const a = parseLockKey(keyA);
+  const b = parseLockKey(keyB);
+  if (a.filePath !== b.filePath) return false;
+  if (!a.section || !b.section) return true;
+  return a.section === b.section;
+}
+
 export class WorktreeLockManager {
   private repoRoot: string;
   private persistLocks: boolean;
@@ -156,10 +172,10 @@ export class WorktreeLockManager {
     this.writeAtomicJson(this.getMetaFilePath(), Object.fromEntries(this.lockMeta.entries()));
   }
 
-  private findLockOwner(file: string): string | undefined {
-    const fl = file.toLowerCase();
+  private findLockOwner(file: string, agentName?: string): string | undefined {
     for (const [k, v] of this.activeLocks.entries()) {
-      if (k.toLowerCase() === fl) return v;
+      if (agentName && v === agentName) continue;
+      if (isLockConflict(k, file)) return v;
     }
     return undefined;
   }
@@ -169,8 +185,8 @@ export class WorktreeLockManager {
       const conflictingFiles: string[] = [];
       const normalized = files.map(normPath);
       for (const file of normalized) {
-        const existingOwner = this.findLockOwner(file);
-        if (existingOwner && existingOwner !== agentName) conflictingFiles.push(file);
+        const existingOwner = this.findLockOwner(file, agentName);
+        if (existingOwner) conflictingFiles.push(file);
       }
       if (conflictingFiles.length > 0) return { success: false, conflictingFiles };
       const now = Date.now();
@@ -192,8 +208,9 @@ export class WorktreeLockManager {
       for (const item of batch) {
         for (const rawFile of item.files) {
           const file = normPath(rawFile);
-          const owner = this.findLockOwner(file);
-          if (owner && owner !== item.agentName) conflictingFiles.push(file);
+          const owner = this.findLockOwner(file, item.agentName);
+          const inBatch = toApply.find(a => a.agentName !== item.agentName && isLockConflict(a.file, file));
+          if (owner || inBatch) conflictingFiles.push(file);
           else toApply.push({ file, agentName: item.agentName });
         }
       }

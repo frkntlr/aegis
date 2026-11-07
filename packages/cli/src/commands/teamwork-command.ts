@@ -81,12 +81,9 @@ function printTrackPayload(track: TeamworkTrack): void {
 }
 
 interface PlanFlags {
-  compact: boolean;
-  json: boolean;
-  dryRun: boolean;
-  maxConcurrency?: number;
-  explicitRole?: string;
-  treeSpecialists?: boolean;
+  compact: boolean; json: boolean; dryRun: boolean;
+  maxConcurrency?: number; explicitRole?: string;
+  treeSpecialists?: boolean; research?: boolean;
 }
 
 function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
@@ -97,6 +94,7 @@ function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
     else if (a === '--json' || a === '-j') flags.json = true;
     else if (a === '--dry-run') flags.dryRun = true;
     else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
+    else if (a === '--research') flags.research = true;
     else if (a === "--tree" || a === "--specialists") flags.treeSpecialists = true;
     else if (a.startsWith("--role=") || a.startsWith("-r=") || a.startsWith("--only=")) flags.explicitRole = a.split("=")[1];
     else if (a.startsWith("--max-agents=") || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
@@ -143,7 +141,8 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
     acquireLocks: !flags.dryRun,
     maxConcurrency: flags.maxConcurrency,
     explicitRole: flags.explicitRole,
-    treeSpecialists: flags.treeSpecialists
+    treeSpecialists: flags.treeSpecialists,
+    research: flags.research
   });
 
   if (flags.json) {
@@ -192,6 +191,7 @@ function routeMeshSubcommands(norm: string, all: string[]): boolean {
   if (norm === 'doc' || norm === 'synthesize') { handleTeamworkDoc(all[1], ...all.slice(2)); return true; }
   if (norm === 'advance') { handleTeamworkAdvance(all[1]); return true; }
   if (norm === 'tools' || norm === 'tool' || norm === 'arsenal') { handleTeamworkTools(all[1], ...all.slice(2)); return true; }
+  if (norm === 'gh' || norm === 'github') { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); return true; }
   return false;
 }
 

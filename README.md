@@ -33,7 +33,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
 - [🩺 Sokratik Teşhis & Kanıt Tabanlı Anti-Halüsinasyon](#-sokratik-teşhis--kanıt-tabanlı-anti-halüsinasyon)
 - [📡 Gerçek Zamanlı SSE Web Komuta Merkezi (`localhost:3000`)](#-gerçek-zamanlı-sse-web-komuta-merkezi-localhost3000)
-- [🌐 Yaşayan GitHub, RFC (45 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
+- [🌐 Yaşayan GitHub, RFC (46 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
 - [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
@@ -426,7 +426,7 @@ aegis dashboard 3000
 
 ---
 
-## 🌐 Yaşayan GitHub, RFC (45 Adet) & NotebookLM Döngüsü
+## 🌐 Yaşayan GitHub, RFC (46 Adet) & NotebookLM Döngüsü
 
 Aegis, statik dokümanların unutulması sorununu çözmek için yaşayan bir bellek köprüsü kurar:
 
@@ -469,7 +469,7 @@ aegis/
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
 │   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
-├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-045 Arşivi
+├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-046 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
 └── turbo.json                   # Monorepo Pipeline ve Önbellek Yapılandırması
 ```
@@ -584,6 +584,7 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | `aegis tr:post "<act>"` / `tw:post` | Ajan faaliyetini, değiştirilen dosyaları ve kontratları dinamik meshe yazar. |
 | `aegis tr:broadcast "<msg>"` / `tw:broadcast` | Kardeş subagent'lara anlık koordinasyon ve kilometre taşı yayını yapar. |
 | `aegis tr:mesh [clear]` / `tw:mesh` | Dinamik gerçek zamanlı teamwork mesh durumunu görüntüler veya temizler (`-c` tel formatı). |
+| `aegis tr:gh "<obj>"` / `tw:gh` | Gerçek zamanlı GitHub Discussion ve Tracking Issue bağlama, canlı durum ilerletme ve onaylı kapatma döngüsü. |
 | `aegis tr:status` / `tw:status` | Aktif Antigravity subagent durumlarını, modellerini ve kilitli dosyalarını listeler (`teamwork`). |
 | `aegis tr:plan "<obj>"` / `tw:plan` | Hedefi izlek dalgalarına böler ve mutex kilitlerini atomik olarak kazanır. |
 | `aegis tr:compact [obj]` / `tw:compact` | Görev geçmişini ve logları RTK ile %85 sıkıştırıp brifing üretir ve tamamlananları arşivler. |

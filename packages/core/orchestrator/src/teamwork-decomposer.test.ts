@@ -128,6 +128,24 @@ test('shardMaxConcurrency guarantees 100% disjoint file allocation for up to 12 
   assert.strictEqual(uniqueAssigned.size, 12);
 });
 
+test('TeamworkDecomposer shards single source file into specialized intra-file AST sections when scaled', () => {
+  const objective = 'Overhaul monolithic parser';
+  const files = ['src/parser.ts'];
+  const subtasks = TeamworkDecomposer.decompose(objective, files, { autoScale: true, maxConcurrency: 8 });
+
+  const solvers = subtasks.filter(s => s.roleType === 'solver');
+  assert.strictEqual(solvers.length, 3);
+  assert.ok(solvers.some(s => s.targetFiles.includes('src/parser.ts#logic')));
+  assert.ok(solvers.some(s => s.targetFiles.includes('src/parser.ts#contract')));
+  assert.ok(solvers.some(s => s.targetFiles.includes('src/parser.ts#safety')));
+
+  const qa = subtasks.find(s => s.roleType === 'qa');
+  assert.ok(qa?.targetFiles.includes('src/parser.test.ts'));
+
+  const docs = subtasks.find(s => s.roleType === 'docs');
+  assert.ok(docs?.targetFiles.includes('docs/parser.md'));
+});
+
 test('compileUltraLeanPrompt generates compact prompt under 200 tokens with anchors and contract', () => {
   const profile = getSubagentProfiles()[0];
   const prompt = compileUltraLeanPrompt(

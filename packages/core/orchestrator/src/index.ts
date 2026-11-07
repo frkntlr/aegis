@@ -25,5 +25,6 @@ export * from './teamwork-doc-synthesizer.js';
 export * from './teamwork-tools-catalog.js';
 export * from './teamwork-hierarchical-tree.js';
 export * from './task-complexity-analyzer.js';
+export * from './teamwork-research-swarm.js';
 export * from './antigravity-installer.js';
 export * from './engine-updater.js';
