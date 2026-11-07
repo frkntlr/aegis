@@ -22,6 +22,7 @@ import { computeExecutionWaves, formatParallelDispatchBriefing, formatCompactWav
 import { stageTracksIntoInboxHelper, exportSubagentManifestHelper, countPendingInboxHelper } from './teamwork-staging.js';
 import { TaskComplexityAnalyzer } from './task-complexity-analyzer.js';
 import { TeamworkResearchSwarm } from './teamwork-research-swarm.js';
+import { TeamworkAnalysisSwarm } from './teamwork-analysis-swarm.js';
 import type {
   TeamworkTrack,
   TeamworkPlan,
@@ -30,7 +31,7 @@ import type {
 } from './teamwork-types.js';
 
 export * from './teamwork-types.js';
-export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm };
+export { TeamworkVisualizer, TeamworkGroundingEngine, FastSemanticAnalyzer, TeamworkCompactEngine, TeamworkMesh, TaskComplexityAnalyzer, TeamworkResearchSwarm, TeamworkAnalysisSwarm };
 
 export class TeamworkCoordinator {
   private repoRoot: string;
@@ -150,11 +151,15 @@ export class TeamworkCoordinator {
       deterministic?: boolean; stage?: boolean; acquireLocks?: boolean;
       maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[];
       explicitRole?: string; treeSpecialists?: boolean; research?: boolean;
+      deepAnalyze?: boolean;
     }
   ): TeamworkPlan {
     const isDet = options?.deterministic === true;
     const shouldStage = options?.stage ?? true;
     const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
+    if (options?.deepAnalyze || TeamworkAnalysisSwarm.isDeepAnalysisRequested(objective)) {
+      new TeamworkAnalysisSwarm(this.repoRoot).runAnalysisSwarmSync(objective, files);
+    }
     const complexity = TaskComplexityAnalyzer.analyze(objective, files);
     const planId = isDet ? `tw-det-${TeamworkTrackBuilder.hashPlan(objective, files)}` : `tw-${Date.now().toString(36)}`;
     const subtasks = this.resolveSubtasks(objective, files, complexity, options);

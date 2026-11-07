@@ -88,7 +88,28 @@ export class TeamworkGroundingEngine {
     return 'text';
   }
 
-  public buildGroundingSection(targetFiles: string[]): string {
+  public buildAnalysisMeshGrounding(targetFiles: string[]): string {
+    if (!targetFiles || targetFiles.length === 0) return '';
+    try {
+      const meshPath = path.join(this.repoRoot, '.aegis', 'analysis-mesh.json');
+      if (!fs.existsSync(meshPath)) return '';
+      const raw = fs.readFileSync(meshPath, 'utf8');
+      const state = JSON.parse(raw);
+      const allInsights = Object.values(state.insights || {}) as Array<{ target: string; lens: string; severity: string; finding: string; actionableStep?: string }>;
+      const relevant = allInsights.filter(i => targetFiles.some(tf => tf.includes(i.target) || i.target.includes(tf)));
+      if (relevant.length === 0) return '';
+      const lines = ['### 🧠 Swarm Working Memory & Pre-Flight Analysis Insights'];
+      for (const item of relevant.slice(0, 4)) {
+        lines.push(`- **[${item.lens.toUpperCase()}]** (${item.severity}): ${item.finding}`);
+        if (item.actionableStep) lines.push(`  *Action*: ${item.actionableStep}`);
+      }
+      return lines.join('\n');
+    } catch {
+      return '';
+    }
+  }
+
+  public buildGroundingSection(targetFiles: string[]): string {
     if (!targetFiles || targetFiles.length === 0) return '';
     const reports = targetFiles.map(f => this.inspectFile(f));
     const lines: string[] = ['### 🛡️ Ground-Truth Codebase Reality (Zero-Hallucination)'];
@@ -105,6 +126,8 @@ export class TeamworkGroundingEngine {
         lines.push(`\`\`\`${lang}\n${r.skeleton}\n\`\`\``);
       }
     }
+    const meshGrounding = this.buildAnalysisMeshGrounding(targetFiles);
+    if (meshGrounding) lines.push('\n' + meshGrounding);
     return lines.join('\n');
   }
 

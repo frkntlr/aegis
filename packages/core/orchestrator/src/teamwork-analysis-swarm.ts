@@ -13,6 +13,7 @@ import {
   RelationalMapperLens,
   GroundingMemoryLens
 } from './teamwork-analysis-lenses.js';
+import { UiVisualLayoutLens } from './teamwork-ui-lens.js';
 import type {
   AnalysisSwarmReport,
   AnalysisSwarmOptions,
@@ -33,6 +34,32 @@ export class TeamworkAnalysisSwarm {
 
   public getSharedMesh(): TeamworkAnalysisMesh {
     return this.mesh;
+  }
+
+  public static isDeepAnalysisRequested(objective: string): boolean {
+    return /(?:deep|derin|analiz\s+et|incele|audit|swarm|kapsamlı|ui\s+incele|ui\s+analiz)/i.test(objective);
+  }
+
+  public runAnalysisSwarmSync(
+    objective: string,
+    explicitFiles: string[] = []
+  ): AnalysisSwarmReport {
+    const start = Date.now();
+    const swarmId = `swarm-${Date.now().toString(36)}`;
+    this.mesh.initSwarm(swarmId, objective);
+
+    const files = explicitFiles.length > 0 ? explicitFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
+    const lensResults: LensExecutionResult[] = [
+      AstStructuralLens.executeSync(this.repoRoot, files),
+      TriageHunterLens.executeSync(this.repoRoot, files),
+      RelationalMapperLens.executeSync(this.repoRoot, files),
+      GroundingMemoryLens.executeSync(this.repoRoot, objective),
+      UiVisualLayoutLens.executeSync(this.repoRoot, files)
+    ];
+
+    const allInsights = lensResults.flatMap(r => r.insights);
+    this.mesh.batchPost(allInsights);
+    return this.buildSwarmReport(swarmId, objective, Date.now() - start, allInsights);
   }
 
   public async runAnalysisSwarm(
@@ -59,7 +86,8 @@ export class TeamworkAnalysisSwarm {
       AstStructuralLens.execute(this.repoRoot, files),
       TriageHunterLens.execute(this.repoRoot, files),
       RelationalMapperLens.execute(this.repoRoot, files),
-      GroundingMemoryLens.execute(this.repoRoot, objective)
+      GroundingMemoryLens.execute(this.repoRoot, objective),
+      UiVisualLayoutLens.execute(this.repoRoot, files)
     ]);
   }
 
@@ -72,7 +100,7 @@ export class TeamworkAnalysisSwarm {
     const criticalRisks = insights.filter(i => i.severity === 'critical' || i.severity === 'high');
     const hotspots = this.mesh.getHotspots();
     const actions = this.extractRecommendedActions(insights);
-    const summary = `Swarm completed in ${durationMs}ms across 4 concurrent lenses with ${insights.length} insight(s).`;
+    const summary = `Swarm completed in ${durationMs}ms across 5 concurrent lenses with ${insights.length} insight(s).`;
 
     return {
       swarmId,

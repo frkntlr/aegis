@@ -4,14 +4,16 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-export type AnalysisLens = 'ast' | 'triage' | 'relation' | 'grounding';
+export type AnalysisLens = 'ast' | 'triage' | 'relation' | 'grounding' | 'ui';
 
 export type AnalysisCategory =
   | 'bottleneck'
   | 'flaw'
   | 'coupling'
   | 'contract'
-  | 'recommendation';
+  | 'recommendation'
+  | 'ui_defect'
+  | 'responsive_risk';
 
 export type AnalysisSeverity = 'critical' | 'high' | 'medium' | 'info';
 

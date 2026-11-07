@@ -12,7 +12,7 @@ import type {
 } from './teamwork-analysis-types.js';
 
 export class AstStructuralLens {
-  public static async execute(repoRoot: string, files: string[]): Promise<LensExecutionResult> {
+  public static executeSync(repoRoot: string, files: string[]): LensExecutionResult {
     const start = Date.now();
     const insights: AnalysisInsight[] = [];
     const targets = files.filter(f => f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.gd'));
@@ -37,10 +37,14 @@ export class AstStructuralLens {
     }
     return { lens: 'ast', agent: 'ast-architect', durationMs: Date.now() - start, insights };
   }
+
+  public static async execute(repoRoot: string, files: string[]): Promise<LensExecutionResult> {
+    return this.executeSync(repoRoot, files);
+  }
 }
 
 export class TriageHunterLens {
-  public static async execute(repoRoot: string, files: string[]): Promise<LensExecutionResult> {
+  public static executeSync(repoRoot: string, files: string[]): LensExecutionResult {
     const start = Date.now();
     const insights: AnalysisInsight[] = [];
     const sourceFiles = files.filter(f => !f.endsWith('.test.ts') && !f.endsWith('.spec.ts'));
@@ -60,10 +64,14 @@ export class TriageHunterLens {
     }
     return { lens: 'triage', agent: 'triage-hunter', durationMs: Date.now() - start, insights };
   }
+
+  public static async execute(repoRoot: string, files: string[]): Promise<LensExecutionResult> {
+    return this.executeSync(repoRoot, files);
+  }
 }
 
 export class RelationalMapperLens {
-  public static async execute(repoRoot: string, files: string[]): Promise<LensExecutionResult> {
+  public static executeSync(repoRoot: string, files: string[]): LensExecutionResult {
     const start = Date.now();
     const insights: AnalysisInsight[] = [];
     const importCounts: Record<string, number> = {};
@@ -88,10 +96,14 @@ export class RelationalMapperLens {
     }
     return { lens: 'relation', agent: 'relational-mapper', durationMs: Date.now() - start, insights };
   }
+
+  public static async execute(repoRoot: string, files: string[]): Promise<LensExecutionResult> {
+    return this.executeSync(repoRoot, files);
+  }
 }
 
 export class GroundingMemoryLens {
-  public static async execute(repoRoot: string, objective: string): Promise<LensExecutionResult> {
+  public static executeSync(repoRoot: string, objective: string): LensExecutionResult {
     const start = Date.now();
     const insights: AnalysisInsight[] = [];
     const rfcDir = path.join(repoRoot, 'docs', 'rfc');
@@ -112,5 +124,9 @@ export class GroundingMemoryLens {
       } catch { /* ignore */ }
     }
     return { lens: 'grounding', agent: 'living-grounder', durationMs: Date.now() - start, insights };
+  }
+
+  public static async execute(repoRoot: string, objective: string): Promise<LensExecutionResult> {
+    return this.executeSync(repoRoot, objective);
   }
 }

@@ -31,4 +31,5 @@ export * from './engine-updater.js';
 export * from './teamwork-analysis-types.js';
 export * from './teamwork-analysis-mesh.js';
 export * from './teamwork-analysis-lenses.js';
+export * from './teamwork-ui-lens.js';
 export * from './teamwork-analysis-swarm.js';

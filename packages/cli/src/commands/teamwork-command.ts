@@ -83,7 +83,7 @@ function printTrackPayload(track: TeamworkTrack): void {
 interface PlanFlags {
   compact: boolean; json: boolean; dryRun: boolean;
   maxConcurrency?: number; explicitRole?: string;
-  treeSpecialists?: boolean; research?: boolean;
+  treeSpecialists?: boolean; research?: boolean; deepAnalyze?: boolean;
 }
 
 function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
@@ -95,6 +95,7 @@ function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
     else if (a === '--dry-run') flags.dryRun = true;
     else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
     else if (a === '--research') flags.research = true;
+    else if (a === '--deep' || a === '--deep-analyze') flags.deepAnalyze = true;
     else if (a === "--tree" || a === "--specialists") flags.treeSpecialists = true;
     else if (a.startsWith("--role=") || a.startsWith("-r=") || a.startsWith("--only=")) flags.explicitRole = a.split("=")[1];
     else if (a.startsWith("--max-agents=") || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
@@ -142,7 +143,8 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
     maxConcurrency: flags.maxConcurrency,
     explicitRole: flags.explicitRole,
     treeSpecialists: flags.treeSpecialists,
-    research: flags.research
+    research: flags.research,
+    deepAnalyze: flags.deepAnalyze
   });
 
   if (flags.json) {
