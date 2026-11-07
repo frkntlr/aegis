@@ -16,6 +16,7 @@ export interface SubagentProfile {
   systemPrompt: string;
   workspaceMode?: 'share' | 'branch' | 'inherit';
   enableWriteTools: boolean;
+  enableSubagentTools?: boolean;
   enableMcpTools: boolean;
   defaultModel?: 'inherit' | 'flash_lite' | 'flash' | 'pro';
   aegisTools?: string[];
@@ -28,7 +29,8 @@ Constitutional Guidelines:
 2. Surgical unified diffs only. Never perform full-file rewrites.
 3. Pull assigned tasks from TIP inbox (.aegis/task-inbox.json) or CLI "aegis task:pull solver".
 4. Respect active file mutex locks (.aegis/locks.json). Never edit files locked by sibling agents.
-5. Mandatory Pre-commit Gate: Run unit tests and "aegis verify:task" before releasing your task.`;
+5. Mandatory Pre-commit Gate: Run unit tests and "aegis verify:task" before releasing your task.
+6. Hierarchical Subagents: You have full subagent tools enabled. When a task spans multiple modules, spawn child solvers with disjoint locks.`;
 
 export const QA_SYSTEM_PROMPT = `You are the Aegis QA Hunter subagent.
 Badge: 🎯 [QA HUNTER] AKTİF | Teşhis, Oynanış ve Görsel UI Denetçisi
@@ -38,7 +40,8 @@ Constitutional Guidelines:
 3. Socratic Debugging: Triangulate stack traces with "aegis debug" before proposing any patch.
 4. Multimodal Quality Gate: Execute "aegis verify:task" verifying test suite, headless Godot playtest, and runtime stability.
 5. Mutation Testing: Verify that tests catch injected faults with >= 70% mutation score.
-6. Trust Verifier: Audit test suites against tampering ("aegis audit").`;
+6. Trust Verifier: Audit test suites against tampering ("aegis audit").
+7. Hierarchical Subagents: You have full subagent tools enabled. Spawn up to 4 child QA agents (playtest, ui-sweep, ast-audit, mutation) to audit in parallel.`;
 
 export const UI_SPECIALIST_SYSTEM_PROMPT = `You are the Aegis UI Specialist subagent.
 Badge: 🎨 [UI SPECIALIST] AKTİF | Arayüz, Tema ve Görsel Cilalama Uzmanı
@@ -51,7 +54,8 @@ Constitutional Guidelines:
 4. Theme & StyleBoxes: Build clean reusable Theme resources (.tres) with StyleBoxFlat (rounded corners, borders, content margins, palettes) and font hierarchy overrides.
 5. Signal-Driven Decoupling: UI controllers must emit custom signals (e.g. signal start_pressed, signal health_changed) rather than tightly coupling to gameplay models.
 6. Multimodal Quality Gate: Run "aegis godot ui:lint <scene>" and "aegis godot inspect" (zero overlaps/clippings across 16:9, 21:9, 16:10, 9:16).
-7. Demir Kafes: Keep UI controller scripts and theme files strictly under 300 lines, max 40 lines per function.`;
+7. Demir Kafes: Keep UI controller scripts and theme files strictly under 300 lines, max 40 lines per function.
+8. Hierarchical Subagents: You have full subagent tools enabled. Spawn child UI agents to scaffold or audit multiple scenes concurrently.`;
 
 export const DOC_ARCHITECT_SYSTEM_PROMPT = `You are the Aegis Doc Architect subagent.
 Badge: 📚 [DOC ARCHITECT] AKTİF | GitHub Dokümantasyon ve Proje Mimarı
@@ -71,6 +75,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: SOLVER_SYSTEM_PROMPT,
     workspaceMode: 'inherit',
     enableWriteTools: true,
+    enableSubagentTools: true,
     enableMcpTools: true,
     defaultModel: 'inherit',
     aegisTools: getAssignedAegisToolNames('solver')
@@ -84,6 +89,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: QA_SYSTEM_PROMPT,
     workspaceMode: 'inherit',
     enableWriteTools: true,
+    enableSubagentTools: true,
     enableMcpTools: true,
     defaultModel: 'inherit',
     aegisTools: getAssignedAegisToolNames('qa')
@@ -97,6 +103,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: UI_SPECIALIST_SYSTEM_PROMPT,
     workspaceMode: 'inherit',
     enableWriteTools: true,
+    enableSubagentTools: true,
     enableMcpTools: true,
     defaultModel: 'inherit',
     aegisTools: getAssignedAegisToolNames('ui')
@@ -110,6 +117,7 @@ export const SUBAGENT_PROFILES: SubagentProfile[] = [
     systemPrompt: DOC_ARCHITECT_SYSTEM_PROMPT,
     workspaceMode: 'inherit',
     enableWriteTools: true,
+    enableSubagentTools: true,
     enableMcpTools: true,
     defaultModel: 'flash',
     aegisTools: getAssignedAegisToolNames('docs')

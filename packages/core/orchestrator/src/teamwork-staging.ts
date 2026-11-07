@@ -87,6 +87,7 @@ export function exportSubagentManifestHelper(
     subagents: profiles.map(p => ({
       name: p.name, role: p.title, description: p.description, systemPrompt: p.systemPrompt,
       workspaceMode: p.workspaceMode ?? 'inherit', enableWriteTools: p.enableWriteTools,
+      enableSubagentTools: p.enableSubagentTools ?? true,
       enableMcpTools: p.enableMcpTools, defaultModel: p.defaultModel ?? 'inherit'
     }))
   };

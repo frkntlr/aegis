@@ -18,12 +18,15 @@ export interface ComplexityAnalysisResult {
   suggestedRoles: RoleType[];
 }
 
-const TRIVIAL_KEYWORDS = ['typo', 'rename', 'comment', 'docstring', 'readme', 'format', 'lint'];
+const TRIVIAL_KEYWORDS = ['typo', 'rename', 'comment', 'docstring', 'readme', 'format', 'lint', 'yazım', 'formatla'];
 const HYPER_KEYWORDS = [
-  'monorepo', 'overhaul', 'massive', 'migration', 'hierarchical', 'swarm', 'hyper', 'complete rewrite'
+  'monorepo', 'overhaul', 'massive', 'migration', 'hierarchical', 'swarm', 'hyper', 'complete rewrite',
+  'çoklu ajan', 'coklu ajan', 'hiyerarşik', 'hiyerarsik', 'sürü', 'suru', 'ölçek', 'olcek', 'tüm proje'
 ];
 const COMPLEX_KEYWORDS = [
-  'feature', 'pipeline', 'integrate', 'controller', 'bridge', 'state', 'worker', 'scanner', 'adapter'
+  'feature', 'pipeline', 'integrate', 'controller', 'bridge', 'state', 'worker', 'scanner', 'adapter',
+  'analiz', 'araştırma', 'arastirma', 'eş zamanlı', 'es zamanli', 'paralel', 'optimizasyon', 'geliştirme',
+  'dinamik ajan', 'çoklu'
 ];
 
 export class TaskComplexityAnalyzer {

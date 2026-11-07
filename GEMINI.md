@@ -105,12 +105,16 @@ Whenever the user or agent proposes an improvement, feature, toolchain gap, or a
 
 ## Antigravity Subagent Teamwork Protocol (`/aegis teamwork`, `/teamwork`, `/tw`, `/tr`, `/aegis-tw`)
 When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamwork`, `/aegis tr`, `/aegist tr`, standard `/teamwork`, or requests multi-agent teamwork:
-1. **Unified Trigger & Immediate Lead Action**: The agent immediately adopts the Team Lead role. Never just print static text or tell the user to run subagents manually; actively orchestrate the subagents.
-2. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into `.aegis/task-inbox.json`.
+1. **Immediate Team Lead Role & Zero Direct Execution**: The agent immediately adopts the Team Lead role.
+   - 🚨 **STRICT PROHIBITION**: Team Lead is STRICTLY FORBIDDEN from directly modifying source code, editing files, or doing sequential development in the main conversation thread! Doing work directly in the main thread completely defeats the user's multi-agent mandate.
+   - All implementation, testing, UI polish, and deep analysis MUST be executed exclusively by concurrently invoked subagents (`invoke_subagent`).
+2. **Plan & Stage**: Run `aegis teamwork plan "<objective>" [targetFiles]` or call MCP `teamwork_plan`. This decomposes the goal into atomic tracks (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`), acquires file mutex locks, and stages tracks into .aegis/task-inbox.json.
 3. **Print Live Task Matrix**: Immediately render the initial markdown table in chat showing which subagents are running (`🔄 Çalışıyor`), their locked files, models, and task titles.
-4. **Register & Invoke Subagents Concurrently**:
-   - Register roles via `define_subagent` if not already defined for this session.
-   - Concurrently call `invoke_subagent` for each active track using `Workspace: 'share'` and hybrid models:
+4. **Register & Concurrently Invoke All Active Wave 1 Subagents**:
+   - Register roles via `define_subagent` if not already defined for this session (`EnableSubagentTools: true`, `EnableWriteTools: true`, `EnableMCPTools: true`).
+   - IN THE VERY SAME TURN as printing the matrix, call `invoke_subagent` for ALL Wave 1 tracks SIMULTANEOUSLY!
+   - Cease calling further tools in that turn to allow Antigravity to spin up and display all subagents executing in parallel in the user interface.
+   - Hybrid model allocation:
      - `issue-solver`: `Model: 'inherit'`
      - `qa-hunter`: `Model: 'inherit'`
      - `ui-specialist`: `Model: 'inherit'`
@@ -131,6 +135,11 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
    - Teamwork automatically shards work across up to 12 parallel, conflict-free subagents with 100% disjoint file locks.
    - Multiple issue-solvers (`issue-solver [ModuleA]`, `issue-solver [ModuleB]`) and UI specialists run concurrently in Phase 1 (Wave 1), accelerating completion without lock contention.
 10. **Autonomous Post-Task Remote Push**: Once all tracks complete and the multimodal quality gate (`cage:check` + monorepo unit tests) passes 100%, Team Lead automatically commits remaining staged assets and pushes to the tracking remote branch (`npm run aegis -- push` or `$env:GIT_TERMINAL_PROMPT=0; git push origin master`). Never leave completed and verified work unpushed as orphaned local commits.
+11. **Hierarchical Recursive Subagent Trees (Child Subagents)**:
+   - When registering subagents via `define_subagent`, ALWAYS set `EnableSubagentTools: true`.
+   - Subagents (e.g. `qa-hunter`, `issue-solver`, `ui-specialist`) are empowered and instructed to spawn their own child subagents (e.g. 4 concurrent testing agents under `qa-hunter`: playtest, ui-sweep, ast-audit, mutation) when their task covers multiple files or deep verification.
+12. **Automatic Dynamic Agent Allocation**:
+   - The user NEVER needs to specify the number of subagents manually. Aegis autonomously evaluates task complexity, scope, and domain radius via `TaskComplexityAnalyzer` (bilingual TR/EN radar) and automatically shards the task across 1 to 12 concurrent subagents with 100% disjoint locks.
 
 ## Godot 4 UI Architecture & Engineering Protocol (Demir Kafes for UI)
 When editing, scaffolding, or polishing Godot UI:

@@ -54,3 +54,12 @@ test('TaskComplexityAnalyzer formatRadar formats markdown output', () => {
   assert.ok(radar.includes('Otonom Görev Karmaşıklık Radarı'));
   assert.ok(radar.includes('Önerilen / Tahsis Edilen Ajan Sayısı:'));
 });
+
+test('TaskComplexityAnalyzer correctly classifies Turkish multi-agent complex task', () => {
+  const result = TaskComplexityAnalyzer.analyze(
+    'çoklu ajan mantığı ile eş zamanlı çalışıp hızlı sonuç odaklı analiz ve mimari geliştirme yap',
+    ['packages/core/orchestrator/src/a.ts', 'packages/cli/src/b.ts']
+  );
+  assert.ok(result.tier === 'COMPLEX' || result.tier === 'HYPER_SCALE');
+  assert.ok(result.optimalAgentCount >= 4);
+});
