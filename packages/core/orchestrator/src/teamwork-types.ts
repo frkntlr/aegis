@@ -7,6 +7,7 @@
 import type { RoleType } from './role-classifier.js';
 import type { SubagentProfile } from './teamwork-prompts.js';
 import type { ComplexityAnalysisResult } from './task-complexity-analyzer.js';
+import type { DeliberationResult } from './teamwork-deliberation-types.js';
 
 export interface AntigravityInvocationPayload {
   TypeName: string;
@@ -37,6 +38,8 @@ export interface TeamworkPlan {
   summary: string;
   discoveredFiles?: string[];
   complexity?: ComplexityAnalysisResult;
+  deliberation?: DeliberationResult;
+  deliberationSummary?: string;
 }
 
 export interface TeamworkStatusReport {

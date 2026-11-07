@@ -211,3 +211,25 @@ test('TeamworkCoordinator smoothly advances waves (Wave 1 -> Wave 2 QA -> Wave 3
   }
 });
 
+test('TeamworkCoordinator integrates SemanticAIDecomposer and embeds deliberation consensus in plan', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-sem-coord-test-'));
+  try {
+    const coordinator = new TeamworkCoordinator(tmpDir);
+    const plan = coordinator.planTeamwork(
+      'Implement state machine workflow and streaming data flow pipeline',
+      ['src/state-mutex.ts', 'src/data-mesh.ts', 'docs/spec.md'],
+      { deliberate: true, semantic: true }
+    );
+
+    assert.ok(plan.deliberation);
+    assert.ok(plan.deliberationSummary);
+    assert.ok(plan.summary.includes('Deliberation'));
+    assert.ok(plan.tracks.length >= 2);
+    assert.ok(plan.tracks.some(t => t.subagentName.includes('StateMachine') || t.subagentName.includes('DataFlow')));
+    assert.ok(coordinator.reflectionEngine);
+    assert.strictEqual(coordinator.getReflectionEngine(), coordinator.reflectionEngine);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+

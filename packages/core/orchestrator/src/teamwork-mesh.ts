@@ -12,6 +12,16 @@ import {
   type MeshConflict
 } from './teamwork-mesh-store.js';
 
+export interface WaveStatus {
+  wave: number;
+  total: number;
+  done: number;
+  blocked: number;
+  pending: number;
+  readyForNextWave: boolean;
+  needsCorrection: boolean;
+}
+
 export { TeamworkMeshStore, type ActivityUpdate, type MeshConflict };
 
 export class TeamworkMesh {
@@ -58,6 +68,13 @@ export class TeamworkMesh {
       }
       if (newContracts.length > 0) {
         this.store.appendEvent(state, agentId, 'contract_update', `📜 Contract published: [${newContracts.join(', ')}]`, { contracts: newContracts });
+      }
+      if (update.status === 'blocked') {
+        this.store.appendEvent(state, agentId, 'milestone', `⚠️ TASK_BLOCKED: @${agentId} is blocked: ${update.activity ?? 'Awaiting remediation'}`, {
+          status: 'blocked',
+          triggerFeedbackLoop: true,
+          agentId
+        });
       }
       if (update.status === 'done') this.checkWaveProgression(state);
 
@@ -147,6 +164,7 @@ export class TeamworkMesh {
         fromWave: oldWave,
         toWave: state.activeWave,
         nextPhase,
+        triggerReflection: true,
         planId: planId ?? state.planId
       });
       this.store.saveState(state);
@@ -173,7 +191,42 @@ export class TeamworkMesh {
     if (peers.length > 0 && peers.every(p => p.status === 'done')) {
       const oldWave = state.activeWave;
       state.activeWave += 1;
-      this.store.appendEvent(state, 'coordinator', 'milestone', `🌊 Wave ${oldWave} completed! Wave ${state.activeWave} unlocked.`);
+      const phaseNames: Record<number, string> = { 2: 'QA Hunter Verification', 3: 'Living Architecture Synthesis' };
+      const nextPhase = phaseNames[state.activeWave] ?? 'Final Delivery';
+      this.store.appendEvent(state, 'coordinator', 'milestone', `🌊 Wave ${oldWave} completed! Wave ${state.activeWave} unlocked.`, {
+        eventName: 'WAVE_COMPLETED',
+        fromWave: oldWave,
+        toWave: state.activeWave,
+        nextPhase,
+        triggerReflection: true
+      });
     }
+  }
+
+  public getWaveStatus(wave?: number): WaveStatus {
+    const s = this.store.loadState();
+    const targetWave = wave ?? s.activeWave;
+    const peers = Object.values(s.agents).filter(p =>
+      (p.phase ?? (p.currentActivity.includes(`Wave ${targetWave}`) ? targetWave : undefined)) === targetWave
+    );
+    const done = peers.filter(p => p.status === 'done').length;
+    const blocked = peers.filter(p => p.status === 'blocked').length;
+    return {
+      wave: targetWave,
+      total: peers.length,
+      done,
+      blocked,
+      pending: peers.length - done - blocked,
+      readyForNextWave: peers.length > 0 && done === peers.length,
+      needsCorrection: blocked > 0
+    };
+  }
+
+  public isWaveComplete(wave?: number): boolean {
+    return this.getWaveStatus(wave).readyForNextWave;
+  }
+
+  public isCorrectionNeeded(): boolean {
+    return Object.values(this.store.loadState().agents).some(p => p.status === 'blocked');
   }
 }

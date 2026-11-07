@@ -249,3 +249,30 @@ test('TeamworkMesh synchronizes concurrent posts across multiple instances atomi
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('TeamworkMesh coordinates wave status, completion, and blocked self-correction triggers', () => {
+  const tmp = createTempDir();
+  try {
+    const mesh = new TeamworkMesh(tmp);
+    mesh.initializeMesh('plan-coord-wave', 'Coordination test', createMockTracks());
+
+    const initStatus = mesh.getWaveStatus(1);
+    assert.strictEqual(initStatus.wave, 1);
+    assert.strictEqual(initStatus.total, 2);
+    assert.strictEqual(initStatus.readyForNextWave, false);
+
+    mesh.postActivity('issue-solver [Core]', { status: 'blocked', activity: 'Missing AST definition' });
+    assert.strictEqual(mesh.isCorrectionNeeded(), true);
+    assert.ok(mesh.getEvents().some(e => e.message.includes('TASK_BLOCKED')));
+
+    mesh.postActivity('issue-solver [Core]', { status: 'done', activity: 'Resolved AST' });
+    mesh.postActivity('ui-specialist [UI]', { status: 'done', activity: 'HUD finished' });
+
+    assert.strictEqual(mesh.getMeshState().activeWave, 2);
+    const completedEv = mesh.getEvents().find(e => e.payload?.eventName === 'WAVE_COMPLETED');
+    assert.ok(completedEv);
+    assert.strictEqual(completedEv?.payload?.triggerReflection, true);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

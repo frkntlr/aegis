@@ -7,25 +7,13 @@
 import { showBanner } from './banner.js';
 import { clearInboxTasks } from './task-inbox.js';
 import {
-  handleTeamworkMesh,
-  handleTeamworkPeers,
-  handleTeamworkPost,
-  handleTeamworkBroadcast,
-  handleTeamworkWaves,
-  handleTeamworkConflicts,
-  handleTeamworkScale,
-  handleTeamworkBatch,
-  handleTeamworkDoc,
-  handleTeamworkAdvance,
-  handleTeamworkTools
+  handleTeamworkMesh, handleTeamworkPeers, handleTeamworkPost, handleTeamworkBroadcast,
+  handleTeamworkWaves, handleTeamworkConflicts, handleTeamworkScale, handleTeamworkBatch,
+  handleTeamworkDoc, handleTeamworkAdvance, handleTeamworkTools, handleTeamworkReflect, handleTeamworkIterate
 } from './teamwork-mesh-command.js';
 
 export { handleTeamworkTools };
-import {
-  TeamworkCoordinator,
-  type TeamworkPlan,
-  type TeamworkTrack
-} from '@aegis/orchestrator';
+import { TeamworkCoordinator, type TeamworkPlan, type TeamworkTrack } from '@aegis/orchestrator';
 
 export function handleTeamworkStatus(flag?: string): void {
   const isJson = flag === '--json' || flag === '-j';
@@ -39,15 +27,12 @@ export function handleTeamworkStatus(flag?: string): void {
   console.log(` • Active Tracks Staged: ${status.activeTracksCount}`);
   console.log(` • Locked Files: ${status.lockedFilesCount}`);
   if (status.lockedFilesCount > 0) {
-    for (const [file, owner] of Object.entries(status.locks)) {
-      console.log(`    🔒 ${file} -> @${owner}`);
-    }
+    for (const [file, owner] of Object.entries(status.locks)) console.log(`    🔒 ${file} -> @${owner}`);
   }
 
   console.log('\n🤖 Available Antigravity Subagent Roles:');
   for (const p of status.profiles) {
-    console.log(` • ${p.badge}`);
-    console.log(`    Mode: ${p.workspaceMode} | MCP: ${p.enableMcpTools ? 'Yes' : 'No'} | Write: ${p.enableWriteTools ? 'Yes' : 'No'}`);
+    console.log(` • ${p.badge}\n    Mode: ${p.workspaceMode} | MCP: ${p.enableMcpTools ? 'Yes' : 'No'} | Write: ${p.enableWriteTools ? 'Yes' : 'No'}`);
   }
 }
 
@@ -78,6 +63,7 @@ interface PlanFlags {
   compact: boolean; json: boolean; dryRun: boolean;
   maxConcurrency?: number; explicitRole?: string;
   treeSpecialists?: boolean; research?: boolean; deepAnalyze?: boolean;
+  semantic?: boolean; deliberate?: boolean; reflect?: boolean; iterate?: boolean;
 }
 
 function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
@@ -90,9 +76,13 @@ function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
     else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
     else if (a === '--research') flags.research = true;
     else if (a === '--deep' || a === '--deep-analyze') flags.deepAnalyze = true;
-    else if (a === "--tree" || a === "--specialists") flags.treeSpecialists = true;
-    else if (a.startsWith("--role=") || a.startsWith("-r=") || a.startsWith("--only=")) flags.explicitRole = a.split("=")[1];
-    else if (a.startsWith("--max-agents=") || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
+    else if (a === '--tree' || a === '--specialists') flags.treeSpecialists = true;
+    else if (a === '--semantic') flags.semantic = true;
+    else if (a === '--deliberate') flags.deliberate = true;
+    else if (a === '--reflect') flags.reflect = true;
+    else if (a === '--iterate') flags.iterate = true;
+    else if (a.startsWith('--role=') || a.startsWith('-r=') || a.startsWith('--only=')) flags.explicitRole = a.split('=')[1];
+    else if (a.startsWith('--max-agents=') || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
     else if (a && !a.startsWith('-')) files.push(a);
   }
   return { files, flags };
@@ -105,17 +95,20 @@ function printPlanSummary(
   coordinator: TeamworkCoordinator
 ): void {
   console.log(`🎯 Aegis Teamwork Plan Created: ${plan.planId}`);
-  console.log(` • Objective: "${plan.objective}"`);
-  console.log(` • Summary: ${plan.summary}`);
+  console.log(` • Objective: "${plan.objective}"\n • Summary: ${plan.summary}`);
   if (plan.complexity) {
     console.log(` • ⚡ Complexity Radar: [${plan.complexity.tier}] (${plan.complexity.score}/100) -> Auto-allocated: ${plan.complexity.optimalAgentCount} agents`);
   }
   if (plan.discoveredFiles && plan.discoveredFiles.length > 0 && files.length === 0) {
     console.log(` • ⚡ Fast Semantic Discovery: ${plan.discoveredFiles.length} file(s) auto-bound: [${plan.discoveredFiles.join(', ')}]`);
   }
+  if (plan.deliberation) {
+    const d = plan.deliberation;
+    console.log(` • 🧠 Deliberation: [${d.consensus.status.toUpperCase()}] (${d.consensus.consensusScore}%) | Domains: [${d.domains.join(', ')}]`);
+    console.log(`   ↳ Consensus Strategy: "${d.consensus.agreedStrategy}"`);
+  }
   const stageMsg = flags.dryRun ? ' • [DRY RUN] Plan not staged in TIP inbox (no locks acquired)\n' : ' • Staged in TIP Inbox: .aegis/task-inbox.json\n';
-  console.log(stageMsg);
-  console.log(coordinator.formatLiveMatrix(plan));
+  console.log(stageMsg + coordinator.formatLiveMatrix(plan));
   console.log('\n' + coordinator.formatAsciiDag(plan));
   for (const track of plan.tracks) printTrackPayload(track);
 }
@@ -134,13 +127,16 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
   const plan = coordinator.planTeamwork(objectiveArg.trim(), files, {
     stage: !flags.dryRun, acquireLocks: !flags.dryRun,
     maxConcurrency: flags.maxConcurrency, explicitRole: flags.explicitRole,
-    treeSpecialists: flags.treeSpecialists, research: flags.research, deepAnalyze: flags.deepAnalyze
+    treeSpecialists: flags.treeSpecialists, research: flags.research, deepAnalyze: flags.deepAnalyze,
+    deliberate: flags.deliberate, semantic: flags.semantic
   });
 
   if (flags.json) { console.log(JSON.stringify(plan, null, 2)); return plan; }
   if (flags.compact) { console.log(coordinator.compactTeamwork(plan)); return plan; }
 
   printPlanSummary(plan, files, flags, coordinator);
+  if (flags.reflect) handleTeamworkReflect(plan.planId);
+  if (flags.iterate) handleTeamworkIterate(plan.planId);
   return plan;
 }
 
@@ -148,8 +144,7 @@ export function handleTeamworkSetup(outDir?: string): void {
   showBanner();
   const coordinator = new TeamworkCoordinator();
   const result = coordinator.exportSubagentManifest(outDir);
-  console.log(`✅ Exported Antigravity Subagents Manifest: ${result.manifestPath}`);
-  console.log(` • Subagents configured: ${result.count}`);
+  console.log(`✅ Exported Antigravity Subagents Manifest: ${result.manifestPath}\n • Subagents configured: ${result.count}`);
 }
 
 export function handleTeamworkDag(objectiveArg?: string, ...files: string[]): void {
@@ -177,6 +172,8 @@ function routeMeshSubcommands(norm: string, all: string[]): boolean {
   if (norm === 'doc' || norm === 'synthesize') { handleTeamworkDoc(all[1], ...all.slice(2)); return true; }
   if (norm === 'advance') { handleTeamworkAdvance(all[1]); return true; }
   if (norm === 'tools' || norm === 'tool' || norm === 'arsenal') { handleTeamworkTools(all[1], ...all.slice(2)); return true; }
+  if (norm === 'reflect') { handleTeamworkReflect(all[1], ...all.slice(2)); return true; }
+  if (norm === 'iterate') { handleTeamworkIterate(all[1], ...all.slice(2)); return true; }
   if (norm === 'gh' || norm === 'github') { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); return true; }
   if (norm === 'swarm') { void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(all[1], ...all.slice(2))); return true; }
   if (norm === 'deliberate' || norm === 'deliberation') { void import('./teamwork-deliberate-command.js').then(m => m.handleTeamworkDeliberate(all[1], ...all.slice(2))); return true; }
@@ -216,8 +213,7 @@ export function handleTeamworkCompact(objectiveArg?: string): void {
   showBanner();
   const coordinator = new TeamworkCoordinator();
   const plan = coordinator.planTeamwork(objectiveArg || 'Active Mission', [], { stage: false, acquireLocks: false });
-  const briefing = coordinator.compactTeamwork(plan);
-  console.log(briefing);
+  console.log(coordinator.compactTeamwork(plan));
 }
 
 export function handleTeamworkAnalyze(objectiveArg?: string, ...files: string[]): void {
@@ -243,36 +239,35 @@ export function mcpTeamworkPlan(args: Record<string, unknown> = {}): string {
   const maxConcurrency = typeof args.maxConcurrency === 'number' ? args.maxConcurrency : undefined;
   const explicitRole = typeof args.role === 'string' ? args.role : undefined;
   const treeSpecialists = typeof args.treeSpecialists === 'boolean' ? args.treeSpecialists : undefined;
-  const plan = coordinator.planTeamwork(objective, targetFiles, { maxConcurrency, explicitRole, treeSpecialists });
+  const deliberate = typeof args.deliberate === 'boolean' ? args.deliberate : undefined;
+  const semantic = typeof args.semantic === 'boolean' ? args.semantic : undefined;
+  const plan = coordinator.planTeamwork(objective, targetFiles, {
+    maxConcurrency, explicitRole, treeSpecialists, deliberate, semantic
+  });
   return JSON.stringify(plan, null, 2);
 }
 
 export function mcpTeamworkStatus(): string {
   const coordinator = new TeamworkCoordinator();
-  const status = coordinator.getTeamworkStatus();
-  return JSON.stringify(status, null, 2);
+  return JSON.stringify(coordinator.getTeamworkStatus(), null, 2);
 }
 
 export function mcpTeamworkDag(args: Record<string, unknown> = {}): string {
   const objective = String(args.objective || 'Active Mission');
   const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, targetFiles, { stage: false, acquireLocks: false });
-  return coordinator.formatAsciiDag(plan);
+  return coordinator.formatAsciiDag(coordinator.planTeamwork(objective, targetFiles, { stage: false, acquireLocks: false }));
 }
 
 export function mcpTeamworkCompact(args: Record<string, unknown> = {}): string {
   const objective = String(args.objective || 'Active Mission');
   const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, [], { stage: false, acquireLocks: false });
-  return coordinator.compactTeamwork(plan);
+  return coordinator.compactTeamwork(coordinator.planTeamwork(objective, [], { stage: false, acquireLocks: false }));
 }
 
 export function mcpTeamworkAnalyze(args: Record<string, unknown> = {}): string {
   const objective = String(args.objective || '');
   if (!objective) return JSON.stringify({ error: 'Missing required argument: objective' });
   const explicitFiles = Array.isArray(args.files) ? args.files.map(String) : [];
-  const coordinator = new TeamworkCoordinator();
-  const res = coordinator.getSemanticAnalyzer().analyze(objective, explicitFiles);
-  return JSON.stringify(res, null, 2);
+  return JSON.stringify(new TeamworkCoordinator().getSemanticAnalyzer().analyze(objective, explicitFiles), null, 2);
 }
