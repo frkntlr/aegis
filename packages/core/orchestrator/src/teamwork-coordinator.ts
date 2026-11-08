@@ -34,6 +34,25 @@ export {
 };
 export type { BootstrapResult, BootstrapOptions };
 
+export interface TeamworkCoordinatorOptions {
+  repoRoot?: string;
+  worktreeManager?: WorktreeManager;
+  roleClassifier?: RoleClassifier;
+  groundingEngine?: TeamworkGroundingEngine;
+  semanticAnalyzer?: FastSemanticAnalyzer;
+  compactEngine?: TeamworkCompactEngine;
+  mesh?: TeamworkMesh;
+  deliberationEngine?: TeamworkDeliberationEngine;
+  reflectionEngine?: TeamworkReflectionEngine;
+}
+
+export interface PlanTeamworkOptions {
+  deterministic?: boolean; stage?: boolean; acquireLocks?: boolean;
+  maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[];
+  explicitRole?: string; treeSpecialists?: boolean; research?: boolean;
+  deepAnalyze?: boolean; deliberate?: boolean; semantic?: boolean;
+}
+
 export class TeamworkCoordinator {
   private repoRoot: string;
   private _worktreeManager?: WorktreeManager;
@@ -46,11 +65,32 @@ export class TeamworkCoordinator {
   private _reflectionEngine?: TeamworkReflectionEngine;
   private cachedProfiles?: SubagentProfile[];
 
-  constructor(repoRoot?: string, wtManager?: WorktreeManager, roleClassifier?: RoleClassifier, grounding?: TeamworkGroundingEngine) {
-    this.repoRoot = resolveSafeRepoRoot(repoRoot);
-    this._worktreeManager = wtManager;
-    this._roleClassifier = roleClassifier;
-    this._groundingEngine = grounding;
+  constructor(
+    repoRootOrOptions?: string | TeamworkCoordinatorOptions,
+    wtManager?: WorktreeManager,
+    roleClassifier?: RoleClassifier,
+    grounding?: TeamworkGroundingEngine,
+    semanticAnalyzer?: FastSemanticAnalyzer,
+    compactEngine?: TeamworkCompactEngine
+  ) {
+    if (typeof repoRootOrOptions === 'object' && repoRootOrOptions !== null) {
+      this.repoRoot = resolveSafeRepoRoot(repoRootOrOptions.repoRoot);
+      this._worktreeManager = repoRootOrOptions.worktreeManager;
+      this._roleClassifier = repoRootOrOptions.roleClassifier;
+      this._groundingEngine = repoRootOrOptions.groundingEngine;
+      this._semanticAnalyzer = repoRootOrOptions.semanticAnalyzer;
+      this._compactEngine = repoRootOrOptions.compactEngine;
+      this._mesh = repoRootOrOptions.mesh;
+      this._deliberationEngine = repoRootOrOptions.deliberationEngine;
+      this._reflectionEngine = repoRootOrOptions.reflectionEngine;
+    } else {
+      this.repoRoot = resolveSafeRepoRoot(repoRootOrOptions);
+      this._worktreeManager = wtManager;
+      this._roleClassifier = roleClassifier;
+      this._groundingEngine = grounding;
+      this._semanticAnalyzer = semanticAnalyzer;
+      this._compactEngine = compactEngine;
+    }
     try { ProjectBootstrapEngine.bootstrap(this.repoRoot); } catch { /* safe */ }
   }
 
@@ -58,42 +98,23 @@ export class TeamworkCoordinator {
     return ProjectBootstrapEngine.bootstrap(this.repoRoot, options);
   }
 
+  public get repoRootPath(): string { return this.repoRoot; }
   public get worktreeManager(): WorktreeManager {
     return this._worktreeManager ??= new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
   }
-
-  public get roleClassifier(): RoleClassifier {
-    return this._roleClassifier ??= new RoleClassifier();
-  }
-
-  public get groundingEngine(): TeamworkGroundingEngine {
-    return this._groundingEngine ??= new TeamworkGroundingEngine(this.repoRoot);
-  }
-
-  public get semanticAnalyzer(): FastSemanticAnalyzer {
-    return this._semanticAnalyzer ??= new FastSemanticAnalyzer(this.repoRoot);
-  }
-
-  public get compactEngine(): TeamworkCompactEngine {
-    return this._compactEngine ??= new TeamworkCompactEngine(this.repoRoot);
-  }
-
-  public get mesh(): TeamworkMesh {
-    return this._mesh ??= new TeamworkMesh(this.repoRoot);
-  }
-
-  public get deliberationEngine(): TeamworkDeliberationEngine {
-    return this._deliberationEngine ??= new TeamworkDeliberationEngine(this.repoRoot);
-  }
-
-  public get reflectionEngine(): TeamworkReflectionEngine {
-    return this._reflectionEngine ??= new TeamworkReflectionEngine(this.repoRoot, this.mesh);
-  }
+  public get roleClassifier(): RoleClassifier { return this._roleClassifier ??= new RoleClassifier(); }
+  public get groundingEngine(): TeamworkGroundingEngine { return this._groundingEngine ??= new TeamworkGroundingEngine(this.repoRoot); }
+  public get semanticAnalyzer(): FastSemanticAnalyzer { return this._semanticAnalyzer ??= new FastSemanticAnalyzer(this.repoRoot); }
+  public get compactEngine(): TeamworkCompactEngine { return this._compactEngine ??= new TeamworkCompactEngine(this.repoRoot); }
+  public get mesh(): TeamworkMesh { return this._mesh ??= new TeamworkMesh(this.repoRoot); }
+  public get deliberationEngine(): TeamworkDeliberationEngine { return this._deliberationEngine ??= new TeamworkDeliberationEngine(this.repoRoot); }
+  public get reflectionEngine(): TeamworkReflectionEngine { return this._reflectionEngine ??= new TeamworkReflectionEngine(this.repoRoot, this.mesh); }
 
   public computeWaves(tracks?: TeamworkTrack[]): ExecutionWave[] { return computeExecutionWaves(tracks ?? []); }
   public formatWaveBriefing(waves?: ExecutionWave[]): string { return formatParallelDispatchBriefing(waves ?? []); }
   public formatCompactWaveBriefing(waves?: ExecutionWave[]): string { return formatCompactWaveBriefing(waves ?? []); }
 
+  public getRepoRoot(): string { return this.repoRoot; }
   public getWorktreeManager(): WorktreeManager { return this.worktreeManager; }
   public getRoleClassifier(): RoleClassifier { return this.roleClassifier; }
   public getGroundingEngine(): TeamworkGroundingEngine { return this.groundingEngine; }
@@ -101,6 +122,7 @@ export class TeamworkCoordinator {
   public getCompactEngine(): TeamworkCompactEngine { return this.compactEngine; }
   public getDeliberationEngine(): TeamworkDeliberationEngine { return this.deliberationEngine; }
   public getReflectionEngine(): TeamworkReflectionEngine { return this.reflectionEngine; }
+  public getMesh(): TeamworkMesh { return this.mesh; }
 
   public deliberate(objective: string, files: string[] = [], options?: DeliberationOptions): DeliberationResult {
     return this.deliberationEngine.deliberate(objective, files, options);
@@ -115,34 +137,25 @@ export class TeamworkCoordinator {
     return this.cachedProfiles;
   }
 
-  private scaleSemanticSubtasks(
-    subtasks: DecomposedSubtask[],
-    files: string[],
-    objective: string,
-    target: number
-  ): DecomposedSubtask[] {
+  private scaleSemanticSubtasks(subtasks: DecomposedSubtask[], files: string[], objective: string, target: number): DecomposedSubtask[] {
     const solvers = subtasks.filter(t => t.roleType === 'solver');
     TeamworkSharder.shardSolversByFiles(subtasks, files, objective);
     TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
-    const scaled = (solvers.length <= 1 && subtasks.length < target)
-      ? TeamworkSharder.shardMaxConcurrency(subtasks, files, target)
-      : subtasks;
+    const scaled = (solvers.length <= 1 && subtasks.length < target) ? TeamworkSharder.shardMaxConcurrency(subtasks, files, target) : subtasks;
     this.alignSubtaskPhases(scaled, files);
     return scaled;
   }
 
   private alignSubtaskPhases(subtasks: DecomposedSubtask[], files: string[]): void {
     for (const t of subtasks) {
-      if (t.roleType === 'ui' || t.roleType === 'solver') {
-        t.phase = 1;
-        t.dependsOn = [];
-      } else if (t.roleType === 'qa') {
+      if (t.roleType === 'ui' || t.roleType === 'solver') { t.phase = 1; t.dependsOn = []; }
+      else if (t.roleType === 'qa') {
         t.phase = 2;
         if (!t.dependsOn?.length) t.dependsOn = subtasks.filter(s => s.phase === 1).map(s => s.label);
       } else if (t.roleType === 'docs') {
         t.phase = 3;
-        const qaDeps = subtasks.filter(s => s.phase === 2).map(s => s.label);
-        t.dependsOn = qaDeps.length > 0 ? qaDeps : subtasks.filter(s => s.phase === 1).map(s => s.label);
+        const qa = subtasks.filter(s => s.phase === 2).map(s => s.label);
+        t.dependsOn = qa.length > 0 ? qa : subtasks.filter(s => s.phase === 1).map(s => s.label);
       }
     }
     if (files.length > 0) TeamworkSharder.partitionFiles(subtasks, files);
@@ -163,24 +176,13 @@ export class TeamworkCoordinator {
     objective: string,
     files: string[],
     complexity: ReturnType<typeof TaskComplexityAnalyzer.analyze>,
-    options?: {
-      maxConcurrency?: number;
-      autoScale?: boolean;
-      selectedRoles?: RoleType[];
-      explicitRole?: string;
-      treeSpecialists?: boolean;
-      deliberate?: boolean;
-      semantic?: boolean;
-    }
+    options?: PlanTeamworkOptions
   ): DecomposedSubtask[] {
     const isSemantic = Boolean(options?.semantic || options?.deliberate);
     if (isSemantic) {
       let subtasks = SemanticAIDecomposer.toDecomposedSubtasks(SemanticAIDecomposer.decompose(objective, files));
       this.reconcileSemanticSubtasks(subtasks, files, objective);
-      const isScaling = Boolean(
-        complexity.tier === 'COMPLEX' || complexity.tier === 'HYPER_SCALE' ||
-        options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1)
-      );
+      const isScaling = Boolean(complexity.tier === 'COMPLEX' || complexity.tier === 'HYPER_SCALE' || options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1));
       if (isScaling) {
         subtasks = this.scaleSemanticSubtasks(subtasks, files, objective, options?.maxConcurrency ?? complexity.optimalAgentCount);
       }
@@ -196,16 +198,7 @@ export class TeamworkCoordinator {
     });
   }
 
-  public planTeamwork(
-    objective: string,
-    targetFiles: string[] = [],
-    options?: {
-      deterministic?: boolean; stage?: boolean; acquireLocks?: boolean;
-      maxConcurrency?: number; autoScale?: boolean; selectedRoles?: RoleType[];
-      explicitRole?: string; treeSpecialists?: boolean; research?: boolean;
-      deepAnalyze?: boolean; deliberate?: boolean; semantic?: boolean;
-    }
-  ): TeamworkPlan {
+  public planTeamwork(objective: string, targetFiles: string[] = [], options?: PlanTeamworkOptions): TeamworkPlan {
     try { ProjectBootstrapEngine.bootstrap(this.repoRoot); } catch { /* safe */ }
     const isDet = options?.deterministic === true;
     const shouldStage = options?.stage ?? true;
@@ -249,7 +242,7 @@ export class TeamworkCoordinator {
   public compactTeamwork(plan?: TeamworkPlan): string {
     const activePlan = plan ?? this.planTeamwork('Active Mission');
     const status = this.getTeamworkStatus();
-    this.compactEngine.compactInbox();
+    this.compactEngine.compactInbox(this.repoRoot);
     return this.compactEngine.generateCompactBriefing(activePlan, status);
   }
 
@@ -265,9 +258,7 @@ export class TeamworkCoordinator {
     return TeamworkVisualizer.formatLiveMatrix(plan, statuses);
   }
 
-  public formatAsciiDag(plan: TeamworkPlan): string {
-    return TeamworkVisualizer.formatAsciiDag(plan);
-  }
+  public formatAsciiDag(plan: TeamworkPlan): string { return TeamworkVisualizer.formatAsciiDag(plan); }
 
   public advanceWave(planId?: string): { advanced: boolean; currentWave: number; nextPhase: string; nextBatchPayload: unknown[] } {
     const meshRes = this.mesh.advanceWave(planId);

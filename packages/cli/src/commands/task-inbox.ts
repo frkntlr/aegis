@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeMutex } from '@aegis/orchestrator';
 
@@ -28,9 +29,41 @@ export interface TaskInboxData {
   tasks: TaskInboxItem[];
 }
 
+function isTestEnvironment(targetDir?: string): boolean {
+  if (process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1' || process.env.AEGIS_TEST_SHIELD === '1') {
+    return true;
+  }
+  const check = (targetDir || process.cwd()).toLowerCase();
+  return check.includes('tmp') || check.includes('temp') || check.includes('.test') || check.includes('-test');
+}
+
+function resolveCustomInboxPath(rawPath: string): string {
+  const custom = path.resolve(rawPath.trim());
+  if (custom.endsWith('.json')) return custom;
+  return path.basename(custom) === '.aegis'
+    ? path.join(custom, 'task-inbox.json')
+    : path.join(custom, '.aegis', 'task-inbox.json');
+}
+
 export function getInboxFilePath(baseDir?: string): string {
-  const root = resolveSafeRepoRoot(baseDir);
-  return path.resolve(root, '.aegis', 'task-inbox.json');
+  if (baseDir) {
+    const resolved = path.resolve(baseDir);
+    if (resolved.endsWith('.json')) return resolved;
+    if (path.basename(resolved) === '.aegis') return path.join(resolved, 'task-inbox.json');
+    if (!fs.existsSync(resolved) || isTestEnvironment(resolved)) {
+      return path.join(resolved, '.aegis', 'task-inbox.json');
+    }
+    return path.join(resolveSafeRepoRoot(baseDir), '.aegis', 'task-inbox.json');
+  }
+  if (process.env.AEGIS_INBOX_PATH?.trim()) {
+    return resolveCustomInboxPath(process.env.AEGIS_INBOX_PATH);
+  }
+  if (isTestEnvironment()) {
+    const testPath = path.resolve(os.tmpdir(), `aegis-test-${process.pid}`, '.aegis', 'task-inbox.json');
+    process.env.AEGIS_INBOX_PATH = testPath;
+    return testPath;
+  }
+  return path.resolve(resolveSafeRepoRoot(), '.aegis', 'task-inbox.json');
 }
 
 export function withInboxLock<T>(baseDir: string | undefined, fn: () => T): T {
@@ -102,6 +135,17 @@ export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskI
   });
 }
 
+function reconcileBlockedTasks(data: TaskInboxData, baseDir?: string): void {
+  let reconciled = false;
+  for (const t of data.tasks) {
+    if (t.status === 'blocked' && t.dependsOn?.length && isTaskDependenciesSatisfied(t, data.tasks)) {
+      t.status = 'pending';
+      reconciled = true;
+    }
+  }
+  if (reconciled) writeTaskInbox(data, baseDir);
+}
+
 export function stageTaskInInbox(
   item: Omit<TaskInboxItem, 'id' | 'stagedAt' | 'status'>,
   baseDir?: string
@@ -117,11 +161,8 @@ export function stageTaskInInbox(
       stagedAt: new Date().toISOString()
     };
 
-    if (existingIndex >= 0) {
-      data.tasks[existingIndex] = stagedItem;
-    } else {
-      data.tasks.push(stagedItem);
-    }
+    if (existingIndex >= 0) data.tasks[existingIndex] = stagedItem;
+    else data.tasks.push(stagedItem);
 
     writeTaskInbox(data, baseDir);
     return stagedItem;
@@ -129,11 +170,8 @@ export function stageTaskInInbox(
 }
 
 function hasRoleMismatch(t: string, q: string): boolean {
-  if (t.includes('solver') && (q.includes('qa') || q.includes('ui') || q.includes('doc'))) return true;
-  if (t.includes('qa') && (q.includes('solver') || q.includes('ui') || q.includes('doc'))) return true;
-  if (t.includes('ui') && (q.includes('solver') || q.includes('qa') || q.includes('doc'))) return true;
-  if (t.includes('doc') && (q.includes('solver') || q.includes('qa') || q.includes('ui'))) return true;
-  return false;
+  const roles = ['solver', 'qa', 'ui', 'doc'];
+  return roles.some(r1 => t.includes(r1) && roles.some(r2 => r1 !== r2 && q.includes(r2)));
 }
 
 export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber?: number, trackId?: string): boolean {
@@ -173,14 +211,7 @@ export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber
 export function pullNextPendingTask(role?: string, baseDir?: string): TaskInboxItem | null {
   return withInboxLock(baseDir, () => {
     const data = readTaskInbox(baseDir);
-    let reconciled = false;
-    for (const t of data.tasks) {
-      if (t.status === 'blocked' && t.dependsOn && t.dependsOn.length > 0 && isTaskDependenciesSatisfied(t, data.tasks)) {
-        t.status = 'pending';
-        reconciled = true;
-      }
-    }
-    if (reconciled) writeTaskInbox(data, baseDir);
+    reconcileBlockedTasks(data, baseDir);
 
     const task = data.tasks.find(t => {
       if (t.status !== 'pending') return false;
@@ -227,14 +258,7 @@ export function updateTaskInboxStatus(
 
 export function listInboxTasks(statusFilter?: string, baseDir?: string): TaskInboxItem[] {
   const data = readTaskInbox(baseDir);
-  let reconciled = false;
-  for (const t of data.tasks) {
-    if (t.status === 'blocked' && t.dependsOn && t.dependsOn.length > 0 && isTaskDependenciesSatisfied(t, data.tasks)) {
-      t.status = 'pending';
-      reconciled = true;
-    }
-  }
-  if (reconciled) writeTaskInbox(data, baseDir);
+  reconcileBlockedTasks(data, baseDir);
 
   if (!statusFilter || statusFilter === 'all') return data.tasks;
   return data.tasks.filter(t => t.status === statusFilter);
@@ -244,11 +268,7 @@ export function clearInboxTasks(statusFilter?: string, baseDir?: string): number
   return withInboxLock(baseDir, () => {
     const data = readTaskInbox(baseDir);
     const before = data.tasks.length;
-    if (!statusFilter || statusFilter === 'all') {
-      data.tasks = [];
-    } else {
-      data.tasks = data.tasks.filter(t => t.status !== statusFilter);
-    }
+    data.tasks = (!statusFilter || statusFilter === 'all') ? [] : data.tasks.filter(t => t.status !== statusFilter);
     writeTaskInbox(data, baseDir);
     return before - data.tasks.length;
   });

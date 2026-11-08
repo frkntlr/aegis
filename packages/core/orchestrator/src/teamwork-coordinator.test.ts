@@ -250,3 +250,23 @@ test('TeamworkCoordinator scales semantic subtasks in parallel for complex and a
   }
 });
 
+test('TeamworkCoordinator supports options-based mock injection and isolates repoRoot', () => {
+  const tmpA = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-coord-iso-a-'));
+  const tmpB = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-coord-iso-b-'));
+  try {
+    const mockAnalyzer = { analyze: () => ({ targetFiles: ['mock.ts'], keywords: [], confidence: 1, durationMs: 0, fromCache: false, objective: 'mock' }) };
+    const coordA = new TeamworkCoordinator({ repoRoot: tmpA, semanticAnalyzer: mockAnalyzer as unknown as import('./fast-semantic-analyzer.js').FastSemanticAnalyzer });
+    const coordB = new TeamworkCoordinator(tmpB);
+
+    assert.strictEqual(coordA.getRepoRoot(), tmpA);
+    assert.strictEqual(coordB.getRepoRoot(), tmpB);
+    assert.strictEqual(coordA.semanticAnalyzer, mockAnalyzer as unknown);
+    assert.notStrictEqual(coordB.semanticAnalyzer, mockAnalyzer as unknown);
+    assert.strictEqual(coordA.getMesh(), coordA.mesh);
+  } finally {
+    fs.rmSync(tmpA, { recursive: true, force: true });
+    fs.rmSync(tmpB, { recursive: true, force: true });
+  }
+});
+
+
