@@ -57,7 +57,9 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis inspect                          Zero-token bounding box layout inspection',
     '  aegis mutate <file>                    Run mutation testing gate on target file',
     '  aegis audit <files>                    Run Immutable Oracle trust verification',
-    '  aegis estimate <files> <tests>         Pre-execution adaptive timeout estimation'
+    '  aegis estimate <files> <tests>         Pre-execution adaptive timeout estimation',
+    '  aegis test [--offline] [--soft]        Resilient test watchdog with network shield',
+    '  aegis test:offline                     Run tests isolated inside strict offline network shield'
   ],
   '🎮 Godot 4 Bridge & UI': [
     '  aegis godot <subcommand>               Godot Bridge: status, inspect, validate, query, run',

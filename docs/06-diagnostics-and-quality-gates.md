@@ -110,6 +110,43 @@ aegis ci:check
 
 ---
 
+## 4.4. RFC-050 Otonom Çevrimdışı Test Kalkanı (`aegis test --offline` / `aegis test:offline`)
+
+Bulut tabanlı yapay zeka ajanları (Google Antigravity, LLM API'leri) düşünme döngülerini sürdürmek için kesintisiz internete ihtiyaç duyar. Host bilgisayarın ağı kesilirse YZ'nin bağlantısı kopar, oturum çöker ve PC kalıcı olarak internetsiz kalır.
+
+Aegis, **RFC-050 Çevrimdışı Test Kalkanı** ile host internetine dokunmadan test sürecini yalıtır:
+
+```mermaid
+flowchart TD
+  AI["YZ Ajanı (Antigravity Cloud)"] -->|"aegis test:offline"| Harness["OfflineTestHarness"]
+  Harness --> Tier{"Ekosistem Tespiti"}
+  Tier -->|"Node.js"| Shim["Node.js Preload Mock Shim (fetch/dns/net/http)"]
+  Tier -->|"Binary / Oyun"| Firewall["Process-Level Firewall / Proxy Blackhole"]
+  Tier -->|"Donanım Adaptörü"| DeadMan["Atomic Script + Dead-Man Watchdog (60s)"]
+  Shim & Firewall & DeadMan --> Result[".aegis/offline-results.json"]
+  Result -->|"Ağ Açık, YZ Kesintisiz"| Report["Telemetri Raporu & Otomatik Triyaj"]
+```
+
+### Node.js Preload Mock Shim (`nodejs-offline-shim.ts`)
+Uygulama veya test kodunda tek bir satır değiştirmeden `NODE_OPTIONS` ortam değişkeniyle enjekte edilir:
+- **`globalThis.fetch`:** `TypeError: fetch failed (cause: ECONNREFUSED 127.0.0.1:0)` fırlatır.
+- **`node:dns`:** `dns.lookup` ve çözümleme metodlarını `ENOTFOUND` / `EAI_AGAIN` ile anında keser.
+- **`node:net`:** `Socket.prototype.connect` seviyesinde TCP soket bağlantılarını `ECONNREFUSED` ile engeller.
+- **`node:http` & `node:https`:** Tüm giden HTTP isteklerini ağa çıkmadan reddeder.
+
+### Kullanım Komutları
+```bash
+# Bounded timeout ve süreç bekçisiyle test koşumu
+aegis test packages/core/watchdog
+
+# RFC-050 çevrimdışı kalkanı ile izole koşum
+aegis test --offline
+# veya
+aegis test:offline packages/core/watchdog --soft --json
+```
+
+---
+
 ## 5. 3-Fazlı Adaptif Watchdog & Devre Kesici (Circuit Breaker)
 
 Uzun süren işlemler veya sonsuz döngüye giren testler için akıllı izleme katmanı devrededir:
@@ -139,3 +176,4 @@ Eğer bir görev aynı hatayı üst üste 3 kez üretirse veya sürekli aynı te
 - [`04-mcp-server-specification.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/04-mcp-server-specification.md) — `socratic_diagnose`, `triage`, `budget_inspect` araçları.
 - [RFC-014: Socratic Evidence-Based Diagnostic Engine](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-014-socratic-evidence-based-diagnostic-dialogue-engine.md)
 - [RFC-024: Next-Gen Evidence-Based Bug Triage Engine](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-024-next-gen-evidence-based-bug-triage-engine-incremental-caching-multi-core-parallelism-blast-radius-stratification.md)
+- [RFC-050: Autonomous Fail-Safe Offline Test Shield and Self-Restoring Network Harness](rfc/RFC-050-autonomous-fail-safe-offline-test-shield-and-self-restoring-network-harness.md)

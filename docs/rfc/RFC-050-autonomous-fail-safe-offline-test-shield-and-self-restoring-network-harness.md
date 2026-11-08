@@ -159,10 +159,10 @@ packages/cli/
 
 ## 🎯 6. Kabul Kriterleri (Acceptance Criteria)
 
-- [ ] Node.js çevrimdışı ön-yükleyici shim (`nodejs-offline-shim.ts` / `offline-shim.mjs`) tasarlandı ve doğrulandı.
-- [ ] `OfflineTestHarness` ve `ProcessNetworkIsolator` çekirdek mimarisi tamamlandı.
-- [ ] Windows Firewall ve Proxy Blackhole tabanlı süreç seviyesi izolasyon birim testleri hazırlandı.
-- [ ] Bağımsız `DeadManWatchdog` PowerShell/OS entegrasyonu yazıldı ve test edildi.
-- [ ] `aegis test:offline` ve `aegis test --offline` CLI komutları kaydedildi.
-- [ ] Demir Kafes (<300L/dosya, <40L/fn, 0 any) denetimi %100 geçti.
-- [ ] Birim testler ve mutasyon testi onaylandı (%100 Kill Score).
+- [x] Node.js çevrimdışı ön-yükleyici shim (`nodejs-offline-shim.ts` / `offline-shim.mjs`) tasarlandı ve doğrulandı.
+- [x] `OfflineTestHarness` ve `ProcessNetworkIsolator` çekirdek mimarisi tamamlandı.
+- [x] Windows Firewall ve Proxy Blackhole tabanlı süreç seviyesi izolasyon birim testleri hazırlandı.
+- [x] Bağımsız `DeadManWatchdog` PowerShell/OS entegrasyonu yazıldı ve test edildi.
+- [x] `aegis test:offline` ve `aegis test --offline` CLI komutları kaydedildi.
+- [x] Demir Kafes (<300L/dosya, <40L/fn, 0 any) denetimi %100 geçti.
+- [x] Birim testler ve mutasyon testi onaylandı (%100 Kill Score).

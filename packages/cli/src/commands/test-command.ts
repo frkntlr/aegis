@@ -10,6 +10,7 @@ import * as child_process from 'node:child_process';
 import { resolveSafeRepoRoot, cleanGitEnv } from '@aegis/shared';
 import { DiagnosticTriageEnricher, type EnrichedDiagnostic } from '@aegis/iron-cage';
 import { GodotTestRunner } from '@aegis/godot-bridge';
+import { OfflineTestHarness } from '@aegis/watchdog';
 import { showBanner } from './banner.js';
 
 export interface ResilientTestOptions {
@@ -19,6 +20,7 @@ export interface ResilientTestOptions {
   json?: boolean;
   soft?: boolean;
   cwd?: string;
+  offline?: boolean;
 }
 
 export interface ResilientTestResult {
@@ -30,6 +32,8 @@ export interface ResilientTestResult {
   stderr: string;
   diagnostic?: EnrichedDiagnostic;
   message: string;
+  offlineVerified?: boolean;
+  telemetryPath?: string;
 }
 
 function killProcessTree(pid?: number): void {
@@ -112,7 +116,9 @@ function parseTestArgs(args: string[]): ResilientTestOptions {
     if (a === '--bail' || a === '-b') opts.bail = true;
     else if (a === '--json' || a === '-j') opts.json = true;
     else if (a === '--soft') opts.soft = true;
-    else if (a.startsWith('--timeout=') || a.startsWith('-t=')) {
+    else if (a === '--offline' || a === 'test:offline' || a === 'offline' || a === ':offline') {
+      opts.offline = true;
+    } else if (a.startsWith('--timeout=') || a.startsWith('-t=')) {
       opts.timeoutMs = parseInt(a.split('=')[1], 10);
     } else if (a && !a.startsWith('-')) {
       opts.target = a;
@@ -135,8 +141,34 @@ async function runGodotTest(root: string, target?: string): Promise<ResilientTes
   };
 }
 
+async function runOfflineTest(root: string, options: ResilientTestOptions): Promise<ResilientTestResult> {
+  const isMonorepo = fs.existsSync(path.resolve(root, 'turbo.json'));
+  const timeoutMs = options.timeoutMs ?? (isMonorepo ? 90000 : 45000);
+  const harness = new OfflineTestHarness({
+    target: options.target,
+    timeoutMs,
+    cwd: root
+  });
+  const raw = await harness.run();
+  const passed = raw.passed && raw.exitCode === 0;
+  const timedOut = raw.exitCode === 124;
+  const diag = passed ? undefined : DiagnosticTriageEnricher.classify(`${raw.stderr}\n${raw.stdout}`.trim());
+  const msg = passed ? `All offline tests passed cleanly in ${raw.durationMs}ms.`
+    : (timedOut ? `Offline tests TIMED OUT after ${timeoutMs}ms.` : `Offline tests failed with exit code ${raw.exitCode}.`);
+
+  return {
+    passed, timedOut, durationMs: raw.durationMs,
+    exitCode: raw.exitCode, stdout: raw.stdout, stderr: raw.stderr,
+    diagnostic: diag, message: msg,
+    offlineVerified: raw.offlineVerified, telemetryPath: raw.telemetryPath
+  };
+}
+
 export async function runResilientTest(options: ResilientTestOptions = {}): Promise<ResilientTestResult> {
   const root = options.cwd || resolveSafeRepoRoot();
+  if (options.offline) {
+    return runOfflineTest(root, options);
+  }
   if (fs.existsSync(path.resolve(root, 'project.godot'))) {
     return runGodotTest(root, options.target);
   }
@@ -157,10 +189,30 @@ export async function runResilientTest(options: ResilientTestOptions = {}): Prom
   };
 }
 
+function printDiagnostic(diag: EnrichedDiagnostic): void {
+  console.error(`\n🔍 Socratic Diagnosis: [${diag.category}] ${diag.title}`);
+  if (diag.filePath) {
+    const loc = diag.line ? `:${diag.line}` : '';
+    console.error(` • Failure Location: ${diag.filePath}${loc}`);
+  }
+  if (diag.remediation) {
+    console.error(` • 💡 Remediation: ${diag.remediation}`);
+  }
+  if (diag.filteredStack) {
+    console.error('\n--- SANITIZED STACK TRACE ---');
+    console.error(diag.filteredStack);
+  }
+}
+
 function printTestReport(res: ResilientTestResult, opts: ResilientTestOptions): void {
   if (opts.json) {
     console.log(JSON.stringify(res, null, 2));
     return;
+  }
+
+  if (opts.offline || res.offlineVerified) {
+    console.log('🛡️ Offline Shield Active: Host internet preserved, target process network-isolated');
+    if (res.telemetryPath) console.log(` 📦 Offline Telemetry: ${res.telemetryPath}`);
   }
 
   if (res.passed) {
@@ -174,18 +226,7 @@ function printTestReport(res: ResilientTestResult, opts: ResilientTestOptions): 
   }
 
   if (res.diagnostic) {
-    console.error(`\n🔍 Socratic Diagnosis: [${res.diagnostic.category}] ${res.diagnostic.title}`);
-    if (res.diagnostic.filePath) {
-      const loc = res.diagnostic.line ? `:${res.diagnostic.line}` : '';
-      console.error(` • Failure Location: ${res.diagnostic.filePath}${loc}`);
-    }
-    if (res.diagnostic.remediation) {
-      console.error(` • 💡 Remediation: ${res.diagnostic.remediation}`);
-    }
-    if (res.diagnostic.filteredStack) {
-      console.error('\n--- SANITIZED STACK TRACE ---');
-      console.error(res.diagnostic.filteredStack);
-    }
+    printDiagnostic(res.diagnostic);
   } else if (res.stderr) {
     console.error(res.stderr.slice(0, 1000));
   }
@@ -195,6 +236,9 @@ export async function handleTestCommand(...rawArgs: string[]): Promise<boolean> 
   const opts = parseTestArgs(rawArgs);
   if (!opts.json) {
     showBanner();
+    if (opts.offline) {
+      console.log('🛡️ Offline Shield Active: Host internet preserved, target process network-isolated');
+    }
     console.log('🛡️  Running Aegis Resilient Test Shield (Non-Hanging, Auto-Triage Watchdog)...');
   }
 

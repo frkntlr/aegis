@@ -228,6 +228,7 @@ export const COMMAND_MAP: Record<string, CommandHandler> = {
   'tw:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
   'teamwork:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
   test: async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); },
+  'test:offline': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand('--offline', ...a.slice(1)); },
   'tw:test': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); },
   'tr:test': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); },
   'teamwork:test': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); }

@@ -46,7 +46,8 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis task:inject <id> [agent]` | Compile prompt & stage task into TIP inbox (.aegis/task-inbox.json) | `aegis task:inject <id> [agent]` |
 | `/aegis task:pull [agent]` | Pull next staged task matching role from TIP inbox | `aegis task:pull [agent]` |
 | `/aegis lock:status` | Inspect active file mutex locks across worktrees | `aegis lock:status` |
-| `/aegis test [target]` | Resilient non-hanging test shield with process watchdog & auto-triage | `aegis test [target]` |
+| `/aegis test [target]` | Resilient non-hanging test shield with process watchdog & auto-triage (supports `--offline`) | `aegis test [target]` |
+| `/aegis test:offline [target]` | Strict RFC-050 isolated offline test shield with Node.js network mock shim | `aegis test:offline [target]` |
 | `/aegis verify:task [file]` | Run Multimodal Quality Gate (Demir Kafes + Godot Playtest) | `aegis verify:task [file]` |
 | `/aegis debug [err\|file]` | Socratic evidence-based interactive debugging session | `aegis debug [err]` |
 | `/aegis merge <agent> [base]` | Multi-tier atomic merge (FF -> Rebase -> Merge Commit) | `aegis merge <agent> [base]` |

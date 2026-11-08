@@ -33,7 +33,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
 - [🩺 Sokratik Teşhis & Kanıt Tabanlı Anti-Halüsinasyon](#-sokratik-teşhis--kanıt-tabanlı-anti-halüsinasyon)
 - [📡 Gerçek Zamanlı SSE Web Komuta Merkezi (`localhost:3000`)](#-gerçek-zamanlı-sse-web-komuta-merkezi-localhost3000)
-- [🌐 Yaşayan GitHub, RFC (50 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
+- [🌐 Yaşayan GitHub, RFC (51 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
 - [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
@@ -57,6 +57,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 | **Rastgele Deneme-Yanılma & Stagnation:** Ajan aynı hatayı 10 kez dener, yığın izini okumadan tahmin yürütür. | **Sokratik Teşhis Kapısı (`aegis debug`) & 3 Fazlı Diyalog Motoru:** Yığın izi ayrıştırma, kök neden triangülasyonu ve hipotez doğrulama. | **Kanıt Tabanlı Çözüm**, sıfır tahmin ve anında doğru reçete. |
 | **Bozuk Kodun Ana Dala Karışması:** Kod derlenir ama çalışma zamanında sahne veya oyun çöker. | **Multimodal Kalite Kapısı (`aegis verify:task`):** Demir Kafes AST denetimi ve Headless Playtesting (Playtest-Before-PR). | **%100 Çalışma Garantisi**, çöken veya hatalı PR açılamaz. |
 | **Güvenilmez Ajan Beyanları:** Ajan "Testler geçti" der ama aslında test dosyasını silmiş ya da `expect(true).toBe(true)` yazmıştır. | **Immutable Oracle (`@aegis/trust-verifier`) & Mutasyon Test Kapısı (%70 Barajı):** Test tahrifini engeller, zayıf testleri eler. | **%100 Güvenilir Doğrulama**, hileli veya sahte testler engellenir. |
+| **YZ Çevrimdışı Test Çıkmazı:** YZ host ağını kestiğinde LLM bağlantısı kopar ve PC internetsiz kalır; kesmezse offline fallback test edilemez. | **RFC-050 Çevrimdışı Test Kalkanı & Node.js Preload Shim (`aegis test:offline`):** Host ve LLM %100 çevrimiçi kalırken test süreci Node.js mock shim veya loopback blackhole ile izole edilir. | **Kesintisiz Otonom Çevrimdışı Test**, sıfır kilitlenme ve güvenli disk telemetrisi. |
 | **Oturum Kopması & Manuel Çerez Hamallığı:** NotebookLM oturumu düştüğünde sistem sessizce kilitlenir veya manuel token ister. | **Ambient Harvester, Hesap Değiştirme (`aegis nlm:switch`) & Tri-State Protokolü:** Sıfır-tıklama CDP/DPAPI keşfi ve interaktif Antigravity modalı. | **Sıfır Kesinti**, tek tıkla oturum yenileme ve sıfır sessiz düşüş. |
 | **CLI Başlangıç Gecikmesi & Yavaş Komutlar:** Monolitik statik importlar CLI başlatma süresini uzatır, hızlı görev akışını aksatır. | **Dinamik Lazy Loading & Persistent Manifest Önbelleği:** 22 komut dinamik import'a geçirildi; manifest ve git index mtime ile taranır. | **~103ms Cold-Start (2.6x Hızlanma)** ve **<2ms** dosya adayı keşfi. |
 | **Çok Ajanlı Görev Karmaşası & Kilit Yarışları:** Paralel ajanlar için görev planlamak uzun komutlar ve manuel kilit koordinasyonu gerektirir. | **Antigravity Otonom Multi-Agent Koordinatörü (`tr` / `tw`), Atomic Batch Locks & RTK Compact:** `tr` ve `tw` evrensel %100 eşdeğerliği, alt ajanların (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) otomatik tanımlanıp eşzamanlı çalıştırılması, tek geçişte `acquireBatchLocks()` ve `--compact` bayrağı. | **Tek Komutla Otonom Orkestrasyon**, sıfır kilit yarışması ve **%85-92 Token Tasarrufu**. |
@@ -409,6 +410,7 @@ aegis merge solver master
 - 🎯 **Cerrahi Sembol Dilimleme (`aegis find <symbol>`):** Büyük bir dosyadan sadece ilgili fonksiyonu, tip bağımlılıklarını ve çağıranlarını kesip çıkarır.
 - 🛡️ **Immutable Oracle (`aegis audit <files>`):** Ajanın testi geçebilmek adına test dosyasını yumuşatmasını (`assert(true)`) veya silmesini statik analizle engeller.
 - 🧪 **Mutation Testing Gate (`aegis mutate [file]`):** Koddaki mantık operatörlerini (`&&` -> `||`, `+` -> `-`) yapay olarak bozar; testlerin bu bozulmayı yakalama oranı **%70'in altındaysa** commit'i reddeder.
+- 🛡️ **Otonom Çevrimdışı Test Kalkanı (`aegis test --offline`, `aegis test:offline`):** YZ'nin düşünce döngüsünü koparmadan (host internetini kesmeden) test sürecini Node.js Network Mock Shim (`fetch`, `dns`, `net`, `http`) veya süreç seviyesi proxy/firewall ile izole eder (RFC-050).
 
 ---
 
@@ -429,7 +431,7 @@ aegis dashboard 3000
 
 ---
 
-## 🌐 Yaşayan GitHub, RFC (50 Adet) & NotebookLM Döngüsü
+## 🌐 Yaşayan GitHub, RFC (51 Adet) & NotebookLM Döngüsü
 
 Aegis, statik dokümanların unutulması sorununu çözmek için yaşayan bir bellek köprüsü kurar:
 
@@ -472,7 +474,7 @@ aegis/
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
 │   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
-├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-050 Arşivi
+├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-051 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
 └── turbo.json                   # Monorepo Pipeline ve Önbellek Yapılandırması
 ```
@@ -647,6 +649,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | :--- | :--- |
 | `aegis cage:check [dir]` | Tüm proje kodunu Demir Kafes (300/40) ve Fast-Stat radarıyla anında denetler. |
 | `aegis ci:audit` / `ci:check` | 10 GitHub Actions CI kapısını kod remote'a gitmeden önce yerelde deterministik doğrular. |
+| `aegis test [target] [--offline]` | Süreç bekçisi, adaptif zaman aşımı ve otomatik triyajlı dayanıklı test koşucusu (`--offline` destekli). |
+| `aegis test:offline [target]` | RFC-050 çevrimdışı test kalkanıyla (Node.js network mock shim) izole ve kesintisiz test çalıştırır. |
 | `aegis verify <filepath>` | Tek bir dosyanın Demir Kafes kurallarına uyumunu test eder. |
 | `aegis verify:task [file]` | Multimodal Kalite Kapısını (Demir Kafes + Godot Headless Playtest) çalıştırır. |
 | `aegis skeleton <filepath>` | Tek dosyanın AST iskelet haritasını ve token tasarrufunu çıkarır. |

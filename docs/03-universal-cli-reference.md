@@ -85,6 +85,8 @@ npm run aegis -- <komut> [argümanlar]
 | :--- | :--- | :--- |
 | `aegis cage:check` | `[dir]` | Projeyi Demir Kafes (300/40) ve Fast-Stat radarıyla anında denetler. |
 | `aegis ci:audit` | Yok | 10 GitHub Actions CI kapısını yerelde deterministik doğrular (takma ad: `aegis ci:check`). |
+| `aegis test` | `[target] [--offline] [--bail] [--json] [--soft] [--timeout=<ms>]` | Resilient test koşucusu; süreç bekçisi, adaptif zaman aşımı ve otomatik triyajla testleri koşturur. |
+| `aegis test:offline` | `[target] [--bail] [--json] [--soft] [--timeout=<ms>]` | RFC-050 çevrimdışı test kalkanıyla (Node.js network mock shim) izole ve kesintisiz test çalıştırır. |
 | `aegis verify` | `<filepath>` | Tek bir dosyanın Demir Kafes kurallarına uyumunu test eder. |
 | `aegis verify:task` | `[file]` | Multimodal Kalite Kapısını (Demir Kafes + Godot Playtest) çalıştırır. |
 | `aegis skeleton` | `<filepath>` | Dosyanın AST iskelet haritasını ve token tasarrufunu çıkarır. |

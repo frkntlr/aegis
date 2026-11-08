@@ -93,3 +93,68 @@ test('handleTestCommand handles --soft flag and returns boolean outcome', async 
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
 });
+
+test('runResilientTest with offline: true executes via OfflineTestHarness with network shield', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-offline-test-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'offline-project',
+      scripts: {
+        test: 'node -e "if (process.env.AEGIS_OFFLINE_SHIELD_ACTIVE !== \'1\') process.exit(2); process.exit(0);"'
+      }
+    }), 'utf8');
+
+    const res = await runResilientTest({ cwd: tmpDir, offline: true, timeoutMs: 5000 });
+    assert.strictEqual(res.passed, true);
+    assert.strictEqual(res.exitCode, 0);
+    assert.strictEqual(res.offlineVerified, true);
+    assert.ok(res.message.includes('offline'));
+    assert.ok(res.telemetryPath && fs.existsSync(res.telemetryPath));
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+});
+
+test('handleTestCommand parses --offline flag and runs isolated offline test', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-offline-cmd-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'offline-cmd-project',
+      scripts: { test: 'node -e "process.exit(0)"' }
+    }), 'utf8');
+
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      const passed1 = await handleTestCommand('--offline', '--soft', '--json');
+      assert.strictEqual(passed1, true);
+
+      const passed2 = await handleTestCommand('test:offline', '--soft', '--json');
+      assert.strictEqual(passed2, true);
+    } finally {
+      process.chdir(origCwd);
+    }
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+});
+
+test('runResilientTest offline mode captures failure and formats diagnostic', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-offline-fail-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'offline-fail-project',
+      scripts: {
+        test: 'node -e "console.error(\'Error: Offline network connection blocked\');process.exit(1)"'
+      }
+    }), 'utf8');
+
+    const res = await runResilientTest({ cwd: tmpDir, offline: true, timeoutMs: 5000 });
+    assert.strictEqual(res.passed, false);
+    assert.strictEqual(res.exitCode, 1);
+    assert.strictEqual(res.offlineVerified, true);
+    assert.ok(res.diagnostic !== undefined);
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  }
+});
