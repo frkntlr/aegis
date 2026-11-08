@@ -7,14 +7,14 @@
 [![TypeScript: 5.7+](https://img.shields.io/badge/TypeScript-5.7+-3178C6.svg)](https://www.typescriptlang.org/)
 [![Monorepo: Turborepo](https://img.shields.io/badge/monorepo-turbo-EF4444.svg)](https://turbo.build/)
 [![Demir Kafes: 100% Compliant](https://img.shields.io/badge/Demir%20Kafes-100%25%20Clean%20(455%2B%20Files)-success.svg)](#-deterministik-demir-kafes-iron-cage)
-[![MCP Protocol: 40 Native Tools](https://img.shields.io/badge/MCP-40%20Native%20Tools-8A2BE2.svg)](#-yerel-model-context-protocol-mcp-sunucusu-40-araç)
+[![MCP Protocol: 54 Native Tools](https://img.shields.io/badge/MCP-54%20Native%20Tools-8A2BE2.svg)](#-yerel-model-context-protocol-mcp-sunucusu-54-araç)
 [![Tests: 812 Passing](https://img.shields.io/badge/Tests-812%20Passing%20(35s)-brightgreen.svg)](#-hızlı-başlangıç-quick-start)
 [![Turbo Replay: 86ms](https://img.shields.io/badge/Turbo%20Replay-86ms-blue.svg)](#-hızlı-başlangıç-quick-start)
 [![Living Wiki: 56 Pages Synchronized](https://img.shields.io/badge/Living%20Wiki-56%20Pages%20Synced-10B981.svg)](https://github.com/frkntlr/aegis/wiki)
 
 Aegis; yapay zeka modellerinin dikkatinin dağılması (**context bloat**), bağlam unutması (**context drop**), uydurma metod/kütüphane üretimi (**AI hallucination**), spagetti/ölü kod üretimi ve sonsuz kilitlenme (**infinite regression / stagnation**) problemlerini ortadan kaldıran yeni nesil otonom yazılım mühendisliği motorudur.
 
-Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`, `aegist`, `tw`, `tr`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Otomatik Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **Yerel CI/CD Kapı Koşucusu (`aegis ci:audit`) & Otomatik Versiyonlama (`aegis update --bump`)**, **40 Yerel Stdio MCP Aracı**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **455+ Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **812 Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
+Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`, `aegist`, `tw`, `tr`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Otomatik Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **Yerel CI/CD Kapı Koşucusu (`aegis ci:audit`) & Otomatik Versiyonlama (`aegis update --bump`)**, **54 Yerel Stdio MCP Aracı**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **455+ Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **812 Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
 
 ---
 
@@ -27,7 +27,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [🏛️ Sistem Mimarisi & Akış Şeması](#️-sistem-mimarisi--akış-şeması)
 - [🧠 5-Katmanlı Kod Tabanı Hafıza Motoru](#-5-katmanlı-kod-tabanı-hafıza-motoru)
 - [📥 Çekme Tabanlı Görev Dağıtım Protokolü (TIP)](#-çekme-tabanlı-görev-dağıtım-protokolü-tip)
-- [🔌 Yerel Model Context Protocol (MCP) Sunucusu (40 Araç)](#-yerel-model-context-protocol-mcp-sunucusu-40-araç)
+- [🔌 Yerel Model Context Protocol (MCP) Sunucusu (54 Araç)](#-yerel-model-context-protocol-mcp-sunucusu-54-araç)
 - [🎮 Godot 4.x Oyun Motoru Köprüsü (`@aegis/godot-bridge`)](#-godot-4x-oyun-motoru-köprüsü-aegisgodot-bridge)
 - [🛡️ Deterministik Demir Kafes (Iron Cage)](#️-deterministik-demir-kafes-iron-cage)
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
@@ -229,19 +229,27 @@ flowchart TD
 | `aegis tr:peers` | `aegis tw:peers` | Kardeş alt ajan telemetrisi, canlı kilitler ve aktif kontratlar (`-c` tel formatı) | `teamwork_peers` |
 | `aegis tr:radar` / `tr:conflicts` | `aegis tw:radar` / `tw:conflicts` | Aktif dosya çakışmalarını ve yarış durumlarını anlık tespit eden çakışma radarı | `teamwork_conflicts` |
 | `aegis tr:doc [id]` / `tr:synthesize` | `aegis tw:doc [id]` / `tw:synthesize` | İnsan odaklı yaşayan mimari sentez raporu, Mermaid topolojisi ve ADR üretimi | `teamwork_doc_synthesize` |
-| `aegis tr:advance [id]` | `aegis tw:advance [id]` | Aktif yürütme dalgasını sonraki faz dalgasına pürüzsüz dinamik ilerletme | - |
+| `aegis tr:report [id]` | `aegis tw:report [id]` | <10ms'de yüksek sinyalli zemin-gerçeklik yürütme raporu üretme (`-c`, `-s`, `-j`) | `teamwork_report` |
+| `aegis tr:advance [id]` | `aegis tw:advance [id]` | Aktif yürütme dalgasını sonraki faz dalgasına pürüzsüz dinamik ilerletme | `teamwork_advance` |
 | `aegis tr:scale "<obj>"` | `aegis tw:scale "<obj>"` | 12+ subagent'a kadar %100 çakışmasız dosya kilit garantili mikro-bölümleme | `teamwork_scale` |
-| `aegis tr:batch [id]` | `aegis tw:batch [id]` | Eşzamanlı çalıştırma dalga paketlerini listeleme | - |
+| `aegis tr:batch [id]` | `aegis tw:batch [id]` | Eşzamanlı çalıştırma dalga paketlerini ve sıralı yürütme kümelerini listeleme | `teamwork_batch` |
 | `aegis tr:post "<act>"` | `aegis tw:post "<act>"` | Ajan faaliyetini, değiştirilen dosyaları (`--files`) ve kontratları meshe yazma | `teamwork_mesh_post` |
 | `aegis tr:broadcast "<msg>"` | `aegis tw:broadcast "<msg>"` | Kardeş alt ajanlara canlı koordinasyon ve kilometre taşı yayını yapma | `teamwork_broadcast` |
 | `aegis tr:mesh [clear]` | `aegis tw:mesh [clear]` | Dinamik teamwork mesh durumunu görüntüleme veya temizleme (`-c` destekli) | `teamwork_mesh_read` |
 | `aegis tr:compact [obj]` | `aegis tw:compact [obj]` | Tamamlananları arşivleme ve %85 token tasarruflu brifing üretme | `teamwork_compact` |
 | `aegis tr:dag [obj]` | `aegis tw:dag [obj]` | Çok ajanlı yürütmenin bağımlılık DAG'ını terminalde ASCII olarak çizme | `teamwork_dag` |
-| `aegis tr:matrix [obj]` | `aegis tw:matrix [obj]` | Alt ajan canlı yürütme ve kilit matrisini raporlama | - |
+| `aegis tr:matrix [obj]` | `aegis tw:matrix [obj]` | Alt ajan canlı yürütme, hedef dosya tahsisi ve kilit matrisini raporlama | `teamwork_matrix` |
 | `aegis tr:analyze "<obj>"` | `aegis tw:analyze "<obj>"` | Persistent disk önbelleğiyle (<2ms) hedef dosyaları semantik puanlama | `teamwork_analyze` |
-| `aegis tr:setup [dir]` | `aegis tw:setup [dir]` | Antigravity ajan manifestosunu (`.aegis/subagents.json`) dışa aktarma | - |
-| `aegis tr:push` / `aegis push` | `aegis tw:push` / `aegis push` | Demir Kafes ön-push kalkanı, çalışma dizini commit'leme ve GitHub'a otonom push | - |
-| `aegis tr:clear` | `aegis tw:clear` | TIP görev kutusunu ve aktif dosya mutex kilitlerini güvenle temizleme | - |
+| `aegis tr:deliberate "<obj>"` | `aegis tw:deliberate "<obj>"` | Çoklu ajan müzakeresi ve konsensüs stratejisi üretimi koşturma | `teamwork_deliberate` |
+| `aegis tr:swarm "<obj>"` | `aegis tw:swarm "<obj>"` | 4 lensli eşzamanlı analiz sürüsü ve paylaşımlı çalışma belleği matrisi | `teamwork_swarm` |
+| `aegis tr:test [target]` | `aegis tw:test [target]` | RFC-050 çevrimdışı test kalkanıyla izole ve kesintisiz test çalıştırma | `teamwork_test` |
+| `aegis tr:tools [role]` | `aegis tw:tools [role]` | Antigravity alt ajan rolleri için akıllı Aegis araç dağılımını listeleme | `teamwork_tools` |
+| `aegis tr:setup [dir]` | `aegis tw:setup [dir]` | Antigravity ajan manifestosunu (`.aegis/subagents.json`) dışa aktarma | `teamwork_tools` |
+| `aegis tr:push` / `aegis push` | `aegis tw:push` / `aegis push` | Demir Kafes ön-push kalkanı, çalışma dizini commit'leme ve GitHub'a otonom push | `teamwork_push` |
+| `aegis tr:clear` | `aegis tw:clear` | TIP görev kutusunu ve aktif dosya mutex kilitlerini güvenle temizleme | `teamwork_clear` |
+
+> [!NOTE]
+> **Evrensel %100 Parite:** Tüm teamwork alt komutları (`tr` ⟷ `tw`) artık eksiksiz bir şekilde CLI ve MCP eşdeğerliğine (%100 Universal Parity) sahiptir. İster terminalden ister JSON-RPC stdio MCP sunucusu üzerinden çağrılsın, aynı deterministik doğrulama, atomik kilit ve dinamik mesh güvencesi sağlanır.
 - **Güçlü Yürütme Bayrakları:**
   - `--compact` / `-c`: RTK ve AST skeleton sıkıştırmasıyla %85 token tasarruflu brifing oluşturur.
   - `--json` / `-j`: Otomasyon ve betikler için JSON formatında makine çıktısı sunar.
@@ -256,7 +264,7 @@ flowchart TD
 
 ---
 
-## 🔌 Yerel Model Context Protocol (MCP) Sunucusu (40 Araç)
+## 🔌 Yerel Model Context Protocol (MCP) Sunucusu (54 Araç)
 
 Aegis, bağımsız bir işlem olarak JSON-RPC stdio protokolü üzerinden **Model Context Protocol (MCP)** sunucusu sağlar. Bu sayede Google Antigravity, Mulgravity, Cursor, Claude Code, VS Code veya Windsurf doğrudan bu araçları çağırabilir:
 
@@ -265,7 +273,7 @@ Aegis, bağımsız bir işlem olarak JSON-RPC stdio protokolü üzerinden **Mode
 aegis mcp
 ```
 
-### Sunulan 40 Yerel MCP Aracı
+### Sunulan 54 Yerel MCP Aracı
 
 #### 🧠 5-Katmanlı Hafıza & Kod İnceleme (8 Araç)
 | MCP Aracı | Parametreler | Görev |
@@ -298,7 +306,7 @@ aegis mcp
 | `task_inbox_pull` | `agentRole` (opt) | TIP kutusundan (`.aegis/task-inbox.json`) sıradaki sahnelenmiş görevi atomik çeker. |
 | `lock_status` | Yok | Aktif dosya kilitleri matrisini ve kilidi tutan ajanları listeler. |
 
-#### 🤝 Antigravity Teamwork & Dinamik Mesh (13 Araç)
+#### 🤝 Antigravity Teamwork & Dinamik Mesh (21 Araç)
 | MCP Aracı | Parametreler | Görev |
 | :--- | :--- | :--- |
 | `teamwork_plan` | `objective` (str), `targetFiles` (opt) | Hedefi alt izleklere böler, mutex kilitlerini atomik alır ve TIP kutusuna sahneler. |
@@ -314,6 +322,24 @@ aegis mcp
 | `teamwork_conflicts`| Yok | Canlı Çakışma Radarı; kardeş ajanlar arasındaki çakışan dosya tahsislerini anlık tespit eder. |
 | `teamwork_scale` | `objective` (str), `maxAgents` (opt) | 12+ subagent'a kadar %100 çakışmasız dosya kilit garantili mikro-bölümleme planı sunar. |
 | `teamwork_doc_synthesize`| `planId` (opt), `compact` (bool) | İnsan odaklı yaşayan mimari sentez raporu, Mermaid topolojisi, metrikler ve ADR derler. |
+| `teamwork_tools` | `role` (opt) | Her Antigravity alt ajan rolü için akıllı Aegis araç dağılımını ve matrisini inceler. |
+| `teamwork_report` | `planId` (opt), `compact` (bool), `save` (bool), `json` (bool) | Antigravity Teamwork için <10ms'de yüksek sinyalli zemin-gerçeklik yürütme raporu üretir. |
+| `teamwork_test` | `target` (opt), `offline` (bool) | RFC-050 çevrimdışı test kalkanı ve Node.js izolasyon kancasıyla dayanıklı test koşucusu. |
+| `teamwork_advance` | `planId` (opt) | Aktif yürütme dalgasını sonraki faza pürüzsüz ilerletir ve yeni batch grubunu sahneler. |
+| `teamwork_clear` | Yok | TIP görev kutusunu sıfırlar ve tüm aktif dosya mutex kilitlerini güvenle temizler. |
+| `teamwork_matrix` | `objective` (opt) | Canlı alt ajan yürütme, hedef dosya tahsisi ve kilit durum matrisini raporlar. |
+| `teamwork_batch` | `planId` (opt) | Eşzamanlı çalıştırma dalga paketlerini ve sıralı yürütme kümelerini listeler. |
+| `teamwork_deliberate`| `objective` (str) | Çoklu ajan müzakeresi ve konsensüs stratejisi üretimi koşturur. |
+| `teamwork_swarm` | `objective` (str) | Kod tabanı genelinde 4 lensli (AST, Triyaj, İlişki, Grounding) eşzamanlı analiz sürüsü koşturur. |
+| `teamwork_push` | `dryRun` (opt), `message` (opt) | Pre-push kalite kalkanıyla doğrulanmış değişiklikleri GitHub origin deposuna otonom push eder. |
+
+#### 🚀 Motor Yönetimi, Sürüm & Git (4 Araç)
+| MCP Aracı | Parametreler | Görev |
+| :--- | :--- | :--- |
+| `engine_update` | `clean` (opt), `pull` (opt), `force` (opt) | Aegis motorunu PC genelinde temiz ve sıfır-durumlu günceller ve yeniden derler. |
+| `version_status` | Yok | Dinamik sürüm kaymasını, origin/master driftini ve monorepo paketlerini inceler. |
+| `github_rfc_pipeline`| `rfc` (str), `description` (opt) | Uçtan uca GitHub RFC yaşam döngüsünü (Discussion, Issue, TIP) yürütür. |
+| `git_push` | `branch` (opt), `dryRun` (opt), `autoCommit` (opt), `message` (opt) | Pre-push kalite kalkanıyla güvenli ve otonom uzak sunucu senkronizasyonu yapar. |
 
 #### 🎮 Godot Substrate 3.0 Paketi (8 Araç)
 | MCP Aracı | Parametreler | Görev |
@@ -475,7 +501,7 @@ aegis/
 │   ├── dialogue-engine/         # Semptom Sınıflandırıcı, Sokratik Teşhis Motoru & Reçete Oluşturucu
 │   ├── web-dashboard/           # SSE Tabanlı Gerçek Zamanlı Komuta Merkezi Web Paneli
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
-│   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
+│   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 54 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
 ├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-052 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
@@ -703,7 +729,7 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 ### 7. Model Context Protocol Sunucusu
 | Komut | Açıklama |
 | :--- | :--- |
-| `aegis mcp` | IDE'lerin bağlanabilmesi için yerel stdio JSON-RPC 43 araçlı yüksek hızlı MCP sunucusunu başlatır. |
+| `aegis mcp` | IDE'lerin bağlanabilmesi için yerel stdio JSON-RPC 54 araçlı yüksek hızlı MCP sunucusunu başlatır. |
 
 ---
 

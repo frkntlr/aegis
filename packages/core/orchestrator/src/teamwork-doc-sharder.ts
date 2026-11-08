@@ -76,7 +76,8 @@ export class TeamworkDocSharder {
   ): DecomposedSubtask[] {
     const docTasks = subtasks.filter(t => t.roleType === 'docs');
     const specialistLabels = new Set(['Architecture', 'Readme', 'RFC', 'Wiki']);
-    if (docTasks.length === 0 || maxConcurrency <= 1 || docTasks.some(t => specialistLabels.has(t.label))) {
+    const hasDocSignal = allFiles.some(f => this.isDocFile(f)) || /wiki|rfc|dokümantasyon|dokumantasyon/i.test(objective);
+    if (docTasks.length === 0 || maxConcurrency <= 1 || !hasDocSignal || docTasks.some(t => specialistLabels.has(t.label))) {
       return subtasks;
     }
 

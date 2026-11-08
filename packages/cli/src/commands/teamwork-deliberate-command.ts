@@ -6,6 +6,7 @@
 
 import {
   TeamworkDeliberationEngine,
+  TeamworkCoordinator,
   type DeliberationOptions
 } from '@aegis/orchestrator';
 import { showBanner } from './banner.js';
@@ -67,7 +68,7 @@ export function mcpTeamworkDeliberate(args: Record<string, unknown> = {}): strin
     ? (args.depth as 'quick' | 'standard' | 'deep')
     : 'standard';
 
-  const engine = new TeamworkDeliberationEngine();
-  const result = engine.deliberate(objective, files, { persistMesh, depth, files });
+  const coordinator = new TeamworkCoordinator();
+  const result = coordinator.deliberate(objective, files, { persistMesh, depth, files });
   return JSON.stringify(result, null, 2);
 }

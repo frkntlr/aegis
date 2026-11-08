@@ -206,15 +206,10 @@ export function handleTeamworkWaves(objectiveArg?: string, ...filesOrFlags: stri
 }
 
 export {
-  mcpTeamworkMeshRead,
-  mcpTeamworkMeshPost,
-  mcpTeamworkBroadcast,
-  mcpTeamworkPeers,
-  mcpTeamworkConflicts,
-  mcpTeamworkWaves,
-  mcpTeamworkScale,
-  mcpTeamworkDocSynthesize,
-  mcpTeamworkTools
+  mcpTeamworkMeshRead, mcpTeamworkMeshPost, mcpTeamworkBroadcast, mcpTeamworkPeers,
+  mcpTeamworkConflicts, mcpTeamworkWaves, mcpTeamworkScale, mcpTeamworkDocSynthesize,
+  mcpTeamworkTools, mcpTeamworkAdvance, mcpTeamworkClear, mcpTeamworkMatrix,
+  mcpTeamworkBatch, mcpTeamworkTest
 } from './teamwork-mesh-mcp.js';
 
 export function handleTeamworkDoc(planId?: string, ...flags: string[]): void {
@@ -241,6 +236,9 @@ export function handleTeamworkAdvance(planId?: string): void {
   const res = new TeamworkCoordinator().advanceWave(planId);
   showBanner();
   console.log(`🌊 Wave Advanced: Wave ${res.currentWave} -> Next Phase: ${res.nextPhase}`);
+  if (res.readinessReport) {
+    console.log(`📋 Wave Status: ${res.readinessReport}`);
+  }
   console.log(`👥 Unlocked subagents in active batch: ${res.nextBatchPayload.length}`);
 }
 

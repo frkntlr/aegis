@@ -130,3 +130,19 @@ export function countPendingInboxHelper(repoRoot: string): number {
     return 0;
   }
 }
+
+export function clearStagedInboxHelper(repoRoot: string): number {
+  const inboxPath = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
+  if (!fs.existsSync(inboxPath)) return 0;
+  const unlock = WorktreeMutex.acquire(inboxPath);
+  try {
+    const existing = readExistingInboxArray(inboxPath);
+    writeInboxFile(inboxPath, []);
+    return existing.length;
+  } catch {
+    return 0;
+  } finally {
+    unlock();
+  }
+}
+

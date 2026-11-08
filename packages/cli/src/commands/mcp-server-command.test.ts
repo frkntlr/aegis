@@ -11,42 +11,27 @@ test('handleJsonRpc handles initialize request', async () => {
   assert.ok((result.serverInfo as Record<string, unknown>).name === 'aegis');
 });
 
-test('handleJsonRpc handles tools/list request with 46 authoritative tools', async () => {
+test('handleJsonRpc handles tools/list request with 54 authoritative tools', async () => {
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 46);
-  assert.ok(result.tools.some(t => t.name === 'github_rfc_pipeline'));
-  assert.ok(result.tools.some(t => t.name === 'engine_update'));
-  assert.ok(result.tools.some(t => t.name === 'version_status'));
-  assert.ok(result.tools.some(t => t.name === 'teamwork_doc_synthesize'));
+  assert.strictEqual(result.tools.length, 54);
 
-  const names = result.tools.map(t => t.name);
-  assert.ok(names.includes('teamwork_plan'));
-  assert.ok(names.includes('teamwork_status'));
-  assert.ok(names.includes('git_push'));
-  assert.ok(names.includes('teamwork_push'));
-  assert.ok(names.includes('memory_query'));
-  assert.ok(names.includes('memory_stats'));
-  assert.ok(names.includes('context7_query'));
-  assert.ok(names.includes('rtk_compress'));
-  assert.ok(names.includes('socratic_diagnose'));
-  assert.ok(names.includes('skeleton_extract'));
-  assert.ok(names.includes('budget_inspect'));
-  assert.ok(names.includes('worktree_status'));
-  assert.ok(names.includes('task_list'));
-  assert.ok(names.includes('task_claim'));
-  assert.ok(names.includes('task_release'));
-  assert.ok(names.includes('task_inbox_pull'));
-  assert.ok(names.includes('lock_status'));
-  assert.ok(names.includes('aegis_godot_status'));
-  assert.ok(names.includes('aegis_godot_playtest'));
-  assert.ok(names.includes('aegis_godot_inspect_ui'));
-  assert.ok(names.includes('aegis_godot_tree'));
-  assert.ok(names.includes('aegis_godot_signals'));
-  assert.ok(names.includes('aegis_godot_screenshot'));
-  assert.ok(names.includes('aegis_godot_validate'));
-  assert.ok(names.includes('aegis_godot_eval'));
+  const names = new Set(result.tools.map(t => t.name));
+  const expected = [
+    'teamwork_report', 'teamwork_plan', 'teamwork_status', 'git_push', 'teamwork_push',
+    'memory_query', 'memory_stats', 'context7_query', 'rtk_compress', 'socratic_diagnose',
+    'skeleton_extract', 'budget_inspect', 'worktree_status', 'task_list', 'task_claim',
+    'task_release', 'task_inbox_pull', 'lock_status', 'github_rfc_pipeline', 'engine_update',
+    'version_status', 'teamwork_doc_synthesize', 'teamwork_test', 'teamwork_advance',
+    'teamwork_clear', 'teamwork_matrix', 'teamwork_batch', 'teamwork_deliberate',
+    'teamwork_swarm', 'aegis_godot_status', 'aegis_godot_playtest', 'aegis_godot_inspect_ui',
+    'aegis_godot_tree', 'aegis_godot_signals', 'aegis_godot_screenshot', 'aegis_godot_validate',
+    'aegis_godot_eval'
+  ];
+  for (const name of expected) {
+    assert.ok(names.has(name), `Missing expected tool: ${name}`);
+  }
 });
 
 test('handleJsonRpc handles tools/call and executes tools', async () => {

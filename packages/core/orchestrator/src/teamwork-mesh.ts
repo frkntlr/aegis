@@ -22,6 +22,17 @@ export interface WaveStatus {
   needsCorrection: boolean;
 }
 
+export interface WaveAdvanceResult {
+  advanced: boolean;
+  currentWave: number;
+  nextWave: number;
+  message: string;
+  status: WaveStatus;
+  blockedAgents: string[];
+  pendingAgents: string[];
+  readinessReport: string;
+}
+
 export { TeamworkMeshStore, type ActivityUpdate, type MeshConflict };
 
 export class TeamworkMesh {
@@ -150,25 +161,78 @@ export class TeamworkMesh {
     });
   }
 
-  public advanceWave(planId?: string): { advanced: boolean; currentWave: number; nextWave: number; message: string } {
+  public inspectWaveReadiness(state: TeamworkMeshState, wave: number): {
+    status: WaveStatus;
+    blockedAgents: string[];
+    pendingAgents: string[];
+    readinessReport: string;
+  } {
+    const peers = Object.values(state.agents).filter(p =>
+      (p.phase ?? (p.currentActivity.includes(`Wave ${wave}`) ? wave : undefined)) === wave
+    );
+    const blockedAgents = peers.filter(p => p.status === 'blocked').map(p => p.subagentName);
+    const pendingAgents = peers.filter(p => p.status !== 'done' && p.status !== 'blocked').map(p => p.subagentName);
+    const done = peers.filter(p => p.status === 'done').length;
+    const total = peers.length;
+    const isReady = total === 0 || (done === total);
+    const status: WaveStatus = {
+      wave,
+      total,
+      done,
+      blocked: blockedAgents.length,
+      pending: pendingAgents.length,
+      readyForNextWave: isReady,
+      needsCorrection: blockedAgents.length > 0
+    };
+
+    let readinessReport = '';
+    if (blockedAgents.length > 0) {
+      readinessReport = `Wave ${wave} blocked: ${blockedAgents.length} agent(s) [${blockedAgents.join(', ')}]. Remediation required.`;
+    } else if (pendingAgents.length > 0) {
+      readinessReport = `Wave ${wave} in progress: ${pendingAgents.length} pending agent(s) [${pendingAgents.join(', ')}] (${done}/${total} done).`;
+    } else {
+      readinessReport = `Wave ${wave} verified: all ${total} tasks complete. Ready for next wave.`;
+    }
+
+    return { status, blockedAgents, pendingAgents, readinessReport };
+  }
+
+  public advanceWave(planId?: string): WaveAdvanceResult {
     return this.store.withLock(() => {
       const state = this.store.loadState();
       const oldWave = state.activeWave;
+      const inspection = this.inspectWaveReadiness(state, oldWave);
+
       state.activeWave += 1;
       state.lastUpdated = new Date().toISOString();
       const phaseNames: Record<number, string> = { 2: 'QA Hunter Verification', 3: 'Living Architecture Synthesis' };
       const nextPhase = phaseNames[state.activeWave] ?? 'Final Delivery';
-      const msg = `🌊 Wave ${oldWave} completed! Wave ${state.activeWave} (${nextPhase}) unlocked.`;
+      const msg = `🌊 Wave ${oldWave} completed! Wave ${state.activeWave} (${nextPhase}) unlocked. [${inspection.readinessReport}]`;
+
       this.store.appendEvent(state, 'coordinator', 'milestone', msg, {
         eventName: 'WAVE_COMPLETED',
         fromWave: oldWave,
         toWave: state.activeWave,
         nextPhase,
         triggerReflection: true,
-        planId: planId ?? state.planId
+        planId: planId ?? state.planId,
+        waveStatus: inspection.status,
+        blockedAgents: inspection.blockedAgents,
+        pendingAgents: inspection.pendingAgents,
+        readinessReport: inspection.readinessReport
       });
       this.store.saveState(state);
-      return { advanced: true, currentWave: oldWave, nextWave: state.activeWave, message: msg };
+
+      return {
+        advanced: true,
+        currentWave: oldWave,
+        nextWave: state.activeWave,
+        message: msg,
+        status: inspection.status,
+        blockedAgents: inspection.blockedAgents,
+        pendingAgents: inspection.pendingAgents,
+        readinessReport: inspection.readinessReport
+      };
     });
   }
 
@@ -205,21 +269,7 @@ export class TeamworkMesh {
 
   public getWaveStatus(wave?: number): WaveStatus {
     const s = this.store.loadState();
-    const targetWave = wave ?? s.activeWave;
-    const peers = Object.values(s.agents).filter(p =>
-      (p.phase ?? (p.currentActivity.includes(`Wave ${targetWave}`) ? targetWave : undefined)) === targetWave
-    );
-    const done = peers.filter(p => p.status === 'done').length;
-    const blocked = peers.filter(p => p.status === 'blocked').length;
-    return {
-      wave: targetWave,
-      total: peers.length,
-      done,
-      blocked,
-      pending: peers.length - done - blocked,
-      readyForNextWave: peers.length > 0 && done === peers.length,
-      needsCorrection: blocked > 0
-    };
+    return this.inspectWaveReadiness(s, wave ?? s.activeWave).status;
   }
 
   public isWaveComplete(wave?: number): boolean {

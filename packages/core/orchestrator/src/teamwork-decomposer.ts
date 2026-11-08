@@ -232,12 +232,18 @@ export class TeamworkDecomposer {
     if (isAllowed('ui') && hasUiSignal && !subtasks.some(t => t.roleType === 'ui')) {
       subtasks.push({ roleType: 'ui', label: 'UI', title: `Refine UI layouts: ${objective}`, targetFiles: [] });
     }
-    const hasDocSignal = allFiles.some(f => f.endsWith('.md') || f.includes('docs/')) || /doc|wiki|rfc|dokümantasyon|belge/i.test(objective);
-    if (isAllowed('docs') && hasDocSignal && !subtasks.some(t => t.roleType === 'docs')) {
-      subtasks.push({ roleType: 'docs', label: 'Docs', title: `Document specs: ${objective}`, targetFiles: [] });
-    }
     if (isAllowed('qa') && !subtasks.some(t => t.roleType === 'qa')) {
       subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
+    }
+    if (isAllowed('docs') && !subtasks.some(t => t.roleType === 'docs')) {
+      subtasks.push({
+        roleType: 'docs',
+        label: 'Docs',
+        title: `Document specs & living architecture: ${objective}`,
+        targetFiles: [],
+        phase: 3,
+        dependsOn: ['Audit']
+      });
     }
     if (subtasks.length === 0) {
       subtasks.push({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [] });

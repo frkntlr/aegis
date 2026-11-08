@@ -2,18 +2,22 @@ import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { TeamworkDecomposer, TeamworkSharder } from './teamwork-decomposer.js';
 import { TeamworkCoordinator } from './teamwork-coordinator.js';
-import { compileUltraLeanPrompt, getSubagentProfiles } from './teamwork-prompts.js';
+import { compileUltraLeanPrompt, compileCompactTrackPrompt, getSubagentProfiles } from './teamwork-prompts.js';
 
-test('TeamworkDecomposer splits numbered objective into separate subtasks', () => {
+test('TeamworkDecomposer splits numbered objective into separate subtasks and includes Phase 3 docs', () => {
   const objective = '1. AST Parser optimize et, 2. Önbellek mekanizması kur, 3. Demir Kafes denetimi yap';
   const subtasks = TeamworkDecomposer.decompose(objective, ['src/parser.ts', 'src/cache.ts']);
 
-  assert.strictEqual(subtasks.length, 3);
+  assert.strictEqual(subtasks.length, 4);
   const solvers = subtasks.filter(s => s.roleType === 'solver');
   const qas = subtasks.filter(s => s.roleType === 'qa');
+  const docs = subtasks.filter(s => s.roleType === 'docs');
 
   assert.strictEqual(solvers.length, 2);
   assert.strictEqual(qas.length, 1);
+  assert.strictEqual(docs.length, 1);
+  assert.strictEqual(docs[0].phase, 3);
+  assert.ok(docs[0].title.includes('Document specs & living architecture'));
   assert.ok(solvers[0].targetFiles.includes('src/parser.ts'));
   assert.ok(solvers[1].targetFiles.includes('src/cache.ts'));
 });
@@ -162,6 +166,14 @@ test('compileUltraLeanPrompt generates compact prompt under 200 tokens with anch
   assert.ok(prompt.includes('ANCHORS:[tokenizeString, TokenKind]'));
   assert.ok(prompt.includes('CONTRACT:export interface Token'));
   assert.ok(prompt.includes('ROLE_COMPLETE: issue-solver [tokenizer]'));
+
+  const compact = compileCompactTrackPrompt(
+    profile, 'Implement fast tokenizer', ['src/tokenizer.ts'], 'issue-solver [tokenizer]', ['Audit'], 1, 'export interface Token'
+  );
+  assert.ok(compact.includes(profile.badge));
+  assert.ok(compact.includes('TASK:issue-solver [tokenizer]|W1|deps:[Audit]'));
+  assert.ok(compact.includes('FILES:[src/tokenizer.ts]'));
+  assert.ok(compact.includes('CONTRACT:export interface Token'));
 });
 
 test('TeamworkSharder clusters sibling tests and implementation files together', () => {

@@ -75,7 +75,12 @@ export class TeamworkSharder {
     subtasks.splice(solverIndex, 1, ...newSolvers);
   }
 
+  public static hasDimensionedQa(tasks: DecomposedSubtask[]): boolean {
+    return tasks.some(t => t.roleType === 'qa' && ['StaticAudit', 'TypeSafety', 'SafetyGate'].includes(t.label));
+  }
+
   public static shardQaByDimensions(subtasks: DecomposedSubtask[], objective: string, companionTest?: string): void {
+    if (this.hasDimensionedQa(subtasks)) return;
     const qaIndex = subtasks.findIndex(t => t.roleType === 'qa');
     if (qaIndex === -1) return;
     const baseTitle = subtasks[qaIndex].title || objective;
@@ -98,6 +103,7 @@ export class TeamworkSharder {
   }
 
   public static shardQaByFiles(subtasks: DecomposedSubtask[], allFiles: string[], objective: string, allowDimensions = true): void {
+    if (this.hasDimensionedQa(subtasks)) return;
     const qas = subtasks.filter(t => t.roleType === 'qa');
     if (qas.length !== 1) return;
     const qaIndex = subtasks.findIndex(t => t.roleType === 'qa');
@@ -140,39 +146,24 @@ export class TeamworkSharder {
           return norm.endsWith('.md') || norm.includes('docs/');
         });
       } else if (task.roleType === 'qa') {
-        task.targetFiles = allFiles.filter(f => {
-          const norm = f.replace(/\\/g, '/').toLowerCase();
-          return (norm.includes('.test.') || norm.includes('.spec.')) && !assigned.has(f.replace(/\\/g, '/'));
-        });
+        task.targetFiles = allFiles.filter(f => (f.toLowerCase().includes('.test.') || f.toLowerCase().includes('.spec.')) && !assigned.has(f.replace(/\\/g, '/')));
       }
       for (const f of task.targetFiles) assigned.add(f.replace(/\\/g, '/'));
     }
     this.partitionSolverFiles(subtasks.filter(t => t.roleType === 'solver' && t.targetFiles.length === 0), allFiles, assigned);
   }
 
-  public static partitionSolverFiles(
-    solvers: DecomposedSubtask[],
-    allFiles: string[],
-    assigned: Set<string>
-  ): void {
+  public static partitionSolverFiles(solvers: DecomposedSubtask[], allFiles: string[], assigned: Set<string>): void {
     if (solvers.length === 0) return;
-    const remaining = allFiles.filter(
-      f => !assigned.has(f.replace(/\\/g, '/')) && this.isSourceFile(f)
-    );
+    const remaining = allFiles.filter(f => !assigned.has(f.replace(/\\/g, '/')) && this.isSourceFile(f));
     for (const solver of solvers) {
       const labelLower = solver.label.toLowerCase();
-      const matched = remaining.filter(
-        f => !assigned.has(f.replace(/\\/g, '/')) && f.toLowerCase().replace(/\\/g, '/').includes(labelLower)
-      );
-      for (const f of matched) {
-        solver.targetFiles.push(f);
-        assigned.add(f.replace(/\\/g, '/'));
-      }
+      const matched = remaining.filter(f => !assigned.has(f.replace(/\\/g, '/')) && f.toLowerCase().replace(/\\/g, '/').includes(labelLower));
+      for (const f of matched) { solver.targetFiles.push(f); assigned.add(f.replace(/\\/g, '/')); }
     }
     const unassigned = remaining.filter(f => !assigned.has(f.replace(/\\/g, '/')));
     unassigned.forEach((f, idx) => {
-      const targetSolver = solvers[idx % solvers.length];
-      targetSolver.targetFiles.push(f);
+      solvers[idx % solvers.length].targetFiles.push(f);
       assigned.add(f.replace(/\\/g, '/'));
     });
   }
@@ -217,7 +208,9 @@ export class TeamworkSharder {
     const baseName = singleFile.replace(/\\/g, '/').replace(/\.[^/.]+$/, '');
     const base = baseName.split('/').pop() || baseName;
     const others = this.resolveCompanionSubtasks(subtasks, `${baseName}.test.ts`, `docs/${base}.md`, objective);
-    this.shardQaByDimensions(others, objective, `${baseName}.test.ts`);
+    if (!this.hasDimensionedQa(others) && !this.hasDimensionedQa(subtasks)) {
+      this.shardQaByDimensions(others, objective, `${baseName}.test.ts`);
+    }
     return [...solvers, ...others];
   }
 
@@ -233,7 +226,9 @@ export class TeamworkSharder {
       shardedSolvers.push({ roleType: 'solver', label: 'State', title: `${baseTitle} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
     }
     const others = subtasks.filter(t => t.roleType !== 'solver');
-    this.shardQaByDimensions(others, objective);
+    if (!this.hasDimensionedQa(others) && !this.hasDimensionedQa(subtasks)) {
+      this.shardQaByDimensions(others, objective);
+    }
     return [...shardedSolvers, ...others];
   }
 
@@ -242,7 +237,9 @@ export class TeamworkSharder {
     if (!subtasks.some(s => s.label === 'State') && subtasks.length < maxConcurrency) {
       subtasks.splice(solvers.length, 0, { roleType: 'solver', label: 'State', title: `${objective} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
     }
-    this.shardQaByDimensions(subtasks, objective);
+    if (!this.hasDimensionedQa(subtasks)) {
+      this.shardQaByDimensions(subtasks, objective);
+    }
     this.partitionFiles(subtasks, allFiles);
     return subtasks;
   }
@@ -280,7 +277,9 @@ export class TeamworkSharder {
 
     const others = subtasks.filter(t => t.roleType !== 'solver');
     const result = [...shardedSolvers, ...others];
-    this.shardQaByFiles(result, allFiles, objective, true);
+    if (!this.hasDimensionedQa(others) && !this.hasDimensionedQa(subtasks)) {
+      this.shardQaByFiles(result, allFiles, objective, true);
+    }
     this.partitionFiles(result, allFiles);
     return result;
   }

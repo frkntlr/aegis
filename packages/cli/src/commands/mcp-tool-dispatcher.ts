@@ -17,24 +17,7 @@ import { GodotMcpProvider } from '@aegis/godot-bridge';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
 import { mcpTaskList, mcpTaskClaim, mcpTaskRelease, mcpTaskInboxPull, mcpLockStatus } from './task-commands.js';
-import {
-  mcpTeamworkPlan,
-  mcpTeamworkStatus,
-  mcpTeamworkCompact,
-  mcpTeamworkAnalyze,
-  mcpTeamworkDag
-} from './teamwork-command.js';
-import {
-  mcpTeamworkMeshRead,
-  mcpTeamworkMeshPost,
-  mcpTeamworkBroadcast,
-  mcpTeamworkPeers,
-  mcpTeamworkWaves,
-  mcpTeamworkConflicts,
-  mcpTeamworkScale,
-  mcpTeamworkDocSynthesize,
-  mcpTeamworkTools
-} from './teamwork-mesh-mcp.js';
+import { executeTeamworkTool } from './teamwork-mcp-dispatcher.js';
 
 export const CORE_MCP_TOOLS = [
   { name: 'memory_query', description: '5-Layer Codebase Memory query (AST, callers, callees, locks)', inputSchema: { type: 'object', properties: { symbol: { type: 'string' }, worktreeId: { type: 'string' } }, required: ['symbol'] } },
@@ -70,6 +53,14 @@ export const CORE_MCP_TOOLS = [
   { name: 'teamwork_scale', description: 'Plan hyper-scale massive concurrency subtasks with disjoint file allocation', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, maxAgents: { type: 'number' } }, required: ['objective'] } },
   { name: 'teamwork_doc_synthesize', description: 'Synthesize human-centric living architecture briefing, component topology and metrics', inputSchema: { type: 'object', properties: { planId: { type: 'string' }, compact: { type: 'boolean' } } } },
   { name: 'teamwork_tools', description: 'Inspect or display assigned intelligent Aegis tools for each Antigravity subagent role', inputSchema: { type: 'object', properties: { role: { type: 'string' } } } },
+  { name: 'teamwork_report', description: 'Generate instant sub-10ms high-signal execution report for Antigravity Teamwork', inputSchema: { type: 'object', properties: { planId: { type: 'string' }, compact: { type: 'boolean' }, save: { type: 'boolean' }, json: { type: 'boolean' } } } },
+  { name: 'teamwork_test', description: 'Run resilient test suite with optional offline isolation shield', inputSchema: { type: 'object', properties: { target: { type: 'string' }, offline: { type: 'boolean' } } } },
+  { name: 'teamwork_advance', description: 'Advance parallel execution wave to next phase and stage batch', inputSchema: { type: 'object', properties: { planId: { type: 'string' } } } },
+  { name: 'teamwork_clear', description: 'Reset and clear teamwork inbox tasks and release all active file locks', inputSchema: { type: 'object', properties: {} } },
+  { name: 'teamwork_matrix', description: 'Display live Antigravity subagent allocation matrix and file status', inputSchema: { type: 'object', properties: { objective: { type: 'string' } } } },
+  { name: 'teamwork_batch', description: 'Inspect concurrent execution batches and sequential wave sets', inputSchema: { type: 'object', properties: { planId: { type: 'string' } } } },
+  { name: 'teamwork_deliberate', description: 'Multi-Agent Deliberation and consensus strategy generation', inputSchema: { type: 'object', properties: { objective: { type: 'string' } } } },
+  { name: 'teamwork_swarm', description: 'Run Collaborative Concurrent Analysis Swarm across codebase', inputSchema: { type: 'object', properties: { objective: { type: 'string' } } } },
   { name: 'engine_update', description: 'Dynamically update and reinstall Aegis across PC with zero-state clean options', inputSchema: { type: 'object', properties: { clean: { type: 'boolean' }, pull: { type: 'boolean' }, force: { type: 'boolean' } } } },
   { name: 'version_status', description: 'Inspect dynamic version drift, upstream commits, and monorepo packages status', inputSchema: { type: 'object', properties: {} } },
   { name: 'github_rfc_pipeline', description: 'Execute end-to-end GitHub RFC lifecycle: Discussion <-> Issue cross-link and TIP staging', inputSchema: { type: 'object', properties: { rfc: { type: 'string' }, description: { type: 'string' } }, required: ['rfc'] } },
@@ -209,12 +200,10 @@ function executeUtilityTool(name: string, args: Record<string, unknown>): string
     return JSON.stringify({ worktrees: list.worktrees, lockedFiles: locks, activeCount: list.activeCount }, null, 2);
   }
   if (name === 'engine_update') {
-    const res = EngineUpdater.runUpdate({ clean: args.clean === true, pull: args.pull === true, force: args.force === true });
-    return JSON.stringify(res, null, 2);
+    return JSON.stringify(EngineUpdater.runUpdate({ clean: args.clean === true, pull: args.pull === true, force: args.force === true }), null, 2);
   }
   if (name === 'version_status') {
-    const rep = EngineUpdater.getVersionReport();
-    return JSON.stringify(rep, null, 2);
+    return JSON.stringify(EngineUpdater.getVersionReport(), null, 2);
   }
   return JSON.stringify({ error: `Unknown tool: ${name}` });
 }
@@ -231,20 +220,8 @@ export async function executeMcpTool(name: string, args: Record<string, unknown>
   if (name === 'task_inbox_pull') return mcpTaskInboxPull(args);
   if (name === 'lock_status') return mcpLockStatus();
   const canonical = name.replace(/^(tr|tw)_/, 'teamwork_');
-  if (canonical === 'teamwork_plan') return mcpTeamworkPlan(args);
-  if (canonical === 'teamwork_status') return mcpTeamworkStatus();
-  if (canonical === 'teamwork_compact') return mcpTeamworkCompact(args);
-  if (canonical === 'teamwork_analyze') return mcpTeamworkAnalyze(args);
-  if (canonical === 'teamwork_dag') return mcpTeamworkDag(args);
-  if (canonical === 'teamwork_mesh_read') return mcpTeamworkMeshRead(args);
-  if (canonical === 'teamwork_mesh_post') return mcpTeamworkMeshPost(args);
-  if (canonical === 'teamwork_broadcast') return mcpTeamworkBroadcast(args);
-  if (canonical === 'teamwork_peers') return mcpTeamworkPeers(args);
-  if (canonical === 'teamwork_waves') return mcpTeamworkWaves(args);
-  if (canonical === 'teamwork_conflicts') return mcpTeamworkConflicts();
-  if (canonical === 'teamwork_scale') return mcpTeamworkScale(args);
-  if (canonical === 'teamwork_doc_synthesize') return mcpTeamworkDocSynthesize(args);
-  if (canonical === 'teamwork_tools') return mcpTeamworkTools(args);
+  const twResult = await executeTeamworkTool(canonical, args);
+  if (twResult !== null) return twResult;
   if (name === 'github_rfc_pipeline') {
     const { handleRfcPipeline } = await import('./rfc-pipeline-command.js');
     await handleRfcPipeline(String(args.rfc || ''), args.description ? String(args.description) : undefined);

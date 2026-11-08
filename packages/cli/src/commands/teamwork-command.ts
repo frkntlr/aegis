@@ -39,8 +39,8 @@ export function handleTeamworkStatus(flag?: string): void {
 export function handleTeamworkClear(flag?: string): void {
   const isJson = flag === '--json' || flag === '-j';
   const coordinator = new TeamworkCoordinator();
-  const locksCleared = coordinator.worktreeManager.clearAllLocks();
-  const tasksCleared = clearInboxTasks();
+  const { locksCleared, tasksCleared: stagedCleared } = coordinator.clearTeamwork();
+  const tasksCleared = Math.max(stagedCleared, clearInboxTasks());
   if (isJson) { console.log(JSON.stringify({ success: true, tasksCleared, locksCleared }, null, 2)); return; }
   showBanner();
   console.log(`🧹 Teamwork reset: Cleared ${tasksCleared} task(s) and released ${locksCleared} lock(s).`);
@@ -272,3 +272,7 @@ export function mcpTeamworkAnalyze(args: Record<string, unknown> = {}): string {
   const explicitFiles = Array.isArray(args.files) ? args.files.map(String) : [];
   return JSON.stringify(new TeamworkCoordinator().getSemanticAnalyzer().analyze(objective, explicitFiles), null, 2);
 }
+
+export { mcpTeamworkClear, mcpTeamworkMatrix } from './teamwork-mesh-mcp.js';
+
+

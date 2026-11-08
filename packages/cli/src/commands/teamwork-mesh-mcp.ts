@@ -12,8 +12,10 @@ import {
   formatAegisToolMatrix,
   computeExecutionWaves,
   formatCompactWaveBriefing,
-  formatParallelDispatchBriefing
+  formatParallelDispatchBriefing,
+  getConcurrentExecutionBatches
 } from '@aegis/orchestrator';
+import { clearInboxTasks } from './task-inbox.js';
 
 function resolveAgentName(override?: string): string {
   if (override && override.trim().length > 0) return override.trim();
@@ -94,4 +96,42 @@ export function mcpTeamworkTools(args: Record<string, unknown> = {}): string {
   const role = typeof args.role === 'string' ? args.role : undefined;
   return formatAegisToolMatrix(role);
 }
+
+export function mcpTeamworkAdvance(args: Record<string, unknown> = {}): string {
+  const coordinator = new TeamworkCoordinator();
+  const planId = typeof args.planId === 'string' ? args.planId : undefined;
+  return JSON.stringify(coordinator.advanceWave(planId), null, 2);
+}
+
+export function mcpTeamworkClear(): string {
+  const coordinator = new TeamworkCoordinator();
+  const { locksCleared, tasksCleared: stagedCleared } = coordinator.clearTeamwork();
+  const tasksCleared = stagedCleared || clearInboxTasks();
+  return JSON.stringify({ success: true, tasksCleared, locksCleared }, null, 2);
+}
+
+export function mcpTeamworkMatrix(args: Record<string, unknown> = {}): string {
+  const objective = String(args.objective || 'Active Teamwork Mission');
+  const targetFiles = Array.isArray(args.targetFiles) ? args.targetFiles.map(String) : [];
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objective, targetFiles, { stage: false, acquireLocks: false });
+  return coordinator.formatLiveMatrix(plan);
+}
+
+export function mcpTeamworkBatch(args: Record<string, unknown> = {}): string {
+  const objective = String(args.objective || args.planId || 'Active Mission');
+  const coordinator = new TeamworkCoordinator();
+  const plan = coordinator.planTeamwork(objective, [], { stage: false, acquireLocks: false });
+  return JSON.stringify(getConcurrentExecutionBatches(plan.tracks), null, 2);
+}
+
+export async function mcpTeamworkTest(args: Record<string, unknown> = {}): Promise<string> {
+  const { runResilientTest } = await import('./test-command.js');
+  const target = typeof args.target === 'string' ? args.target : undefined;
+  const offline = args.offline === true;
+  const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined;
+  const res = await runResilientTest({ target, offline, timeoutMs });
+  return JSON.stringify(res, null, 2);
+}
+
 

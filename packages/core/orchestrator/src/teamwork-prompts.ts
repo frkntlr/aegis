@@ -206,21 +206,21 @@ export function compileCompactTrackPrompt(
   subagentName?: string,
   dependsOn?: string[],
   phase?: number,
-  upstreamContracts?: string
+  upstreamContracts?: string,
+  targetSymbols?: string[]
 ): string {
   const roleId = subagentName ?? profile.name;
   const deps = dependsOn?.length ? `|deps:[${dependsOn.join(',')}]` : '';
   const ph = phase ? `|W${phase}` : '';
-  const fileStr = files.length ? files.join(',') : 'general';
-  const contractSlice = upstreamContracts ? `\nCONTRACTS:\n${upstreamContracts.trim()}` : '';
+  const fileStr = files.length ? files.join(', ') : 'general';
+  const symStr = targetSymbols?.length ? `\nANCHORS:[${targetSymbols.join(', ')}]` : '';
+  const contractSlice = upstreamContracts ? `\nCONTRACT:${upstreamContracts.trim()}` : '';
 
   return `[${profile.badge}]\n` +
-    `TASK:${roleId}${ph}${deps}\n` +
-    `GOAL:${trackDesc}\n` +
-    `FILES:[${fileStr}]\n` +
-    `RULES:DemirKafes(<300L/file,<40L/fn,0any),SurgicalDiffs,VerifyTask` +
-    `${contractSlice}\n` +
-    `MESH:Post progress via tw:post. Conclude with [ROLE_COMPLETE: ${roleId}].`;
+    `TASK:${roleId}${ph}${deps} | GOAL:${trackDesc}\n` +
+    `FILES:[${fileStr}]${symStr}${contractSlice}\n` +
+    `GATE:DemirKafes(<300L/file,<40L/fn,0any),SurgicalDiffs,VerifyTask\n` +
+    `COMM:tw:post progress | Conclude:[ROLE_COMPLETE: ${roleId}]`;
 }
 
 export function compileUltraLeanPrompt(
@@ -229,15 +229,19 @@ export function compileUltraLeanPrompt(
   files: string[],
   subagentName?: string,
   targetSymbols?: string[],
-  contract?: string
+  contract?: string,
+  phase?: number,
+  dependsOn?: string[]
 ): string {
   const roleId = subagentName ?? profile.name;
   const targetStr = files.length > 0 ? files.join(', ') : 'general';
   const symStr = targetSymbols?.length ? `\nANCHORS:[${targetSymbols.join(', ')}]` : '';
   const cStr = contract ? `\nCONTRACT:${contract.trim()}` : '';
+  const ph = phase ? `|W${phase}` : '';
+  const deps = dependsOn?.length ? `|deps:[${dependsOn.join(',')}]` : '';
 
   return `[${profile.badge}]\n` +
-    `ACT:${roleId} | GOAL:${desc}\n` +
+    `ACT:${roleId}${ph}${deps} | GOAL:${desc}\n` +
     `FILES:[${targetStr}]${symStr}${cStr}\n` +
     `GATE:DemirKafes(<300L/file,<40L/fn,0any),SurgicalDiff,VerifyTask\n` +
     `COMM:tw:post progress | Conclude:[ROLE_COMPLETE: ${roleId}]`;

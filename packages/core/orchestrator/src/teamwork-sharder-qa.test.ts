@@ -144,3 +144,42 @@ test('shardSmartClusters guarantees disjoint file allocations across sharded age
   const uniqueQaFiles = new Set(qaFiles.map(f => f.replace(/\\/g, '/')));
   assert.strictEqual(qaFiles.length, uniqueQaFiles.size, 'QA target files must be strictly disjoint');
 });
+
+test('shardQaByDimensions does not duplicate QA tasks when already dimensioned', () => {
+  const subtasks: DecomposedSubtask[] = [
+    { roleType: 'qa', label: 'StaticAudit', title: 'Audit [StaticAudit]', targetFiles: [] },
+    { roleType: 'qa', label: 'TypeSafety', title: 'Audit [TypeSafety]', targetFiles: [] },
+    { roleType: 'qa', label: 'SafetyGate', title: 'Audit [SafetyGate]', targetFiles: [] }
+  ];
+  TeamworkSharder.shardQaByDimensions(subtasks, 'Audit feature');
+  const qas = subtasks.filter(t => t.roleType === 'qa');
+  assert.strictEqual(qas.length, 3, 'Must not duplicate dimensioned QA tasks');
+  assert.deepStrictEqual(qas.map(q => q.label), ['StaticAudit', 'TypeSafety', 'SafetyGate']);
+});
+
+test('shardSmartClusters preserves dimensioned QA tasks without duplication in general scope', () => {
+  const initial: DecomposedSubtask[] = [
+    { roleType: 'solver', label: 'Core', title: 'Implement feature', targetFiles: [] },
+    { roleType: 'qa', label: 'StaticAudit', title: 'Audit [StaticAudit]', targetFiles: [] },
+    { roleType: 'qa', label: 'TypeSafety', title: 'Audit [TypeSafety]', targetFiles: [] },
+    { roleType: 'qa', label: 'SafetyGate', title: 'Audit [SafetyGate]', targetFiles: [] }
+  ];
+  const sharded = TeamworkSharder.shardSmartClusters(initial, [], 'General scope task', 4);
+  const qas = sharded.filter(t => t.roleType === 'qa');
+  assert.strictEqual(qas.length, 3, 'Must retain exactly 3 QA tasks without re-sharding');
+  assert.deepStrictEqual(qas.map(q => q.label), ['StaticAudit', 'TypeSafety', 'SafetyGate']);
+});
+
+test('shardSmartClusters preserves dimensioned QA tasks without duplication with files', () => {
+  const files = ['packages/core/src/auth.ts', 'packages/cli/src/cmd.ts'];
+  const initial: DecomposedSubtask[] = [
+    { roleType: 'solver', label: 'Core', title: 'Implement feature', targetFiles: [] },
+    { roleType: 'qa', label: 'StaticAudit', title: 'Audit [StaticAudit]', targetFiles: [] },
+    { roleType: 'qa', label: 'TypeSafety', title: 'Audit [TypeSafety]', targetFiles: [] },
+    { roleType: 'qa', label: 'SafetyGate', title: 'Audit [SafetyGate]', targetFiles: [] }
+  ];
+  const sharded = TeamworkSharder.shardSmartClusters(initial, files, 'Clustered task', 4);
+  const qas = sharded.filter(t => t.roleType === 'qa');
+  assert.strictEqual(qas.length, 3, 'Must retain exactly 3 QA tasks when already dimensioned');
+});
+

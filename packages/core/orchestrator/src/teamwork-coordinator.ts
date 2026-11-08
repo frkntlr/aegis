@@ -17,7 +17,7 @@ import { FastSemanticAnalyzer } from './fast-semantic-analyzer.js';
 import { TeamworkCompactEngine } from './teamwork-compact.js';
 import { TeamworkMesh } from './teamwork-mesh.js';
 import { computeExecutionWaves, formatParallelDispatchBriefing, formatCompactWaveBriefing } from './teamwork-waves.js';
-import { stageTracksIntoInboxHelper, exportSubagentManifestHelper, countPendingInboxHelper } from './teamwork-staging.js';
+import { stageTracksIntoInboxHelper, exportSubagentManifestHelper, countPendingInboxHelper, clearStagedInboxHelper } from './teamwork-staging.js';
 import { TaskComplexityAnalyzer } from './task-complexity-analyzer.js';
 import { TeamworkResearchSwarm } from './teamwork-research-swarm.js';
 import { TeamworkAnalysisSwarm } from './teamwork-analysis-swarm.js';
@@ -35,15 +35,10 @@ export {
 export type { BootstrapResult, BootstrapOptions };
 
 export interface TeamworkCoordinatorOptions {
-  repoRoot?: string;
-  worktreeManager?: WorktreeManager;
-  roleClassifier?: RoleClassifier;
-  groundingEngine?: TeamworkGroundingEngine;
-  semanticAnalyzer?: FastSemanticAnalyzer;
-  compactEngine?: TeamworkCompactEngine;
-  mesh?: TeamworkMesh;
-  deliberationEngine?: TeamworkDeliberationEngine;
-  reflectionEngine?: TeamworkReflectionEngine;
+  repoRoot?: string; worktreeManager?: WorktreeManager; roleClassifier?: RoleClassifier;
+  groundingEngine?: TeamworkGroundingEngine; semanticAnalyzer?: FastSemanticAnalyzer;
+  compactEngine?: TeamworkCompactEngine; mesh?: TeamworkMesh;
+  deliberationEngine?: TeamworkDeliberationEngine; reflectionEngine?: TeamworkReflectionEngine;
 }
 
 export interface PlanTeamworkOptions {
@@ -67,11 +62,8 @@ export class TeamworkCoordinator {
 
   constructor(
     repoRootOrOptions?: string | TeamworkCoordinatorOptions,
-    wtManager?: WorktreeManager,
-    roleClassifier?: RoleClassifier,
-    grounding?: TeamworkGroundingEngine,
-    semanticAnalyzer?: FastSemanticAnalyzer,
-    compactEngine?: TeamworkCompactEngine
+    wtManager?: WorktreeManager, roleClassifier?: RoleClassifier,
+    grounding?: TeamworkGroundingEngine, semanticAnalyzer?: FastSemanticAnalyzer, compactEngine?: TeamworkCompactEngine
   ) {
     if (typeof repoRootOrOptions === 'object' && repoRootOrOptions !== null) {
       this.repoRoot = resolveSafeRepoRoot(repoRootOrOptions.repoRoot);
@@ -260,11 +252,20 @@ export class TeamworkCoordinator {
 
   public formatAsciiDag(plan: TeamworkPlan): string { return TeamworkVisualizer.formatAsciiDag(plan); }
 
-  public advanceWave(planId?: string): { advanced: boolean; currentWave: number; nextPhase: string; nextBatchPayload: unknown[] } {
+  public advanceWave(planId?: string): { advanced: boolean; currentWave: number; nextPhase: string; nextBatchPayload: unknown[]; status?: import('./teamwork-mesh.js').WaveStatus; readinessReport?: string } {
     const meshRes = this.mesh.advanceWave(planId);
     const nextPhase = meshRes.nextWave === 2 ? 'QA Hunter Verification' : (meshRes.nextWave === 3 ? 'Living Architecture Synthesis' : 'Final Delivery');
     const nextBatchPayload = this.mesh.listPeers().filter(p => p.currentActivity.includes(`Wave ${meshRes.nextWave}`));
-    return { advanced: meshRes.advanced, currentWave: meshRes.nextWave, nextPhase, nextBatchPayload };
+    return { advanced: meshRes.advanced, currentWave: meshRes.nextWave, nextPhase, nextBatchPayload, status: meshRes.status, readinessReport: meshRes.readinessReport };
+  }
+
+  public clearLocks(): number { return this.worktreeManager.clearAllLocks(); }
+
+  public clearTeamwork(): { locksCleared: number; tasksCleared: number } {
+    const locksCleared = this.clearLocks();
+    const tasksCleared = clearStagedInboxHelper(this.repoRoot);
+    try { this.mesh.clearMesh(); } catch { /* safe */ }
+    return { locksCleared, tasksCleared };
   }
 
   public getTeamworkStatus(): TeamworkStatusReport {
@@ -276,3 +277,12 @@ export class TeamworkCoordinator {
     };
   }
 }
+
+export function clearTeamwork(repoRoot?: string): { locksCleared: number; tasksCleared: number } {
+  return new TeamworkCoordinator(repoRoot).clearTeamwork();
+}
+
+export function clearLocks(repoRoot?: string): number {
+  return new TeamworkCoordinator(repoRoot).clearLocks();
+}
+
