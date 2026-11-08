@@ -124,11 +124,15 @@ export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskI
       )
     );
     if (candidates.length === 0) return true;
-    const sameBatch = candidates.filter(c => Math.abs(c.issueNumber - task.issueNumber) < 50);
+    const upstream = candidates.filter(c =>
+      task.phase !== undefined && c.phase !== undefined ? c.phase < task.phase : true
+    );
+    const pool = upstream.length > 0 ? upstream : candidates;
+    const sameBatch = pool.filter(c => Math.abs(c.issueNumber - task.issueNumber) < 50);
     if (sameBatch.length > 0) {
       return sameBatch.every(c => c.status === 'done' || (isDiagnosticRole && c.status === 'blocked'));
     }
-    const parent = candidates.reduce((best, curr) =>
+    const parent = pool.reduce((best, curr) =>
       Math.abs(curr.issueNumber - task.issueNumber) < Math.abs(best.issueNumber - task.issueNumber) ? curr : best
     );
     return parent.status === 'done' || (isDiagnosticRole && parent.status === 'blocked');

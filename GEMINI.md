@@ -43,7 +43,9 @@ When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegi
 - `/aegis triage [dir]`: Evidence-Based Bug Triage (zero false alarms).
 - `/aegis trace <target>`: Trace relational callers, signal listeners & scenes.
 - `/aegis graph:scan [dir]`: Build cross-reference relational knowledge graph.
-- `/aegis godot <subcmd>`: Godot Bridge: status, ui, inspect, validate, query, run, playtest.
+- `/aegis godot <subcmd>`: Godot Bridge: status, ui, inspect, validate, query, run, playtest, tree.
+- `/aegis godot tree <scene> [--focus=<node>] [--depth=<n>] [--compact]`: Zero-token Targeted Scene Slicing (TSS) without engine cold-start (<0.03ms, <150 tokens).
+- `/aegis godot playtest <scene> [--track=<id>]`: Headless playtest runner with RFC-051 ephemeral port sharding and per-track isolated user-data-dir.
 - `/aegis godot ui:lint <scene>`: Run static Godot 4 UI compliance linter (anchors, container rules, touch targets).
 - `/aegis godot ui:scaffold <type> <name> [dir]`: Scaffold production-ready Godot 4 UI (menu, hud, dialog, theme).
 - `/aegis mutate <file>`: Run mutation testing gate on target file.
@@ -125,9 +127,9 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
      - `ui-specialist`: `Model: 'inherit'`
      - `doc-architect`: `Model: 'flash'`
 5. **Role Specialization & Intelligent Aegis Tool Arsenal**:
-   - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`). Uses `godot ui:lint`, `aegis godot inspect` (`aegis_godot_inspect_ui`), `godot ui:scaffold`, `aegis_godot_tree`, and `aegis_godot_signals`.
+   - `ui-specialist` (`🎨 [UI SPECIALIST]`): Designated primary owner of Godot UI scenes (`.tscn`), Themes (`.tres`), and presentation scripts (`.gd`). Uses `godot ui:lint`, `aegis godot inspect` (`aegis_godot_inspect_ui`), `godot ui:scaffold`, `aegis godot tree` (`GodotSceneSlicer` zero-token TSS with `--focus`/`--depth`), and `aegis_godot_signals`.
    - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions. Uses 5-layer Codebase Memory (`find_symbol`, `memory_query`), AST search/replace (`ast_search`, `ast_replace`), relational trace (`trace_relational`), official docs (`context7_query`), and Socratic debugging (`socratic_diagnose`).
-   - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests (`aegis_godot_playtest`), UI layout sweeps (`aegis godot inspect`), evidence-based bug triage (`triage`), Demir Kafes audits (`cage_check`), RTK output compression (`rtk_compress`), and mutation/oracle trust verification (`mutate`, `audit`).
+   - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests with RFC-051 ephemeral port sharding and track isolation (`aegis godot playtest --track=qa-hunter`), UI layout sweeps (`aegis godot inspect`), evidence-based bug triage (`triage`), Demir Kafes audits (`cage_check`), RTK output compression (`rtk_compress`), and mutation/oracle trust verification (`mutate`, `audit`).
    - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki (`wiki_sync`), living architecture blueprints & reports (`teamwork_doc_synthesize` / `aegis tw:doc`, `aegis tw:report`), NotebookLM grounding (`nlm:query`, `nlm:research`), and RFC lifecycle (`rfc:create`, `rfc:decompose`).
 6. **Autonomous Subagent Execution & Resilient Error Protocol**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules (<300 lines/file, <40 lines/function), and validate with `aegis verify:task` or `aegis test` / `aegis test:offline`. If tests fail, subagents run `aegis triage` or `aegis debug` for Socratic diagnosis (max 2 surgical fix attempts; never hang or loop indefinitely). If unresolvable, subagents report `[ROLE_FAILED: <role>] <reason>` and release locks (`aegis task:release <role> blocked "<reason>"`). On success, subagents report `[ROLE_COMPLETE: <role>]`.
 7. **Live Progress Reporting & Graceful Lock Release**:

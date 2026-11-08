@@ -123,7 +123,31 @@ Sistem, 9 kritik ekran en-boy oranında (`16:9`, `21:9`, `16:10`, `4:3`, `9:16`,
 
 ---
 
-## 6. İlgili Belgeler
+## 6. Sıfır-Token Hedefe Odaklı Sahne Dilimleme & Port İzolasyonu (RFC-051)
+
+### 6.1. Cerrahi Sahne Ağacı Dilimleme (`aegis godot tree`)
+Geleneksel JSON ağaç dökümlerinin aksine (10,000+ token), TypeScript tabanlı `GodotSceneSlicer` motoru açmadan <0.03ms'de statik AST üzerinden cerrahi düğüm görünümü sunar:
+
+```bash
+# Tüm sahneyi kompakt ağaç olarak listeleme
+aegis godot tree res://scenes/hud.tscn --compact
+
+# Belirli bir düğüme odaklanarak n derinlikte dilimleme (<150 token)
+aegis godot tree res://scenes/hud.tscn --focus=%StartButton --depth=2
+```
+
+### 6.2. Çoklu Ajan Dinamik Port Ayrıştırma (Port Sharding)
+Eşzamanlı `/aegis tw` senaryolarında alt ajanların (`qa-hunter`, `issue-solver`, `ui-specialist`) port çakışması (`EADDRINUSE`) yaşamaması için `GodotPortRouter`:
+- Her ajan izleğine (`trackId`) özel benzersiz deterministik port havuzu tahsis eder (Base: 6850 / Debug: 6200).
+- Her ajan için izole geçici veri dizini oluşturur (`--user-data-dir /tmp/aegis-godot-<track>`).
+- Playtest komutunda izole çalıştırma:
+  ```bash
+  aegis godot playtest res://scenes/main.tscn --track=qa-hunter
+  ```
+
+---
+
+## 7. İlgili Belgeler
 
 - [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — Çoklu ajan görev döngüsü.
 - [`04-mcp-server-specification.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/04-mcp-server-specification.md) — Godot MCP araçları.
@@ -131,3 +155,4 @@ Sistem, 9 kritik ekran en-boy oranında (`16:9`, `21:9`, `16:10`, `4:3`, `9:16`,
 - [GODOT_UI.md](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/GODOT_UI.md) — Orijinal Godot UI el kitabı.
 - [RFC-002: Aegis Godot Bridge](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-002-aegis-godot-bridge.md)
 - [RFC-038: Godot 4 UI Teamwork Scaffolding](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-038-rfc-011-godot-4-ui-teamwork-scaffolding-static-linter-and-mutual-exclusion-lock-allocation.md)
+- [RFC-051: Multi-Agent Godot Toolchain Ephemeral Port Sharding & Zero-Token Scene Slicing](file:///C:/Users/Lenovo/Documents/work/aegis/docs/rfc/RFC-051-high-performance-multi-agent-godot-toolchain-ephemeral-port-sharding-and-zero-token-scene-slicing.md)

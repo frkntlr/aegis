@@ -11,6 +11,7 @@ export * from './ui/godot-ui-verifier.js';
 export * from './ui/godot-leak-radar.js';
 export * from './ui/godot-ui-linter.js';
 export * from './ui/godot-ui-parser.js';
+export * from './ui/godot-scene-slicer.js';
 export * from './ui/godot-ui-templates.js';
 export * from './ui/godot-ui-scaffolder.js';
 export * from './ui/godot-ui-perf-auditor.js';

@@ -16,6 +16,36 @@ test('GodotPortRouter deterministically maps worktrees to ports', () => {
   assert.ok(customPort >= 6850 && customPort <= 6950);
 });
 
+test('GodotPortRouter allocates deterministic track ports and isolated userDataDir', () => {
+  const defaultAlloc = GodotPortRouter.allocateTrackPort();
+  assert.strictEqual(defaultAlloc.port, 6850);
+  assert.strictEqual(defaultAlloc.debugPort, 6200);
+  assert.ok(defaultAlloc.userDataDir.includes('aegis-godot-default'));
+
+  const solverAlloc = GodotPortRouter.allocateTrackPort('solver');
+  assert.strictEqual(solverAlloc.port, 6851);
+  assert.strictEqual(solverAlloc.debugPort, 6201);
+  assert.ok(solverAlloc.userDataDir.includes('aegis-godot-solver'));
+
+  const qaAlloc = GodotPortRouter.allocateTrackPort('qa');
+  assert.strictEqual(qaAlloc.port, 6852);
+  assert.strictEqual(qaAlloc.debugPort, 6202);
+  assert.ok(qaAlloc.userDataDir.includes('aegis-godot-qa'));
+
+  const uiAlloc = GodotPortRouter.allocateTrackPort('ui');
+  assert.strictEqual(uiAlloc.port, 6853);
+  assert.strictEqual(uiAlloc.debugPort, 6203);
+  assert.ok(uiAlloc.userDataDir.includes('aegis-godot-ui'));
+
+  const customAlloc = GodotPortRouter.allocateTrackPort('track-feature-alpha', 7000);
+  assert.ok(customAlloc.port >= 7010 && customAlloc.port <= 7060);
+  assert.ok(customAlloc.debugPort >= 6210 && customAlloc.debugPort <= 6260);
+  assert.ok(customAlloc.userDataDir.includes('aegis-godot-track-feature-alpha'));
+
+  const secondAlloc = GodotPortRouter.allocateTrackPort('track-feature-alpha', 7000);
+  assert.deepStrictEqual(customAlloc, secondAlloc);
+});
+
 test('GodotPortRouter builds standard CLI arguments with token and port', () => {
   const args = GodotPortRouter.buildCliArgs({
     worktreeOrRole: 'solver',
@@ -32,6 +62,22 @@ test('GodotPortRouter builds standard CLI arguments with token and port', () => 
   assert.ok(args.includes('5'));
   assert.ok(args.includes('--aegis-port=6851'));
   assert.ok(args.includes('--aegis-token=secret123'));
+});
+
+test('GodotPortRouter builds CLI args with user-data-dir and trackId isolation', () => {
+  const argsWithUserData = GodotPortRouter.buildCliArgs({
+    userDataDir: '/tmp/isolated-godot-user'
+  });
+  assert.ok(argsWithUserData.includes('--user-data-dir'));
+  const idx = argsWithUserData.indexOf('--user-data-dir');
+  assert.strictEqual(argsWithUserData[idx + 1], '/tmp/isolated-godot-user');
+
+  const argsWithTrack = GodotPortRouter.buildCliArgs({
+    trackId: 'track-beta'
+  });
+  assert.ok(argsWithTrack.includes('--user-data-dir'));
+  assert.ok(argsWithTrack[argsWithTrack.indexOf('--user-data-dir') + 1].includes('aegis-godot-track-beta'));
+  assert.ok(argsWithTrack.some((a: string) => a.startsWith('--aegis-port=')));
 });
 
 test('GodotProcessWatchdog executes quick process and enforces timeout', async () => {

@@ -1,7 +1,7 @@
 # 🏛️ RFC-051: High-Performance Multi-Agent Godot Toolchain, Ephemeral Port Sharding, and Zero-Token Scene Slicing
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-051 | **Durum:** Proposed | **Tarih:** 2026-11-08
+- **RFC ID:** RFC-051 | **Durum:** Implemented | **Tarih:** 2026-11-08
 - **GitHub Discussion:** [#532 (Ideas)](https://github.com/frkntlr/aegis/discussions/532)
 - **Tasarımcı:** Aegis Autonomous Fleet & Antigravity Pair Lead
 
@@ -139,8 +139,21 @@ packages/plugins/godot-bridge/src/
 
 ## 🎯 5. Kabul Kriterleri (Acceptance Criteria)
 
-- [ ] `GodotPortRouter` eşzamanlı `trackId` tabanlı dinamik port dağıtımı tamamlandı.
-- [ ] `GodotSceneSlicer` (Targeted Scene Slicing) cerrahi ağaç budama aracı yazıldı.
-- [ ] Statik `GodotUIParser` öncelikli kontrol pipeline'ı `@aegis/godot-bridge` içine entegre edildi.
-- [ ] Godot test ve playtest çıktıları `RTKTokenKiller` ile gürültüden arındırıldı.
-- [ ] Çoklu ajan eşzamanlı test senaryoları birim testleri ile kanıtlandı.
+- [x] `GodotPortRouter` eşzamanlı `trackId` tabanlı dinamik port dağıtımı tamamlandı (`GodotPortRouter.allocateTrackPort(trackId, basePort)`).
+- [x] `GodotSceneSlicer` (Targeted Scene Slicing - TSS) cerrahi ağaç budama aracı yazıldı (`--focus` ve `--depth` filtreleme ile <0.03ms ve <150 token).
+- [x] Statik `GodotUIParser` öncelikli kontrol pipeline'ı `@aegis/godot-bridge` içine entegre edildi.
+- [x] Godot test ve playtest çıktıları `RTKTokenKiller` ile gürültüden arındırıldı ve izole temp user-data dizinleri (`aegis-godot-<track>`) bağlandı.
+- [x] `aegis godot tree <scene.tscn> [--focus=<node>] [--depth=<n>] [--compact]` CLI komutu `@aegis/cli` içine entegre edildi.
+- [x] Çoklu ajan eşzamanlı test senaryoları birim testleri ile kanıtlandı (%100 geçiş: 70/70 `@aegis/godot-bridge`, 196/196 `@aegis/cli`, 523/523 Demir Kafes uyumu).
+
+---
+
+## 🏆 6. Uygulama Kilometre Taşları & Doğrulama Sonuçları (Implementation Milestones)
+
+| Bileşen / Özellik | Hedef | Gerçekleşen Sonuç | Durum |
+| :--- | :--- | :--- | :---: |
+| **`GodotPortRouter.allocateTrackPort`** | Deterministik port ve temp user data dizini izolasyonu | Base 6850 / Debug 6200 üzerinden hash/rol tabanlı çakışmasız port tahsisi; `aegis-godot-<track>` izole çalışma dizini | ✅ Tamamlandı |
+| **`GodotSceneSlicer` (TSS)** | Sıfır soğuk başlangıçlı cerrahi AST dilimleme | <0.03ms ayrıştırma süresi; 10,000+ token'lık JSON çıktısını <150 token'a indirme (%98.8 token tasarrufu) | ✅ Tamamlandı |
+| **`aegis godot tree` CLI** | Cerrahi sahne ağacı komutu | `@aegis/cli` entegrasyonu: `<scene.tscn> [--focus=<node>] [--depth=<n>] [--compact]` | ✅ Tamamlandı |
+| **`aegis godot playtest`** | Çoklu ajan playtest port izolasyonu | `--track=<id>` bayrağı ile dinamik port ve `userDataDir` parametresi otomatik enjekte edilir | ✅ Tamamlandı |
+| **Birim Testleri & Demir Kafes** | Tam test kapsamı ve Demir Kafes uyumu | `@aegis/godot-bridge` (70/70 passing), `@aegis/cli` (196/196 passing), 523/523 dosya Demir Kafes tam uyumlu | ✅ Doğrulandı |

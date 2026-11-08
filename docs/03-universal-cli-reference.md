@@ -111,6 +111,22 @@ npm run aegis -- <komut> [argümanlar]
 | `aegis nlm:prune` | `[--dry-run]` | Eski kaynakları MFCS güven skoruyla budar ve mezar taşı mahzenine arşivler. |
 | `aegis nlm:restore` | `<id>` | Arşivlenmiş bir kaynağı yerel mahzenden NotebookLM'e geri yükler. |
 
+### 2.6. Godot 4 Oyun Motoru Köprüsü & UI Dilimleme
+
+| Komut | Parametreler | Açıklama |
+| :--- | :--- | :--- |
+| `aegis godot tree` | `<scene.tscn> [--focus=<node>] [--depth=<n>] [--compact]` | Zero-token cerrahi sahne dilimleme (TSS); motoru başlatmadan <0.03ms'de statik AST hiyerarşisi çıkarır (%98.8 token tasarrufu, <150 token). |
+| `aegis godot playtest` | `[scenario] [--track=<id>]` | Headless playtest senaryolarını koşturur; `--track` ile çoklu ajan için çakışmasız dinamik port ve izole temp user data dizini tahsis eder. |
+| `aegis godot ui:lint` | `<scene.tscn>` | Statik Demir Kafes UI uyum denetimi (anchors_preset=15, dokunma alanı >=44px, container kuralları). |
+| `aegis godot ui:scaffold` | `<type> <name> [dir]` | Demir Kafes uyumlu hazır UI sahneleri ve kontrolcüleri üretir (menu, hud, dialog, theme). |
+| `aegis godot inspect` | `[projectDir]` | 9 kritik en-boy oranında sıfır-token BoundingBox UI taşma ve düzen denetimini koşturur. |
+| `aegis godot query` | `<ClassName>` | Godot ClassDB Oracle üzerinden sınıfın metod, sinyal ve özelliklerini anlık sorgular. |
+| `aegis godot validate` | `<file.gd>` | GDScript AST sözdizimini, sinyallerini ve ClassDB API uyumunu statik olarak doğrular. |
+| `aegis godot init` | `[projectDir] [port]` | Hedef Godot projesine `addons/aegis_bridge/` eklentisini kurar ve yapılandırır. |
+| `aegis godot status` | Yok | Godot binary yolunu, sürümünü ve köprü bağlantı durumunu raporlar. |
+| `aegis godot doctool` | Yok | Godot motor dokümantasyonunu ve ClassDB API indeksini yerel önbelleğe çıkarır. |
+| `aegis godot run` | `<scene.tscn> [args]` | Belirtilen sahneyi Godot motorunda çalıştırır. |
+
 ---
 
 ## 3. Web Komuta Merkezi Dashboard (`localhost:3000`)

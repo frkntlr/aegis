@@ -10,6 +10,7 @@ import {
   handleGodotValidate,
   handleGodotPlaytest,
   handleGodotUi,
+  handleGodotTree,
   handleGodot
 } from './godot-command.js';
 
@@ -171,4 +172,75 @@ test('handleGodotUi scaffolds UI scenes and lints Godot UI scenes cleanly', asyn
 test('handleGodotUi prints usage error when linting without .tscn scene argument', async () => {
   const out = await captureOutput(() => handleGodotUi('lint'));
   assert.ok(out.includes('Usage: aegis godot ui:lint <scene.tscn>'));
+});
+
+function createSampleScene(dir: string): string {
+  const sceneFile = path.join(dir, 'hud.tscn');
+  const sceneContent = `[gd_scene load_steps=2 format=3]
+[node name="Hud" type="MarginContainer"]
+anchors_preset = 15
+[node name="VBox" type="VBoxContainer" parent="."]
+[node name="StartButton" type="Button" parent="VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 50)
+[node name="QuitButton" type="Button" parent="VBox"]
+[node name="Label" type="Label" parent="."]
+`;
+  fs.writeFileSync(sceneFile, sceneContent, 'utf8');
+  return sceneFile;
+}
+
+test('handleGodotTree slices full scenes and respects --depth flag', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-tree-test-'));
+  try {
+    const sceneFile = createSampleScene(tmp);
+    const fullOut = await captureOutput(() => handleGodotTree(sceneFile));
+    assert.ok(fullOut.includes('Slicing Godot scene: hud.tscn'));
+    assert.ok(fullOut.includes('Hud [MarginContainer]'));
+    assert.ok(fullOut.includes('%StartButton [Button]'));
+    assert.ok(fullOut.includes('QuitButton [Button]'));
+
+    const depthOut = await captureOutput(() => handleGodot(['tree', sceneFile, '--depth=1']));
+    assert.ok(depthOut.includes('Max Depth: 1'));
+    assert.ok(depthOut.includes('VBox [VBoxContainer]'));
+    assert.ok(depthOut.includes('Label [Label]'));
+    assert.strictEqual(depthOut.includes('%StartButton'), false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('handleGodotTree isolates focusNode with --focus flag and supports compact mode', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-focus-test-'));
+  try {
+    const sceneFile = createSampleScene(tmp);
+    const focusOut = await captureOutput(() => handleGodotTree(sceneFile, '--focus=%StartButton'));
+    assert.ok(focusOut.includes('Focus: %StartButton'));
+    assert.ok(focusOut.includes('%StartButton [Button]'));
+    assert.ok(focusOut.includes('VBox [VBoxContainer]'));
+    assert.ok(focusOut.includes('Hud [MarginContainer]'));
+    assert.strictEqual(focusOut.includes('QuitButton'), false);
+    assert.strictEqual(focusOut.includes('Label'), false);
+
+    const compactOut = await captureOutput(() => handleGodotTree(sceneFile, '--compact'));
+    assert.ok(compactOut.includes('Mode: Compact'));
+    assert.strictEqual(compactOut.includes('└──'), false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('handleGodotTree reports usage on missing scene argument or missing file', async () => {
+  const usageOut = await captureOutput(() => handleGodotTree());
+  assert.ok(usageOut.includes('Usage: aegis godot tree <scene.tscn>'));
+
+  const missingOut = await captureOutput(() => handleGodotTree('non_existent_scene.tscn'));
+  assert.ok(missingOut.includes('Scene file not found: non_existent_scene.tscn'));
+});
+
+test('handleGodotPlaytest integrates GodotPortRouter ephemeral track port allocation', async () => {
+  const out = await captureOutput(() => handleGodotPlaytest(undefined, '--track=qa-hunter'));
+  assert.ok(out.includes('Track Port Isolation: [qa-hunter] -> Port: 6852, Debug: 6202'));
+  assert.ok(out.includes('User Data Directory:'));
+  assert.ok(out.includes('aegis-godot-qa-hunter'));
 });

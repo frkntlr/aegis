@@ -6,6 +6,8 @@ import {
   GodotLocator,
   DoctoolRunner,
   GodotUiPerfAuditor,
+  GodotPortRouter,
+  GodotSceneSlicer,
   type ClassDbOracle,
   type GodotUiNode,
   type ValidationResult
@@ -97,35 +99,59 @@ export function handleGodotDoctool(): void {
   console.log(`✅ Indexed ${indexed.size} Godot classes into local zero-bloat cache.`);
 }
 
-export function handleGodotPlaytest(scenarioArg?: string): void {
-  showBanner();
-  console.log('🎮 Autonomous Aegis Playtest Queue...');
+function resolvePlaytestTrack(scenarioArg?: string, extraArgs: string[] = []): string {
+  if (scenarioArg?.startsWith('--track=')) {
+    return scenarioArg.slice('--track='.length);
+  }
+  for (const a of extraArgs) {
+    if (a.startsWith('--track=')) return a.slice('--track='.length);
+  }
+  return process.env.AEGIS_TRACK_ID || 'qa-hunter';
+}
+
+function resolveScenarioPath(scenarioArg?: string): string | undefined {
+  if (!scenarioArg || scenarioArg.startsWith('--')) return undefined;
   const cwd = process.cwd();
   const fileCandidates = [
     scenarioArg,
     path.join(cwd, '.aegis', 'playtest.json'),
     path.join(cwd, 'test', 'playtest.json'),
     path.join(cwd, 'playtest.json')
-  ].filter(Boolean) as string[];
+  ];
+  return fileCandidates.find(p => fs.existsSync(p));
+}
 
-  const scenarioPath = fileCandidates.find(p => fs.existsSync(p));
-  let actions: unknown[] = [
+function loadScenarioActions(scenarioPath?: string): unknown[] {
+  const fallback: unknown[] = [
     { type: 'ping' },
     { type: 'wait', duration: 0.1 },
     { type: 'get_ui_tree' }
   ];
-
-  if (scenarioPath) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
-      actions = Array.isArray(raw) ? raw : (raw.actions || actions);
-      console.log(` • Scenario loaded from: ${path.basename(scenarioPath)} (${actions.length} action(s))`);
-    } catch {
-      console.log(' ℹ️ Failed to read scenario file; using default smoke scenario.');
-    }
-  } else {
+  if (!scenarioPath) {
     console.log(' • Using default smoke playtest scenario (3 actions).');
+    return fallback;
   }
+  try {
+    const raw = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
+    const actions: unknown[] = Array.isArray(raw) ? raw : (raw.actions || fallback);
+    console.log(` • Scenario loaded from: ${path.basename(scenarioPath)} (${actions.length} action(s))`);
+    return actions;
+  } catch {
+    console.log(' ℹ️ Failed to read scenario file; using default smoke scenario.');
+    return fallback;
+  }
+}
+
+export function handleGodotPlaytest(scenarioArg?: string, ...extraArgs: string[]): void {
+  showBanner();
+  console.log('🎮 Autonomous Aegis Playtest Queue...');
+  const trackId = resolvePlaytestTrack(scenarioArg, extraArgs);
+  const allocation = GodotPortRouter.allocateTrackPort(trackId);
+  console.log(` • Track Port Isolation: [${trackId}] -> Port: ${allocation.port}, Debug: ${allocation.debugPort}`);
+  console.log(` • User Data Directory: ${allocation.userDataDir}`);
+
+  const scenarioPath = resolveScenarioPath(scenarioArg);
+  const actions = loadScenarioActions(scenarioPath);
 
   const reqId = `playtest-${Date.now()}`;
   console.log(`✅ Queued playtest scenario [${reqId}] with ${actions.length} action(s).`);
@@ -175,4 +201,77 @@ export function handleGodotUiOptimize(targetArg?: string): void {
   console.log(`⚡ Optimized UI Scene: ${target}`);
   console.log(` • Applied ${fixesApplied.length} performance fix(es):`);
   for (const fix of fixesApplied) console.log(`   - ${fix}`);
+}
+
+
+export interface GodotTreeCliOptions {
+  scenePath?: string;
+  focusNode?: string;
+  maxDepth?: number;
+  compact?: boolean;
+}
+
+export function parseGodotTreeArgs(args: string[]): GodotTreeCliOptions {
+  const options: GodotTreeCliOptions = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--focus=')) {
+      options.focusNode = arg.slice('--focus='.length);
+    } else if (arg === '--focus' && i + 1 < args.length) {
+      options.focusNode = args[++i];
+    } else if (arg.startsWith('--depth=')) {
+      const parsed = parseInt(arg.slice('--depth='.length), 10);
+      if (!Number.isNaN(parsed)) options.maxDepth = parsed;
+    } else if (arg === '--depth' && i + 1 < args.length) {
+      const parsed = parseInt(args[++i], 10);
+      if (!Number.isNaN(parsed)) options.maxDepth = parsed;
+    } else if (arg === '--compact') {
+      options.compact = true;
+    } else if (!arg.startsWith('--') && !options.scenePath) {
+      options.scenePath = arg;
+    }
+  }
+  return options;
+}
+
+function resolveScenePath(scenePath?: string): string | undefined {
+  if (!scenePath) return undefined;
+  if (scenePath.startsWith('res://')) {
+    return path.resolve(process.cwd(), scenePath.slice(6));
+  }
+  return path.isAbsolute(scenePath) ? scenePath : path.resolve(process.cwd(), scenePath);
+}
+
+export function handleGodotTree(...rawArgs: (string | string[])[]): void {
+  showBanner();
+  const args = rawArgs.flat();
+  const parsed = parseGodotTreeArgs(args);
+  if (!parsed.scenePath) {
+    console.log('Usage: aegis godot tree <scene.tscn> [--focus=<node>] [--depth=<n>] [--compact]');
+    return;
+  }
+  const targetPath = resolveScenePath(parsed.scenePath);
+  if (!targetPath || !fs.existsSync(targetPath)) {
+    console.error(`❌ Scene file not found: ${parsed.scenePath}`);
+    return;
+  }
+  console.log(`🌲 Slicing Godot scene: ${path.basename(targetPath)}...`);
+  if (parsed.focusNode) console.log(` • Focus: ${parsed.focusNode}`);
+  if (parsed.maxDepth !== undefined) console.log(` • Max Depth: ${parsed.maxDepth}`);
+  if (parsed.compact) console.log(` • Mode: Compact`);
+
+  try {
+    const slice = GodotSceneSlicer.sliceScene(targetPath, {
+      focusNode: parsed.focusNode,
+      maxDepth: parsed.maxDepth,
+      compact: parsed.compact
+    });
+    if (!slice.trim()) {
+      console.log('ℹ️ Scene slice is empty (no matching nodes found).');
+    } else {
+      console.log(slice);
+    }
+  } catch (err) {
+    console.error(`❌ Slicing failed: ${(err as Error).message}`);
+  }
 }

@@ -20,10 +20,11 @@ import {
   handleGodotDoctool,
   handleGodotPlaytest,
   handleGodotUiPerf,
-  handleGodotUiOptimize
+  handleGodotUiOptimize,
+  handleGodotTree
 } from './godot-helpers.js';
 
-export { handleGodotRun, handleGodotDoctool, handleGodotPlaytest };
+export { handleGodotRun, handleGodotDoctool, handleGodotPlaytest, handleGodotTree };
 
 export function handleGodotInit(projectDirArg?: string, portArg?: string): void {
   showBanner();
@@ -229,10 +230,13 @@ export async function handleGodot(args: string[]): Promise<void> {
   } else if (subcommand === 'run') {
     handleGodotRun(args[1], ...args.slice(2));
   } else if (subcommand === 'playtest') {
-    handleGodotPlaytest(args[1]);
+    handleGodotPlaytest(args[1], ...args.slice(2));
+  } else if (subcommand === 'tree') {
+    handleGodotTree(...args.slice(1));
   } else if (subcommand === 'test') {
     await handleGodotTest(args[1], args[2]);
   } else {
-    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|ui|status|inspect|query|doctool|validate|run|playtest]`);
+    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|ui|status|inspect|query|doctool|validate|run|playtest|tree]`);
   }
 }
+

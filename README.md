@@ -33,7 +33,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 - [👥 Rol Tabanlı Git Worktrees & Çakışmasız Kilitleme](#-rol-tabanlı-git-worktrees--çakışmasız-kilitleme)
 - [🩺 Sokratik Teşhis & Kanıt Tabanlı Anti-Halüsinasyon](#-sokratik-teşhis--kanıt-tabanlı-anti-halüsinasyon)
 - [📡 Gerçek Zamanlı SSE Web Komuta Merkezi (`localhost:3000`)](#-gerçek-zamanlı-sse-web-komuta-merkezi-localhost3000)
-- [🌐 Yaşayan GitHub, RFC (51 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
+- [🌐 Yaşayan GitHub, RFC (52 Adet) & NotebookLM Döngüsü](#-yaşayan-github-rfc-34-adet--notebooklm-döngüsü)
 - [📦 Monorepo Paket Dağılımı (14 Paket)](#-monorepo-paket-dağılımı-14-paket)
 - [🚀 Hızlı Başlangıç (Quick Start)](#-hızlı-başlangıç-quick-start)
 - [⚡ Alt Komut Keşfi, Tab-Completion & Slash Komutları](#-alt-komut-keşfi-tab-completion--antigravity-slash-komutları)
@@ -68,6 +68,7 @@ Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Curso
 | **Bozuk CI / Uzak Pipeline Sürprizleri:** Kod yerelde çalışır görünür ama GitHub Actions'a push edildiğinde 10 farklı kapıdan birinde patlar. | **Yerel CI/CD Pipeline Koşucusu (`aegis ci:audit` / `aegis ci:check`):** GitHub Actions'ın tüm 10 kapısını (build, lint, typecheck, drift, cage, verify, tests, inspect, godot, mutate) kod push edilmeden önce yerelde deterministik doğrular. | **Sıfır Kırık CI**, GitHub kota israfını önleme ve deterministik yeşil pipeline. |
 | **Monorepo Sürüm Uyumsuzluğu:** Monorepo paketlerinin versiyonlarını elle senkronize etmek yorucudur ve bayat derlemelere yol açar. | **Otomatik Sürüm Yükseltme & Seviye Teşhisi (`aegis update --bump`, `aegis version:status`):** Tüm paketleri otomatik yükseltir (patch/minor/major), package.json'ları senkronize eder, derler ve PC geneli shim'leri günceller. | **Tek Komutla Versiyonlama**, tam paket tutarlılığı ve sıfır bayat shim. |
 | **Ajan Raporlama Kirliliği & Yavaş Brifing:** Çoklu ajan yürütmesi tamamlandığında logların elle taranması zaman alır ve chat bağlamını yüzlerce gereksiz tokenla doldurur. | **Sub-10ms Yüksek Sinyalli Raporlama Motoru (`aegis tw:report`, `tw:doc`):** Gerçek zamanlı kanıt tabanlı çalışma özeti (<10ms), `--compact` bayrağı ile <120 tokenlık cerrahi özet ve `--save` ile kalıcı `.aegis/reports/report-<id>.md` arşivleme. | **<10ms Yürütme Hızı**, **%95 Token Tasarrufu (<120 Token)** ve sıfır bağlam kirliliği. |
+| **Çoklu Ajan Godot Port Çakışması & Sahne Şişmesi:** Eşzamanlı ajanlar sabit portlarda (`EADDRINUSE`) kilitlenir; sahne dökümleri 10.000+ token harcar. | **RFC-051 Ephemeral Port Sharding (`GodotPortRouter`) & Targeted Scene Slicing (`GodotSceneSlicer`):** TrackId bazlı izole deterministik port havuzu (6850/6200), izole temp user-data dizinleri ve <0.03ms'de <150 tokenlık cerrahi AST dilimleme (`aegis godot tree`). | **Sıfır Port Çakışması**, **%98.8 Token Tasarrufu** ve soğuk başlatmasız anlık analiz. |
 
 ---
 
@@ -320,7 +321,7 @@ aegis mcp
 | `aegis_godot_status` | Yok | Godot binary yolunu, sürümünü ve köprü bağlantı durumunu doğrular. |
 | `aegis_godot_playtest` | `projectDir` (opt), `scenarioPath` (opt) | Headless veya interaktif otomatik Godot test senaryosunu yürütür. |
 | `aegis_godot_inspect_ui` | `projectDir` (opt), `minTouchTarget` (opt) | 4 kanonik en-boy oranında (16:9, 21:9, 16:10, 9:16) sıfır-token duyarlı UI denetimi yapar. |
-| `aegis_godot_tree` | `tscnPath` (str) | Çalışan oyundan veya `.tscn` dosyasından sahne düğüm ağacı hiyerarşisini çıkarır. |
+| `aegis_godot_tree` | `tscnPath` (str) | Hedefe odaklı sahne dilimleme (TSS) ile sıfır soğuk başlangıçlı AST ağaç hiyerarşisi çıkarır (<150 token). |
 | `aegis_godot_signals` | `className` (str) | ClassDB üzerinden Godot sınıflarının sinyal tanımlarını ve bağlantılarını listeler. |
 | `aegis_godot_screenshot` | `outputPath` (opt) | Yüksek çözünürlüklü framebuffer ekran görüntüsü yakalayıp yerel PNG kaydeder. |
 | `aegis_godot_validate` | `filePath` (str) | GDScript sözdizimini yerel derleyiciyle doğrular ve ClassDB API kullanımını denetler. |
@@ -340,6 +341,8 @@ Aegis, Godot 4.x tabanlı oyun ve simülasyon projeleri için derinlemesine öze
 - 🛠️ **Otomatik Köprü Kurulumu (`aegis godot init`):** Projeye `addons/aegis_bridge/` eklentisini kurar, `project.godot` ayarlarını yapılandırır.
 - 🔍 **GDScript Statik Doğrulama (`aegis godot validate <file>`):** Tip güvenliği, sinyal bağlantıları ve isimlendirme standartlarını AST düzeyinde denetler.
 - 🧩 **Ayrık Godot UI AST Ayrıştırıcısı (`GodotUiParser`):** Godot 4 `.tscn` sahnelerini (`[node]`, `[connection]`) ve GDScript kontrolcü fonksiyonlarını (`func ...`) motor binary'si çalıştırmadan statik AST düzeyinde ayrıştıran, linter'dan tamamen bağımsızlaştırılmış modül (< 100 satır).
+- 🌲 **Sıfır-Token Hedefe Odaklı Sahne Dilimleme (`aegis godot tree <scene.tscn> [--focus=<node>] [--depth=<n>] [--compact]`):** Geleneksel 10.000+ token'lık JSON dökümü yerine motoru açmadan <0.03ms'de statik AST üzerinden hedefe odaklı düğüm hiyerarşisini çıkarır (%98.8 token tasarrufu, <150 token).
+- 🔀 **Çoklu Ajan Ephemeral Port Ayrıştırma (`GodotPortRouter`):** Eşzamanlı çalışan subagent'lar için (`qa-hunter`, `ui-specialist`) trackId tabanlı deterministik port sharding (Base 6850 / Debug 6200) ve izole temp user-data dizinleri tahsis ederek `EADDRINUSE` çakışmalarını tamamen önler.
 
 ---
 
@@ -431,7 +434,7 @@ aegis dashboard 3000
 
 ---
 
-## 🌐 Yaşayan GitHub, RFC (51 Adet) & NotebookLM Döngüsü
+## 🌐 Yaşayan GitHub, RFC (52 Adet) & NotebookLM Döngüsü
 
 Aegis, statik dokümanların unutulması sorununu çözmek için yaşayan bir bellek köprüsü kurar:
 
@@ -474,7 +477,7 @@ aegis/
 │   ├── shared/                  # Ortak TypeScript Tipleri, IDE Arayüzleri ve Worktree Modelleri
 │   └── cli/                     # Evrensel aegis Komut Satırı Aracı (50+ Komut) & 19 Araçlı MCP Sunucusu
 ├── .githooks/                   # Pre-commit & Pre-push Deterministik Doğrulama Kancaları (Turborepo Önbellekli)
-├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-051 Arşivi
+├── docs/                        # Ajan Anayasası, Güvenlik Modeli ve RFC-001 - RFC-052 Arşivi
 ├── tsconfig.base.json           # Monorepo TypeScript Project References Temel Yapılandırması
 └── turbo.json                   # Monorepo Pipeline ve Önbellek Yapılandırması
 ```
@@ -671,7 +674,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | `aegis godot inspect` | Godot sahne ağacını ve UI kontrol düğümlerini sıfır-token ile denetler. |
 | `aegis godot run <scene>` | Belirtilen sahneyi Godot motorunda çalıştırır. |
 | `aegis godot doctool` | Godot motor dokümantasyonunu günceller ve senkronize eder. |
-| `aegis godot playtest <scene>` | Sahneyi headless modda başlatıp otomatik playtest senaryolarını koşturur. |
+| `aegis godot tree <scene> [--focus=<node>] [--depth=<n>] [--compact]` | Zero-token cerrahi sahne dilimleme (TSS); motoru başlatmadan <0.03ms'de statik AST hiyerarşisi çıkarır (<150 token). |
+| `aegis godot playtest <scene> [--track=<id>]` | Sahneyi headless modda başlatıp otomatik playtest senaryolarını koşturur; çoklu ajan için dinamik port ve user data izolasyonu sağlar. |
 
 ### 6. GitHub, RFC, Yaşayan Wiki & NotebookLM
 | Komut | Açıklama |
