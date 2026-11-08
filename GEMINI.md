@@ -19,6 +19,7 @@ When the user sends `/aegist` or `/aegis` or any subcommand starting with `/aegi
 - `/aegis task:inject <id> [agent]`: Compile prompt & stage task into TIP inbox (.aegis/task-inbox.json).
 - `/aegis task:pull [agent]`: Pull next staged task matching role from TIP inbox.
 - `/aegis lock:status`: Inspect active file mutex locks across worktrees.
+- `/aegis test [target]`: Resilient non-hanging test shield with process watchdog, bounded timeout & auto-triage.
 - `/aegis verify:task [file]`: Run Multimodal Quality Gate (Demir Kafes + Godot Playtest).
 - `/aegis debug [error|file]`: Run Socratic evidence-based interactive debugging session.
 - `/aegis dashboard [port]`: Run `npm run aegis -- dashboard [port]` as daemon and provide web link.
@@ -127,11 +128,11 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
    - `issue-solver` (`🛠️ [ISSUE SOLVER]`): Focuses strictly on core logic, algorithms, state engines, and domain models, avoiding UI file lock collisions. Uses 5-layer Codebase Memory (`find_symbol`, `memory_query`), AST search/replace (`ast_search`, `ast_replace`), relational trace (`trace_relational`), official docs (`context7_query`), and Socratic debugging (`socratic_diagnose`).
    - `qa-hunter` (`🎯 [QA HUNTER]`): Runs headless playtests (`aegis_godot_playtest`), UI layout sweeps (`aegis godot inspect`), evidence-based bug triage (`triage`), Demir Kafes audits (`cage_check`), RTK output compression (`rtk_compress`), and mutation/oracle trust verification (`mutate`, `audit`).
    - `doc-architect` (`📚 [DOC ARCHITECT]`): Maintains living wiki (`wiki_sync`), living architecture blueprints & reports (`teamwork_doc_synthesize` / `aegis tw:doc`, `aegis tw:report`), NotebookLM grounding (`nlm:query`, `nlm:research`), and RFC lifecycle (`rfc:create`, `rfc:decompose`).
-6. **Autonomous Subagent Execution**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules (<300 lines/file, <40 lines/function), run `aegis verify:task`, and report completion back to Team Lead with `[ROLE_COMPLETE: <role>]`.
-7. **Live Progress Reporting & Lock Release**:
+6. **Autonomous Subagent Execution & Resilient Error Protocol**: Subagents pull tasks via `aegis task:pull [role]` or MCP `task_inbox_pull`, edit code under Demir Kafes rules (<300 lines/file, <40 lines/function), and validate with `aegis verify:task` or `aegis test`. If tests fail, subagents run `aegis triage` or `aegis debug` for Socratic diagnosis (max 2 surgical fix attempts; never hang or loop indefinitely). If unresolvable, subagents report `[ROLE_FAILED: <role>] <reason>` and release locks (`aegis task:release <role> blocked "<reason>"`). On success, subagents report `[ROLE_COMPLETE: <role>]`.
+7. **Live Progress Reporting & Graceful Lock Release**:
    - As each subagent message arrives, Team Lead receives a reactive wakeup.
-   - Team Lead emits an updated status in chat marking that role `✅ Tamamlandı` with its surgical diff / verification summary.
-   - Team Lead releases the task lock via `aegis task:release <id> done`.
+   - On `[ROLE_COMPLETE: <role>]`, Team Lead marks `✅ Tamamlandı` and releases lock via `aegis task:release <id> done`.
+   - On `[ROLE_FAILED: <role>]`, Team Lead marks `🛑 Başarısız / Hata`, releases file locks immediately, unblocks diagnostic QA tracks, and avoids indefinite hangs.
 8. **Final Consolidation**: Once all tracks complete, Team Lead triggers `aegis tw:report [planId] --compact` (or `--save`) for sub-10ms ground-truth metrics (<120 tokens) and presents the final consolidated review card with Demir Kafes and test verification status.
 9. **Hyper-Scale Concurrency & Dynamic Scaling (`--max-agents`, `--scale`)**:
    - When an objective involves multiple components, sentences, or files, or when the user invokes `--max-agents=<n>` / `--scale`:

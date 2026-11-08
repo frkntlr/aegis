@@ -9,15 +9,15 @@ import * as path from 'node:path';
 import { showBanner } from './banner.js';
 
 export const ALL_AEGIS_COMMANDS: readonly string[] = [
-  'tw', 'tw:plan', 'tw:status', 'tw:compact', 'tw:clear', 'tw:dag', 'tw:matrix', 'tw:analyze', 'tw:setup', 'tw:mesh', 'tw:peers', 'tw:post', 'tw:broadcast', 'tw:waves', 'tw:radar', 'tw:conflicts', 'tw:scale', 'tw:batch', 'tw:doc', 'tw:synthesize', 'tw:report', 'tw:advance', 'tw:deliberate', 'tw:reflect', 'tw:iterate', 'tw:tools', 'tw:push',
-  'tr', 'tr:plan', 'tr:status', 'tr:compact', 'tr:clear', 'tr:dag', 'tr:matrix', 'tr:analyze', 'tr:setup', 'tr:mesh', 'tr:peers', 'tr:post', 'tr:broadcast', 'tr:waves', 'tr:radar', 'tr:conflicts', 'tr:scale', 'tr:batch', 'tr:doc', 'tr:synthesize', 'tr:report', 'tr:advance', 'tr:deliberate', 'tr:reflect', 'tr:iterate', 'tr:tools', 'tr:push',
-  'teamwork', 'teamwork:status', 'teamwork:plan', 'teamwork:compact', 'teamwork:clear', 'teamwork:dag', 'teamwork:matrix', 'teamwork:analyze', 'teamwork:setup', 'teamwork:mesh', 'teamwork:peers', 'teamwork:post', 'teamwork:broadcast', 'teamwork:waves', 'teamwork:radar', 'teamwork:conflicts', 'teamwork:scale', 'teamwork:batch', 'teamwork:doc', 'teamwork:synthesize', 'teamwork:report', 'teamwork:advance', 'teamwork:deliberate', 'teamwork:reflect', 'teamwork:iterate', 'teamwork:tools', 'teamwork:push',
+  'tw', 'tw:plan', 'tw:status', 'tw:compact', 'tw:clear', 'tw:dag', 'tw:matrix', 'tw:analyze', 'tw:setup', 'tw:mesh', 'tw:peers', 'tw:post', 'tw:broadcast', 'tw:waves', 'tw:radar', 'tw:conflicts', 'tw:scale', 'tw:batch', 'tw:doc', 'tw:synthesize', 'tw:report', 'tw:advance', 'tw:deliberate', 'tw:reflect', 'tw:iterate', 'tw:tools', 'tw:push', 'tw:test',
+  'tr', 'tr:plan', 'tr:status', 'tr:compact', 'tr:clear', 'tr:dag', 'tr:matrix', 'tr:analyze', 'tr:setup', 'tr:mesh', 'tr:peers', 'tr:post', 'tr:broadcast', 'tr:waves', 'tr:radar', 'tr:conflicts', 'tr:scale', 'tr:batch', 'tr:doc', 'tr:synthesize', 'tr:report', 'tr:advance', 'tr:deliberate', 'tr:reflect', 'tr:iterate', 'tr:tools', 'tr:push', 'tr:test',
+  'teamwork', 'teamwork:status', 'teamwork:plan', 'teamwork:compact', 'teamwork:clear', 'teamwork:dag', 'teamwork:matrix', 'teamwork:analyze', 'teamwork:setup', 'teamwork:mesh', 'teamwork:peers', 'teamwork:post', 'teamwork:broadcast', 'teamwork:waves', 'teamwork:radar', 'teamwork:conflicts', 'teamwork:scale', 'teamwork:batch', 'teamwork:doc', 'teamwork:synthesize', 'teamwork:report', 'teamwork:advance', 'teamwork:deliberate', 'teamwork:reflect', 'teamwork:iterate', 'teamwork:tools', 'teamwork:push', 'teamwork:test',
   'init', 'status', 'auto', 'prompt', 'contribute', 'report', 'push', 'git:push', 'gh:push',
   'rfc', 'rfc:triage', 'rfc:create', 'rfc:approve', 'rfc:decompose', 'ideate',
   'nlm:sync', 'nlm:query', 'nlm:research', 'nlm:sources', 'nlm:poll', 'nlm:import', 'nlm:prune', 'nlm:restore', 'nlm:auth', 'nlm:switch', 'switch',
   'task:list', 'task:claim', 'task:release', 'task:inject', 'task:pull', 'task:clear', 'task:reset', 'task:verify', 'verify:task',
   'lock:status', 'lock:clear', 'lock:reset',
-  'cage:check', 'ci', 'ci:audit', 'ci:check', 'ci:verify', 'ci:run', 'skeleton', 'skeleton:scan', 'diff', 'inspect', 'mutate', 'audit', 'estimate', 'verify',
+  'cage:check', 'ci', 'ci:audit', 'ci:check', 'ci:verify', 'ci:run', 'test', 'skeleton', 'skeleton:scan', 'diff', 'inspect', 'mutate', 'audit', 'estimate', 'verify',
   'find', 'triage', 'trace', 'graph:scan', 'ast:search', 'ast-grep', 'sg', 'ast:replace', 'rtk:compress', 'context7:query',
   'memory:query', 'memory:stats', 'memory:cold-start', 'memory:refresh', 'memory:prune', 'memory:verify', 'memory:watch',
   'godot', 'godot:init', 'godot:status', 'godot:inspect', 'godot:validate', 'godot:query', 'godot:run', 'godot:doctool', 'godot:playtest', 'godot:test', 'godot:ui', 'godot:ui:lint', 'godot:ui:scaffold',

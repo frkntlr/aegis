@@ -177,6 +177,7 @@ function routeMeshSubcommands(norm: string, all: string[]): boolean {
   if (norm === 'gh' || norm === 'github') { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); return true; }
   if (norm === 'swarm') { void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(all[1], ...all.slice(2))); return true; }
   if (norm === 'deliberate' || norm === 'deliberation') { void import('./teamwork-deliberate-command.js').then(m => m.handleTeamworkDeliberate(all[1], ...all.slice(2))); return true; }
+  if (norm === 'test') { void import('./test-command.js').then(m => m.handleTestCommand(...all.slice(1))); return true; }
   return false;
 }
 

@@ -119,9 +119,9 @@ export function defaultStepExecutor(command: string, cwd: string): { success: bo
     execSync(normCmd, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 300000,
+      timeout: 90000,
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, ...cleanGitEnv(), CI: 'true' },
+      env: { ...process.env, ...cleanGitEnv(), CI: 'true', GIT_TERMINAL_PROMPT: '0' },
       encoding: 'utf8'
     });
     return { success: true, durationMs: Date.now() - start };

@@ -55,13 +55,16 @@ export class WorktreeMutex {
     const stat = fs.statSync(lockDir, { throwIfNoEntry: false });
     if (!stat) return true;
     const age = Date.now() - stat.mtimeMs;
-    if (age > 60000) return true;
+    if (age > 30000) return true;
 
     try {
       const rawPid = fs.readFileSync(pidFile, 'utf8').trim();
       const ownerPid = parseInt(rawPid, 10);
       if (!Number.isFinite(ownerPid) || ownerPid <= 0) {
-        return age > 5000;
+        return age > 500;
+      }
+      if (ownerPid === process.pid) {
+        return age > 300;
       }
       process.kill(ownerPid, 0);
       return false;
@@ -69,11 +72,11 @@ export class WorktreeMutex {
       const code = (err as { code?: string })?.code;
       if (code === 'ESRCH') return true;
       if (code === 'EPERM') return false;
-      return age > 5000;
+      return age > 500;
     }
   }
 
-  public static acquire(lockFilePath: string, maxRetries = 120, retryDelay = 50): () => void {
+  public static acquire(lockFilePath: string, maxRetries = 60, retryDelay = 50): () => void {
     const lockDir = `${lockFilePath}.lock`;
     const pidFile = path.join(lockDir, 'pid');
     fs.mkdirSync(path.dirname(lockDir), { recursive: true });
@@ -86,13 +89,13 @@ export class WorktreeMutex {
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
         if (code !== 'EEXIST') throw err;
-        if (WorktreeMutex.isLockStale(lockDir, pidFile)) {
+        if (WorktreeMutex.isLockStale(lockDir, pidFile) || attempt > 30) {
           try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch { /* ignore */ }
           continue;
         }
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay);
       }
     }
-    throw new Error('Aegis Mutex Timeout: Failed to acquire lock within 6000ms');
+    throw new Error('Aegis Mutex Timeout: Failed to acquire lock within 3000ms');
   }
 }

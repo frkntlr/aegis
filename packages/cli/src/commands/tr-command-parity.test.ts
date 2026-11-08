@@ -17,7 +17,7 @@ const PARITY_SUBCOMMANDS = [
   'status', 'plan', 'setup', 'matrix', 'dag', 'analyze',
   'compact', 'clear', 'mesh', 'peers', 'post', 'broadcast',
   'waves', 'conflicts', 'radar', 'scale', 'batch', 'doc',
-  'synthesize', 'advance', 'tools', 'deliberate', 'push'
+  'synthesize', 'advance', 'tools', 'deliberate', 'push', 'test'
 ] as const;
 
 beforeEach(() => {

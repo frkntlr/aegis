@@ -78,6 +78,7 @@ export function writeTaskInbox(data: TaskInboxData, baseDir?: string): void {
 
 export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskInboxItem[]): boolean {
   if (!task.dependsOn || task.dependsOn.length === 0) return true;
+  const isDiagnosticRole = task.role.includes('qa') || task.title.toLowerCase().includes('triage') || task.title.toLowerCase().includes('remediation');
   return task.dependsOn.every(dep => {
     const depLower = dep.toLowerCase();
     const candidates = allTasks.filter(other =>
@@ -91,11 +92,13 @@ export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskI
     );
     if (candidates.length === 0) return true;
     const sameBatch = candidates.filter(c => Math.abs(c.issueNumber - task.issueNumber) < 50);
-    if (sameBatch.length > 0) return sameBatch.every(c => c.status === 'done');
+    if (sameBatch.length > 0) {
+      return sameBatch.every(c => c.status === 'done' || (isDiagnosticRole && c.status === 'blocked'));
+    }
     const parent = candidates.reduce((best, curr) =>
       Math.abs(curr.issueNumber - task.issueNumber) < Math.abs(best.issueNumber - task.issueNumber) ? curr : best
     );
-    return parent.status === 'done';
+    return parent.status === 'done' || (isDiagnosticRole && parent.status === 'blocked');
   });
 }
 
@@ -172,7 +175,7 @@ export function pullNextPendingTask(role?: string, baseDir?: string): TaskInboxI
     const data = readTaskInbox(baseDir);
     let reconciled = false;
     for (const t of data.tasks) {
-      if (t.status === 'blocked' && isTaskDependenciesSatisfied(t, data.tasks)) {
+      if (t.status === 'blocked' && t.dependsOn && t.dependsOn.length > 0 && isTaskDependenciesSatisfied(t, data.tasks)) {
         t.status = 'pending';
         reconciled = true;
       }
@@ -209,9 +212,9 @@ export function updateTaskInboxStatus(
     if (claimedBy) task.claimedBy = claimedBy;
     if (status === 'in_progress' && !task.claimedAt) task.claimedAt = new Date().toISOString();
 
-    if (status === 'done') {
+    if (status === 'done' || status === 'blocked') {
       for (const other of data.tasks) {
-        if (other.status === 'blocked' && isTaskDependenciesSatisfied(other, data.tasks)) {
+        if (other.issueNumber !== issueNumber && other.status === 'blocked' && other.dependsOn && other.dependsOn.length > 0 && isTaskDependenciesSatisfied(other, data.tasks)) {
           other.status = 'pending';
         }
       }
@@ -226,7 +229,7 @@ export function listInboxTasks(statusFilter?: string, baseDir?: string): TaskInb
   const data = readTaskInbox(baseDir);
   let reconciled = false;
   for (const t of data.tasks) {
-    if (t.status === 'blocked' && isTaskDependenciesSatisfied(t, data.tasks)) {
+    if (t.status === 'blocked' && t.dependsOn && t.dependsOn.length > 0 && isTaskDependenciesSatisfied(t, data.tasks)) {
       t.status = 'pending';
       reconciled = true;
     }

@@ -71,7 +71,7 @@ export class WorktreeLockManager {
   constructor(options: WorktreeLockManagerOptions = {}) {
     this.repoRoot = resolveSafeRepoRoot(options.repoRoot);
     this.persistLocks = options.persistLocks ?? false;
-    this.staleTimeoutMs = options.staleTimeoutMs ?? 30 * 60 * 1000;
+    this.staleTimeoutMs = options.staleTimeoutMs ?? 5 * 60 * 1000;
     if (this.persistLocks) this.loadLocks();
   }
 
@@ -182,6 +182,7 @@ export class WorktreeLockManager {
 
   public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
     return this.withLock(() => {
+      this.pruneStaleLocks();
       const conflictingFiles: string[] = [];
       const normalized = files.map(normPath);
       for (const file of normalized) {
@@ -203,6 +204,7 @@ export class WorktreeLockManager {
     conflictingFiles: string[];
   } {
     return this.withLock(() => {
+      this.pruneStaleLocks();
       const conflictingFiles: string[] = [];
       const toApply: Array<{ file: string; agentName: string }> = [];
       for (const item of batch) {

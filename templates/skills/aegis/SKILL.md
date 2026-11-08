@@ -46,6 +46,7 @@ Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm 
 | `/aegis task:inject <id> [agent]` | Compile prompt & stage task into TIP inbox (.aegis/task-inbox.json) | `aegis task:inject <id> [agent]` |
 | `/aegis task:pull [agent]` | Pull next staged task matching role from TIP inbox | `aegis task:pull [agent]` |
 | `/aegis lock:status` | Inspect active file mutex locks across worktrees | `aegis lock:status` |
+| `/aegis test [target]` | Resilient non-hanging test shield with process watchdog & auto-triage | `aegis test [target]` |
 | `/aegis verify:task [file]` | Run Multimodal Quality Gate (Demir Kafes + Godot Playtest) | `aegis verify:task [file]` |
 | `/aegis debug [err\|file]` | Socratic evidence-based interactive debugging session | `aegis debug [err]` |
 | `/aegis merge <agent> [base]` | Multi-tier atomic merge (FF -> Rebase -> Merge Commit) | `aegis merge <agent> [base]` |
@@ -185,10 +186,12 @@ When the user triggers `/aegis tw <objective>`, `/aegis teamwork <objective>`, `
    - Subagents pull their task with `aegis task:pull [role]` or MCP `task_inbox_pull`.
    - Subagents implement isolated changes without modifying files locked by peers.
    - Subagents run `aegis verify:task` or `aegis godot ui:lint` before reporting back.
-   - Subagents send completion message: `[ROLE_COMPLETE: <role>]` with verification summary.
+   - Resilient Error Protocol: If tests fail, run `aegis triage` or `aegis debug` (max 2 fix attempts; never hang). If unresolvable, report `[ROLE_FAILED: <role>] <reason>` and release locks (`aegis task:release <role> blocked "<reason>"`).
+   - On success, send completion message: `[ROLE_COMPLETE: <role>]` with verification summary.
 
 6. **Live Progress Reporting & Lock Release**:
    - As each subagent completes and sends a message, Team Lead receives a reactive wakeup.
    - Team Lead emits an updated status in chat marking that role `✅ Tamamlandı` with its surgical diff / verification summary.
-   - Team Lead releases the task lock via `aegis task:release <id> done`.
+   - On `[ROLE_COMPLETE]`, Team Lead releases the task lock via `aegis task:release <id> done`.
+   - On `[ROLE_FAILED]`, Team Lead marks `🛑 Başarısız / Hata`, releases file locks immediately, unblocks diagnostic QA tracks, and avoids indefinite hangs.
    - Once all tracks complete, Team Lead presents the final consolidated review card with Demir Kafes and test verification status.

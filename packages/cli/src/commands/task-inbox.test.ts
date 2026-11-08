@@ -266,3 +266,22 @@ test('isTaskDependenciesSatisfied waits for ALL candidates in the same batch', (
   assert.ok(unblocked);
   assert.strictEqual(unblocked.issueNumber, 803);
 });
+
+test('isTaskDependenciesSatisfied unblocks diagnostic QA role on blocked upstream failure', () => {
+  const baseItem = { worktree: 'experimental/solver', targetFiles: [], acceptanceCriteria: [] };
+  stageTaskInInbox({ ...baseItem, issueNumber: 901, title: 'Failing Solver', role: 'issue-solver', prompt: 'Solve' }, tmpDir);
+  stageTaskInInbox({
+    ...baseItem,
+    issueNumber: 902,
+    title: 'Diagnostic QA Triage',
+    role: 'qa-hunter',
+    worktree: 'experimental/qa',
+    prompt: 'Diagnose defect',
+    dependsOn: ['901']
+  }, tmpDir);
+
+  updateTaskInboxStatus(901, 'blocked', 'issue-solver', tmpDir);
+  const unblockedQa = pullNextPendingTask('qa-hunter', tmpDir);
+  assert.ok(unblockedQa);
+  assert.strictEqual(unblockedQa.issueNumber, 902);
+});

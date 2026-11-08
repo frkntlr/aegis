@@ -226,5 +226,9 @@ export const COMMAND_MAP: Record<string, CommandHandler> = {
   'git:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
   'gh:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
   'tw:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
-  'teamwork:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); }
+  'teamwork:push': async (a) => { await (await import('../commands/git-push-command.js')).handleGitPush(...a.slice(1)); },
+  test: async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); },
+  'tw:test': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); },
+  'tr:test': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); },
+  'teamwork:test': async (a) => { await (await import('../commands/test-command.js')).handleTestCommand(...a.slice(1)); }
 };
