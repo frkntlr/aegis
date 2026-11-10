@@ -120,6 +120,7 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
 4. **Register & Concurrently Invoke All Active Wave 1 Subagents**:
    - Register roles via `define_subagent` if not already defined for this session (`EnableSubagentTools: true`, `EnableWriteTools: true`, `EnableMCPTools: true`).
    - IN THE VERY SAME TURN as printing the matrix, call `invoke_subagent` for ALL Wave 1 tracks SIMULTANEOUSLY!
+   - In each subagent invocation payload prompt, include the Recursive Dispatch Mandate ensuring that the subagent immediately delegates heavy multi-file inspection/modifications to parallel child subagents (`TypeName: 'self'`) in Turn 1.
    - Cease calling further tools in that turn to allow Antigravity to spin up and display all subagents executing in parallel in the user interface.
    - Hybrid model allocation:
      - `issue-solver`: `Model: 'inherit'`
@@ -142,9 +143,12 @@ When the user sends `/tw`, `/tr`, `/aegis-tw`, `/aegis teamwork`, `/aegist teamw
    - Teamwork automatically shards work across up to 12 parallel, conflict-free subagents with 100% disjoint file locks.
    - Multiple issue-solvers (`issue-solver [ModuleA]`, `issue-solver [ModuleB]`) and UI specialists run concurrently in Phase 1 (Wave 1), accelerating completion without lock contention.
 10. **Autonomous Post-Task Remote Push**: Once all tracks complete and the multimodal quality gate (`cage:check` + monorepo unit tests) passes 100%, Team Lead automatically commits remaining staged assets and pushes to the tracking remote branch (`npm run aegis -- push` or `$env:GIT_TERMINAL_PROMPT=0; git push origin master`). Never leave completed and verified work unpushed as orphaned local commits.
-11. **Hierarchical Recursive Subagent Trees (Child Subagents)**:
-   - When registering subagents via `define_subagent`, ALWAYS set `EnableSubagentTools: true`.
-   - Subagents (e.g. `qa-hunter`, `issue-solver`, `ui-specialist`) are empowered and instructed to spawn their own child subagents (e.g. 4 concurrent testing agents under `qa-hunter`: playtest, ui-sweep, ast-audit, mutation) when their task covers multiple files or deep verification.
+11. **Hierarchical Recursive Subagent Trees (MTS-Swarm Protocol & Child Subagents)**:
+   - When registering subagents via `define_subagent`, ALWAYS set `EnableSubagentTools: true`, `EnableWriteTools: true`, and `EnableMCPTools: true`.
+   - **Zero Sequential Exploration on Domain Leads**: Domain lead subagents (`issue-solver`, `qa-hunter`, `ui-specialist`, `doc-architect`) are STRICTLY FORBIDDEN from sequentially reading dozens of files or performing heavy exploration alone in their root conversation thread!
+   - **Mandatory Turn 1 Child Dispatch**: Whenever a subagent receives a multi-file, multi-module, or multi-step task, its VERY FIRST TURN must be calling `invoke_subagent` to spawn 2 to 4 parallel child subagents (`TypeName: 'self'` or `TypeName: 'research'`) with partitioned disjoint scopes (e.g. for solver: 1 scanner/AST child, 1 implementer child, 1 verifier child; for QA: 1 playtest child, 1 cage/lint child, 1 mutation child; for UI: 1 hierarchy scaffolder child, 1 theme child, 1 multi-aspect inspector child).
+   - **Arbitrary-Depth Recursion**: Child subagents inherit `EnableSubagentTools: true` and can themselves spawn Level-3 grandchild subagents if their sub-task covers multiple components.
+   - **Synthesis & Lean Root Context**: Root subagents act as conductors: collecting child summaries, keeping root context ultra-lean (<20k tokens), running the final pre-commit verification gate (`aegis verify:task` or `aegis test`), and reporting `[ROLE_COMPLETE: <id>]` to the Team Lead.
 12. **Automatic Dynamic Agent Allocation**:
    - The user NEVER needs to specify the number of subagents manually. Aegis autonomously evaluates task complexity, scope, and domain radius via `TaskComplexityAnalyzer` (bilingual TR/EN radar) and automatically shards the task across 1 to 12 concurrent subagents with 100% disjoint locks.
 

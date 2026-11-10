@@ -22,7 +22,8 @@ const TRIVIAL_KEYWORDS = ['typo', 'rename', 'comment', 'docstring', 'readme', 'f
 const HYPER_KEYWORDS = [
   'monorepo', 'overhaul', 'massive', 'migration', 'hierarchical', 'swarm', 'hyper', 'complete rewrite',
   'çoklu ajan', 'coklu ajan', 'hiyerarşik', 'hiyerarsik', 'sürü', 'suru', 'ölçek', 'olcek', 'tüm proje',
-  'kendi altında', 'kendi altinda', 'mikro ajan'
+  'kendi altında', 'kendi altinda', 'mikro ajan', 'alt ajan', 'alt subagent', 'child agent', 'tree swarm',
+  'recursive', 'özyinelemeli', 'ozyinelemeli'
 ];
 const COMPLEX_KEYWORDS = [
   'feature', 'pipeline', 'integrate', 'controller', 'bridge', 'state', 'worker', 'scanner', 'adapter',

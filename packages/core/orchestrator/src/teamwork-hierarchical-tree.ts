@@ -70,7 +70,23 @@ export class TeamworkHierarchicalTree {
 
   public static isHierarchicalRequested(objective: string): boolean {
     const lower = objective.toLowerCase();
-    return /\b(?:\d+\s+ajan|subagents?|tree|specialists?|hiyerarşi|hiyerarsi|ağaç|agac|mikro|kendi\s+altında|kendi\s+altinda|alt\s+ajan)\b/.test(lower);
+    return /\b(?:\d+\s+ajan|subagents?|child|tree|specialists?|hiyerarşi|hiyerarsi|ağaç|agac|mikro|kendi\s+altında|kendi\s+altinda|alt\s+ajan|alt\s+subagent|recursive|özyinelemeli|ozyinelemeli|swarm)\b/.test(lower);
+  }
+
+  public static getChildSpecialists(role: RoleType): MicroSpecialistDef[] {
+    return ROLE_SPECIALISTS[role] ?? [];
+  }
+
+  public static buildChildSubagentDirective(role: RoleType): string {
+    const specs = ROLE_SPECIALISTS[role] ?? [];
+    const specLines = specs.map(s => `   • **[${s.label}]**: ${s.focus} (Araçlar: ${s.assignedTools.slice(0, 2).join(', ')})`).join('\n');
+    return `### 🌲 Hiyerarşik Alt Ajan (Child Subagents) ve Bağlam Yönetimi\n` +
+      `- 🚨 TEK BAŞINA SIRALI OKUMA YASAĞI: Çok sayıda dosyayı tek bir sohbette ardışık okumak bağlamı şişirir (\`Model unavailable\`, yüksek gecikme, token israfı).\n` +
+      `- ⚡ ZORUNLU İLK HAMLE (Turn 1): Göreviniz birden fazla dosya, dizin taraması veya çok aşamalı analiz içeriyorsa, İLK İŞİNİZ \`invoke_subagent\` ile 2-4 paralel çocuk ajan (\`TypeName: 'self'\` veya \`'research'\`) başlatmaktır!\n` +
+      `- 🌳 Çok Katmanlı Ağaç (Arbitrary-Depth Recursion): Başlattığınız çocuk ajanlar da (\`TypeName: 'self'\`) tam alt ajan yetkilerine sahiptir ve alt görevleri torun ajanlara (grandchild subagents) delege edebilir.\n` +
+      `- 🎯 Bu Rol İçin Önerilen Çocuk Uzmanlıklar:\n${specLines}\n` +
+      `- 🛠️ Çağrı Şablonu: \`invoke_subagent({ TypeName: 'self', Role: '${role.toUpperCase()} - [Uzmanlık]', Prompt: 'Cerrahi dosya kapsamı ve beklenen çıktı formatı...', Workspace: 'inherit' })\`\n` +
+      `- 🎯 Sentez & Kalite Kapısı: Çocuk ajanlar işini bitirdiğinde gelen özetleri toplayın, doğrulamayı yapıp (\`verify:task\`) görevi tamamlayın.\n\n`;
   }
 
   public static expandHierarchicalRoles(
