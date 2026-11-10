@@ -19,7 +19,8 @@
     "aegis-engine": {
       "command": "node",
       "args": [
-        "packages/cli/dist/bin/aegis.js"
+        "packages/cli/dist/bin/aegis.js",
+        "mcp"
       ]
     },
     "ast-grep": {

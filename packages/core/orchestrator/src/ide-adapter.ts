@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IdeCapabilities, IdeExclusionResult, IdeAdapter } from '@aegis/shared';
+import { CodexAdapter } from './codex-adapter.js';
+export { CodexAdapter } from './codex-adapter.js';
 
 export type { IdeCapabilities, IdeExclusionResult, IdeAdapter };
 
@@ -194,6 +196,7 @@ export class IdeAdapterRegistry {
 
   constructor() {
     this.register(new AntigravityAdapter());
+    this.register(new CodexAdapter());
     this.register(new VSCodeAdapter());
     this.register(new CopilotAdapter());
     this.register(new CursorAdapter());

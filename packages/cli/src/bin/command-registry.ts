@@ -50,6 +50,7 @@ export const COMMAND_MAP: Record<string, CommandHandler> = {
   dashboard: async (a) => (await import('../commands/core-commands.js')).handleDashboard(a[1]),
   'ide:list': async () => (await import('../commands/core-commands.js')).handleIdeList(),
   'ide:sync': async () => (await import('../commands/core-commands.js')).handleIdeSync(),
+  'codex:setup': async (a) => (await import('../commands/codex-command.js')).handleCodexSetup(a[1]),
   'gh:status': async (a) => (await import('../commands/github-commands.js')).handleGhStatus(a[1]),
   'gh:sync': async (a) => (await import('../commands/github-commands.js')).handleGhSync(a[1]),
   'gh:pipeline': async (a) => (await import('../commands/rfc-pipeline-command.js')).handleRfcPipeline(a[1], a[2]),

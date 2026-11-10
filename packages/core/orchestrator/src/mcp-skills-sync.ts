@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IdeAdapter } from './ide-adapter.js';
+import { syncCodexMcp } from './codex-config.js';
+import { parse } from 'smol-toml';
 
 export interface McpServerConfig {
   command: string;
@@ -49,6 +51,15 @@ export class McpSkillsSyncEngine {
     if (typeof existing.servers === 'object' && existing.servers !== null && !existing.mcpServers) return 'servers';
     return 'mcpServers';
   }
+
+  private syncToCodex(repoRoot: string): McpSyncResult {
+    const targetFile = syncCodexMcp(repoRoot, this.getServers());
+    const config = parse(fs.readFileSync(targetFile, 'utf8'));
+    return { ideId: 'codex', targetFile, supported: true,
+      syncedServersCount: Object.keys(config.mcp_servers ?? {}).length,
+      message: 'Synchronized Codex MCP configuration (TOML).' };
+  }
+
   public syncToIde(adapter: IdeAdapter, repoRoot: string): McpSyncResult {
     if (!adapter.capabilities.supportsMcp || !adapter.capabilities.mcpConfigFile) {
       return {
@@ -60,6 +71,7 @@ export class McpSkillsSyncEngine {
     }
 
     const targetFile = path.resolve(repoRoot, adapter.capabilities.mcpConfigFile);
+    if (adapter.ideId === 'codex') return this.syncToCodex(repoRoot);
     let existingConfig: Record<string, unknown> = {};
     if (fs.existsSync(targetFile)) {
       try {

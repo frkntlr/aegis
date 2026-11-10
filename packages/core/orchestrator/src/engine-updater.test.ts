@@ -41,7 +41,7 @@ test('EngineUpdater cleans workspace caches and locks', () => {
 });
 
 test('EngineUpdater getVersionReport returns complete diagnostics', () => {
-  const rep = EngineUpdater.getVersionReport();
+  const rep = EngineUpdater.getVersionReport(path.resolve(__dirname, '../../../..'));
   assert.ok(rep.currentVersion);
   assert.ok(rep.localCommit);
   assert.ok(rep.branch);

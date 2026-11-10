@@ -21,13 +21,14 @@ export class DashboardServer {
   private hub: ProjectHub;
   private launcher = new IdeLauncher();
   private toolchainSync: UniversalToolchainSync;
-  private engineSvc = new AegisEngineService();
+  private engineSvc: AegisEngineService;
   private orphanReclaimer = new OrphanTaskReclaimer();
   private sseClients = new Set<http.ServerResponse>();
   private dispatcher: ActionDispatcher;
 
   constructor(options: DashboardServerOptions = {}) {
     this.port = options.port ?? 3000;
+    this.engineSvc = new AegisEngineService(options.repoRoot);
     this.hub = new ProjectHub(options.repoRoot, options.offline, options.persistLocks ?? false);
     if (options.metricsService) this.hub.getActiveContext().metrics = options.metricsService;
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);

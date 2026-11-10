@@ -24,6 +24,7 @@ export interface CodebaseMemoryAdapters {
 }
 
 export interface MemoryQueryOptions {
+  repoRoot?: string;
   worktreeId?: string;
   filePath?: string;
   rawLogs?: string;
@@ -208,7 +209,7 @@ export class CodebaseMemoryEngine {
   public queryMemory(symbol: string, options: MemoryQueryOptions = {}): MemoryQueryResult {
     const worktreeId = options.worktreeId || ActiveHeadResolver.resolveActiveWorktree();
     const ns = this.getNamespace(worktreeId);
-    LiveHotPatcher.patchUncommitted(this, ns, worktreeId);
+    LiveHotPatcher.patchUncommitted(this, ns, worktreeId, options.repoRoot);
 
     const { slice: sliceResult, ambiguous: ambiguousMatches } = this.resolveSlice(ns, symbol, options.contextLines ?? 3, worktreeId, options.filePath);
     const traceResult = ns.queryEngine.trace(symbol, options.maxDepth ?? 5);

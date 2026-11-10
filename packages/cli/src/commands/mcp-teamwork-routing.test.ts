@@ -4,9 +4,19 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import * as assert from 'node:assert';
 import { executeMcpTool, CORE_MCP_TOOLS } from './mcp-tool-dispatcher.js';
+import { GitPushManager } from './git-push-command.js';
+
+function mockDryRunPush(t: TestContext) {
+  t.after(() => t.mock.restoreAll());
+  t.mock.method(GitPushManager.prototype, 'checkAuthStatus', () => ({ authenticated: true }));
+  t.mock.method(GitPushManager.prototype, 'detectCurrentBranch', () => 'fixture-main');
+  t.mock.method(GitPushManager.prototype, 'isAheadOfRemote', () => ({ ahead: true, count: 1 }));
+  t.mock.method(GitPushManager.prototype, 'hasUncommittedChanges', () => false);
+  return t.mock.method(GitPushManager.prototype, 'executePush', () => ({ success: true, message: 'Dry-run fixture' }));
+}
 
 test('executeMcpTool executes tr_status and returns valid JSON', async () => {
   const raw = await executeMcpTool('tr_status', {});
@@ -23,7 +33,8 @@ test('executeMcpTool executes tr_mesh_read and returns valid JSON', async () => 
   assert.strictEqual(typeof parsed.activeWave, 'number');
 });
 
-test('executeMcpTool routes all tr_* tools without error', async () => {
+test('executeMcpTool routes all tr_* tools without error', async t => {
+  const push = mockDryRunPush(t);
   const planRaw = await executeMcpTool('tr_plan', { objective: 'Test TR routing' });
   assert.ok(planRaw.includes('planId'));
 
@@ -42,9 +53,12 @@ test('executeMcpTool routes all tr_* tools without error', async () => {
   const pushRaw = await executeMcpTool('tr_push', { dryRun: true });
   const pushParsed = JSON.parse(pushRaw) as Record<string, unknown>;
   assert.strictEqual(pushParsed.success, true);
+  assert.strictEqual(push.mock.callCount(), 1);
+  assert.deepStrictEqual(push.mock.calls[0].arguments, ['fixture-main', true]);
 });
 
-test('executeMcpTool routes tw_* alias tools with full parity', async () => {
+test('executeMcpTool routes tw_* alias tools with full parity', async t => {
+  const push = mockDryRunPush(t);
   const twStatus = await executeMcpTool('tw_status', {});
   const statusParsed = JSON.parse(twStatus) as Record<string, unknown>;
   assert.ok(Array.isArray(statusParsed.profiles));
@@ -56,6 +70,8 @@ test('executeMcpTool routes tw_* alias tools with full parity', async () => {
   const twPush = await executeMcpTool('tw_push', { dryRun: true });
   const pushParsed = JSON.parse(twPush) as Record<string, unknown>;
   assert.strictEqual(pushParsed.success, true);
+  assert.strictEqual(push.mock.callCount(), 1);
+  assert.deepStrictEqual(push.mock.calls[0].arguments, ['fixture-main', true]);
 });
 
 test('executeMcpTool routes teamwork_report, tw_report and tr_report', async () => {

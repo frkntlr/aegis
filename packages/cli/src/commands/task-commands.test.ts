@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { WorktreeManager } from '@aegis/orchestrator';
 import {
   normalizeRole,
   mcpTaskList,
@@ -13,7 +14,9 @@ import {
   handleTaskList,
   handleTaskPull,
   handleLockStatus,
-  handleTaskVerify
+  handleTaskVerify,
+  handleTaskClaim,
+  handleTaskRelease
 } from './task-commands.js';
 
 let testTmpDir: string;
@@ -21,10 +24,12 @@ let testTmpDir: string;
 beforeEach(() => {
   testTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-task-test-'));
   process.env.AEGIS_WORKSPACE = testTmpDir;
+  process.env.AEGIS_INBOX_PATH = path.join(testTmpDir, '.aegis/task-inbox.json');
 });
 
 afterEach(() => {
   delete process.env.AEGIS_WORKSPACE;
+  delete process.env.AEGIS_INBOX_PATH;
   try {
     fs.rmSync(testTmpDir, { recursive: true, force: true });
   } catch { /* ignore */ }
@@ -78,4 +83,39 @@ test('handleTaskList and handleTaskPull execute without throwing', () => {
 test('handleTaskVerify runs without error in test environment', () => {
   const target = fs.existsSync('src/bin/aegis.ts') ? 'src/bin/aegis.ts' : 'packages/cli/src/bin/aegis.ts';
   assert.doesNotThrow(() => handleTaskVerify(target));
+});
+
+function writeParallelTasks(): WorktreeManager {
+  const tasks = [101, 102].map(id => ({
+    id, issueNumber: id, title: `Task ${id}`, role: 'issue-solver [Codex]',
+    worktree: 'experimental/solver', targetFiles: [`src/${id}.ts`],
+    acceptanceCriteria: [], prompt: '', status: 'pending', stagedAt: new Date().toISOString()
+  }));
+  fs.mkdirSync(path.join(testTmpDir, '.aegis'), { recursive: true });
+  fs.writeFileSync(path.join(testTmpDir, '.aegis/task-inbox.json'), JSON.stringify(tasks));
+  const manager = new WorktreeManager({ repoRoot: testTmpDir, persistLocks: true });
+  manager.acquireFileLocks('issue-solver [Codex]', ['src/101.ts', 'src/102.ts']);
+  manager.acquireFileLocks('diagnostic text', ['src/unrelated.ts']);
+  return manager;
+}
+
+test('CLI claim keeps staged owner and release preserves sibling and reason-named locks', async () => {
+  const manager = writeParallelTasks();
+  handleTaskClaim('101', 'solver');
+  const tasks = JSON.parse(mcpTaskList()).tasks;
+  assert.strictEqual(tasks.find((t: { id: number }) => t.id === 101).claimedBy, 'issue-solver [Codex]');
+  await handleTaskRelease('101', 'done', 'diagnostic text');
+  assert.strictEqual(manager.getLockedFiles().has('src/101.ts'), false);
+  assert.strictEqual(manager.getLockedFiles().get('src/102.ts'), 'issue-solver [Codex]');
+  assert.strictEqual(manager.getLockedFiles().get('src/unrelated.ts'), 'diagnostic text');
+});
+
+test('MCP claim keeps staged owner and release preserves same-role sibling locks', async () => {
+  const manager = writeParallelTasks();
+  const claimed = JSON.parse(mcpTaskClaim({ issueNumber: 101, agentRole: 'solver' }));
+  assert.strictEqual(claimed.success, true);
+  assert.strictEqual(claimed.role, 'issue-solver [Codex]');
+  await mcpTaskRelease({ issueNumber: 101, status: 'done', agentRole: 'solver' });
+  assert.strictEqual(manager.getLockedFiles().has('src/101.ts'), false);
+  assert.strictEqual(manager.getLockedFiles().get('src/102.ts'), 'issue-solver [Codex]');
 });

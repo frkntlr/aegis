@@ -85,7 +85,7 @@ test('McpSkillsSyncEngine syncs MCP server definitions across capable IDEs', () 
     const registry = new IdeAdapterRegistry();
     const results = engine.syncAll(registry.listAdapters(), tmpDir);
 
-    assert.strictEqual(results.length, 7);
+    assert.strictEqual(results.length, 8);
     const godotResult = results.find(r => r.ideId === 'godot');
     assert.ok(godotResult?.supported);
     const agResult = results.find(r => r.ideId === 'antigravity');

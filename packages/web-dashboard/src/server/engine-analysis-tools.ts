@@ -7,23 +7,26 @@ import { Context7Bridge } from '@aegis/github-live';
 import { resolveSafeRepoRoot, resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
 import { collectSourceFiles } from './metrics-helpers.js';
 
-function resolveTargetDir(targetDir?: string): string {
-  const root = resolveSafeRepoRoot();
+function resolveTargetDir(targetDir?: string, repoRoot?: string): string {
+  const root = resolveSafeRepoRoot(repoRoot);
   if (targetDir) return path.resolve(root, targetDir);
   const pkgDir = path.resolve(root, 'packages');
   return fs.existsSync(pkgDir) ? pkgDir : root;
 }
 
-function resolveCachePath(fileName: string): string {
-  return resolveSafeCacheDir(fileName);
+function resolveCachePath(fileName: string, repoRoot?: string): string {
+  return resolveSafeCacheDir(fileName, repoRoot);
 }
 
 export class EngineAnalysisTools {
   private cageValidator = new IronCageValidator();
   private triageGate = new EvidenceBasedTriageGate();
+  private memory = new CodebaseMemoryEngine({ persistToDisk: false });
+
+  constructor(private readonly repoRoot?: string) {}
 
   public runCageCheck(targetDir?: string): Record<string, unknown> {
-    const base = resolveTargetDir(targetDir);
+    const base = resolveTargetDir(targetDir, this.repoRoot);
     const files = collectSourceFiles(base);
     let compliant = 0;
     const violations: Array<{ file: string; rule: string; msg: string }> = [];
@@ -57,7 +60,7 @@ export class EngineAnalysisTools {
   }
 
   public runBugTriage(targetDir?: string): Record<string, unknown> {
-    const base = resolveTargetDir(targetDir);
+    const base = resolveTargetDir(targetDir, this.repoRoot);
     const files = collectSourceFiles(base);
     const allViolations: CageViolation[] = [];
 
@@ -87,13 +90,13 @@ export class EngineAnalysisTools {
   public runSymbolFind(query?: string): Record<string, unknown> {
     const symbolQuery = query?.trim() || 'IronCageValidator';
     const indexer = new SymbolIndexer();
-    const cachePath = resolveCachePath('symbols.json');
+    const cachePath = resolveCachePath('symbols.json', this.repoRoot);
     indexer.loadCache(cachePath);
     let matches = indexer.findSymbols(symbolQuery);
 
     if (matches.length === 0) {
-      const files = collectSourceFiles(resolveTargetDir());
-      indexer.indexFiles(files, resolveSafeRepoRoot(), cachePath);
+      const files = collectSourceFiles(resolveTargetDir(undefined, this.repoRoot));
+      indexer.indexFiles(files, resolveSafeRepoRoot(this.repoRoot), cachePath);
       matches = indexer.findSymbols(symbolQuery);
     }
 
@@ -110,7 +113,7 @@ export class EngineAnalysisTools {
 
   public runRelationalTrace(target?: string): Record<string, unknown> {
     const query = target?.trim() || 'IronCageValidator';
-    const graphCachePath = resolveCachePath('graph.json');
+    const graphCachePath = resolveCachePath('graph.json', this.repoRoot);
     const graph = new RelationalGraph();
     graph.loadCache(graphCachePath);
     const engine = new GraphQueryEngine(graph);
@@ -131,12 +134,12 @@ export class EngineAnalysisTools {
 
   public runMemoryQuery(symbol?: string, worktreeId = 'default'): Record<string, unknown> {
     const sym = symbol?.trim() || 'IronCageValidator';
-    const engine = new CodebaseMemoryEngine();
+    const engine = this.memory;
     const stats = engine.getMemoryStats(worktreeId);
     if (stats.totalFiles === 0) {
-      engine.indexDirectory(resolveTargetDir(), worktreeId);
+      engine.indexDirectory(resolveTargetDir(undefined, this.repoRoot), worktreeId);
     }
-    const res = engine.queryMemory(sym, { worktreeId });
+    const res = engine.queryMemory(sym, { worktreeId, repoRoot: resolveSafeRepoRoot(this.repoRoot) });
     return {
       tool: 'memory_query',
       symbol: sym,
@@ -153,10 +156,10 @@ export class EngineAnalysisTools {
   }
 
   public runMemoryStats(worktreeId = 'default'): Record<string, unknown> {
-    const engine = new CodebaseMemoryEngine();
+    const engine = this.memory;
     let stats = engine.getMemoryStats(worktreeId);
     if (stats.totalFiles === 0) {
-      engine.indexDirectory(resolveTargetDir(), worktreeId);
+      engine.indexDirectory(resolveTargetDir(undefined, this.repoRoot), worktreeId);
       stats = engine.getMemoryStats(worktreeId);
     }
     return {
@@ -173,7 +176,7 @@ export class EngineAnalysisTools {
 
   public runAstSearch(pattern?: string, targetDir?: string): Record<string, unknown> {
     const pat = pattern?.trim() || 'class $NAME';
-    const base = resolveTargetDir(targetDir);
+    const base = resolveTargetDir(targetDir, this.repoRoot);
     const matches = AstGrepBridge.searchDirectory(base, pat);
     return {
       tool: 'ast_search',

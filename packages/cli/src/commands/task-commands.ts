@@ -54,10 +54,10 @@ export function handleTaskClaim(issueArg?: string, roleArg?: string): void {
     console.error('❌ Usage: aegis task:claim <issueNumber> [agentRole]');
     process.exit(1);
   }
-  const role = normalizeRole(roleArg);
   const wtManager = new WorktreeManager({ persistLocks: true });
   const tasks = listInboxTasks();
   const task = tasks.find(t => t.issueNumber === issueNum);
+  const role = task?.role || normalizeRole(roleArg);
   const targetFiles = task ? task.targetFiles : [];
 
   if (targetFiles.length > 0) {
@@ -120,8 +120,6 @@ export async function handleTaskRelease(...args: string[]): Promise<void> {
   const mesh = new TeamworkMesh();
   for (const t of matched) {
     if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
-    if (t.role) wtManager.releaseFileLocks(t.role);
-    if (t.claimedBy) wtManager.releaseFileLocks(t.claimedBy);
     updateTaskInboxStatus(t.issueNumber, status);
     if (status === 'done' || status === 'blocked') {
       try { mesh.postActivity(t.claimedBy || t.role, { status, activity: `Task #${t.issueNumber} marked ${status}` }); } catch { /* ignore */ }
@@ -130,7 +128,7 @@ export async function handleTaskRelease(...args: string[]): Promise<void> {
   }
 
   if (matched.length === 0) wtManager.releaseFileLocks(issueArg);
-  if (reasonArg) wtManager.releaseFileLocks(reasonArg);
+  if (reasonArg) console.log(`Reason: ${reasonArg}`);
   console.log(`🔓 Task release complete for "${issueArg}". New Status: [${status.toUpperCase()}]`);
 }
 

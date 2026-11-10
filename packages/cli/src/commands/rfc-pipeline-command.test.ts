@@ -2,19 +2,28 @@ import test from 'node:test';
 import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import * as os from 'node:os';
 import { handleRfcPipeline } from './rfc-pipeline-command.js';
-import { readTaskInbox, writeTaskInbox } from './task-inbox.js';
+import { readTaskInbox } from './task-inbox.js';
 
-test('handleRfcPipeline decomposes RFC into issue and stages in task-inbox', async () => {
+test('handleRfcPipeline decomposes RFC into issue and stages in task-inbox', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-rfc-pipeline-'));
+  const previousCwd = process.cwd();
+  const previousEnv = { AEGIS_TEST: process.env.AEGIS_TEST, AEGIS_WORKSPACE: process.env.AEGIS_WORKSPACE,
+    AEGIS_INBOX_PATH: process.env.AEGIS_INBOX_PATH };
+  t.after(() => {
+    process.chdir(previousCwd);
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  });
   process.env.AEGIS_TEST = '1';
-  const root = resolveSafeRepoRoot();
+  process.env.AEGIS_WORKSPACE = root;
+  process.env.AEGIS_INBOX_PATH = path.join(root, '.aegis/task-inbox.json');
+  process.chdir(root);
   const rfcDir = path.resolve(root, 'docs', 'rfc');
   fs.mkdirSync(rfcDir, { recursive: true });
-  for (const f of fs.readdirSync(rfcDir).filter(f => f.includes('test-autonomous-dynamic-pipeline'))) {
-    try { fs.unlinkSync(path.join(rfcDir, f)); } catch { /* ignore */ }
-  }
-
   const testTitle = 'Test Autonomous Dynamic Pipeline';
   const testDesc = 'Verify end-to-end discussion, issue cross-linking and TIP task staging';
   await handleRfcPipeline(testTitle, testDesc);
@@ -34,9 +43,4 @@ test('handleRfcPipeline decomposes RFC into issue and stages in task-inbox', asy
   assert.ok(staged, 'Task should be staged in TIP inbox');
   assert.strictEqual(staged?.role, 'issue-solver');
   assert.strictEqual(staged?.isGitHubIssue, true);
-
-  // Clean up test file and task
-  try { fs.unlinkSync(rfcFile); } catch { /* ignore */ }
-  inbox.tasks = inbox.tasks.filter(t => !t.title.includes('Test Autonomous'));
-  writeTaskInbox(inbox);
 });

@@ -52,12 +52,13 @@ export class GitPushManager {
     }
   }
 
-  public isAheadOfRemote(branch: string): { ahead: boolean; count: number } {
+  public isAheadOfRemote(branch: string): { ahead: boolean; count: number; error?: string } {
     try {
       execFileSync('git', ['fetch', 'origin', branch], {
         cwd: this.repoRoot,
-        stdio: ['ignore', 'pipe', 'ignore'],
-        env: { ...cleanGitEnv(), GIT_TERMINAL_PROMPT: '0' }
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 30000,
+        env: { ...cleanGitEnv(), GCM_INTERACTIVE: 'never', GIT_TERMINAL_PROMPT: '0' }
       });
       const out = execFileSync('git', ['rev-list', `origin/${branch}..${branch}`, '--count'], {
         cwd: this.repoRoot,
@@ -67,8 +68,9 @@ export class GitPushManager {
       }).trim();
       const count = parseInt(out, 10) || 0;
       return { ahead: count > 0, count };
-    } catch {
-      return { ahead: false, count: 0 };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ahead: false, count: 0, error: `Could not verify origin/${branch}: ${message}` };
     }
   }
 
@@ -118,7 +120,8 @@ export class GitPushManager {
         timeout: 60000,
         env: { ...cleanGitEnv(), GCM_INTERACTIVE: 'never', GIT_TERMINAL_PROMPT: '0' }
       });
-      return { success: true, message: out.trim() || `Pushed ${branch} to origin successfully.` };
+      const fallback = dryRun ? `Dry-run push passed for ${branch}; no commits were uploaded.` : `Pushed ${branch} to origin successfully.`;
+      return { success: true, message: out.trim() || fallback };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return { success: false, message: msg };
@@ -126,15 +129,18 @@ export class GitPushManager {
   }
 }
 
-function commitIfDirtyConsole(mgr: GitPushManager, commitMsg: string, autoCommit: boolean): void {
-  if (!mgr.hasUncommittedChanges()) return;
-  const prefix = autoCommit ? ' • Committing working tree:' : ' ⚠️ Working tree dirty. Auto-committing before push:';
-  console.log(`${prefix} "${commitMsg}"...`);
-  mgr.commitAll(commitMsg);
+function commitIfDirtyConsole(mgr: GitPushManager, commitMsg: string, autoCommit: boolean): boolean {
+  if (!mgr.hasUncommittedChanges()) return true;
+  if (!autoCommit) { console.log('Working tree changes are not included; use --commit to commit them.'); return true; }
+  console.log(`Committing working tree: "${commitMsg}"...`);
+  if (mgr.commitAll(commitMsg)) return true;
+  console.error('Commit failed; push cancelled.');
+  return false;
 }
 
-function reportPushOutcome(res: { success: boolean; message: string }, branch: string): boolean {
+function reportPushOutcome(res: { success: boolean; message: string }, branch: string, dryRun: boolean): boolean {
   if (res.success) {
+    if (dryRun) { console.log(`Dry-run push passed for ${branch}; no commits were uploaded.`); return true; }
     console.log(`\n🎉 Remote Push Succeeded: ${res.message}`);
     console.log(`✅ origin/${branch} is now completely in sync with local ${branch}.`);
     return true;
@@ -162,9 +168,10 @@ export async function handleGitPush(...args: string[]): Promise<boolean> {
   }
   console.log(` • Authenticated as: @${auth.user || 'developer'} ✅`);
 
-  commitIfDirtyConsole(mgr, commitMsg, autoCommit);
+  if (!dryRun && !commitIfDirtyConsole(mgr, commitMsg, autoCommit)) return false;
 
   const aheadInfo = mgr.isAheadOfRemote(branch);
+  if (aheadInfo.error) { console.error(aheadInfo.error); return false; }
   if (!aheadInfo.ahead) {
     console.log(`✅ Branch ${branch} is already up to date with origin/${branch}. Nothing to push.`);
     return true;
@@ -173,7 +180,7 @@ export async function handleGitPush(...args: string[]): Promise<boolean> {
   console.log(` • Commits to push: ${aheadInfo.count} commit(s) ahead of origin/${branch}.`);
   console.log(` • Executing ${dryRun ? 'DRY-RUN push' : 'safe remote push'}...`);
   const res = mgr.executePush(branch, dryRun);
-  return reportPushOutcome(res, branch);
+  return reportPushOutcome(res, branch, dryRun);
 }
 
 export function mcpGitPush(args: Record<string, unknown> = {}): string {
@@ -189,10 +196,11 @@ export function mcpGitPush(args: Record<string, unknown> = {}): string {
   }
 
   if (!dryRun && mgr.hasUncommittedChanges() && autoCommit) {
-    mgr.commitAll(commitMsg);
+    if (!mgr.commitAll(commitMsg)) return JSON.stringify({ success: false, branch, error: 'Commit failed; push cancelled.' });
   }
 
   const aheadInfo = mgr.isAheadOfRemote(branch);
+  if (aheadInfo.error) return JSON.stringify({ success: false, branch, error: aheadInfo.error });
   if (!aheadInfo.ahead) {
     return JSON.stringify({ success: true, branch, message: `Branch ${branch} is already up to date with origin.` });
   }

@@ -10,6 +10,7 @@ import {
   McpSkillsSyncEngine,
   UniversalToolchainSync
 } from '@aegis/orchestrator';
+import { CodexInstaller } from '@aegis/orchestrator';
 import { GodotInitWorkflow } from '@aegis/godot-bridge';
 import { showBanner } from './banner.js';
 
@@ -29,7 +30,7 @@ export function autoConfigureGodot(repoRoot: string): void {
 export function setupIdeExclusions(repoRoot: string): void {
   const registry = new IdeAdapterRegistry();
   const results = registry.setupAll(repoRoot);
-  const universal = new UniversalToolchainSync(process.cwd());
+  const universal = new UniversalToolchainSync(repoRoot);
   universal.syncAll();
   for (const r of results) {
     if (r.success) {
@@ -61,10 +62,11 @@ export function handleIdeSync(): void {
   console.log('🔄 Synchronizing MCP Servers & Skills across all supported IDEs...');
   const registry = new IdeAdapterRegistry();
   const nodeBin = 'node';
+  const engineRoot = CodexInstaller.resolveEngineRoot(process.cwd());
   const engine = new McpSkillsSyncEngine({
-    'aegis-engine': {
-      command: 'npx',
-      args: ['--yes', '@aegis/cli', 'mcp']
+    aegis: {
+      command: process.execPath,
+      args: [path.join(engineRoot, 'packages/cli/dist/bin/aegis.js'), 'mcp']
     },
     notebooklm: {
       command: nodeBin,

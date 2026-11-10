@@ -11,6 +11,20 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { runResilientTest, handleTestCommand } from './test-command.js';
 
+async function inFixtureDirectory(root: string, action: () => Promise<void>): Promise<void> {
+  const originalCwd = process.cwd();
+  const previousEnv = { AEGIS_WORKSPACE: process.env.AEGIS_WORKSPACE, AEGIS_INBOX_PATH: process.env.AEGIS_INBOX_PATH };
+  process.chdir(root);
+  delete process.env.AEGIS_WORKSPACE;
+  delete process.env.AEGIS_INBOX_PATH;
+  try { await action(); } finally {
+    process.chdir(originalCwd);
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
 test('runResilientTest executes in node project and returns structured result', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-test-cmd-'));
   try {
@@ -81,14 +95,10 @@ test('handleTestCommand handles --soft flag and returns boolean outcome', async 
       scripts: { test: 'node -e "process.exit(0)"' }
     }), 'utf8');
 
-    const origCwd = process.cwd();
-    process.chdir(tmpDir);
-    try {
+    await inFixtureDirectory(tmpDir, async () => {
       const passed = await handleTestCommand('--soft', '--json');
       assert.strictEqual(passed, true);
-    } finally {
-      process.chdir(origCwd);
-    }
+    });
   } finally {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
@@ -123,17 +133,13 @@ test('handleTestCommand parses --offline flag and runs isolated offline test', a
       scripts: { test: 'node -e "process.exit(0)"' }
     }), 'utf8');
 
-    const origCwd = process.cwd();
-    process.chdir(tmpDir);
-    try {
+    await inFixtureDirectory(tmpDir, async () => {
       const passed1 = await handleTestCommand('--offline', '--soft', '--json');
       assert.strictEqual(passed1, true);
 
       const passed2 = await handleTestCommand('test:offline', '--soft', '--json');
       assert.strictEqual(passed2, true);
-    } finally {
-      process.chdir(origCwd);
-    }
+    });
   } finally {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
   }

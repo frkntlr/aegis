@@ -23,7 +23,7 @@ export const ALL_AEGIS_COMMANDS: readonly string[] = [
   'godot', 'godot:init', 'godot:status', 'godot:inspect', 'godot:validate', 'godot:query', 'godot:run', 'godot:doctool', 'godot:playtest', 'godot:test', 'godot:ui', 'godot:ui:lint', 'godot:ui:scaffold',
   'gh:status', 'gh:sync', 'gh:comment', 'gh:pr', 'gh:locate',
   'project:list', 'project:sync', 'wiki:list', 'wiki:show', 'wiki:clean', 'wiki:seed', 'wiki:sync', 'wiki:status',
-  'merge', 'branch:sync', 'deps:drift', 'deps:sync', 'dashboard', 'ide:list', 'ide:sync',
+  'merge', 'branch:sync', 'deps:drift', 'deps:sync', 'dashboard', 'ide:list', 'ide:sync', 'codex:setup',
   'update', 'upgrade', 'self-update', 'update:check', 'update:clean', 'version:status',
   'debug', 'loop:status', 'loop:reset', 'mcp', 'mcp:start', 'completion', 'search', 'help', 'version'
 ];

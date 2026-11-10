@@ -6,10 +6,13 @@
 
 import test from 'node:test';
 import * as assert from 'node:assert';
+import { isolateTeamworkTestWorkspace } from './teamwork-test-workspace.js';
 import {
   handleTeamworkDeliberate,
   mcpTeamworkDeliberate
 } from './teamwork-deliberate-command.js';
+
+isolateTeamworkTestWorkspace('deliberation');
 
 test('handleTeamworkDeliberate executes with JSON output', async () => {
   const originalLog = console.log;

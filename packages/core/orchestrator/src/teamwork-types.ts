@@ -8,6 +8,7 @@ import type { RoleType } from './role-classifier.js';
 import type { SubagentProfile } from './teamwork-prompts.js';
 import type { ComplexityAnalysisResult } from './task-complexity-analyzer.js';
 import type { DeliberationResult } from './teamwork-deliberation-types.js';
+import type { CodexInvocationPayload } from './codex-teamwork.js';
 
 export interface AntigravityInvocationPayload {
   TypeName: string;
@@ -25,6 +26,7 @@ export interface TeamworkTrack {
   targetFiles: string[];
   prompt: string;
   invocationPayload: AntigravityInvocationPayload;
+  codexInvocationPayload?: CodexInvocationPayload;
   dependsOn: string[];
   phase: number;
   assignedAegisTools?: string[];

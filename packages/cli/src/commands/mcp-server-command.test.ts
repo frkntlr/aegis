@@ -1,6 +1,27 @@
-import test from 'node:test';
+import test, { before, after } from 'node:test';
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { handleJsonRpc } from './mcp-server-command.js';
+import { resetSharedMemoryEngine } from './memory-command.js';
+
+let workspace: string;
+const previousWorkspace = process.env.AEGIS_WORKSPACE;
+before(() => {
+  workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mcp-server-test-'));
+  fs.writeFileSync(path.join(workspace, 'validator.ts'),
+    'export class IronCageValidator { validate(): boolean { return true; } }\n' +
+    'export function check(): boolean { return new IronCageValidator().validate(); }\n');
+  process.env.AEGIS_WORKSPACE = workspace;
+  resetSharedMemoryEngine();
+});
+after(() => {
+  resetSharedMemoryEngine();
+  if (previousWorkspace === undefined) delete process.env.AEGIS_WORKSPACE;
+  else process.env.AEGIS_WORKSPACE = previousWorkspace;
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
 
 test('handleJsonRpc handles initialize request', async () => {
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 1, method: 'initialize' });

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AntigravityInstaller } from './antigravity-installer.js';
+import { CodexInstaller } from './codex-installer.js';
 
 export interface DiscoveredSkill {
   name: string;
@@ -13,6 +14,8 @@ export interface McpServerDefinition {
   command?: string;
   args?: string[];
   url?: string;
+  env?: Record<string, string>;
+  disabled?: boolean;
   transport: 'stdio' | 'sse';
 }
 
@@ -72,13 +75,15 @@ export class UniversalToolchainSync {
       try {
         const data = JSON.parse(fs.readFileSync(cursorMcp, 'utf8'));
         if (data.mcpServers) {
-          interface RawMcpServerCfg { command?: string; args?: string[]; url?: string; }
+          interface RawMcpServerCfg { command?: string; args?: string[]; url?: string; env?: Record<string, string>; disabled?: boolean; }
           for (const [name, cfg] of Object.entries<RawMcpServerCfg>(data.mcpServers)) {
             servers.push({
               name,
               command: cfg.command,
               args: cfg.args,
               url: cfg.url,
+              env: cfg.env,
+              disabled: cfg.disabled,
               transport: cfg.url ? 'sse' : 'stdio'
             });
           }
@@ -89,7 +94,7 @@ export class UniversalToolchainSync {
     }
     if (servers.length === 0) {
       servers.push(
-        { name: 'aegis-engine', command: 'node', args: ['packages/cli/dist/bin/aegis.js'], transport: 'stdio' },
+        { name: 'aegis-engine', command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'], transport: 'stdio' },
         { name: 'ast-grep', command: 'npx', args: ['@ast-grep/mcp'], transport: 'stdio' },
         { name: 'context7', command: 'npx', args: ['context7-mcp'], transport: 'stdio' }
       );
@@ -216,6 +221,21 @@ export class UniversalToolchainSync {
     AntigravityInstaller.syncGlobal(userHome, this.repoRoot, (cfg) => this.registerAegisMcpServer(cfg));
   }
 
+  private syncCodex(mcps: McpServerDefinition[], warnings: string[]): boolean {
+    try {
+      const servers = Object.fromEntries(mcps.filter(m => m.name !== 'aegis-engine' && m.name !== 'aegis').map(m =>
+        [m.name, { command: m.command, args: m.args, url: m.url, env: m.env, disabled: m.disabled, cwd: m.url ? undefined : this.repoRoot }]));
+      CodexInstaller.sync(this.repoRoot, servers);
+      const engineRoot = CodexInstaller.resolveEngineRoot(this.repoRoot);
+      const cli = path.resolve(engineRoot, 'packages/cli/dist/bin/aegis.js');
+      if (fs.existsSync(cli)) CodexInstaller.install(this.repoRoot, engineRoot);
+      return true;
+    } catch (e: unknown) {
+      warnings.push(`Codex synchronization failed: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
+    }
+  }
+
   public syncAll(): ToolchainSyncReport {
     const skills = this.discoverSkills();
     const mcps = this.discoverMcpServers();
@@ -225,6 +245,7 @@ export class UniversalToolchainSync {
     if (this.syncCursor(skills, mcps, warnings)) syncedIdes.push('Cursor AI');
     if (this.syncVSCode(mcps, warnings)) syncedIdes.push('VS Code');
     if (this.syncAntigravity(mcps, warnings)) syncedIdes.push('Google Antigravity');
+    if (this.syncCodex(mcps, warnings)) syncedIdes.push('OpenAI Codex');
         const hasCopilot = fs.existsSync(path.resolve(this.repoRoot, '.github', 'copilot')) || fs.existsSync(path.resolve(this.repoRoot, 'plugins', 'aegis-copilot'));
         if (hasCopilot) { syncedIdes.push('GitHub Copilot'); }
 

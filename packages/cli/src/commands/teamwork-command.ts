@@ -57,6 +57,10 @@ function printTrackPayload(track: TeamworkTrack): void {
   }
   console.log('   Antigravity invoke_subagent Payload:');
   console.log(JSON.stringify(track.invocationPayload, null, 2));
+  if (track.codexInvocationPayload) {
+    console.log('   Codex native spawn payload (adapt to the host tool schema):');
+    console.log(JSON.stringify(track.codexInvocationPayload, null, 2));
+  }
 }
 
 interface PlanFlags {

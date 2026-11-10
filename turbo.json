@@ -14,6 +14,11 @@
         "build"
       ],
       "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/templates/codex/**",
+        "$TURBO_ROOT$/scripts/install-codex-commands*.cjs",
+        "$TURBO_ROOT$/scripts/verify-codex-mcp*.cjs",
+        "$TURBO_ROOT$/scripts/test-workspace.cjs",
         "src/**",
         "tests/**"
       ]

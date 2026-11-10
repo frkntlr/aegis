@@ -49,3 +49,6 @@ tmp/
 !.cursor/settings.json
 .cursor/mcp.json
 .vscode/
+.codex/config.toml
+graphify-out/
+.codegraphcontext_db

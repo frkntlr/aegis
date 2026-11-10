@@ -21,10 +21,10 @@ export function mcpTaskList(args: Record<string, unknown> = {}): string {
 
 export function mcpTaskClaim(args: Record<string, unknown> = {}): string {
   const issueNum = Number(args.issueNumber || 0);
-  const role = normalizeRole(typeof args.agentRole === 'string' ? args.agentRole : undefined);
   const wtManager = new WorktreeManager({ persistLocks: true });
   const tasks = listInboxTasks();
   const task = tasks.find(t => t.issueNumber === issueNum);
+  const role = task?.role || normalizeRole(typeof args.agentRole === 'string' ? args.agentRole : undefined);
   if (task && task.targetFiles.length > 0) {
     const lockRes = wtManager.acquireFileLocks(role, task.targetFiles);
     if (!lockRes.success) {
@@ -48,13 +48,11 @@ export async function mcpTaskRelease(args: Record<string, unknown> = {}): Promis
 
   for (const t of matched) {
     if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
-    if (t.role) wtManager.releaseFileLocks(t.role);
-    if (t.claimedBy) wtManager.releaseFileLocks(t.claimedBy);
     updateTaskInboxStatus(t.issueNumber, status);
     if (status === 'done' && t.isGitHubIssue === true) await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
   }
 
-  if (roleQuery) wtManager.releaseFileLocks(roleQuery);
+  if (matched.length === 0 && roleQuery) wtManager.releaseFileLocks(roleQuery);
   return JSON.stringify({ success: true, count: matched.length, status }, null, 2);
 }
 

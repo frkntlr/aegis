@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
+    "test": "node --test scripts/install-codex-commands.test.cjs scripts/verify-codex-mcp.test.cjs && turbo run test",
     "lint": "biome lint packages/",
     "typecheck": "tsc --build",
     "aegis": "node packages/cli/dist/bin/aegis.js",

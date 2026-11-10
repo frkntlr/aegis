@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -25,6 +25,18 @@ import {
   mcpTeamworkScale,
   mcpTeamworkDocSynthesize
 } from './teamwork-mesh-command.js';
+
+let workspace: string;
+const previousWorkspace = process.env.AEGIS_WORKSPACE;
+before(() => {
+  workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-teamwork-mesh-test-'));
+  process.env.AEGIS_WORKSPACE = workspace;
+});
+after(() => {
+  if (previousWorkspace === undefined) delete process.env.AEGIS_WORKSPACE;
+  else process.env.AEGIS_WORKSPACE = previousWorkspace;
+  fs.rmSync(workspace, { recursive: true, force: true });
+});
 
 test('mcpTeamworkMeshRead returns valid mesh state JSON and compact format', () => {
   const resStr = mcpTeamworkMeshRead();
@@ -131,6 +143,7 @@ test('CLI mesh handlers run without exceptions', () => {
   assert.doesNotThrow(() => handleTeamworkIterate());
   assert.doesNotThrow(() => handleTeamworkIterate('--json'));
   assert.doesNotThrow(() => handleTeamworkMesh('clear'));
+  assert.ok(fs.existsSync(path.join(workspace, '.aegis/task-inbox.json')));
 });
 
 test('handleTeamworkDoc supports --readme flag in isolated workspace', () => {
@@ -144,7 +157,8 @@ test('handleTeamworkDoc supports --readme flag in isolated workspace', () => {
     const content = fs.readFileSync(path.join(tmp, 'README.md'), 'utf8');
     assert.ok(content.includes('Aegis Living Architecture'));
   } finally {
-    process.env.AEGIS_WORKSPACE = prev;
+    if (prev === undefined) delete process.env.AEGIS_WORKSPACE;
+    else process.env.AEGIS_WORKSPACE = prev;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

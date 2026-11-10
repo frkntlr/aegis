@@ -27,6 +27,7 @@ function buildTrackInboxItem(
     targetFiles: track.targetFiles,
     acceptanceCriteria: [`Complete track objective: ${objective}`, 'Pass Demir Kafes & verify:task'],
     prompt: track.prompt,
+    codexInvocationPayload: track.codexInvocationPayload,
     status: track.dependsOn.length > 0 ? 'blocked' : 'pending',
     dependsOn: track.dependsOn,
     phase: track.phase,

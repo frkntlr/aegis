@@ -14,6 +14,7 @@ import type { DecomposedSubtask } from './teamwork-decomposer.js';
 import type { TeamworkGroundingEngine } from './teamwork-grounding.js';
 import type { TeamworkTrack } from './teamwork-types.js';
 import { ROLE_SPECIALISTS } from './teamwork-hierarchical-tree.js';
+import { buildCodexInvocation } from './codex-teamwork.js';
 
 export class TeamworkTrackBuilder {
   public static hashPlan(objective: string, files: string[]): string {
@@ -112,15 +113,15 @@ export class TeamworkTrackBuilder {
     const spec = ROLE_SPECIALISTS[roleType]?.find(s => s.label.toLowerCase() === label.toLowerCase());
     const assignedAegisTools = spec ? spec.assignedTools : (profile.aegisTools ?? []);
     return {
-      id,
-      roleType,
-      subagentName,
+      id, roleType, subagentName,
       title: `${profile.title} [${label}]`,
       targetFiles: files,
       prompt,
       dependsOn,
       phase,
       assignedAegisTools,
+      codexInvocationPayload: buildCodexInvocation({ id, title: desc, targetFiles: files, dependsOn, phase, roleType }, desc,
+        [groundingContext, contracts, `Assigned Aegis tools: ${assignedAegisTools.join(', ')}`].filter(Boolean).join('\n')),
       invocationPayload: {
         TypeName: profile.name,
         Role: `${profile.title} - ${label}`,

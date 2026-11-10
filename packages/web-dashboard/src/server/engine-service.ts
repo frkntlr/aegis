@@ -197,7 +197,9 @@ export class AegisEngineService {
     };
   }
 
-  private analysisTools = new EngineAnalysisTools();
+  private analysisTools: EngineAnalysisTools;
+
+  constructor(repoRoot?: string) { this.analysisTools = new EngineAnalysisTools(repoRoot); }
 
   public runCageCheck(dir?: string): Record<string, unknown> {
     return this.analysisTools.runCageCheck(dir);

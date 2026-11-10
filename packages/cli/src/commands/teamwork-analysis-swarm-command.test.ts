@@ -1,11 +1,14 @@
 import test from 'node:test';
 import * as assert from 'node:assert';
+import { isolateTeamworkTestWorkspace } from './teamwork-test-workspace.js';
 import {
   handleTeamworkAnalysisSwarm,
   mcpTeamworkAnalysisSwarm,
   mcpAnalysisMeshQuery,
   mcpAnalysisMeshPost
 } from './teamwork-analysis-swarm-command.js';
+
+isolateTeamworkTestWorkspace('analysis-swarm');
 
 test('handleTeamworkAnalysisSwarm executes with JSON output', async () => {
   const originalLog = console.log;

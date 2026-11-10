@@ -3,19 +3,26 @@ import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
+import { GitHubTokenResolver } from '@aegis/github-live';
 import { ProjectHub } from './project-hub.js';
 import { DashboardServer } from './dashboard-server.js';
 
-test('ProjectHub initializes with default context and lists projects', () => {
-  const hub = new ProjectHub();
-  const active = hub.getActiveContext();
-  assert.ok(active);
-  assert.ok(active.id.includes('aegis') || active.id.includes('solver'));
-  assert.strictEqual(active.projectNumber, 4);
-
-  const list = hub.listProjects();
-  assert.ok(list.length >= 1);
-  assert.strictEqual(list[0].isFocused, true);
+test('ProjectHub initializes its configured default context and lists the focused project', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-default-project-'));
+  t.mock.method(GitHubTokenResolver, 'resolve', () => ({
+    source: 'none', hasCredentials: false, owner: 'fixture-owner', repo: 'fixture-project'
+  }));
+  try {
+    const hub = new ProjectHub(root, true, false);
+    const active = hub.getActiveContext();
+    assert.strictEqual(active.id, 'fixture-owner/fixture-project');
+    assert.strictEqual(active.localPath, root);
+    assert.strictEqual(active.projectNumber, 4);
+    const list = hub.listProjects();
+    assert.strictEqual(list.length, 1);
+    assert.strictEqual(list[0].id, active.id);
+    assert.strictEqual(list[0].isFocused, true);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test('ProjectHub handles focus auto-switching when workspace path changes', () => {

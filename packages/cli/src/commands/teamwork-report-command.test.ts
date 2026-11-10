@@ -3,10 +3,13 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { resolveSafeRepoRoot } from '@aegis/shared';
+import { isolateTeamworkTestWorkspace } from './teamwork-test-workspace.js';
 import {
   parseReportArgs,
   handleTeamworkReport
 } from './teamwork-report-command.js';
+
+isolateTeamworkTestWorkspace('report');
 
 test('parseReportArgs correctly parses flags and planId', () => {
   const res1 = parseReportArgs();

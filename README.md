@@ -1,5 +1,8 @@
 # 🛡️ AEGIS — Autonomous Vibe Coding & Codebase Memory Engine
-### Google Antigravity, Mulgravity, Cursor, VS Code & Web İçin 5-Katmanlı Hafıza, TIP Protokolü ve Deterministik Güvenlik Motoru
+### Google Antigravity, OpenAI Codex, Mulgravity, Cursor, VS Code & Web İçin 5-Katmanlı Hafıza, TIP Protokolü ve Deterministik Güvenlik Motoru
+
+Codex kurulumu: `npm run build` ardından `npm run aegis -- codex:setup`.
+Ortak görev/kilit akışları ve istemci farkları için [Codex uyumluluk rehberi](docs/codex-compatibility.md).
 
 [![CI](https://github.com/frkntlr/aegis/actions/workflows/ci.yml/badge.svg)](https://github.com/frkntlr/aegis/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

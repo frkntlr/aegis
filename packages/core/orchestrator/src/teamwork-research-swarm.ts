@@ -6,6 +6,7 @@
  */
 
 import type { TeamworkTrack } from './teamwork-types.js';
+import { buildCodexInvocation } from './codex-teamwork.js';
 
 export interface ResearchSpecialist {
   role: 'docs' | 'solver' | 'qa';
@@ -64,6 +65,8 @@ export class TeamworkResearchSwarm {
         prompt,
         assignedAegisTools: spec.assignedTools,
         dependsOn: [],
+        codexInvocationPayload: buildCodexInvocation({ id: `${planId}-res-${idx + 1}`, title: spec.focus,
+          targetFiles: [spec.outputArtifact], phase: 0, dependsOn: [], roleType: spec.role }, objective),
         invocationPayload: {
           TypeName: spec.role === 'docs' ? 'doc-architect' : spec.role === 'solver' ? 'issue-solver' : 'qa-hunter',
           Role: `Deep Research Specialist - ${spec.subagentName}`,
