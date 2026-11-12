@@ -2,6 +2,8 @@ When the user submits `aegis`, `aegist`, `$aegis`, `/aegis` or `/aegist` followe
 
 Use the active project's CLI working directory for inboxes, locks and plans. Prefer Aegis MCP only when its project root matches. Planning stages tasks; execute ready tracks with the available native spawn tool when teamwork was requested, respecting dependencies and capacity. Keep Antigravity-only tool calls and invocation payloads out of Codex dispatch. Follow the installed skill for verification and task release.
 
+In application projects use installed `aegis`, including workspaces with no package.json. `npm run aegis` belongs only to the Aegis engine checkout. If the command is missing, use the executable paths in the project's `.aegis/installation.json` or the installed skill's `runtime.json` while preserving the project's working directory; never add a package.json merely to run Aegis.
+
 For nontrivial teamwork, follow the Aegis skill's `codex:orchestrate` execution loop. Workers that cannot spawn submit child requests to the root, which dispatches them within actual host capacity and later resumes their parent. Treat this as a logical task hierarchy; do not claim native nested agents exist without successful native tool calls. The scheduler reserves tasks but never starts agents by itself.
 
 Dispatch all ready independent workers before waiting for results; refill available slots as results arrive. Review the combined changes and verify their integration before completing the request. Use the Codex-specific plan output (`--client=codex`) to keep Antigravity instructions out of native execution.

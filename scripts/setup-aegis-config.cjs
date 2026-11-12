@@ -57,6 +57,10 @@ function configureAntigravity(engine, project) {
     files.push(path.join(plugin, 'rules/AGENTS.md'));
     writeChanged(files.at(-1), fs.readFileSync(rules));
   }
+  const runtime = path.join(project, '.aegis/installation.json');
+  writeChanged(runtime, JSON.stringify({ engineRoot: engine, command: process.execPath,
+    args: [path.join(engine, 'packages/cli/dist/bin/aegis.js')], cwd: project }, null, 2));
+  files.push(runtime);
   return files;
 }
 

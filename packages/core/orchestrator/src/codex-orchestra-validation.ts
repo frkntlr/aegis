@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { TeamworkTrack } from './teamwork-types.js';
 import type { OrchestraOptions, OrchestraRun, OrchestraTask, OrchestraTaskInput } from './codex-orchestra-types.js';
+import { validateRecovery } from './codex-orchestra-recovery.js';
 
 export function requireIdentifier(value: string): void {
   if (typeof value !== 'string' || !/^[\p{L}\p{N}][\p{L}\p{N}\p{M}_-]{0,159}$/u.test(value)) {
@@ -118,7 +119,7 @@ export function validateStoredRun(value: unknown, id: string, root: string): ass
 function validateStoredTask(task: OrchestraTask, run: OrchestraRun, root: string): void {
   requireIdentifier(task.id);
   const arrays = [task.dependsOn, task.children, task.targetFiles];
-  if (!['pending', 'reserved', 'running', 'waiting', 'done', 'failed', 'blocked'].includes(task.state) ||
+  if (!['pending', 'reserved', 'running', 'waiting', 'deferred', 'done', 'failed', 'blocked'].includes(task.state) ||
       arrays.some(values => !Array.isArray(values) || values.some(value => typeof value !== 'string')) ||
       !Number.isSafeInteger(task.phase) || task.phase < 1 || !Number.isSafeInteger(task.depth) ||
       task.depth < 0 || task.depth > run.options.maxDepth || typeof task.title !== 'string' || !task.title.trim()) {
@@ -127,6 +128,8 @@ function validateStoredTask(task: OrchestraTask, run: OrchestraRun, root: string
   if (JSON.stringify(normalizeFiles(root, task.targetFiles)) !== JSON.stringify(task.targetFiles)) {
     throw new Error('Invalid persisted target scope');
   }
+  if (task.state === 'deferred' && !task.recovery) throw new Error('Deferred task is missing recovery checkpoint');
+  if (task.recovery) validateRecovery(task.recovery);
   if ((task.state === 'running' && !task.agentId?.trim()) ||
       (task.state === 'reserved' && !task.reservationId?.trim()) ||
       (['done', 'failed', 'blocked'].includes(task.state) && !task.evidence?.trim())) {

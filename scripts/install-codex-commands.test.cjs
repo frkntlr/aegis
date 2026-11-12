@@ -22,6 +22,9 @@ test('user install upgrades stale skills, keeps custom rules and is idempotent',
     assert.match(fs.readFileSync(skill, 'utf8'), /--client=codex --json/);
     assert.match(fs.readFileSync(skill, 'utf8'), /Dispatch every independent item.*before waiting/);
     assert.match(fs.readFileSync(skill, 'utf8'), /codex:orchestrate create/);
+    const runtime = JSON.parse(fs.readFileSync(path.join(path.dirname(skill), 'runtime.json'), 'utf8'));
+    assert.equal(runtime.command, process.execPath);
+    assert.equal(runtime.args[0], path.resolve(__dirname, '../packages/cli/dist/bin/aegis.js'));
     const first = fs.readFileSync(agents, 'utf8');
     assert.match(first, /^Keep my rules\n/);
     assert.match(first, /aegis tw <objective>/);

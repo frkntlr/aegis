@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import type { TeamworkPlan } from './teamwork-types.js';
 import { OrchestraStore } from './codex-orchestra-store.js';
 import { getTask, reserveDispatches, settle } from './codex-orchestra-scheduler.js';
 import { fileScopeKey, newTask, normalizedOptions, resolvePlanDependencies, validateGraph } from './codex-orchestra-validation.js';
 import type { OrchestraDispatch, OrchestraOptions, OrchestraRun, OrchestraTaskInput } from './codex-orchestra-types.js';
+import type { OrchestraDeferralInput, OrchestraRecoveryStatus } from './codex-orchestra-types.js';
+import { deferOrchestraTask, recoveryStatus } from './codex-orchestra-recovery.js';
 
 export * from './codex-orchestra-types.js';
 
@@ -41,6 +44,23 @@ export class CodexOrchestra {
   }
 
   public status(runId: string): OrchestraRun { return this.store.read(runId); }
+
+  public list(): OrchestraRun[] {
+    const directory = path.join(this.root, '.aegis/codex-orchestra');
+    if (!fs.existsSync(directory)) return [];
+    return fs.readdirSync(directory).filter(file => file.endsWith('.json'))
+      .map(file => this.store.read(file.slice(0, -5))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  public recovery(runId: string): OrchestraRecoveryStatus { return recoveryStatus(this.status(runId)); }
+
+  public defer(runId: string, taskId: string, input: OrchestraDeferralInput): OrchestraRun {
+    return this.store.change(runId, run => {
+      deferOrchestraTask(getTask(run, taskId), input);
+      settle(run);
+      return run;
+    });
+  }
 
   public dispatch(runId: string, availableWorkers?: number): OrchestraDispatch[] {
     return this.store.change(runId, run => reserveDispatches(run, availableWorkers));

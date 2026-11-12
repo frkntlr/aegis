@@ -11,7 +11,7 @@ export function settle(run: OrchestraRun): void {
   for (let pass = 0; pass <= run.tasks.length; pass++) {
     let changed = false;
     for (const task of run.tasks) {
-      if (!['pending', 'waiting'].includes(task.state)) continue;
+      if (!['pending', 'waiting', 'deferred'].includes(task.state)) continue;
       const failed = run.tasks.some(other => ['failed', 'blocked'].includes(other.state) &&
         (task.dependsOn.includes(other.id) || task.children.includes(other.id) || other.phase < task.phase));
       if (failed) { task.state = 'blocked'; task.evidence = 'A prerequisite or child failed'; changed = true; }
@@ -45,12 +45,13 @@ function isAncestor(run: OrchestraRun, ancestor: OrchestraTask, task: OrchestraT
 
 function hasWaitingScopeConflict(run: OrchestraRun, task: OrchestraTask): boolean {
   // Delegation yields a worker slot, but the parent retains its shared file locks.
-  const owners = run.tasks.filter(owner => owner.state === 'waiting' && !isAncestor(run, owner, task));
+  const owners = run.tasks.filter(owner => owner.id !== task.id && ['waiting', 'deferred'].includes(owner.state) && !isAncestor(run, owner, task));
   return hasFileConflict(task, owners);
 }
 
 function isReady(run: OrchestraRun, task: OrchestraTask): boolean {
-  return task.state === 'pending' && task.dependsOn.every(id => getTask(run, id).state === 'done') &&
+  const due = task.state === 'deferred' && Date.parse(task.recovery!.resumeAfter) <= Date.now();
+  return (task.state === 'pending' || due) && task.dependsOn.every(id => getTask(run, id).state === 'done') &&
     run.tasks.every(other => other.phase >= task.phase || other.state === 'done');
 }
 
@@ -71,6 +72,9 @@ function dispatchMessage(run: OrchestraRun, task: OrchestraTask): string {
       : 'Child work is dispatched by root; do not call missing child spawn tools.',
     'The host active-turn/thread limits remain authoritative; orchestra reservations do not create or close agents.',
     ...results.map(result => `Verified child result: ${result}`),
+    ...(task.recovery ? [`Recovery reason: ${task.recovery.reason}`,
+      `Saved checkpoint (unverified progress, not completion evidence): ${task.recovery.checkpoint}`,
+      'Reinspect current source and verify remaining work. Preserve verified done tasks; check for prior external side effects before repeating actions.'] : []),
     'Return verification evidence. Root records completion only after checking the results.'
   ].join('\n');
 }
@@ -86,6 +90,7 @@ export function reserveDispatches(run: OrchestraRun, availableWorkers?: number):
   const dispatches: OrchestraDispatch[] = [];
   for (const task of candidates) {
     if (dispatches.length >= slots) break;
+    if (task.agentId && active.some(other => other.agentId === task.agentId)) continue;
     if (hasFileConflict(task, active) || hasWaitingScopeConflict(run, task)) continue;
     task.state = 'reserved'; task.reservationId = randomUUID(); active.push(task);
     const parent = task.parentId ? getTask(run, task.parentId) : undefined;

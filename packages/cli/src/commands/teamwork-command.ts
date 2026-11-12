@@ -8,6 +8,7 @@ import { showBanner } from './banner.js';
 import { clearInboxTasks } from './task-inbox.js';
 import { saveTeamworkPlan } from './teamwork-plan-store.js';
 import { printCodexHandoff } from './teamwork-codex-handoff.js';
+import { handleCodexOrchestra } from './codex-orchestra-command.js';
 import {
   handleTeamworkMesh, handleTeamworkPeers, handleTeamworkPost, handleTeamworkBroadcast,
   handleTeamworkWaves, handleTeamworkConflicts, handleTeamworkScale, handleTeamworkBatch,
@@ -197,6 +198,9 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
   const norm = first ? first.toLowerCase() : '';
   const jsonFlag = all.find(a => a === '--json' || a === '-j');
 
+  if (norm === 'resume') {
+    handleCodexOrchestra('resume', ...all.slice(1).filter(arg => arg !== '--json' && arg !== '-j')); return;
+  }
   if (!first || norm === 'status' || norm === '--json' || norm === '-j') {
     handleTeamworkStatus(jsonFlag);
   } else if (norm === 'clear' || norm === 'reset') {

@@ -19,6 +19,9 @@ const entries = [
 
 // Validate every input before modifying a user's installation.
 const files = entries.map(([relative, destination]) => [destination, fs.readFileSync(path.join(source, relative))]);
+files.push([path.join(userHome, '.agents/skills/aegis/runtime.json'), Buffer.from(JSON.stringify({
+  engineRoot: engine, command: process.execPath, args: [path.join(engine, 'packages/cli/dist/bin/aegis.js')]
+}, null, 2))]);
 const instructions = path.join(codexHome, 'AGENTS.md');
 const existing = fs.existsSync(instructions) ? fs.readFileSync(instructions, 'utf8') : '';
 files.push([instructions, Buffer.from(mergeInstructions(existing), 'utf8')]);

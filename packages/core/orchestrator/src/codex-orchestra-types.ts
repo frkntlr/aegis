@@ -1,6 +1,23 @@
 import type { CodexInvocationPayload } from './codex-teamwork.js';
 
-export type OrchestraTaskState = 'pending' | 'reserved' | 'running' | 'waiting' | 'done' | 'failed' | 'blocked';
+export type OrchestraTaskState = 'pending' | 'reserved' | 'running' | 'waiting' | 'deferred' | 'done' | 'failed' | 'blocked';
+export interface OrchestraDeferralInput {
+  reason: string;
+  checkpoint: string;
+  resumeAfter: string;
+  agentStopped: true;
+}
+export interface OrchestraRecovery extends OrchestraDeferralInput {
+  deferredAt: string;
+  lastAgentId?: string;
+}
+export interface OrchestraRecoveryStatus {
+  runId: string;
+  state: OrchestraRun['state'];
+  checkedAt: string;
+  deferred: Array<OrchestraRecovery & { taskId: string; due: boolean }>;
+  nextResumeAfter?: string;
+}
 export interface OrchestraOptions {
   maxWorkers: number;
   maxDepth?: number;
@@ -23,6 +40,7 @@ export interface OrchestraTask extends OrchestraTaskInput {
   reservationId?: string;
   children: string[];
   message?: string;
+  recovery?: OrchestraRecovery;
 }
 export interface OrchestraRun {
   id: string;

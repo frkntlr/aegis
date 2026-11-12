@@ -39,6 +39,11 @@ export class CodexInstaller {
       AntigravityInstaller.copySkillFiles(path.join(src, 'skills/aegis'), skill);
       installed.push(path.join(skill, 'SKILL.md'));
     }
+    const runtime = path.resolve(repoRoot, '.aegis/installation.json');
+    fs.mkdirSync(path.dirname(runtime), { recursive: true });
+    fs.writeFileSync(runtime, JSON.stringify({ engineRoot: path.resolve(engineRoot),
+      command: process.execPath, args: [cli], cwd: path.resolve(repoRoot) }, null, 2), 'utf8');
+    installed.push(runtime);
     return installed;
   }
 

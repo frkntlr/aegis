@@ -13,6 +13,10 @@ This skill activates whenever the user triggers the `/aegist` or `/aegis` slash 
 
 ## Universal CLI & Workspace Execution
 
+Keep cwd in the active project, even if it has no `package.json`. Never run `npm run aegis` in an application or workspace container; that npm script belongs only to the Aegis engine checkout. On ENOENT do not create a package file. Use installed `aegis` or the Node command and CLI args recorded in `.aegis/installation.json`, preserving the active project's cwd. If the record is unavailable, locate the installed CLI from MCP configuration instead of inventing a path.
+
+For interrupted teamwork, inspect `aegis codex:orchestrate list` / `recovery <run-id>` and use `aegis tw resume <run-id>` to obtain the saved handoff. Completed tasks must not repeat. Quota reset times come from the host; never invent them. A not-before checkpoint cannot wake a closed agent by itself: use a host-provided scheduler only when available and authorized, otherwise report the saved resume command. Never bypass usage limits or label queued work as running.
+
 `aegis` and `aegist` are installed as universal binaries accessible from **ANY** project directory (e.g. `Hake Game`, `aegis`, worktrees).
 Directly run `aegis <command>` or `aegist <command>` via `run_command` (no `npm run` wrapper needed):
 

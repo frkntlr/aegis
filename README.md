@@ -17,6 +17,8 @@ Windows örneği: `--project="C:\Projeler\oyunum"`. Yalnızca bir istemci için 
 
 [Adım adım kurulum, AI'a kurdurma ve güncelleme](docs/getting-started.md) · [Codex uyumluluk rehberi](docs/codex-compatibility.md)
 
+Oyun/workspace içinde `npm run aegis` yerine `aegis` kullan; kökte `package.json` gerekmez. Kota kesintisinden sonra `aegis tw resume <run-id>` ile kayıtlı işe dön. [Komut hatası ve kota sonrası devam rehberi](docs/quota-recovery.md).
+
 [![CI](https://github.com/frkntlr/aegis/actions/workflows/ci.yml/badge.svg)](https://github.com/frkntlr/aegis/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node: >=20](https://img.shields.io/badge/node->=20.0.0-blue.svg)](https://nodejs.org/)

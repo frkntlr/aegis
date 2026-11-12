@@ -52,6 +52,16 @@ aegis status
 aegis help tw
 ```
 
+Godot veya çok depolu çalışma alanının kökünde `package.json` olması gerekmez.
+Bu dizinde **`npm run aegis` kullanma**; o script yalnızca Aegis motor deposuna
+aittir. `aegis` bulunamazsa `.aegis/installation.json` dosyasındaki Node `command`
+ve CLI `args` yollarını kullan; çalışma dizinini kendi projen olarak koru.
+Kullanıcı becerisinin yanındaki `runtime.json` da aynı motor yolunu gösterir.
+Sırf Aegis çalıştırmak için boş `package.json` oluşturma.
+
+Kota veya oturum kesintisinden sonra devam etmek için
+[kalıcı devam rehberini](quota-recovery.md) kullan.
+
 Codex veya Antigravity sohbetinde:
 
 ```text

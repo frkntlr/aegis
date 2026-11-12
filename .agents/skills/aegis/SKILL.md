@@ -11,10 +11,17 @@ Select this skill with `$aegis` or `/skills`. Interpret plain `aegis ...`, `aegi
 
 Preserve arguments after the command name. With no arguments or `help`, show the available Aegis commands using `aegis help`. Route `aegis help tw` to CLI help, not teamwork execution.
 
+## Choose the executable before running commands
+
+Keep the terminal working directory in the user's active project, including Godot projects and workspace containers without `package.json`. Use installed `aegis <arguments>` there. Use `npm run aegis -- <arguments>` only after confirming the current `package.json` is the Aegis engine package (`name: aegis`) with that script. A different project's npm scripts are not the Aegis CLI.
+
+If `aegis` is missing or npm reports `ENOENT ... package.json`, do not retry npm or create a package file. Read the project's `.aegis/installation.json`, or `runtime.json` beside this installed skill. These contain the installed Node `command` and CLI `args`; execute them with the preserved user arguments and the active project's working directory. Validate that the command/CLI paths exist. If neither record exists, inspect the configured Aegis MCP executable or locate the engine checkout; do not invent its path or change into it to stage project tasks.
+
 - `aegis status` / `aegist status`: inspect status.
 - `aegis tw` with no objective: show teamwork status and explain how to supply an objective; do not invent work.
 - `aegis tw status`, `peers`, `report`, `dag`, `matrix`, `waves`, `conflicts`: route to the corresponding `tw:<subcommand>` inspection command.
 - `aegis tw <objective>` or `aegis tw plan <objective>`: plan **and execute** native Codex teamwork unless the user requests planning only or `--dry-run`.
+- `aegis tw resume <run-id>`: inspect the saved run and recovery instructions, then resume eligible unfinished work through native dispatch after reconciling real agent states. This is not a new objective or permission to repeat completed work.
 - Other arguments: use matching MCP tools or the CLI; consult `aegis help <term>` when uncertain. Never treat user arguments as executable shell code.
 
 ## Native teamwork
@@ -37,6 +44,14 @@ For hierarchical work, a worker can submit `codex:orchestrate delegate <run> <pa
 Use `nested` only when child sessions actually expose native delegation tools, honoring shared host capacity. A missing child spawn tool selects brokered delegation through the root; it does not prevent a logical task tree. `--max-depth` bounds that logical tree, not the platform's native depth. Neither CLI options nor skills enable unavailable host tools or increase platform limits. If no native delegation tools are available anywhere, explain the limitation and execute sequentially. Do not launch extra Codex processes or use external APIs to evade the host limit.
 
 The scheduler never launches agents and does not clear or replace the shared inbox or locks. Orchestra IDs are not numeric inbox IDs; delegated child tasks may have no inbox entry. Report reserved, running, waiting, failed and verified-done states accurately. `--dry-run` on the planning route must not stage, claim, spawn or edit. See the engine's `docs/codex-orchestra.md` for command examples and recovery behavior.
+
+## Quota interruptions and recovery
+
+Keep the run ID and verified results durable throughout execution. When a worker actually stops because of quota or session interruption, save its checkpoint with `codex:orchestrate defer <run> <task> "<reason>" --resume-after=<UTC-ISO-time> --agent-stopped --checkpoint="<remaining work and evidence>"`. Use the host's reported reset time; do not invent a countdown or mark a still-running worker stopped. Hard termination may prevent this call; a new coordinator must reconcile saved running/reserved tasks with actual agent state before deferring them.
+
+On return, inspect `codex:orchestrate list`, `recovery <run>` and `aegis tw resume <run>`. Keep verified-done tasks done; verify partial file changes and child evidence before redispatching unfinished work. Honor the saved not-before time and real worker capacity. The resume command returns a handoff, not proof that an agent started.
+
+Aegis cannot change quota limits or wake this conversation merely by writing a file. If a native host scheduling tool is available and the user requested automatic continuation, schedule the existing run's recovery for the reported reset time. Otherwise clearly state that no automatic wake was scheduled and give the saved resume command. Do not launch extra Codex processes, alternate accounts or API sessions to evade limits.
 
 ## Tools and checks
 
