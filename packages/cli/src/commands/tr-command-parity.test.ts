@@ -4,7 +4,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import { test, beforeEach, afterEach } from 'node:test';
+import { test, beforeEach, afterEach, mock } from 'node:test';
 import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -12,6 +12,7 @@ import * as os from 'node:os';
 import { COMMAND_MAP } from '../bin/command-registry.js';
 
 let testTmpDir: string;
+let previousWorkspace: string | undefined;
 
 const PARITY_SUBCOMMANDS = [
   'status', 'plan', 'setup', 'matrix', 'dag', 'analyze',
@@ -21,12 +22,19 @@ const PARITY_SUBCOMMANDS = [
 ] as const;
 
 beforeEach(() => {
+  // Handler output is not asserted here. Large Unicode logs can corrupt older
+  // node:test IPC framing under concurrent load (nodejs/node#64061).
+  mock.method(console, 'log', () => {});
+  mock.method(console, 'error', () => {});
+  previousWorkspace = process.env.AEGIS_WORKSPACE;
   testTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-tr-test-'));
   process.env.AEGIS_WORKSPACE = testTmpDir;
 });
 
 afterEach(() => {
-  delete process.env.AEGIS_WORKSPACE;
+  mock.restoreAll();
+  if (previousWorkspace === undefined) delete process.env.AEGIS_WORKSPACE;
+  else process.env.AEGIS_WORKSPACE = previousWorkspace;
   try {
     fs.rmSync(testTmpDir, { recursive: true, force: true });
   } catch {
