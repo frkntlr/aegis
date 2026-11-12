@@ -13,9 +13,16 @@ import {
   computeExecutionWaves,
   formatCompactWaveBriefing,
   formatParallelDispatchBriefing,
-  getConcurrentExecutionBatches
+  getConcurrentExecutionBatches,
+  type TeamworkTrack
 } from '@aegis/orchestrator';
 import { clearInboxTasks } from './task-inbox.js';
+import { loadTeamworkPlan } from './teamwork-plan-store.js';
+
+function codexTrack(track: TeamworkTrack) {
+  const { prompt: _prompt, invocationPayload: _antigravity, ...native } = track;
+  return native;
+}
 
 function resolveAgentName(override?: string): string {
   if (override && override.trim().length > 0) return override.trim();
@@ -70,6 +77,10 @@ export function mcpTeamworkWaves(args: Record<string, unknown> = {}): string {
   const plan = new TeamworkCoordinator().planTeamwork(objective, targetFiles, { stage: false, acquireLocks: false });
   const waves = computeExecutionWaves(plan.tracks);
   if (args.compact) return formatCompactWaveBriefing(waves);
+  if (args.client === 'codex') {
+    return JSON.stringify({ waves: waves.map(wave => ({ ...wave, tracks: wave.tracks.map(codexTrack) })),
+      briefing: 'Use codexInvocationPayload.message with the native spawn tool; inherit the model and respect host capacity, dependencies and locks.' }, null, 2);
+  }
   return JSON.stringify({ waves, briefing: formatParallelDispatchBriefing(waves) }, null, 2);
 }
 
@@ -119,10 +130,15 @@ export function mcpTeamworkMatrix(args: Record<string, unknown> = {}): string {
 }
 
 export function mcpTeamworkBatch(args: Record<string, unknown> = {}): string {
-  const objective = String(args.objective || args.planId || 'Active Mission');
-  const coordinator = new TeamworkCoordinator();
-  const plan = coordinator.planTeamwork(objective, [], { stage: false, acquireLocks: false });
-  return JSON.stringify(getConcurrentExecutionBatches(plan.tracks), null, 2);
+  try {
+    const plan = typeof args.planId === 'string' && args.planId
+      ? loadTeamworkPlan(args.planId)
+      : new TeamworkCoordinator().planTeamwork(String(args.objective || 'Active Mission'), [], { stage: false, acquireLocks: false });
+    const batches = getConcurrentExecutionBatches(plan.tracks);
+    return JSON.stringify(args.client === 'codex' ? batches.map(batch => batch.map(codexTrack)) : batches, null, 2);
+  } catch (error) {
+    return JSON.stringify({ error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 export async function mcpTeamworkTest(args: Record<string, unknown> = {}): Promise<string> {

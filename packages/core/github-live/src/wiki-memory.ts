@@ -26,8 +26,10 @@ export class WikiMemoryManager {
       content,
       lastUpdated: new Date().toISOString()
     };
+    if (!this.adapter.publishPage(slug, title, threeBullets, content)) {
+      throw new Error(`Wiki page could not be persisted: ${slug}`);
+    }
     this.pages.set(slug, page);
-    this.adapter.publishPage(slug, title, threeBullets, content);
   }
 
   public getContextForLabels(labels: string[]): string {

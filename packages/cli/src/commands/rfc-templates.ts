@@ -1,3 +1,4 @@
+import { sourceWikiArtifact } from './rfc-source-evidence.js';
 /**
  * @file rfc-templates.ts
  * Templates and synthesizers for Research-Driven Discussions & Clean-Room Wiki Documentation.
@@ -102,10 +103,10 @@ function buildWikiWorkflowAndSpecs(): string[] {
     '## 4. 🔒 Demir Kafes Standartları ve Kalite Garantileri',
     '- **Dosya Sınırı:** Azami 300 satır/dosya.',
     '- **Fonksiyon Sınırı:** Azami 40 satır/fonksiyon.',
-    '- **Test Kapsamı:** %100 Monorepo test geçişi ve %70+ Mutation Testing Gate skoru.',
+    '- **Test evidence:** Record executed checks and outcomes; no result is implied by this template.',
     '',
     '## 5. 📊 Üretim Doğrulama ve Performans Metrikleri',
-    '- **Durum:** Onaylandı & Üretimde Aktif (Implemented / Authoritative).',
+    '- **Status:** Template only; implementation requires source and execution evidence.',
     '- **Canlı Bellek Entegrasyonu:** GitHub Wiki ve yaşayan depo hafızasına tam senkronize.'
   ];
 }
@@ -131,7 +132,7 @@ export function generateCleanWikiArchitecture(
     threeBullets: [
       'Temize çekilmiş kanonik sistem mimarisi.',
       'Demir Kafes kuralları ve test kapılarıyla doğrulanmış üretim spesifikasyonu.',
-      'Sıfır-yanılma (zero-hallucination) garantili resmi teknik referans.'
+      'Proposed reference; verify against current source before implementation.'
     ],
     cleanContent
   };
@@ -140,14 +141,5 @@ export function generateCleanWikiArchitecture(
 export function cleanseExistingRfcForWiki(slug: string, rawContent: string): CleanWikiArtifact {
   const titleMatch = rawContent.match(/^#\s+(.+)$/m);
   const title = titleMatch ? titleMatch[1].replace(/^[^\w]+/, '').trim() : slug;
-  const numMatch = slug.match(/^RFC-(\d+)/i);
-  const num = numMatch ? parseInt(numMatch[1], 10) : 1;
-
-  const descMatch = rawContent.match(/##\s+🔍?\s*1\.\s*Fikir ve Problem Tanımı\s*\n+([^#]+)/i);
-  const desc = descMatch ? descMatch[1].trim() : title;
-
-  const fileMatches = rawContent.match(/packages\/[a-zA-Z0-9_\-\/.]+\.ts/g);
-  const files = fileMatches ? Array.from(new Set(fileMatches)) : [];
-
-  return generateCleanWikiArchitecture(num, title.replace(/^RFC-\d+:\s*/i, ''), desc, files);
+  return sourceWikiArtifact(title, slug, rawContent);
 }

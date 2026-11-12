@@ -21,7 +21,7 @@ test('EngineUpdater discovers monorepo packages accurately', () => {
   }
 });
 
-test('EngineUpdater cleans workspace caches and locks', () => {
+test('EngineUpdater cleans build caches while preserving task state and locks', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-clean-test-'));
   try {
     const turboDir = path.join(tmpDir, '.turbo');
@@ -34,7 +34,8 @@ test('EngineUpdater cleans workspace caches and locks', () => {
     const res = EngineUpdater.cleanWorkspace(tmpDir);
     assert.ok(res.cachesRemoved.length >= 1);
     assert.strictEqual(fs.existsSync(turboDir), false);
-    assert.strictEqual(fs.existsSync(path.join(aegisDir, 'task-inbox.json')), false);
+    assert.strictEqual(fs.existsSync(path.join(aegisDir, 'task-inbox.json')), true);
+    assert.strictEqual(res.locksCleared, 0);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

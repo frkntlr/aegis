@@ -35,6 +35,7 @@ export {
 export type { BootstrapResult, BootstrapOptions };
 
 export interface TeamworkCoordinatorOptions {
+  bootstrap?: boolean;
   repoRoot?: string; worktreeManager?: WorktreeManager; roleClassifier?: RoleClassifier;
   groundingEngine?: TeamworkGroundingEngine; semanticAnalyzer?: FastSemanticAnalyzer;
   compactEngine?: TeamworkCompactEngine; mesh?: TeamworkMesh;
@@ -58,7 +59,7 @@ export class TeamworkCoordinator {
   private _mesh?: TeamworkMesh;
   private _deliberationEngine?: TeamworkDeliberationEngine;
   private _reflectionEngine?: TeamworkReflectionEngine;
-  private cachedProfiles?: SubagentProfile[];
+  private cachedProfiles?: SubagentProfile[]; private bootstrapped = false;
 
   constructor(
     repoRootOrOptions?: string | TeamworkCoordinatorOptions,
@@ -83,13 +84,20 @@ export class TeamworkCoordinator {
       this._semanticAnalyzer = semanticAnalyzer;
       this._compactEngine = compactEngine;
     }
-    try { ProjectBootstrapEngine.bootstrap(this.repoRoot); } catch { /* safe */ }
+    if (typeof repoRootOrOptions !== 'object' || repoRootOrOptions?.bootstrap !== false) {
+      this.ensureBootstrap();
+    }
   }
 
   public bootstrap(options?: BootstrapOptions): BootstrapResult {
-    return ProjectBootstrapEngine.bootstrap(this.repoRoot, options);
+    const result = ProjectBootstrapEngine.bootstrap(this.repoRoot, options);
+    this.bootstrapped = true;
+    return result;
   }
-
+  private ensureBootstrap(): void {
+    if (this.bootstrapped) return;
+    try { this.bootstrap(); } catch { /* retry on the next staging attempt */ }
+  }
   public get repoRootPath(): string { return this.repoRoot; }
   public get worktreeManager(): WorktreeManager {
     return this._worktreeManager ??= new WorktreeManager({ repoRoot: this.repoRoot, persistLocks: true });
@@ -191,9 +199,9 @@ export class TeamworkCoordinator {
   }
 
   public planTeamwork(objective: string, targetFiles: string[] = [], options?: PlanTeamworkOptions): TeamworkPlan {
-    try { ProjectBootstrapEngine.bootstrap(this.repoRoot); } catch { /* safe */ }
     const isDet = options?.deterministic === true;
     const shouldStage = options?.stage ?? true;
+    if (shouldStage) this.ensureBootstrap();
     const files = targetFiles.length > 0 ? targetFiles : this.semanticAnalyzer.analyze(objective).targetFiles;
     const delibResult = options?.deliberate ? this.deliberate(objective, files) : undefined;
     if (options?.deepAnalyze || TeamworkAnalysisSwarm.isDeepAnalysisRequested(objective)) {
@@ -206,6 +214,9 @@ export class TeamworkCoordinator {
     const resTracks = (options?.research || TeamworkResearchSwarm.isResearchRequested(objective))
       ? TeamworkResearchSwarm.buildResearchTracks(objective, planId) : [];
     const allTracks = [...resTracks, ...tracks];
+    for (const track of allTracks) {
+      if (track.codexInvocationPayload) track.codexInvocationPayload.message = `Mission: ${objective}\n${track.codexInvocationPayload.message}`;
+    }
 
     if (shouldStage) {
       this.stageTracksIntoInbox(planId, objective, allTracks, options?.acquireLocks ?? shouldStage);

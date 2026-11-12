@@ -10,6 +10,7 @@ import { WikiMemoryManager } from '@aegis/github-live';
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { cleanseExistingRfcForWiki } from './rfc-templates.js';
+import { rfcStatus } from './rfc-source-evidence.js';
 
 export interface DocSyncReport {
   wikiPagesSynced: number;
@@ -55,14 +56,13 @@ function buildDynamicRfcIndex(rfcs: RfcFileInfo[]): string {
 
   for (const rfc of rfcs) {
     let title = rfc.slug;
-    let status = 'Accepted';
+    let status = 'Unspecified';
     try {
       const content = fs.readFileSync(rfc.filePath, 'utf8');
       const tm = content.match(/^#\s+(.+)$/m);
       if (tm) title = tm[1].replace(/^[^\w]+/, '').trim();
-      if (content.includes('Durum: In Progress') || content.includes('Status: In Progress')) status = 'In Progress 🚀';
-      else if (content.includes('Durum: Proposed') || content.includes('Status: Proposed')) status = 'Proposed 💡';
-      else status = 'Approved ✅';
+      status = rfcStatus(content);
+      status = rfcStatus(content);
     } catch { /* use default */ }
     const pad = String(rfc.num).padStart(3, '0');
     lines.push(`| **RFC-${pad}** | **${title}** | \`${status}\` | [[${rfc.slug}]] |`);
@@ -70,9 +70,10 @@ function buildDynamicRfcIndex(rfcs: RfcFileInfo[]): string {
   return lines.join('\n');
 }
 
-function updateWikiSuite(rfcs: RfcFileInfo[]): { count: number; pushed: boolean } {
+function updateWikiSuite(rfcs: RfcFileInfo[]): { count: number; pushed: boolean; failures: string[] } {
   const wiki = new WikiMemoryManager();
   let count = 0;
+  const failures: string[] = [];
 
   for (const rfc of rfcs) {
     try {
@@ -80,7 +81,7 @@ function updateWikiSuite(rfcs: RfcFileInfo[]): { count: number; pushed: boolean 
       const cleanDoc = cleanseExistingRfcForWiki(rfc.slug, content);
       wiki.setPage(rfc.slug, cleanDoc.title, cleanDoc.threeBullets, cleanDoc.cleanContent);
       count++;
-    } catch { /* continue */ }
+    } catch (error) { failures.push(`${rfc.fileName}: ${error instanceof Error ? error.message : String(error)}`); }
   }
 
   const indexMd = buildDynamicRfcIndex(rfcs);
@@ -89,31 +90,30 @@ function updateWikiSuite(rfcs: RfcFileInfo[]): { count: number; pushed: boolean 
     'RFC-Index',
     `Aegis Mimari Karar Kayıtları & RFC Dizini (RFC-001 - RFC-${maxPad})`,
     [
-      `Aegis Çekirdek Motorunun ${count} Onaylı ve Aktif Mimari Tasarım Belgesi.`,
-      'Yaşayan GitHub Wiki ve Kod Tabanı Hafızasına Tam Senkronize Spesifikasyonlar.',
-      'Demir Kafes Standartları ve Kabul Kriterleriyle Doğrulanmış Üretim Spesifikasyonları.'
+      `${count} RFC source snapshots cached locally.`,
+      'Remote publication is reported separately from local caching.',
+      'Approval and verification outcomes are not inferred from synchronization.'
     ],
     indexMd
   );
 
-  const pushRes = wiki.pushAllToRemote();
-  return { count, pushed: pushRes.success };
+  const pushRes = failures.length ? { success: false } : wiki.pushAllToRemote();
+  return { count, pushed: pushRes.success, failures };
 }
 
 function updateReadmeFile(root: string, rfcCount: number, maxRfcNum = 43): boolean {
   const readmePath = path.resolve(root, 'README.md');
   if (!fs.existsSync(readmePath)) return false;
 
-  let content = fs.readFileSync(readmePath, 'utf8');
+  const original = fs.readFileSync(readmePath, 'utf8');
+  let content = original;
   const countStr = String(rfcCount);
   const padStr = String(maxRfcNum).padStart(3, '0');
 
-  content = content.replace(/MCP-\d+\s+Native\s+Tools/gi, 'MCP-43 Native Tools');
-  content = content.replace(/MCP Sunucusu\s*\(\d+\s*Araç\)/gi, 'MCP Sunucusu (43 Araç)');
   content = content.replace(/RFC\s*\(\d+\s*Adet\)/gi, `RFC (${countStr} Adet)`);
   content = content.replace(/RFC-001\s*-\s*RFC-\d+/gi, `RFC-001 - RFC-${padStr}`);
-  content = content.replace(/Living\s+Wiki-\d+\s+Pages/gi, `Living Wiki-57+ Pages`);
 
+  if (content === original) return false;
   fs.writeFileSync(readmePath, content, 'utf8');
   return true;
 }
@@ -127,7 +127,7 @@ export async function syncRfcToWikiAndReadme(
 ): Promise<DocSyncReport> {
   const root = resolveSafeRepoRoot();
   const rfcs = resolveRfcFiles(root);
-  const totalRfcs = Math.max(rfcs.length, num);
+  const totalRfcs = rfcs.some(rfc => rfc.slug === fileName.replace(/\.md$/, '')) ? rfcs.length : rfcs.length + 1;
 
   const slug = fileName.replace(/\.md$/, '');
   const cleanDoc = cleanseExistingRfcForWiki(slug, content);
@@ -135,14 +135,14 @@ export async function syncRfcToWikiAndReadme(
   wiki.setPage(slug, cleanDoc.title, cleanDoc.threeBullets, cleanDoc.cleanContent);
 
   const indexMd = buildDynamicRfcIndex(rfcs);
-  const padStr = String(totalRfcs).padStart(3, '0');
+  const padStr = String(Math.max(num, ...rfcs.map(rfc => rfc.num))).padStart(3, '0');
   wiki.setPage(
     'RFC-Index',
     `Aegis Mimari Karar Kayıtları & RFC Dizini (RFC-001 - RFC-${padStr})`,
     [
       `Aegis Çekirdek Motorunun ${totalRfcs} Mimari Tasarım Belgesi (RFC-001 - RFC-${padStr}).`,
-      'Yaşayan GitHub Wiki ve Kod Tabanı Hafızasına Tam Senkronize Spesifikasyonlar.',
-      'Demir Kafes Standartları ve Kabul Kriterleriyle Doğrulanmış Üretim Spesifikasyonları.'
+      'Remote publication is reported separately from local caching.',
+      'Approval and verification outcomes are not inferred from synchronization.'
     ],
     indexMd
   );
@@ -152,7 +152,7 @@ export async function syncRfcToWikiAndReadme(
   const readmeUpdated = updateReadmeFile(root, totalRfcs, maxNum);
 
   return {
-    wikiPagesSynced: rfcs.length,
+    wikiPagesSynced: 1,
     wikiPushed: pushRes.success,
     readmeUpdated,
     totalRfcs
@@ -164,11 +164,13 @@ export async function handleDocSync(): Promise<void> {
   console.log('📚 Synchronizing Living Memory: GitHub Wiki, RFCs & README.md...');
   const root = resolveSafeRepoRoot();
   const rfcs = resolveRfcFiles(root);
-  const { count, pushed } = updateWikiSuite(rfcs);
+  const { count, pushed, failures } = updateWikiSuite(rfcs);
+  for (const failure of failures) console.error(`Wiki cache failed: ${failure}`);
+  if (failures.length) process.exitCode = 1;
   const maxNum = rfcs.length > 0 ? Math.max(...rfcs.map(r => r.num)) : 43;
   const readmeUpdated = updateReadmeFile(root, rfcs.length, maxNum);
 
   console.log(`✅ GitHub Wiki: ${count} RFC pages & RFC-Index synchronized into .aegis/wiki-cache.`);
   console.log(pushed ? '🚀 Pushed directly to GitHub Wiki remote (<repo>.wiki.git)!' : 'ℹ️  Wiki cache updated locally (run `aegis wiki:sync` to push remote).');
-  console.log(readmeUpdated ? `✅ README.md: Synchronized with ${rfcs.length} RFCs & 43 Native MCP tools.` : '⚠️  README.md not found.');
+  console.log(readmeUpdated ? `README RFC metadata updated (${rfcs.length} source files).` : 'README unchanged or absent.');
 }

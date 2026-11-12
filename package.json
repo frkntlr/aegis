@@ -11,14 +11,15 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "test": "node --test scripts/install-codex-commands.test.cjs scripts/verify-codex-mcp.test.cjs && turbo run test",
+    "test": "node --test scripts/install-codex-commands.test.cjs scripts/verify-codex-mcp.test.cjs scripts/setup-aegis.test.cjs && turbo run test",
     "lint": "biome lint packages/",
     "typecheck": "tsc --build",
     "aegis": "node packages/cli/dist/bin/aegis.js",
     "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .githooks', {stdio: 'ignore'}) } catch {}\"",
     "aegist": "node packages/cli/dist/bin/aegis.js",
     "tw": "node packages/cli/dist/bin/aegis.js",
-    "tr": "node packages/cli/dist/bin/aegis.js"
+    "tr": "node packages/cli/dist/bin/aegis.js",
+    "setup": "node scripts/setup-aegis.cjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",

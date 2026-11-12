@@ -1,7 +1,7 @@
 /**
  * @file teamwork-grounding.ts
- * Zero-Hallucination Grounding Engine for Antigravity Teamwork.
- * Injects immutable AST skeletons, line budgets, and upstream contracts into prompts.
+ * Bounded source grounding for teamwork prompts.
+ * Injects partial AST snapshots, line budgets, and upstream context into prompts.
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
@@ -18,12 +18,13 @@ export interface FileGroundingReport {
   budgetStatus: 'healthy' | 'warning' | 'critical';
   skeleton: string;
   tokenSavingsPercent: number;
+  unavailable?: boolean;
 }
 
 export class TeamworkGroundingEngine {
   private repoRoot: string;
   private skeletonGen: SkeletonGenerator;
-  private fileCache = new Map<string, { mtimeMs: number; size: number; report: FileGroundingReport }>();
+  private fileCache = new Map<string, { stamp: string; report: FileGroundingReport }>();
 
   constructor(repoRoot?: string, skeletonGen?: SkeletonGenerator) {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
@@ -37,19 +38,13 @@ export class TeamworkGroundingEngine {
 
   public inspectFile(relPath: string): FileGroundingReport {
     const fullPath = this.resolvePath(relPath);
-    if (!fs.existsSync(fullPath)) {
-      return {
-        filePath: relPath, exists: false, lineCount: 0,
-        headroom: 300, budgetStatus: 'healthy', skeleton: '', tokenSavingsPercent: 0
-      };
-    }
-
     try {
       const stat = fs.statSync(fullPath);
-      const cached = this.fileCache.get(relPath);
-      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
-        return cached.report;
-      }
+      if (!stat.isFile()) return this.unavailableReport(relPath, true);
+      const stamp = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}:${stat.ino}`;
+      const key = this.cacheKey(fullPath);
+      const cached = this.fileCache.get(key);
+      if (cached?.stamp === stamp) return { ...cached.report, filePath: relPath };
       const content = fs.readFileSync(fullPath, 'utf8');
       const lines = content.split('\n').length;
       const headroom = Math.max(0, 300 - lines);
@@ -60,17 +55,34 @@ export class TeamworkGroundingEngine {
         budgetStatus, skeleton: this.trimSkeleton(extRes.skeletonContent),
         tokenSavingsPercent: extRes.tokenSavingsPercent
       };
-      this.fileCache.set(relPath, { mtimeMs: stat.mtimeMs, size: stat.size, report });
-      return report;
-    } catch {
-      return { filePath: relPath, exists: false, lineCount: 0, headroom: 300, budgetStatus: 'healthy', skeleton: '', tokenSavingsPercent: 0 };
+      this.fileCache.set(key, { stamp, report });
+      return { ...report };
+    } catch (error) {
+      this.fileCache.delete(this.cacheKey(fullPath));
+      const missing = error instanceof Error && 'code' in error && ['ENOENT', 'ENOTDIR'].includes(String(error.code));
+      return this.unavailableReport(relPath, !missing);
     }
   }
 
-  private trimSkeleton(skel: string, maxLines = 35): string {
-    const lines = skel.trim().split('\n');
-    if (lines.length <= maxLines) return skel.trim();
-    return lines.slice(0, maxLines).join('\n') + '\n// ... (additional members truncated for prompt economy)';
+  private unavailableReport(filePath: string, unavailable: boolean): FileGroundingReport {
+    return { filePath, exists: unavailable, unavailable, lineCount: 0, headroom: 300,
+      budgetStatus: 'healthy', skeleton: '', tokenSavingsPercent: 0 };
+  }
+
+  private cacheKey(filePath: string): string {
+    const key = this.resolvePath(filePath);
+    return process.platform === 'win32' ? key.toLowerCase() : key;
+  }
+
+  private uniqueFiles(files: string[]): string[] {
+    return [...new Map(files.map(file => [this.cacheKey(file), file])).values()];
+  }
+
+  private trimSkeleton(skel: string, maxLines = 35, maxChars = 1800): string {
+    const full = skel.trim();
+    const excerpt = full.split('\n').slice(0, maxLines).join('\n').slice(0, maxChars);
+    if (full === excerpt) return full;
+    return excerpt + '\n// Excerpt truncated; inspect source before assuming members are absent.';
   }
 
   private resolveStatusIcon(status: FileGroundingReport['budgetStatus']): string {
@@ -100,8 +112,8 @@ export class TeamworkGroundingEngine {
       if (relevant.length === 0) return '';
       const lines = ['### 🧠 Swarm Working Memory & Pre-Flight Analysis Insights'];
       for (const item of relevant.slice(0, 4)) {
-        lines.push(`- **[${item.lens.toUpperCase()}]** (${item.severity}): ${item.finding}`);
-        if (item.actionableStep) lines.push(`  *Action*: ${item.actionableStep}`);
+        lines.push(`- **[${item.lens.slice(0, 80).toUpperCase()}]** (${item.severity.slice(0, 40)}): ${item.finding.slice(0, 800)}`);
+        if (item.actionableStep) lines.push(`  *Action*: ${item.actionableStep.slice(0, 400)}`);
       }
       return lines.join('\n');
     } catch {
@@ -109,12 +121,18 @@ export class TeamworkGroundingEngine {
     }
   }
 
-  public buildGroundingSection(targetFiles: string[]): string {
+  public buildGroundingSection(targetFiles: string[]): string {
+
     if (!targetFiles || targetFiles.length === 0) return '';
-    const reports = targetFiles.map(f => this.inspectFile(f));
-    const lines: string[] = ['### 🛡️ Ground-Truth Codebase Reality (Zero-Hallucination)'];
+    const unique = this.uniqueFiles(targetFiles);
+    const reports = unique.slice(0, 8).map(f => this.inspectFile(f));
+    const lines: string[] = ['### 🛡️ Ground-Truth Codebase Reality (Source Snapshot)'];
 
     for (const r of reports) {
+      if (r.unavailable) {
+        lines.push(`- \`${r.filePath}\`: Grounding unavailable (not a readable source file or extraction failed). Inspect directly; do not assume it is missing.`);
+        continue;
+      }
       if (!r.exists) {
         lines.push(`- \`${r.filePath}\`: (New File to Create - Max 300 lines, 0 any)`);
         continue;
@@ -126,7 +144,9 @@ export class TeamworkGroundingEngine {
         lines.push(`\`\`\`${lang}\n${r.skeleton}\n\`\`\``);
       }
     }
-    const meshGrounding = this.buildAnalysisMeshGrounding(targetFiles);
+    lines.push('AST excerpts are partial observations, not verified complete interfaces. This snapshot may predate upstream edits; reread current target and upstream signatures before editing. Omitted members are not evidence of absence.');
+    if (unique.length > reports.length) lines.push(`${unique.length - reports.length} additional file(s) omitted from grounding budget; inspect them directly before edits.`);
+    const meshGrounding = this.buildAnalysisMeshGrounding(unique.slice(0, 8));
     if (meshGrounding) lines.push('\n' + meshGrounding);
     return lines.join('\n');
   }
@@ -135,11 +155,18 @@ export class TeamworkGroundingEngine {
     upstreamItems: Array<{ subagentName: string; files: string[] }>
   ): string {
     if (!upstreamItems || upstreamItems.length === 0) return '';
-    const lines: string[] = ['### 🔗 Upstream Dependency Contracts (Verified Interfaces)'];
+    const lines: string[] = ['### 🔗 Upstream Dependency Contracts (Source Snapshots)'];
     let count = 0;
+    const seen = new Set<string>();
+    let omitted = 0;
+    lines.push('Source-derived AST excerpts only; completeness and runtime compatibility are not verified. Recheck current source.');
 
     for (const item of upstreamItems) {
       for (const f of item.files) {
+        const key = this.cacheKey(f);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (seen.size > 8) { omitted++; continue; }
         const rep = this.inspectFile(f);
         if (rep.exists && rep.skeleton.trim().length > 0) {
           count++;
@@ -149,6 +176,7 @@ export class TeamworkGroundingEngine {
         }
       }
     }
+    if (omitted) lines.push(`${omitted} additional upstream file(s) omitted from grounding budget; inspect directly before relying on their contracts.`);
     return count > 0 ? lines.join('\n') : '';
   }
 }

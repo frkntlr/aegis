@@ -20,7 +20,7 @@ export function formatWikiMarkdown(
     '## Detailed Context',
     content || '_Direct GitHub Wiki Living Memory._',
     '',
-    `_Published to GitHub Wiki on: ${dateStr}_`
+    `_Cached locally on: ${dateStr}_`
   ].join('\n');
 }
 
@@ -37,7 +37,7 @@ export function parseWikiMarkdown(slug: string, raw: string): WikiPage {
     threeBulletSummary: [
       bullets[0] || 'Living architecture documentation updated.',
       bullets[1] || 'Living architecture documentation updated.',
-      bullets[2] || 'Demir Kafes compliance verified.'
+      bullets[2] || 'Quality-gate evidence not supplied.'
     ],
     content: raw,
     lastUpdated: new Date().toISOString()

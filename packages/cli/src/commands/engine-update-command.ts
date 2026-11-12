@@ -85,9 +85,9 @@ function printVersionGrade(report: EngineVersionReport): void {
 
 function printDriftStatus(report: EngineVersionReport): void {
   if (report.driftStatus === 'synced') {
-    console.log(' • Drift Status:  ✅ 100% SYNCED with origin/master');
+    console.log(' • Drift Status:  ✅ Synced with the observed origin branch');
   } else if (report.driftStatus === 'ahead') {
-    console.log(` • Drift Status:  🚀 AHEAD of origin/master by ${report.aheadCount} commit(s)`);
+    console.log(` • Drift Status:  🚀 AHEAD of the observed origin branch by ${report.aheadCount} commit(s)`);
   } else if (report.driftStatus === 'behind') {
     console.log(` • Drift Status:  ⚠️  BEHIND origin/master by ${report.behindCount} commit(s) -> run 'aegis update --pull'`);
   } else if (report.driftStatus === 'diverged') {
@@ -108,8 +108,8 @@ export function handleEngineUpdate(...args: string[]): EngineUpdateResult | null
   if (!flags.json) {
     showBanner();
     console.log('🔄 Aegis Dynamic Engine Update & Full Reinstallation Initiated...');
-    if (flags.clean) console.log('🧹 Clean Mode Active: Wiping build caches and stale locks.');
-    if (flags.pull) console.log('🐙 Remote Pull: Checking for latest commits on origin/master.');
+    if (flags.clean) console.log('🧹 Clean Mode Active: Clearing build caches; task inbox, mesh and locks are preserved.');
+    if (flags.pull) console.log('🐙 Remote Pull: Fast-forwarding the installed engine from its configured upstream.');
     if (flags.bump) console.log(`🏷️  Version Bump Active: Upgrading semver (${flags.bump}) across monorepo.`);
   }
 
@@ -121,12 +121,14 @@ export function handleEngineUpdate(...args: string[]): EngineUpdateResult | null
   };
 
   const result = EngineUpdater.runUpdate(opts);
+  if (!result.success) process.exitCode = 1;
 
   if (flags.json) {
     console.log(JSON.stringify(result, null, 2));
     return result;
   }
 
+  if (result.engineRoot) console.log(`Engine checkout: ${result.engineRoot}`);
   printUpdateSummary(result);
   return result;
 }
@@ -140,11 +142,11 @@ function printUpdateSummary(result: EngineUpdateResult): void {
   console.log('\n🎉 Aegis Update Complete!');
   console.log(` • Version:           v${result.previousVersion} -> v${result.newVersion} (${result.commitHash})`);
   console.log(` • Clean Reinstall:   ${result.cleaned ? '✅ Yes' : '⚡ Incremental'}`);
-  console.log(` • Monorepo Build:    ${result.built ? '✅ 100% Succeeded' : '❌ Failed'}`);
+  console.log(` • Monorepo Build:    ${result.built ? '✅ Passed' : '❌ Failed'}`);
   console.log(` • Global Shims:      ✅ ${result.reinstalledShims} shims reinstalled`);
-  console.log(` • Plugin & Schemas:  ${result.syncedPlugins ? '✅ Synchronized (41 tools)' : '❌ Not synced'}`);
+  console.log(` • Plugin & Schemas:  ${result.syncedPlugins ? '✅ Refreshed listed integrations' : '❌ Not synced'}`);
   console.log(` • IDEs Synchronized: [${result.syncedIdes.join(', ')}]`);
-  console.log(` • Worktree Branches: ${result.syncedWorktrees} worktrees synced with master`);
+  console.log(` • Worktree Branches: Preserved; no automatic branch merges`);
   console.log(` • Elapsed Duration:  ${(result.durationMs / 1000).toFixed(2)}s`);
-  console.log('\n✨ Everyone on this PC is now guaranteed running the latest Aegis build!');
+  console.log('\n✨ Reload active IDE and MCP sessions to use the refreshed integrations.');
 }

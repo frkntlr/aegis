@@ -19,11 +19,24 @@ Preserve arguments after the command name. With no arguments or `help`, show the
 
 ## Native teamwork
 
-Plan with `teamwork plan "<objective>" [files...] --json`. Planning stages tasks; it does not start agents. Read each track's `codexInvocationPayload`, then dispatch ready independent tracks with the native Codex spawn tool using its actual schema. Inherit the model and bound concurrency to available slots. Keep Antigravity payloads for Antigravity only.
+For nontrivial requested teamwork, plan with `teamwork plan "<objective>" [files...] --client=codex --json` and save the returned JSON using the terminal's UTF-8-safe file writer. Planning stages tasks; it does not start agents. Create the execution record with `codex:orchestrate create <plan.json> --workers=N --mode=brokered`. Set N from the host's actual available worker capacity, excluding the root coordinator; never infer capacity from the number of planned tasks. Inherit the active model. Keep Antigravity payloads for Antigravity only.
 
 Claim the actual numeric inbox task ID, respect file locks, and preserve unrelated pending work. A configured MCP server may have a different working directory from the active project: use the CLI in the active project for project-local tasks unless its MCP root is confirmed. Do not clear the queue to start a new request.
 
-Wait for child results, verify their evidence, and release claimed tasks only after verification. Run dependent waves after their prerequisites complete. Report failed or blocked tracks explicitly; never present staged tasks as running or complete. If spawning is unavailable, explain the limitation and execute sequentially. `--dry-run` must not stage, claim, spawn or edit.
+Use this execution loop until `codex:orchestrate status <run>` shows completion or explicit failure:
+
+1. Call `codex:orchestrate next <run> --available=N` with currently available worker capacity. Returned items are reserved, not running. Check actual host capacity and shared file locks before native dispatch.
+2. Dispatch every independent item returned by `next` before waiting for any result. Use each `codexInvocationPayload.message` with the host's real spawn schema. Separate spawn calls still run concurrently when no result wait is inserted between them. For `resume`, prefer the native follow-up tool on the recorded agent; otherwise start a replacement with the supplied child evidence. Reuse idle workers when the client's open-thread limit prevents another spawn.
+3. After native dispatch succeeds, call `codex:orchestrate start <run> <task> <native-agent-id>`. If dispatch fails, use `cancel-dispatch <run> <task> <reason>`; do not acknowledge a nonexistent agent.
+4. Process results as they arrive; do not wait for an entire batch when a finished task frees capacity. Independently verify the result before `complete <run> <task> <evidence>`, or record `fail <run> <task> <reason>`. Release any claimed inbox task only after verification. Call `next` again to fill free slots and continue dependent waves. Share contract changes and findings through native messages or `tw:post`, so peers can adjust while still running.
+
+Before reporting completion, review the combined changes and run checks for their integration. Show actual native agent identities, overlapping running intervals and verification results in the execution report. A plan with multiple tracks is not evidence of simultaneous execution. Do not end the request after planning or after the first worker returns while ready or running work remains.
+
+For hierarchical work, a worker can submit `codex:orchestrate delegate <run> <parent-task> <children.json>` while running, then return the delegation request and end its current turn. Each child is `{ "id": "unique-id", "title": "bounded objective", "targetFiles": [], "dependsOn": [] }`; assigned files must stay within the parent's scope, and an empty scope is read-only. Children may repeat this protocol to form deeper logical levels. The root waits for the parent's native turn to end, then dispatches child requests using the same loop. A waiting parent is resumed after its children succeed and must review their evidence before completing. Never mark a parent done just because it requested children.
+
+Use `nested` only when child sessions actually expose native delegation tools, honoring shared host capacity. A missing child spawn tool selects brokered delegation through the root; it does not prevent a logical task tree. `--max-depth` bounds that logical tree, not the platform's native depth. Neither CLI options nor skills enable unavailable host tools or increase platform limits. If no native delegation tools are available anywhere, explain the limitation and execute sequentially. Do not launch extra Codex processes or use external APIs to evade the host limit.
+
+The scheduler never launches agents and does not clear or replace the shared inbox or locks. Orchestra IDs are not numeric inbox IDs; delegated child tasks may have no inbox entry. Report reserved, running, waiting, failed and verified-done states accurately. `--dry-run` on the planning route must not stage, claim, spawn or edit. See the engine's `docs/codex-orchestra.md` for command examples and recovery behavior.
 
 ## Tools and checks
 

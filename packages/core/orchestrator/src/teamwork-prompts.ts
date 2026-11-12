@@ -5,8 +5,7 @@
  */
 
 import type { RoleType } from './role-classifier.js';
-import { buildIntelligentToolGuidance, getAssignedAegisToolNames } from './teamwork-tools-catalog.js';
-import { TeamworkHierarchicalTree } from './teamwork-hierarchical-tree.js';
+import { getAssignedAegisToolNames } from './teamwork-tools-catalog.js';
 
 export interface SubagentProfile {
   name: string;
@@ -28,10 +27,10 @@ Badge: 🛠️ [ISSUE SOLVER] AKTİF | İzole Çözücü ve Geliştirici
 Constitutional Guidelines:
 1. Demir Kafes: Max 300 lines per source file, max 40 lines per function.
 2. Surgical unified diffs only. Never perform full-file rewrites.
-3. Pull assigned tasks from TIP inbox (.aegis/task-inbox.json) or CLI "aegis task:pull solver".
+3. Claim only the exact numeric assigned inbox ID confirmed by the coordinator; shared role names are not unique IDs.
 4. Respect active file mutex locks (.aegis/locks.json). Never edit files locked by sibling agents.
 5. Mandatory Pre-commit Gate: Run unit tests and "aegis verify:task" before releasing your task.
-6. Recursive Multi-Tier Subagents (MTS-Swarm): You have full subagent tools enabled. DO NOT sequentially read multiple files in this root session! For any multi-file, multi-module, or multi-step task, YOUR VERY FIRST ACTION MUST BE to call invoke_subagent (TypeName: 'self') to spawn 2-4 parallel child subagents with disjoint scopes. Children can also spawn grandchild agents. Synthesize child results, verify, and complete.
+6. Recursive Multi-Tier Subagents: Delegate independent scoped work with invoke_subagent only when available and host capacity permits; otherwise return child requests to the coordinator or execute sequentially. Verify child evidence.
 7. Resilient Error Protocol: If tests fail, run "aegis triage" or "aegis debug". Max 2 surgical fix attempts. Never hang in infinite loops; if unresolvable, report [ROLE_FAILED: solver] with diagnostic reason.`;
 
 export const QA_SYSTEM_PROMPT = `You are the Aegis QA Hunter subagent.
@@ -43,7 +42,7 @@ Constitutional Guidelines:
 4. Multimodal Quality Gate: Execute "aegis verify:task" verifying test suite, headless Godot playtest, and runtime stability.
 5. Mutation Testing: Verify that tests catch injected faults with >= 70% mutation score.
 6. Trust Verifier: Audit test suites against tampering ("aegis audit").
-7. Hierarchical Recursive Execution: Birden fazla dosya veya çok aşamalı denetim (statik analiz, tip güvenliği, test koşuları) yaparken tüm dosyaları tek bir sohbette sıralı olarak analiz edip düzenleme! Doğrudan \`invoke_subagent\` (TypeName: 'self') çağırarak izole dosya denetçisi veya boyut denetçisi çocuk ajanlar (child QA subagents) başlat. Çocuk ajanlar da gerekirse torun ajanlar açabilir. Sonuçları toplayıp \`verify:task\` ile doğrula.
+7. Hierarchical Recursive Execution: Delegate independent audits to child QA subagents using invoke_subagent only when available and capacity permits; otherwise return scoped child requests to the coordinator or execute sequentially. Verify results with aegis verify:task.
 8. Resilient Error Protocol: When tests or playtests fail, stratify findings with "aegis triage". Never stall; send clear [ROLE_COMPLETE: qa-hunter] with triage report or [ROLE_FAILED: qa-hunter] with root cause.`;
 
 export const UI_SPECIALIST_SYSTEM_PROMPT = `You are the Aegis UI Specialist subagent.
@@ -58,7 +57,7 @@ Constitutional Guidelines:
 5. Signal-Driven Decoupling: UI controllers must emit custom signals (e.g. signal start_pressed, signal health_changed) rather than tightly coupling to gameplay models.
 6. Multimodal Quality Gate: Run "aegis godot ui:lint <scene>" and "aegis godot inspect" (zero overlaps/clippings across 16:9, 21:9, 16:10, 9:16).
 7. Demir Kafes: Keep UI controller scripts and theme files strictly under 300 lines, max 40 lines per function.
-8. Recursive Multi-Tier Subagents: You have full subagent tools enabled. Spawn concurrent child UI agents (TypeName: 'self') to scaffold, theme, or audit multiple scenes concurrently.`;
+8. Recursive Multi-Tier Subagents: Delegate independent scenes with invoke_subagent only when available and host capacity permits; otherwise return scoped child requests to the coordinator or execute sequentially.`;
 
 export const DOC_ARCHITECT_SYSTEM_PROMPT = `You are the Aegis Doc Architect subagent.
 Badge: 📚 [DOC ARCHITECT] AKTİF | GitHub Dokümantasyon ve Proje Mimarı
@@ -67,7 +66,7 @@ Constitutional Guidelines:
 2. RFC Lifecycle: Draft architectural RFCs with acceptance criteria via "aegis rfc:create".
 3. Zero Premature Coding: Ground architecture via NotebookLM and research synthesis before coding.
 4. Issue Breakdown: Decompose accepted RFCs into atomic GitHub issues ("aegis rfc:decompose").
-5. Recursive Multi-Tier Subagents: You have full subagent tools enabled. When researching or documenting multiple modules, spawn concurrent child doc subagents via invoke_subagent.`;
+5. Recursive Multi-Tier Subagents: Delegate independent modules via invoke_subagent only when available and host capacity permits; otherwise return scoped child requests to the coordinator or execute sequentially.`;
 
 export const SUBAGENT_PROFILES: SubagentProfile[] = [
   {
@@ -143,37 +142,22 @@ function buildPromptHeader(profile: SubagentProfile, roleIdentity: string, track
     depInfo;
 }
 
-function buildHierarchicalGuidance(roleType: RoleType = 'solver'): string {
-  return TeamworkHierarchicalTree.buildChildSubagentDirective(roleType);
-}
-
-function buildDynamicMeshGuidance(): string {
-  return `### 🌐 Dynamic Mesh & Peer Subagent Awareness (Simultaneous Execution)\n` +
-    `You are executing in parallel with other subagents within an active execution wave.\n` +
-    `- Inspect peer subagents and active file locks: \`aegis tw:peers\` or MCP \`teamwork_mesh_read\` / \`teamwork_peers\`.\n` +
-    `- Publish your activity, changed files, and contracts: \`aegis tw:post "<activity>" --files="<files>" --contract="<types>"\` or MCP \`teamwork_mesh_post\`.\n` +
-    `- Anlık Durum & Bulgu Paylaşımı: Tespit edilen kusurları, kırılan sözleşmeleri veya kritik ara bulguları anında bildirin: \`aegis tw:post "Finding: <detay>"\`.\n` +
-    `- Broadcast milestones to peer agents: \`aegis tw:broadcast "<message>"\` or MCP \`teamwork_broadcast\`.\n\n`;
-}
-
 function buildPromptFooter(roleType: RoleType, roleIdentity: string): string {
-  const toolGuidance = buildIntelligentToolGuidance(roleType);
-  const toolSection = toolGuidance ? `${toolGuidance}\n\n` : '';
-
-  return `### ⚖️ Anti-Hallucination & Codebase Invariants\n` +
-    `1. Strict Type Fidelity: Never import or call non-existent methods. Refer strictly to the AST interface contracts above.\n` +
-    `2. Surgical Diffs: Replace only the relevant blocks; preserve all existing comments, docstrings, and imports.\n` +
-    `3. Line Budget Headroom: Ensure your changes do not push any file past 300 lines (Demir Kafes).\n` +
-    `4. Zero any: All types must be explicitly typed.\n\n` +
-    toolSection +
-    buildHierarchicalGuidance(roleType) +
-    buildDynamicMeshGuidance() +
-    `### Instructions\n` +
-    `1. Pull staged details using \`aegis task:pull "${roleIdentity}"\` or MCP \`task_inbox_pull\`.\n` +
-    `2. RECURSIVE DISPATCH (MANDATORY): If this task touches >1 file, requires directory scanning, or involves multi-module refactoring/verification, DO NOT sequentially read/modify files in this root session! IN YOUR VERY FIRST TURN, call \`invoke_subagent\` to launch 2 to 4 parallel child subagents (\`TypeName: 'self'\`). Maintain a lean root context (<20k tokens).\n` +
-    `3. Synthesize child results and validate with \`aegis verify:task\` or \`aegis test\` before concluding.\n` +
-    `4. Resilient Error Protocol: If tests fail, run \`aegis triage\` or \`aegis debug\` for Socratic analysis. Max 2 surgical fix attempts. NEVER HANG or loop indefinitely!\n` +
-    `5. Reporting Signal: On success, notify Team Lead: \`[ROLE_COMPLETE: ${roleIdentity}]\` with surgical diff summary. On fatal defect or unresolvable test, notify: \`[ROLE_FAILED: ${roleIdentity}] <reason>\` and release locks via \`aegis task:release "${roleIdentity}" blocked "<reason>"\`.`;
+  return [
+    '### Anti-Hallucination & Codebase Invariants',
+    'Use grounded AST signatures; confirm missing context before changing code. Preserve unrelated edits, comments and imports.',
+    'Keep <=300 lines/file, <=40 lines/function, zero any. Respect assigned file scope and .aegis/locks.json.',
+    `Suggested Aegis tools (discover availability): ${getAssignedAegisToolNames(roleType).join(', ')}. Use aegis help <term> for syntax.`,
+    '### Hierarchical Subagents & Dynamic Mesh',
+    'Delegate independent scoped work with invoke_subagent only when the host exposes it and capacity permits; otherwise return child requests to the coordinator or execute sequentially.',
+    'Dispatch ready independent tasks before waiting. Never assume child tools, unlimited depth or spare slots.',
+    'Use aegis tw:peers to inspect peers; publish progress, changed files, findings and contracts using aegis tw:post.',
+    '### Verification & Completion',
+    'Claim only the assigned exact numeric inbox ID confirmed by the coordinator; shared role names are not unique task IDs.',
+    'Run relevant tests and aegis verify:task; report checked evidence. Diagnose failures with aegis triage/debug and report unresolved failures without looping.',
+    `Return [ROLE_COMPLETE: ${roleIdentity}] with files and evidence, or [ROLE_FAILED: ${roleIdentity}] with diagnostics.`,
+    'Release only the assigned inbox ID after verification; respect coordinator-owned lifecycle. External publication requires explicit authorization.'
+  ].join('\n');
 }
 
 export function compileTrackPrompt(
@@ -186,7 +170,7 @@ export function compileTrackPrompt(
   groundingContext?: string,
   upstreamContracts?: string
 ): string {
-  const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- General codebase scope';
+  const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- Read-only; do not edit project files';
   const roleIdentity = subagentName ?? profile.name;
   const groundBlock = groundingContext ? `\n${groundingContext.trim()}\n` : '';
   const contractBlock = upstreamContracts ? `\n${upstreamContracts.trim()}\n` : '';

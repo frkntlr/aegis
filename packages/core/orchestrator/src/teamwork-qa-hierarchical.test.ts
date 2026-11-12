@@ -43,11 +43,12 @@ test('compileTrackPrompt includes Hierarchical Subagents and Dynamic Mesh guidan
   const qaProfile = profiles.find(p => p.roleType === 'qa')!;
   const prompt = compileTrackPrompt(qaProfile, 'Audit test suite', ['src/test.ts'], 'qa-hunter [Audit]');
 
-  assert.ok(prompt.includes('### 🌲 Hiyerarşik Alt Ajan (Child Subagents) ve Bağlam Yönetimi'));
-  assert.ok(prompt.includes('Model unavailable'));
-  assert.ok(prompt.includes('### 🌐 Dynamic Mesh & Peer Subagent Awareness'));
-  assert.ok(prompt.includes('Finding: <detay>'));
-  assert.ok(prompt.includes('RECURSIVE DISPATCH (MANDATORY)'));
+  assert.ok(prompt.includes('### Hierarchical Subagents & Dynamic Mesh'));
+  assert.ok(prompt.includes('invoke_subagent only when the host exposes it and capacity permits'));
+  assert.ok(prompt.includes('aegis tw:post'));
+  assert.ok(prompt.includes('exact numeric inbox ID'));
+  assert.ok(!prompt.includes('RECURSIVE DISPATCH (MANDATORY)'));
+  assert.ok(!prompt.includes('You have full subagent tools enabled'));
 });
 
 test('TeamworkTrackBuilder enriches QA track with surgical upstream contracts and delta scope', () => {

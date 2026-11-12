@@ -76,6 +76,11 @@ changing global prompts. Neither installer changes the Codex application UI.
 
 ## Teamwork
 
+For persistent, capacity-aware execution and child requests relayed through the
+root coordinator, see [Codex orchestra](codex-orchestra.md). A logical task tree
+works even when a child session has no native spawn tool; the root dispatches
+its children and resumes their parent after verified results.
+
 Planning returns the original `invocationPayload` for Antigravity and an additive
 `codexInvocationPayload` for Codex. Use the latter's `message` with the host's
 spawn schema; `task_name` and `fork_turns` describe the current desktop host and
@@ -90,6 +95,38 @@ The Antigravity prompt intentionally keeps its existing model and recursive
 dispatch instructions. The Codex message uses native tools, inherits the model
 and makes recursion conditional on available capacity. Do not send the
 Antigravity payload or its Prompt to the Codex spawn tool.
+
+## Remaining compatibility checks
+
+Codex track messages preserve the complete user objective in a `Mission:` line,
+even when decomposition gives a track a narrower objective. Orchestra identifiers
+accept Unicode letters, numbers and combining marks, including Turkish track
+names, while rejecting path separators and traversal. Native messages require
+the exact numeric inbox ID from the coordinator, explicit writable file scope,
+and project-local state. Empty file scope is read-only; expanding it requires
+the coordinator's assignment.
+
+CLI and MCP planning save full plans under
+`.aegis/teamwork-plans/<planId>.json` in the active project. CLI `--dry-run`
+does not save or stage a plan. MCP `teamwork_batch` with `planId` loads that
+exact saved plan; missing or invalid IDs return an error instead of generating
+unrelated work. Without `planId`, its `objective` argument previews new batches.
+For `teamwork_waves` and `teamwork_batch`, set `client: "codex"` to receive
+tracks with `codexInvocationPayload` and without Antigravity prompts/payloads.
+The default retains Antigravity output. `tw_*` and `tr_*` aliases behave alike.
+
+NotebookLM authentication failure in a noninteractive host requires an explicit
+choice: reauthenticate, continue local-only, or cancel. Failed reauthentication
+and invalid choices report errors; local-only fallback is an explicit choice.
+The NotebookLM command reports a failing exit status when authentication fails.
+Godot UI inspection also fails when runtime telemetry has no usable nodes,
+so an empty capture cannot count as successful UI verification.
+
+Regression checks cover these contracts with disposable state and mocked
+authentication/runtime inputs. Final monorepo validation evidence is recorded
+separately after the release checks finish. Live NotebookLM authentication and
+Godot runtime/playtest behavior require their external services and have not
+been established by those isolated tests.
 
 ## Limits and validation
 

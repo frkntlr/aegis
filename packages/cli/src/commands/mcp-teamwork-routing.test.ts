@@ -154,7 +154,7 @@ test('executeMcpTool routes teamwork_matrix and aliases', async () => {
 
 test('executeMcpTool routes teamwork_batch and aliases', async () => {
   for (const tool of ['teamwork_batch', 'tw_batch', 'tr_batch']) {
-    const raw = await executeMcpTool(tool, { planId: 'tw-test' });
+    const raw = await executeMcpTool(tool, { objective: 'Test batch preview' });
     const parsed = JSON.parse(raw) as unknown[];
     assert.ok(Array.isArray(parsed));
   }

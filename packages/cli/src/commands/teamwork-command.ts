@@ -6,6 +6,8 @@
 
 import { showBanner } from './banner.js';
 import { clearInboxTasks } from './task-inbox.js';
+import { saveTeamworkPlan } from './teamwork-plan-store.js';
+import { printCodexHandoff } from './teamwork-codex-handoff.js';
 import {
   handleTeamworkMesh, handleTeamworkPeers, handleTeamworkPost, handleTeamworkBroadcast,
   handleTeamworkWaves, handleTeamworkConflicts, handleTeamworkScale, handleTeamworkBatch,
@@ -65,6 +67,7 @@ function printTrackPayload(track: TeamworkTrack): void {
 
 interface PlanFlags {
   compact: boolean; json: boolean; dryRun: boolean;
+  codex?: boolean;
   maxConcurrency?: number; explicitRole?: string;
   treeSpecialists?: boolean; research?: boolean; deepAnalyze?: boolean;
   semantic?: boolean; deliberate?: boolean; reflect?: boolean; iterate?: boolean;
@@ -77,6 +80,7 @@ function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
     if (a === '--compact' || a === '-c') flags.compact = true;
     else if (a === '--json' || a === '-j') flags.json = true;
     else if (a === '--dry-run') flags.dryRun = true;
+    else if (a === '--client=codex') flags.codex = true;
     else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
     else if (a === '--research') flags.research = true;
     else if (a === '--deep' || a === '--deep-analyze') flags.deepAnalyze = true;
@@ -127,7 +131,7 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
   const { files, flags } = parsePlanArgs(filesOrFlags);
   if (!flags.json && !flags.compact) showBanner();
 
-  const coordinator = new TeamworkCoordinator();
+  const coordinator = new TeamworkCoordinator({ bootstrap: !flags.dryRun });
   const plan = coordinator.planTeamwork(objectiveArg.trim(), files, {
     stage: !flags.dryRun, acquireLocks: !flags.dryRun,
     maxConcurrency: flags.maxConcurrency, explicitRole: flags.explicitRole,
@@ -135,6 +139,8 @@ export function handleTeamworkPlan(objectiveArg?: string, ...filesOrFlags: strin
     deliberate: flags.deliberate, semantic: flags.semantic
   });
 
+  if (!flags.dryRun) saveTeamworkPlan(plan);
+  if (flags.codex) { printCodexHandoff(plan, flags.json, flags.dryRun); return plan; }
   if (flags.json) { console.log(JSON.stringify(plan, null, 2)); return plan; }
   if (flags.compact) { console.log(coordinator.compactTeamwork(plan)); return plan; }
 
@@ -249,6 +255,7 @@ export function mcpTeamworkPlan(args: Record<string, unknown> = {}): string {
   const plan = coordinator.planTeamwork(objective, targetFiles, {
     maxConcurrency, explicitRole, treeSpecialists, deliberate, semantic
   });
+  saveTeamworkPlan(plan);
   return JSON.stringify(plan, null, 2);
 }
 

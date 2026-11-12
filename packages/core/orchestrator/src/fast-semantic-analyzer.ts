@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { cleanGitEnv, resolveSafeRepoRoot } from '@aegis/shared';
+import { readSemanticManifest, saveSemanticManifest } from './semantic-file-manifest.js';
 
 export interface SemanticAnalysisResult {
   objective: string;
@@ -52,6 +53,7 @@ const TURKISH_SYNONYMS: Record<string, string[]> = {
 export class FastSemanticAnalyzer {
   private repoRoot: string;
   private cachedFiles: { files: string[]; timestamp: number } | null = null;
+  private lastLookupFromCache = false;
   private keywordCache = new Map<string, string[]>();
   private metaCache = new Map<string, CandidateMeta>();
   private testIntentCache = new Map<string, boolean>();
@@ -92,14 +94,18 @@ export class FastSemanticAnalyzer {
 
   public listCandidateFiles(): string[] {
     const now = Date.now();
-    if (this.cachedFiles && (now - this.cachedFiles.timestamp) < FastSemanticAnalyzer.FILE_CACHE_TTL_MS) {
+    this.lastLookupFromCache = false;
+    if (this.cachedFiles && now >= this.cachedFiles.timestamp && (now - this.cachedFiles.timestamp) < FastSemanticAnalyzer.FILE_CACHE_TTL_MS) {
+      this.lastLookupFromCache = true;
       return this.cachedFiles.files;
     }
 
-    const diskFiles = this.readDiskManifest();
+    const index = this.resolveGitIndexPath();
+    const diskFiles = readSemanticManifest(this.repoRoot, index, FastSemanticAnalyzer.FILE_CACHE_TTL_MS, now);
     if (diskFiles) {
-      this.cachedFiles = { files: diskFiles, timestamp: now };
-      return diskFiles;
+      this.lastLookupFromCache = true;
+      this.cachedFiles = diskFiles;
+      return diskFiles.files;
     }
 
     let files: string[] = [];
@@ -118,13 +124,9 @@ export class FastSemanticAnalyzer {
       files = this.walkDirectoryFallback(this.repoRoot, '');
     }
 
-    this.saveDiskManifest(files);
+    saveSemanticManifest(this.repoRoot, index, { files, timestamp: now });
     this.cachedFiles = { files, timestamp: now };
     return files;
-  }
-
-  private getManifestPath(): string {
-    return path.resolve(this.repoRoot, '.aegis', 'cache', 'fast-semantic-manifest.json');
   }
 
   private resolveGitIndexPath(): string | null {
@@ -147,29 +149,6 @@ export class FastSemanticAnalyzer {
       }
     } catch { /* ignore */ }
     return null;
-  }
-
-  private readDiskManifest(): string[] | null {
-    const gitIndexPath = this.resolveGitIndexPath();
-    const manifestPath = this.getManifestPath();
-    if (!gitIndexPath || !fs.existsSync(manifestPath)) return null;
-    try {
-      const gitMtime = fs.statSync(gitIndexPath).mtimeMs;
-      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { gitIndexMtime?: number; files?: string[] };
-      if (data.gitIndexMtime === gitMtime && Array.isArray(data.files)) return data.files;
-    } catch { /* ignore corrupted disk cache */ }
-    return null;
-  }
-
-  private saveDiskManifest(files: string[]): void {
-    const gitIndexPath = this.resolveGitIndexPath();
-    if (!gitIndexPath) return;
-    try {
-      const gitMtime = fs.statSync(gitIndexPath).mtimeMs;
-      const manifestPath = this.getManifestPath();
-      fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-      fs.writeFileSync(manifestPath, JSON.stringify({ gitIndexMtime: gitMtime, files }), 'utf8');
-    } catch { /* ignore */ }
   }
 
   private walkDirectoryFallback(baseDir: string, currentRel: string): string[] {
@@ -261,10 +240,10 @@ export class FastSemanticAnalyzer {
 
   public analyze(objective: string, explicitFiles: string[] = [], maxResults = 5): SemanticAnalysisResult {
     const start = Date.now();
-    const fromCache = this.cachedFiles !== null;
     const keywords = this.extractKeywords(objective);
     const hasIntent = this.hasTestIntent(objective, keywords);
     const candidates = this.listCandidateFiles();
+    const fromCache = this.lastLookupFromCache;
 
     const scored: Array<{ file: string; score: number }> = [];
     for (const file of candidates) {
@@ -277,7 +256,9 @@ export class FastSemanticAnalyzer {
 
     for (const item of scored) {
       if (selected.size >= maxResults) break;
-      selected.add(item.file);
+      try {
+        if (fs.statSync(path.resolve(this.repoRoot, item.file)).isFile()) selected.add(item.file);
+      } catch { /* Deleted discovery candidates must not become new-file assignments. */ }
     }
 
     const targetFiles = Array.from(selected);

@@ -6,6 +6,8 @@
 
 ## 📑 Dokümantasyon İndeksi & Hızlı Erişim Matrisi
 
+Codex için [kurulum ve uyumluluk](codex-compatibility.md), [native ekip çalışması ve kapasite sınırları](codex-orchestra.md) ve [doğrulama kanıtları](codex-orchestra-validation.md) rehberlerine bakın.
+
 Aegis mimarisi tek bir monolitik dosya yerine bağımsız, derinlemesine odaklanmış 8 temel bölüme ayrılmıştır:
 
 | Bölüm | Başlık | Odak Kapsamı | İlgili Dosya |

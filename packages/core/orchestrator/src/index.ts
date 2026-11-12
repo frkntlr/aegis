@@ -31,6 +31,7 @@ export * from './antigravity-installer.js';
 export * from './codex-installer.js';
 export * from './codex-config.js';
 export * from './codex-teamwork.js';
+export * from './codex-orchestra.js';
 export * from './version-manager.js';
 export * from './engine-updater.js';
 export * from './teamwork-analysis-types.js';

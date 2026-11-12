@@ -1,13 +1,7 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { WorktreeManager, TeamworkMesh } from '@aegis/orchestrator';
-import { IronCageValidator } from '@aegis/iron-cage';
-import { GodotLocator } from '@aegis/godot-bridge';
-import { GitHubTokenResolver, GitHubClient } from '@aegis/github-live';
-import { resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { compilePrompt } from './prompt-command.js';
-import { getChangedSourceFiles, verifyFile } from './dev-helpers.js';
+export { handleTaskVerify } from './task-verification.js';
 import {
   stageTaskInInbox,
   pullNextPendingTask,
@@ -71,15 +65,10 @@ export function handleTaskClaim(issueArg?: string, roleArg?: string): void {
   console.log(`🎯 Task #${issueNum} claimed by [${role.toUpperCase()}]! Status: IN_PROGRESS.`);
 }
 
-export async function closeGitHubIssueIfConfigured(issueNum: number, agent?: string): Promise<void> {
-  try {
-    const auth = GitHubTokenResolver.resolve();
-    if (auth.hasCredentials && auth.token && auth.owner && auth.repo) {
-      const client = new GitHubClient({ autoConnectLive: true });
-      await client.completeIssue(issueNum, agent);
-      console.log(`🌐 GitHub Issue #${issueNum} marked DONE and closed on ${auth.owner}/${auth.repo}.`);
-    }
-  } catch { /* soft-fail */ }
+/** Local completion is not remote quality proof; closure uses the explicit evidence workflow. */
+export async function closeGitHubIssueIfConfigured(issueNum: number, _agent?: string): Promise<void> {
+  console.log(`Local task complete; GitHub issue #${issueNum} remains open until explicit proof-based closure.`);
+  console.log('Use aegis tw:gh:close <full-commit-hash> "<summary>" <remote-issue-number> <proof.json>.');
 }
 
 function parseReleaseArgs(args: string[]): { issueArg: string; status: 'pending' | 'in_progress' | 'done' | 'blocked'; reasonArg?: string } {
@@ -199,64 +188,6 @@ export function handleLockStatus(): void {
   console.log(`🔒 Active File Locks (${Object.keys(lockedFiles).length}):`);
   for (const [file, agent] of Object.entries(lockedFiles)) {
     console.log(` • ${file} -> Locked by @${agent}`);
-  }
-}
-
-function resolveTargetFile(f: string): string {
-  if (fs.existsSync(f)) return f;
-  const root = resolveSafeRepoRoot();
-  const fromRoot = path.resolve(root, f);
-  if (fs.existsSync(fromRoot)) return fromRoot;
-  const fromCwd = path.resolve(process.cwd(), f);
-  if (fs.existsSync(fromCwd)) return fromCwd;
-  if (f.startsWith('packages/cli/') && fs.existsSync(f.replace('packages/cli/', ''))) {
-    return f.replace('packages/cli/', '');
-  }
-  return f;
-}
-
-function verifyGodotProject(): void {
-  const isGodot = fs.existsSync(path.resolve(process.cwd(), 'project.godot'));
-  if (!isGodot) return;
-  console.log('🎮 Godot Project Detected: Enforcing Playtest-Before-PR & GDScript integrity...');
-  const inst = GodotLocator.findGodot();
-  if (inst) {
-    console.log(` • Engine: Godot ${inst.versionString} (${inst.binaryPath})`);
-  } else {
-    console.log(' ⚠️ Godot binary not auto-detected; ensure Godot 4.7 is in PATH for Playtest-Before-PR.');
-  }
-  console.log(' • UI Layout Verification: Multi-aspect ratios checked.');
-}
-
-export function handleTaskVerify(targetArg?: string): void {
-  showBanner();
-  console.log('🛡️  Running Multimodal Task Quality Gate (Demir Kafes + Godot Playtest)...');
-  const validator = new IronCageValidator();
-  const rawChanged = targetArg ? [targetArg] : getChangedSourceFiles();
-  let files: string[] = [];
-  if (rawChanged.length > 0) {
-    files = rawChanged.map(resolveTargetFile);
-  } else {
-    const candidate = fs.existsSync('packages/cli/src/bin/aegis.ts') ? 'packages/cli/src/bin/aegis.ts' : 'src/bin/aegis.ts';
-    if (fs.existsSync(candidate)) files = [candidate];
-  }
-
-  let allValid = true;
-  if (files.length === 0) {
-    console.log(' ℹ️  No modified files detected. Working tree is clean.');
-  } else {
-    for (const f of files) {
-      if (!verifyFile(f, validator)) allValid = false;
-    }
-  }
-
-  verifyGodotProject();
-
-  if (!allValid) {
-    console.error('❌ Task Verification FAILED: Iron Cage violations detected.');
-    if (process.env.NODE_ENV !== 'test') process.exit(1);
-  } else {
-    console.log('✅ Task Verification PASSED: 100% compliant with Iron Cage & Playtest requirements.');
   }
 }
 

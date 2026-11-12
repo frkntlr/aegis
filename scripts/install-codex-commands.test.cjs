@@ -17,10 +17,16 @@ test('user install upgrades stale skills, keeps custom rules and is idempotent',
     fs.writeFileSync(agents, 'Keep my rules\n');
     execFileSync(process.execPath, [installer, root], { windowsHide: true });
     assert.match(fs.readFileSync(skill, 'utf8'), /aegis tw/);
+    assert.equal(fs.readFileSync(skill, 'utf8'), fs.readFileSync(
+      path.join(__dirname, '../templates/codex/skills/aegis/SKILL.md'), 'utf8'));
+    assert.match(fs.readFileSync(skill, 'utf8'), /--client=codex --json/);
+    assert.match(fs.readFileSync(skill, 'utf8'), /Dispatch every independent item.*before waiting/);
+    assert.match(fs.readFileSync(skill, 'utf8'), /codex:orchestrate create/);
     const first = fs.readFileSync(agents, 'utf8');
     assert.match(first, /^Keep my rules\n/);
     assert.match(first, /aegis tw <objective>/);
     assert.match(first, /active project/);
+    assert.match(first, /Dispatch all ready independent workers before waiting/);
     const backups = fs.readdirSync(path.dirname(skill)).filter(f => f.includes('.backup-'));
     assert.equal(backups.length, 1);
     assert.equal(fs.readFileSync(path.join(path.dirname(skill), backups[0]), 'utf8'), 'Old skill');

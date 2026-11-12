@@ -34,7 +34,7 @@ test('TeamworkGroundingEngine inspects existing file and extracts skeleton and l
   }
 });
 
-test('TeamworkGroundingEngine builds markdown grounding section with zero hallucination info', () => {
+test('TeamworkGroundingEngine builds markdown grounding section with source snapshots', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-ground-sec-'));
   try {
     const fileA = path.join(tmpDir, 'auth.ts');
@@ -43,7 +43,7 @@ test('TeamworkGroundingEngine builds markdown grounding section with zero halluc
     const engine = new TeamworkGroundingEngine(tmpDir);
     const section = engine.buildGroundingSection(['auth.ts', 'missing.ts']);
 
-    assert.ok(section.includes('Ground-Truth Codebase Reality (Zero-Hallucination)'));
+    assert.ok(section.includes('Ground-Truth Codebase Reality (Source Snapshot)'));
     assert.ok(section.includes('auth.ts'));
     assert.ok(section.includes('UserSession'));
     assert.ok(section.includes('New File to Create'));
@@ -63,7 +63,7 @@ test('TeamworkGroundingEngine builds upstream contracts section for dependent tr
       { subagentName: 'issue-solver [Parser]', files: ['parser.ts'] }
     ]);
 
-    assert.ok(section.includes('Upstream Dependency Contracts (Verified Interfaces)'));
+    assert.ok(section.includes('Upstream Dependency Contracts (Source Snapshots)'));
     assert.ok(section.includes('issue-solver [Parser]'));
     assert.ok(section.includes('parseSource'));
   } finally {

@@ -91,6 +91,13 @@ export function handleCageCheck(rawArgs?: string | string[]): void {
     : (fs.existsSync(path.resolve(resolveSafeRepoRoot(), 'packages')) ? path.resolve(resolveSafeRepoRoot(), 'packages') : resolveSafeRepoRoot());
   if (!opts.jsonOutput) console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(resolveSafeRepoRoot(), base) || '.'}...`);
   const files = collectSourceFiles(base);
+  if (!fs.existsSync(base) || files.length === 0) {
+    const error = fs.existsSync(base) ? 'No source files found for Iron Cage audit' : 'Iron Cage audit target does not exist';
+    if (opts.jsonOutput) console.log(JSON.stringify({ filesScanned: 0, compliantCount: 0, violations: [], clean: false, error }));
+    else console.error(`Iron Cage audit failed: ${error}: ${base}`);
+    process.exitCode = 1;
+    return;
+  }
   const { passedCount, violations, radarAlerts, cachedCount } = scanCageFiles(files, opts.noCache);
 
   if (opts.jsonOutput) {

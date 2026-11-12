@@ -59,6 +59,17 @@ function writeInboxFile(inboxPath: string, data: unknown[]): void {
   }
 }
 
+function nextInboxNumber(items: unknown[], preferred: number): number {
+  return items.reduce<number>((next, item) => {
+    if (!item || typeof item !== 'object') return next;
+    const record = item as Record<string, unknown>;
+    for (const value of [record.id, record.issueNumber]) {
+      if (typeof value === 'number' && Number.isSafeInteger(value) && value >= next) next = value + 1;
+    }
+    return next;
+  }, Math.max(1, preferred));
+}
+
 export function stageTracksIntoInboxHelper(
   repoRoot: string,
   planId: string,
@@ -73,9 +84,10 @@ export function stageTracksIntoInboxHelper(
   const unlock = WorktreeMutex.acquire(inboxPath);
   try {
     const inboxArray = readExistingInboxArray(inboxPath);
-    const numBase = planId.startsWith('tw-det-')
+    const preferred = planId.startsWith('tw-det-')
       ? parseInt(crypto.createHash('md5').update(planId).digest('hex').slice(0, 6), 16) % 100000
       : parseInt(planId.replace(/\D/g, '') || `${Date.now() % 100000}`, 10);
+    const numBase = nextInboxNumber(inboxArray, preferred);
 
     if (shouldLock) {
       const lockBatch = tracks

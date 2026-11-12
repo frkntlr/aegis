@@ -57,12 +57,12 @@ export class GitHubWikiLiveAdapter {
       };
     } catch {
       this.cachedAvailability = {
-        available: true,
+        available: false,
         url: this.getWikiWebUrl(),
         remoteRepo: `${this.owner}/${this.repo}.wiki.git`,
         pageCount: 0,
         initializeUrl: `${this.getWikiWebUrl()}/_new`,
-        message: 'GitHub Wiki repository ready for first automated push.'
+        message: 'GitHub Wiki availability could not be confirmed. Check access, network and wiki initialization.'
       };
     }
     this.cachedAvailabilityTime = Date.now();
@@ -155,13 +155,19 @@ export class GitHubWikiLiveAdapter {
     fs.mkdirSync(this.cloneDir, { recursive: true });
     const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
     if (!filePath.startsWith(path.resolve(this.cloneDir))) return false;
-    fs.writeFileSync(filePath, formatWikiMarkdown(title, bullets, content), 'utf8');
+    const formatted = formatWikiMarkdown(title, bullets, content);
+    const withoutStamp = (text: string): string => text.replace(/_(?:Published to GitHub Wiki|Cached locally) on: [^\n]+_\s*$/, '');
+    const unchanged = fs.existsSync(filePath) && withoutStamp(fs.readFileSync(filePath, 'utf8')) === withoutStamp(formatted);
+    if (unchanged && !pushImmediate) return true;
+    if (!unchanged) fs.writeFileSync(filePath, formatted, 'utf8');
 
-    if (!fs.existsSync(path.join(this.cloneDir, '.git'))) return true;
+    if (!fs.existsSync(path.join(this.cloneDir, '.git'))) return !pushImmediate;
     try {
       const env = cleanGitEnv();
-      execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
-      execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
+      if (!unchanged) {
+        execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
+        execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
+      }
       if (pushImmediate) {
         execFileSync('git', ['-C', this.cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
       }

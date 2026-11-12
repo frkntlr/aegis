@@ -1,8 +1,21 @@
 # 🛡️ AEGIS — Autonomous Vibe Coding & Codebase Memory Engine
 ### Google Antigravity, OpenAI Codex, Mulgravity, Cursor, VS Code & Web İçin 5-Katmanlı Hafıza, TIP Protokolü ve Deterministik Güvenlik Motoru
 
-Codex kurulumu: `npm run build` ardından `npm run aegis -- codex:setup`.
-Ortak görev/kilit akışları ve istemci farkları için [Codex uyumluluk rehberi](docs/codex-compatibility.md).
+## Kur ve kullan
+
+Node.js 20+, npm ve Git kurulu olsun. Aegis motorunu kalıcı bir dizine indir:
+
+```bash
+git clone https://github.com/frkntlr/aegis.git
+cd aegis
+npm run setup -- --client=both --project="/projenin/tam/yolu" --user
+```
+
+Windows örneği: `--project="C:\Projeler\oyunum"`. Yalnızca bir istemci için `--client=codex` veya `--client=antigravity` seç. Kurucu bağımlılıkları yükler, motoru derler ve seçtiğin istemcilerin proje ayarlarını hazırlar; `--user` CLI komutlarını, Codex seçiliyse kullanıcı becerisini de kurar.
+
+İstemciyi ve terminali yeniden aç, projenin içinde AI'a **`aegis tw <yapılacak iş>`** yaz. Codex'te **`$aegis tw <yapılacak iş>`** de kullanılabilir. Terminalde `aegis status` ile kurulumu kontrol et. Güncellemek için **`aegis update --pull`** çalıştır.
+
+[Adım adım kurulum, AI'a kurdurma ve güncelleme](docs/getting-started.md) · [Codex uyumluluk rehberi](docs/codex-compatibility.md)
 
 [![CI](https://github.com/frkntlr/aegis/actions/workflows/ci.yml/badge.svg)](https://github.com/frkntlr/aegis/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -175,6 +188,8 @@ Aegis, ajanların görevleri rastgele seçmesini önlemek için deterministik **
 4. **Güvenli Teslim (`aegis task:release <id> [status]`):** İşlem bittiğinde dosya kilitleri serbest bırakılır ve durum güncellenir.
 
 ### 🤝 Antigravity Dynamic Teamwork Mesh & Çoklu Ajan Koordinatörü (`tr` / `tw`)
+
+**Codex:** Sohbette `$aegis tw <hedef>` planlama ve yerel alt ajan yürütmesini başlatır. CLI planlama komutu görevleri kuyruğa alır; ajanları Codex'in native spawn aracı çalıştırır. Ajanlar mevcut modeli devralır, bağımlılıklara ve oturumun gerçek çalışan kapasitesine uyar. Commit, push ve dış yayın için açık kullanıcı yetkisi gerekir. Kalıcı görev ağacı ve kök koordinatör üzerinden delegasyon için [Codex orchestra rehberine](docs/codex-orchestra.md) bakın. Aşağıdaki araç ve model örnekleri Antigravity akışını anlatır.
 
 > [!IMPORTANT]
 > **Evrensel %100 Eşdeğerlik (Universal Parity):** `tr`, `tw` ve `teamwork` komutları için birinci sınıf (*first-class*) evrensel takma addır ve tüm 22 alt komutta, bayraklarda (`--compact`, `--json`, `--dry-run`, `--scale`) ve MCP eşdeğerlerinde **%100 özellik eşdeğerliğine (100% feature parity)** sahiptir (`tr` ≡ `tw` ≡ `teamwork`).
@@ -515,43 +530,26 @@ aegis/
 
 ## 🚀 Hızlı Başlangıç (Quick Start)
 
-### 1. Gereksinimler
-- **Node.js:** `>= 20.0.0`
-- **npm:** `>= 10.0.0`
-- **Git:** `>= 2.30.0`
+Node.js 20+, npm ve Git kurulu olmalı. Codex/Antigravity hesabına kendi uygulamasından giriş yap.
 
-### 2. Klonlama ve Kurulum
 ```bash
 git clone https://github.com/frkntlr/aegis.git
 cd aegis
-npm install
-npm run build
+npm run setup -- --client=both --project="/projenin/tam/yolu" --user
 ```
 
-### 3. Evrensel CLI Kullanımı
-Aegis, projenin derlenmesiyle birlikte evrensel bir sistem binary'si haline gelir. Herhangi bir çalışma alanında (ana repo, worktree, Godot oyun dizini) `npm run` yazmadan doğrudan `aegis`, `aegist`, `tw` veya `tr` komutunu kullanabilirsiniz:
-```bash
-# Worktree'leri ve ortamı hazırlama
-aegis init
+Windows proje yolu örneği: `--project="C:\Projeler\oyunum"`.
+Tek istemci için `--client=codex` veya `--client=antigravity` seç.
+Kurulumdan sonra istemciyi ve terminali yeniden aç; proje terminalinde `aegis status`,
+AI sohbetinde `aegis tw <hedef>` kullan. Codex'te `$aegis tw <hedef>` de kullanılabilir.
 
-# Durumu ve aktif kilitleri denetleme
-aegis status
-```
+Güncelleme: `aegis update --pull`. CLI bulunamazsa motor dizininde
+`npm run aegis -- status` çalıştır ve kurucunun bildirdiği PATH ayarını kontrol et.
+Yalnızca derlemek global komut kurmaz; kullanıcı komutları için `--user` kullan.
 
-### 4. Komuta Merkezini Başlatma (Web Panel)
-```bash
-aegis dashboard 3000
-```
-Tarayıcınızda `http://localhost:3000` adresine giderek bağlı oturumları, kilitleri, görevleri ve telemetriyi anlık izleyebilirsiniz.
+AI'a kopyalayacağın kurulum istemi, GitHub bağlantısı ve sorun giderme:
+**[Tam kurulum ve güncelleme rehberi](docs/getting-started.md)**.
 
-### 5. Kod Hafızasını İndeksleme ve İzleme
-```bash
-# Projeyi 5-Katmanlı Hafıza Motoruna tam indeksleme (Soğuk Başlangıç)
-aegis memory:cold-start packages
-
-# Değişiklikleri gerçek zamanlı izleyen artımlı watcher'ı başlatma
-aegis memory:watch packages
-```
 
 ---
 
