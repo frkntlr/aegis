@@ -22,7 +22,9 @@ function appendTypeScriptRules(targetFiles: string[], lines: string[]): void {
     'TypeScript Clean Domain Architecture:',
     "- Zero 'any' types: use strict domain types or unknown with type narrowing (TS_001).",
     '- Zero empty catches: swallowing exceptions without comments or handling is prohibited (TS_002).',
-    '- Max nesting depth <= 4: refactor deeply nested conditionals with guard clauses (TS_003).'
+    '- Max nesting depth <= 4: refactor deeply nested conditionals with guard clauses (TS_003).',
+    '- Demir Kafes v2 Anti-Spaghetti Thresholds: CC <= 15 per function, <= 5 params/fn, <= 12 methods/class (TS_004/TS_005).',
+    '- Modularity & File Budget: <= 10 imports/file (ARCH_001), 0 circular runtime imports, and target < 250 lines/file.'
   );
 }
 

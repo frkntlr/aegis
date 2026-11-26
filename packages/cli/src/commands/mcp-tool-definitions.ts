@@ -14,6 +14,7 @@ export const CORE_MCP_TOOLS = [
   { name: 'skeleton_extract', description: 'Extract token-saving AST skeleton folding function/method bodies', inputSchema: { type: 'object', properties: { filePath: { type: 'string' } }, required: ['filePath'] } },
   { name: 'budget_inspect', description: 'Inspect Demir Kafes line budget quota remaining & decomposition advice', inputSchema: { type: 'object', properties: { filePath: { type: 'string' } }, required: ['filePath'] } },
   { name: 'cage_check', description: 'Audit codebase or directory against Demir Kafes compliance', inputSchema: { type: 'object', properties: { dir: { type: 'string' } } } },
+  { name: 'arch_health', description: 'Run RFC-053 Architecture Health & Anti-Spaghetti audit (cycles, complexity, god classes, fan-out, 0-100 score)', inputSchema: { type: 'object', properties: { dir: { type: 'string' }, strict: { type: 'boolean' }, maxCycles: { type: 'number' }, minScore: { type: 'number' } } } },
   { name: 'triage', description: 'Evidence-Based Bug Triage (zero false alarms)', inputSchema: { type: 'object', properties: { dir: { type: 'string' } } } },
   { name: 'socratic_diagnose', description: 'Instant Socratic evidence parsing & diagnostic hypothesis generation', inputSchema: { type: 'object', properties: { rawLog: { type: 'string' } }, required: ['rawLog'] } },
   { name: 'context7_query', description: 'Query official library ground-truth documentation', inputSchema: { type: 'object', properties: { library: { type: 'string' }, topic: { type: 'string' } }, required: ['library', 'topic'] } },

@@ -51,6 +51,7 @@ export const HELP_CATEGORIES: Record<string, string[]> = {
     '  aegis ci:audit [--fast] [--json]       Run full CI pipeline simulation & quality gates',
     '  aegis verify <file>                    Validate single file against Demir Kafes',
     '  aegis cage:check [dir]                 Audit codebase against Deterministik Demir Kafes',
+    '  aegis arch:health [dir] [--strict]     Run RFC-053 Architecture Health & Anti-Spaghetti audit',
     '  aegis skeleton:scan [dir]              Compute global AST skeleton map & token savings',
     '  aegis skeleton <file>                  Generate AST skeleton for TS, Python, or GDScript',
     '  aegis diff <diff>                      Validate surgical unified diff compliance',

@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AstGrepBridge, SkeletonGenerator } from '@aegis/ast-skeleton';
-import { IronCageValidator, EvidenceBasedTriageGate, LineBudgetRadar } from '@aegis/iron-cage';
+import { IronCageValidator, EvidenceBasedTriageGate, LineBudgetRadar, ArchitectureHealthAuditor } from '@aegis/iron-cage';
 import { resolveSafeRepoRoot } from '@aegis/shared';
 import { getSharedMemoryEngine } from './memory-command.js';
 import { collectSourceFiles } from './dev-helpers.js';
@@ -78,7 +78,31 @@ export function executeAstTool(name: string, args: Record<string, unknown>): str
   return JSON.stringify({ error: `Unknown AST tool: ${name}` });
 }
 
+function resolveArchAuditTarget(rawDir: unknown): string {
+  const root = resolveSafeRepoRoot();
+  const dirArg = typeof rawDir === 'string' && rawDir.trim().length > 0 ? rawDir.trim() : '';
+  if (dirArg) return path.resolve(root, dirArg);
+  const pkgDir = path.join(root, 'packages');
+  return fs.existsSync(pkgDir) ? pkgDir : root;
+}
+
+function handleArchHealthTool(args: Record<string, unknown>): string {
+  const targetDir = resolveArchAuditTarget(args.dir);
+  if (!fs.existsSync(targetDir)) {
+    return JSON.stringify({ passed: false, targetDir, error: `Target directory does not exist: ${targetDir}` }, null, 2);
+  }
+  const report = new ArchitectureHealthAuditor().auditDirectory(targetDir);
+  const maxCycles = typeof args.maxCycles === 'number' && Number.isFinite(args.maxCycles) ? args.maxCycles : 0;
+  const minScore = typeof args.minScore === 'number' && Number.isFinite(args.minScore) ? args.minScore : 95;
+  const withinThresholds = report.runtimeCycles.length <= maxCycles && report.healthScore >= minScore;
+  const passed = args.strict === false ? true : withinThresholds;
+  return JSON.stringify({ passed, ...report }, null, 2);
+}
+
 export function executeQualityTool(name: string, args: Record<string, unknown>): string {
+  if (name === 'arch_health') {
+    return handleArchHealthTool(args);
+  }
   if (name === 'budget_inspect') {
     const rawFp = String(args.filePath || '');
     const fp = resolveFilePath(rawFp);

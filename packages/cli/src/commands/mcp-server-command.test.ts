@@ -32,17 +32,17 @@ test('handleJsonRpc handles initialize request', async () => {
   assert.ok((result.serverInfo as Record<string, unknown>).name === 'aegis');
 });
 
-test('handleJsonRpc handles tools/list request with 54 authoritative tools', async () => {
+test('handleJsonRpc handles tools/list request with 55 authoritative tools', async () => {
   const res = await handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.ok(res);
   const result = res.result as { tools: Array<{ name: string }> };
-  assert.strictEqual(result.tools.length, 54);
+  assert.strictEqual(result.tools.length, 55);
 
   const names = new Set(result.tools.map(t => t.name));
   const expected = [
     'teamwork_report', 'teamwork_plan', 'teamwork_status', 'git_push', 'teamwork_push',
     'memory_query', 'memory_stats', 'context7_query', 'rtk_compress', 'socratic_diagnose',
-    'skeleton_extract', 'budget_inspect', 'worktree_status', 'task_list', 'task_claim',
+    'skeleton_extract', 'budget_inspect', 'arch_health', 'worktree_status', 'task_list', 'task_claim',
     'task_release', 'task_inbox_pull', 'lock_status', 'github_rfc_pipeline', 'engine_update',
     'version_status', 'teamwork_doc_synthesize', 'teamwork_test', 'teamwork_advance',
     'teamwork_clear', 'teamwork_matrix', 'teamwork_batch', 'teamwork_deliberate',

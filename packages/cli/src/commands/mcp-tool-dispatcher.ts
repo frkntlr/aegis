@@ -41,6 +41,7 @@ const DIRECT_MCP_HANDLERS: Record<string, McpToolHandler> = {
   skeleton_extract: (args) => executeAstTool('skeleton_extract', args),
   budget_inspect: (args) => executeQualityTool('budget_inspect', args),
   cage_check: (args) => executeQualityTool('cage_check', args),
+  arch_health: (args) => executeQualityTool('arch_health', args),
   triage: (args) => executeQualityTool('triage', args),
   task_list: (args) => mcpTaskList(args),
   task_claim: (args) => mcpTaskClaim(args),
