@@ -1,33 +1,20 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { AntigravityInstaller } from './antigravity-installer.js';
 import { CodexInstaller } from './codex-installer.js';
+import {
+  type DiscoveredSkill,
+  discoverMcpServersInRepo,
+  discoverSkillsInRepo,
+  type McpServerDefinition,
+  mergeMcpServerEntries,
+  readExistingMcpServers,
+  registerAegisMcpServerInFile,
+  type ToolchainSyncReport,
+  updateCursorRulesFile,
+} from './toolchain-sync-helpers.js';
 
-export interface DiscoveredSkill {
-  name: string;
-  description: string;
-  path: string;
-}
-
-export interface McpServerDefinition {
-  name: string;
-  command?: string;
-  args?: string[];
-  url?: string;
-  env?: Record<string, string>;
-  disabled?: boolean;
-  transport: 'stdio' | 'sse';
-}
-
-export interface ToolchainSyncReport {
-  timestamp: string;
-  skillsFound: number;
-  mcpServersFound: number;
-  syncedIdes: string[];
-  warnings: string[];
-  success: boolean;
-}
+export type { DiscoveredSkill, McpServerDefinition, ToolchainSyncReport };
 
 export class UniversalToolchainSync {
   private repoRoot: string;
@@ -37,111 +24,27 @@ export class UniversalToolchainSync {
   }
 
   public discoverSkills(): DiscoveredSkill[] {
-    const skills: DiscoveredSkill[] = [];
-    const candidates = [
-      path.resolve(this.repoRoot, 'templates', 'skills'),
-      path.resolve(this.repoRoot, '.agents', 'skills')
-    ];
-    const skillsDir = candidates.find(d => fs.existsSync(d));
-    if (!skillsDir) return skills;
-
-    try {
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const skillMd = path.join(skillsDir, entry.name, 'SKILL.md');
-        if (fs.existsSync(skillMd)) {
-          const content = fs.readFileSync(skillMd, 'utf8');
-          const descMatch = content.match(/description:\s*(?:>-|>)?\s*([^\n\r]+)/i);
-          skills.push({
-            name: entry.name,
-            description: descMatch ? descMatch[1].trim() : 'Aegis Agent Skill',
-            path: skillMd
-          });
-        }
-      }
-    } catch (err: unknown) {
-      debugLogIgnored('ToolchainSync:discoverSkills', err);
-    }
-    return skills;
+    return discoverSkillsInRepo(this.repoRoot);
   }
 
   public discoverMcpServers(): McpServerDefinition[] {
-    const servers: McpServerDefinition[] = [];
-    let cursorMcp = path.resolve(this.repoRoot, '.cursor', 'mcp.json');
-    if (!fs.existsSync(cursorMcp)) {
-      cursorMcp = path.resolve(this.repoRoot, '.cursor', 'mcp.example.json');
-    }
-    if (fs.existsSync(cursorMcp)) {
-      try {
-        interface RawMcpServerCfg { command?: string; args?: string[]; url?: string; env?: Record<string, string>; disabled?: boolean; }
-        const data = readJsonSafe<{ mcpServers?: Record<string, RawMcpServerCfg> }>(cursorMcp);
-        if (data.mcpServers) {
-          for (const [name, cfg] of Object.entries(data.mcpServers)) {
-            servers.push({
-              name, command: cfg.command, args: cfg.args, url: cfg.url,
-              env: cfg.env, disabled: cfg.disabled, transport: cfg.url ? 'sse' : 'stdio'
-            });
-          }
-        }
-      } catch (err: unknown) {
-        debugLogIgnored('ToolchainSync:discoverMcpServers', err);
-      }
-    }
-    if (servers.length === 0) {
-      servers.push(
-        { name: 'aegis-engine', command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'], transport: 'stdio' },
-        { name: 'ast-grep', command: 'npx', args: ['@ast-grep/mcp'], transport: 'stdio' },
-        { name: 'context7', command: 'npx', args: ['context7-mcp'], transport: 'stdio' }
-      );
-    }
-    return servers;
+    return discoverMcpServersInRepo(this.repoRoot);
   }
 
-  private readExistingServers(jsonPath: string, key: 'mcpServers' | 'servers'): Record<string, unknown> {
-    if (!fs.existsSync(jsonPath)) return {};
-    try {
-      const parsed = readJsonSafe<Record<string, unknown>>(jsonPath);
-      if (parsed?.[key] && typeof parsed[key] === 'object') {
-        return parsed[key] as Record<string, unknown>;
-      }
-    } catch (err: unknown) { debugLogIgnored('ToolchainSync:readExistingServers', err); }
-    return {};
-  }
-
-  private updateCursorRules(skills: DiscoveredSkill[]): void {
-    const rulesFile = path.resolve(this.repoRoot, '.cursorrules');
-    const skillLines = skills.map(s => `- **${s.name}**: ${s.description}`).join('\n');
-    const header = `# Aegis Synchronized Skills Index\n${skillLines}\n<!-- aegis:skills:end -->\n\n`;
-    if (fs.existsSync(rulesFile)) {
-      const existing = fs.readFileSync(rulesFile, 'utf8');
-      const pattern = /# Aegis Synchronized Skills Index[\s\S]*?(?:<!-- aegis:skills:end -->\r?\n\r?\n?|(?=\r?\n#)|\n$|$)/;
-      if (pattern.test(existing)) {
-        fs.writeFileSync(rulesFile, existing.replace(pattern, header), 'utf8');
-      } else {
-        fs.writeFileSync(rulesFile, header + existing, 'utf8');
-      }
-    } else {
-      fs.writeFileSync(rulesFile, header, 'utf8');
-    }
-  }
-
-  private syncCursor(skills: DiscoveredSkill[], mcps: McpServerDefinition[], warnings: string[]): boolean {
+  private syncCursor(
+    skills: DiscoveredSkill[],
+    mcps: McpServerDefinition[],
+    warnings: string[],
+  ): boolean {
     try {
       const cursorDir = path.resolve(this.repoRoot, '.cursor');
       fs.mkdirSync(cursorDir, { recursive: true });
       const mcpJsonPath = path.join(cursorDir, 'mcp.json');
-      const existingServers = this.readExistingServers(mcpJsonPath, 'mcpServers');
-      const mcpConfig = { mcpServers: { ...existingServers } as Record<string, unknown> };
-      for (const m of mcps) {
-        mcpConfig.mcpServers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
-      }
-      if (!mcpConfig.mcpServers['aegis-engine']) {
-        mcpConfig.mcpServers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'] };
-      }
+      const existingServers = readExistingMcpServers(mcpJsonPath, 'mcpServers');
+      const mcpConfig = { mcpServers: mergeMcpServerEntries(existingServers, mcps, true) };
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
-      this.registerAegisMcpServer(mcpJsonPath);
-      this.updateCursorRules(skills);
+      registerAegisMcpServerInFile(this.repoRoot, mcpJsonPath);
+      updateCursorRulesFile(this.repoRoot, skills);
       return true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -155,14 +58,8 @@ export class UniversalToolchainSync {
       const vscodeDir = path.resolve(this.repoRoot, '.vscode');
       fs.mkdirSync(vscodeDir, { recursive: true });
       const mcpJsonPath = path.join(vscodeDir, 'mcp.json');
-      const existingServers = this.readExistingServers(mcpJsonPath, 'servers');
-      const mcpConfig = { servers: { ...existingServers } as Record<string, unknown> };
-      for (const m of mcps) {
-        mcpConfig.servers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
-      }
-      if (!mcpConfig.servers['aegis-engine']) {
-        mcpConfig.servers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'] };
-      }
+      const existingServers = readExistingMcpServers(mcpJsonPath, 'servers');
+      const mcpConfig = { servers: mergeMcpServerEntries(existingServers, mcps, true) };
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
       return true;
     } catch (e: unknown) {
@@ -177,51 +74,48 @@ export class UniversalToolchainSync {
       const geminiDir = path.resolve(this.repoRoot, '.gemini', 'config');
       fs.mkdirSync(geminiDir, { recursive: true });
       const mcpJsonPath = path.join(geminiDir, 'mcp_config.json');
-      const existing = this.readExistingServers(mcpJsonPath, 'mcpServers');
-      const mcpConfig = { mcpServers: { ...existing } as Record<string, unknown> };
-      for (const m of mcps) {
-        mcpConfig.mcpServers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
-      }
+      const existing = readExistingMcpServers(mcpJsonPath, 'mcpServers');
+      const mcpConfig = { mcpServers: mergeMcpServerEntries(existing, mcps, false) };
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
       const userHome = process.env.USERPROFILE || process.env.HOME || '';
-      const isTemp = this.repoRoot.includes('Temp') || this.repoRoot.includes('tmp') || !fs.existsSync(path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js'));
+      const isTemp =
+        this.repoRoot.includes('Temp') ||
+        this.repoRoot.includes('tmp') ||
+        !fs.existsSync(path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js'));
       if (!isTemp && userHome && fs.existsSync(path.resolve(userHome, '.gemini'))) {
         this.syncGlobalAntigravity(userHome);
       }
       return true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      warnings.push("Antigravity senkronizasyon hatasi: " + msg);
+      warnings.push(`Antigravity senkronizasyon hatasi: ${msg}`);
       return false;
     }
   }
 
-  private registerAegisMcpServer(mcpJsonPath: string): void {
-    if (!fs.existsSync(path.dirname(mcpJsonPath))) return;
-    try {
-      const cliPath = path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js');
-      const relCfg = path.relative(this.repoRoot, mcpJsonPath);
-      const isInsideRepo = Boolean(relCfg) && !relCfg.startsWith('..') && !path.isAbsolute(relCfg);
-      const entry = isInsideRepo
-        ? { command: 'node', args: [path.relative(this.repoRoot, cliPath).replace(/\\/g, '/'), 'mcp'] }
-        : { command: process.execPath, args: [cliPath, 'mcp'] };
-      const data = fs.existsSync(mcpJsonPath) ? readJsonSafe<Record<string, unknown>>(mcpJsonPath) : {};
-      const key = typeof data.servers === 'object' && data.servers !== null ? 'servers' : 'mcpServers';
-      const map = typeof data[key] === 'object' && data[key] !== null ? (data[key] as Record<string, unknown>) : {};
-      map.aegis = entry;
-      data[key] = map;
-      fs.writeFileSync(mcpJsonPath, JSON.stringify(data, null, 2), 'utf8');
-    } catch (err: unknown) { debugLogIgnored('ToolchainSync:registerAegisMcpServer', err); }
-  }
-
   private syncGlobalAntigravity(userHome: string): void {
-    AntigravityInstaller.syncGlobal(userHome, this.repoRoot, (cfg) => this.registerAegisMcpServer(cfg));
+    AntigravityInstaller.syncGlobal(userHome, this.repoRoot, (cfg) =>
+      registerAegisMcpServerInFile(this.repoRoot, cfg),
+    );
   }
 
   private syncCodex(mcps: McpServerDefinition[], warnings: string[]): boolean {
     try {
-      const servers = Object.fromEntries(mcps.filter(m => m.name !== 'aegis-engine' && m.name !== 'aegis').map(m =>
-        [m.name, { command: m.command, args: m.args, url: m.url, env: m.env, disabled: m.disabled, cwd: m.url ? undefined : this.repoRoot }]));
+      const servers = Object.fromEntries(
+        mcps
+          .filter((m) => m.name !== 'aegis-engine' && m.name !== 'aegis')
+          .map((m) => [
+            m.name,
+            {
+              command: m.command,
+              args: m.args,
+              url: m.url,
+              env: m.env,
+              disabled: m.disabled,
+              cwd: m.url ? undefined : this.repoRoot,
+            },
+          ]),
+      );
       CodexInstaller.sync(this.repoRoot, servers);
       const engineRoot = CodexInstaller.resolveEngineRoot(this.repoRoot);
       const cli = path.resolve(engineRoot, 'packages/cli/dist/bin/aegis.js');
@@ -243,8 +137,12 @@ export class UniversalToolchainSync {
     if (this.syncVSCode(mcps, warnings)) syncedIdes.push('VS Code');
     if (this.syncAntigravity(mcps, warnings)) syncedIdes.push('Google Antigravity');
     if (this.syncCodex(mcps, warnings)) syncedIdes.push('OpenAI Codex');
-        const hasCopilot = fs.existsSync(path.resolve(this.repoRoot, '.github', 'copilot')) || fs.existsSync(path.resolve(this.repoRoot, 'plugins', 'aegis-copilot'));
-        if (hasCopilot) { syncedIdes.push('GitHub Copilot'); }
+    const hasCopilot =
+      fs.existsSync(path.resolve(this.repoRoot, '.github', 'copilot')) ||
+      fs.existsSync(path.resolve(this.repoRoot, 'plugins', 'aegis-copilot'));
+    if (hasCopilot) {
+      syncedIdes.push('GitHub Copilot');
+    }
 
     const isGodot = fs.existsSync(path.resolve(this.repoRoot, 'project.godot'));
     if (isGodot) {
@@ -257,7 +155,7 @@ export class UniversalToolchainSync {
       mcpServersFound: mcps.length,
       syncedIdes,
       warnings,
-      success: warnings.length === 0
+      success: warnings.length === 0,
     };
   }
 }

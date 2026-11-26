@@ -3,17 +3,12 @@ import type { CageValidationResult, CageViolation } from '@aegis/shared';
 import { GDScriptRulesValidator } from './gdscript-rules.js';
 import { CleanArchitectureValidator } from './clean-architecture-rules.js';
 import { AntiSpaghettiValidator } from './anti-spaghetti-rules.js';
+import { validateIndentationBased, validateLineBased } from './cage-fallback-scanners.js';
 
 export interface CageValidatorOptions {
   maxFunctionLines?: number;
   maxFileLines?: number;
   maxCyclomaticComplexity?: number;
-}
-
-interface ScanState {
-  inFunction: boolean;
-  funcStartLine: number;
-  braceDepth: number;
 }
 
 export class IronCageValidator {
@@ -103,115 +98,6 @@ export class IronCageValidator {
     violations.push(...antiSpaghetti.validateSourceFile(filePath, sourceFile));
   }
 
-  private checkFunctionLimit(
-    funcStart: number,
-    funcLength: number,
-    filePath: string,
-    violations: CageViolation[]
-  ): void {
-    if (funcLength > this.maxFunctionLines) {
-      violations.push({
-        rule: 'MAX_FUNCTION_LINES',
-        filePath,
-        line: funcStart,
-        message: `Function starting at line ${funcStart} exceeds ${this.maxFunctionLines} lines (actual: ${funcLength} lines).`,
-        severity: 'error'
-      });
-    }
-  }
-
-  private isLineFunctionStart(trimmed: string): boolean {
-    const stripped = trimmed.replace(/^export\s+(default\s+)?/, '');
-    const fnRegex = /^(public\s+|private\s+|protected\s+|static\s+)*(async\s+)?\w+\s*\([^)]*\)\s*[:\w<>\s]*\{?/;
-    return stripped.startsWith('function ') ||
-      stripped.startsWith('async function ') ||
-      stripped.startsWith('func ') ||
-      stripped.startsWith('func(') ||
-      stripped.startsWith('fn ') ||
-      stripped.startsWith('pub fn ') ||
-      stripped.startsWith('async fn ') ||
-      /=>\s*\{/.test(trimmed) ||
-      Boolean(stripped.match(fnRegex));
-  }
-
-  private updateBraces(line: string, state: ScanState, i: number, violations: CageViolation[], filePath: string): void {
-    const cleanLine = line
-      .replace(/"(\\.|[^"\\])*"/g, '""')
-      .replace(/'(\\.|[^'\\])*'/g, "''")
-      .replace(/`(\\.|[^`\\])*`/g, '``')
-      .replace(/\/\/.*$/gm, '');
-
-    for (const ch of cleanLine) {
-      if (ch === '{') state.braceDepth++;
-      if (ch === '}') state.braceDepth--;
-    }
-
-    if (state.braceDepth <= 0 && cleanLine.includes('}')) {
-      this.checkFunctionLimit(state.funcStartLine, (i + 1) - state.funcStartLine + 1, filePath, violations);
-      state.inFunction = false;
-    }
-  }
-
-  private validateIndentationBased(filePath: string, lines: string[], violations: CageViolation[]): void {
-    let inFunction = false;
-    let funcStart = 0;
-    let baseIndent = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      const isDef = trimmed.startsWith('def ') || trimmed.startsWith('async def ') ||
-        trimmed.startsWith('func ') || trimmed.startsWith('static func ');
-      const indent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
-
-      if (inFunction && indent <= baseIndent) {
-        this.checkFunctionLimit(funcStart + 1, i - funcStart, filePath, violations);
-        inFunction = false;
-      }
-      if (!inFunction && isDef) {
-        inFunction = true;
-        funcStart = i;
-        baseIndent = indent;
-      }
-    }
-    if (inFunction) {
-      this.checkFunctionLimit(funcStart + 1, lines.length - funcStart, filePath, violations);
-    }
-  }
-
-  private validateLineBased(filePath: string, lines: string[], violations: CageViolation[]): void {
-    const state: ScanState = { inFunction: false, funcStartLine: 0, braceDepth: 0 };
-    let inBlockComment = false;
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i];
-      if (inBlockComment) {
-        if (line.includes('*/')) {
-          line = line.slice(line.indexOf('*/') + 2);
-          inBlockComment = false;
-        } else { continue; }
-      }
-      if (line.includes('/*')) {
-        if (!line.includes('*/')) {
-          inBlockComment = true;
-          line = line.slice(0, line.indexOf('/*'));
-        } else {
-          line = line.replace(/\/\*.*?\*\//g, '');
-        }
-      }
-      const trimmed = line.trim();
-      if (!state.inFunction && this.isLineFunctionStart(trimmed)) {
-        state.inFunction = true;
-        state.funcStartLine = i + 1;
-        state.braceDepth = 0;
-      }
-      if (state.inFunction) {
-        this.updateBraces(line, state, i, violations, filePath);
-      }
-    }
-  }
-
   private validateNonGdScript(filePath: string, content: string, lines: string[], violations: CageViolation[]): void {
     if (lines.length > this.maxFileLines) {
       violations.push({
@@ -222,17 +108,19 @@ export class IronCageValidator {
       });
     }
 
+    const fallbackCtx = { filePath, maxFunctionLines: this.maxFunctionLines, violations };
     if (/\.[jt]sx?$/i.test(filePath)) {
       try {
         this.validateTypeScriptAst(filePath, content, violations);
         violations.push(...new CleanArchitectureValidator().validate(filePath, content));
       } catch {
-        this.validateLineBased(filePath, lines, violations);
+        // Fallback to brace-based scanning if TS AST parsing fails
+        validateLineBased(lines, fallbackCtx);
       }
     } else if (/\.py$/i.test(filePath)) {
-      this.validateIndentationBased(filePath, lines, violations);
+      validateIndentationBased(lines, fallbackCtx);
     } else {
-      this.validateLineBased(filePath, lines, violations);
+      validateLineBased(lines, fallbackCtx);
     }
   }
 

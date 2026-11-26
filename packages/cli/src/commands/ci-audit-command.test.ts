@@ -47,6 +47,12 @@ test('CI_GATES contains all 11 deterministic pipeline gates', () => {
   assert.ok(coreIds.includes('cage:check'));
   assert.ok(coreIds.includes('arch:health'));
   assert.ok(coreIds.includes('test'));
+
+  const archGate = CI_GATES.find(g => g.id === 'arch:health');
+  assert.strictEqual(
+    archGate?.command,
+    'node packages/cli/dist/bin/aegis.js arch:health --strict --max-cycles=0 --min-score=95'
+  );
 });
 
 test('parseCiAuditOptions parses flags and values correctly', () => {

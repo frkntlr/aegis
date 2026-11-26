@@ -6,6 +6,7 @@
  */
 
 import type { ClarificationOption } from './types.js';
+import { findMatchingParen, splitTopLevelTokens } from './signature-token-scanner.js';
 
 export type BoundaryDiscrepancyType =
   | 'ARITY_MISMATCH'
@@ -50,7 +51,7 @@ export class SymbioticDiagnosticTriangulator {
     const inner = sig.slice(openParen + 1, closeParen).trim();
     if (!inner) return { minArgs: 0, maxArgs: 0, paramNames: [] };
 
-    const rawParams = SymbioticDiagnosticTriangulator.splitTokens(inner, ',');
+    const rawParams = splitTopLevelTokens(inner, ',');
     let minArgs = 0;
     let maxArgs = 0;
     const paramNames: string[] = [];
@@ -77,11 +78,11 @@ export class SymbioticDiagnosticTriangulator {
     }
     const openParen = callSite.indexOf('(', searchStart);
     if (openParen === -1) return 0;
-    const closeParen = SymbioticDiagnosticTriangulator.findMatchingParen(callSite, openParen);
+    const closeParen = findMatchingParen(callSite, openParen);
     if (closeParen <= openParen) return 0;
     const inner = callSite.slice(openParen + 1, closeParen).trim();
     if (!inner) return 0;
-    return SymbioticDiagnosticTriangulator.splitTokens(inner, ',').length;
+    return splitTopLevelTokens(inner, ',').length;
   }
 
   public static triangulate(input: BoundaryTriangulationInput): BoundaryTriangulationResult {
@@ -179,80 +180,5 @@ export class SymbioticDiagnosticTriangulator {
       falsifiableHypothesis: '',
       suggestedAction: ''
     };
-  }
-
-  private static findMatchingParen(str: string, openIdx: number): number {
-    let depth = 0;
-    for (let i = openIdx; i < str.length; i++) {
-      if (str[i] === '(') depth++;
-      else if (str[i] === ')') {
-        depth--;
-        if (depth === 0) return i;
-      }
-    }
-    return -1;
-  }
-
-  private static readonly OPEN_DELIMITERS: Record<string, 'parenDepth' | 'bracketDepth' | 'braceDepth'> = {
-    '(': 'parenDepth',
-    '<': 'bracketDepth',
-    '[': 'bracketDepth',
-    '{': 'braceDepth'
-  };
-
-  private static readonly CLOSE_DELIMITERS: Record<string, 'parenDepth' | 'bracketDepth' | 'braceDepth'> = {
-    ')': 'parenDepth',
-    '>': 'bracketDepth',
-    ']': 'bracketDepth',
-    '}': 'braceDepth'
-  };
-
-  private static updateDepthAndAppend(
-    ch: string,
-    state: { cur: string; parenDepth: number; bracketDepth: number; braceDepth: number }
-  ): void {
-    const openKey = SymbioticDiagnosticTriangulator.OPEN_DELIMITERS[ch];
-    if (openKey) state[openKey]++;
-    const closeKey = SymbioticDiagnosticTriangulator.CLOSE_DELIMITERS[ch];
-    if (closeKey) state[closeKey]--;
-    state.cur += ch;
-  }
-
-  private static stepTokenScan(
-    str: string,
-    i: number,
-    delimiter: string,
-    state: { cur: string; parenDepth: number; bracketDepth: number; braceDepth: number; inQuote: string | null }
-  ): string | null {
-    const ch = str[i];
-    if (state.inQuote) {
-      state.cur += ch;
-      if (ch === state.inQuote && str[i - 1] !== '\\') state.inQuote = null;
-      return null;
-    }
-    if (ch === '"' || ch === "'" || ch === '`') {
-      state.inQuote = ch;
-      state.cur += ch;
-      return null;
-    }
-    const atTopLevel = state.parenDepth === 0 && state.bracketDepth === 0 && state.braceDepth === 0;
-    if (ch === delimiter && atTopLevel) {
-      const token = state.cur.trim();
-      state.cur = '';
-      return token;
-    }
-    SymbioticDiagnosticTriangulator.updateDepthAndAppend(ch, state);
-    return null;
-  }
-
-  private static splitTokens(str: string, delimiter: string): string[] {
-    const tokens: string[] = [];
-    const state = { cur: '', parenDepth: 0, bracketDepth: 0, braceDepth: 0, inQuote: null as string | null };
-    for (let i = 0; i < str.length; i++) {
-      const token = SymbioticDiagnosticTriangulator.stepTokenScan(str, i, delimiter, state);
-      if (token !== null) tokens.push(token);
-    }
-    if (state.cur.trim()) tokens.push(state.cur.trim());
-    return tokens;
   }
 }

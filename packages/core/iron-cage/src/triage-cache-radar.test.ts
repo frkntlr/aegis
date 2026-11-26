@@ -112,3 +112,23 @@ test('TriageCacheRadar handles invalidateAll and corrupted file cleanly', () => 
   const recoveredCheck = recoveredRadar.checkFile('src/c.ts', 3000, 5, 'hello');
   assert.strictEqual(recoveredCheck.hit, false);
 });
+
+test('TriageCacheRadar recordFile accepts RecordFileInput options object', () => {
+  const cacheDir = createTempCacheDir();
+  const radar = new TriageCacheRadar({ cacheDir, engineRulesSalt: 'v1' });
+  const content = 'export const obj = true;';
+  const quota = { file: 'src/obj.ts', lines: 260, msg: 'Quota notice' };
+
+  radar.recordFile({
+    filePath: 'src/obj.ts',
+    mtimeMs: 4200,
+    size: content.length,
+    content,
+    violations: [],
+    quotaAlert: quota
+  });
+
+  const hit = radar.checkFile('src/obj.ts', 4200, content.length, content);
+  assert.strictEqual(hit.hit, true);
+  assert.deepStrictEqual(hit.quotaAlert, quota);
+});

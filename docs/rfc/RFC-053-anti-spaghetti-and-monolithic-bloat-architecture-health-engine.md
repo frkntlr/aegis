@@ -1,7 +1,7 @@
 # 🏛️ RFC-053: Anti-Spaghetti and Monolithic Bloat Architecture Health Engine
 ### Aegis Autonomous Architecture Blueprint
 
-- **RFC ID:** RFC-053 | **Durum:** Proposed | **Tarih:** 2026-11-26
+- **RFC ID:** RFC-053 | **Durum:** Implemented (Tamamlandı) ✅ | **Tarih:** 2026-11-26
 - **İlişkili RFC'ler:** [RFC-012: Demir Kafes Autonomous Architectural Decomposition](./RFC-012-demir-kafes-autonomous-architectural-decomposition-anti-degradation-engine.md)
 - **Tasarımcı:** Aegis Autonomous Architecture & Doc Architect
 
@@ -127,8 +127,8 @@ aegis arch:health
 # Belirli bir dizini JSON çıktısıyla denetle
 aegis arch:health packages --json
 
-# Katı CI/Pre-push kapısı: sıfır döngü ve minimum sağlık skoru barajı
-aegis arch:health --strict --max-cycles=0 --min-score=85
+# Kalıcı CI/Pre-push kapısı (`CI_GATES` -> `Architecture Health Gate`): sıfır döngü ve minimum %95 sağlık skoru
+aegis arch:health --strict --max-cycles=0 --min-score=95
 ```
 
 ### Desteklenen CLI Bayrakları
@@ -160,9 +160,31 @@ flowchart LR
 
 ---
 
-## 🎯 7. Kabul Kriterleri (Acceptance Criteria)
+## 📈 7. 4-Fazlı Monorepo İyileştirme İlerlemesi (4-Phase Progression)
 
-- [ ] `IronCageValidator` içinde `CYCLOMATIC_COMPLEXITY` (`maxCyclomaticComplexity`), `TS_004_MAX_PARAMS` ve `TS_005_GOD_CLASS` kuralları aktif olarak uygulanır.
-- [ ] `ArchitectureHealthAuditor`, `ARCH_001_HIGH_FAN_OUT` ve `ARCH_002_CIRCULAR_DEPENDENCY` kurallarıyla runtime ve type-only döngüleri ayrıştırır, `0-100` sağlık skoru ve RFC-012 reçeteleri üretir.
-- [ ] `aegis arch:health` (`aegis arch:audit`) komutu `--json`, `--strict`, `--max-cycles` ve `--min-score` bayraklarıyla çalışır.
-- [ ] Temel denetimde tespit edilen 2 runtime döngüsü (`task-commands.ts <-> task-mcp-adapters.ts`, `nlm-auth-helper.ts <-> nlm-switch-helper.ts`) ve en yüksek CC / parametre / god class sıcak noktaları RFC-012 reçeteleriyle kademeli olarak azaltılır.
+RFC-053 motorunun geliştirilmesi ve Aegis `packages/` monoreposunun arındırılması dört aşamalı kontrollü bir ilerleme ile tamamlanmıştır:
+
+```mermaid
+flowchart LR
+    Base["Baseline: 2 Runtime / 23 Type Cycles<br/>44 CC, 32 Param, 22 God Class, 7-8 Fan-Out"] --> P1["Faz 1: Motor + CLI<br/>0 Runtime Cycles"]
+    P1 --> P2["Faz 2: Pure DAG + CI Gate<br/>80/100 (0 Type Cycles, 0 CC>=20)"]
+    P2 --> P3["Faz 3: Yapısal Arınma<br/>98/100 (0 CC, 0 God Class, 0 Fan-Out)"]
+    P3 --> P4["Faz 4: Final Polish & Kilit<br/>100/100 Hedefi + min-score=95 CI Kilidi"]
+```
+
+| Faz | Mimari Kazanımlar & Bileşenler | Runtime Döngü | Type-Only Döngü | Karmaşıklık (`CC`) | Parametre (`TS_004`) | God Class (`TS_005`) | Fan-Out (`ARCH_001`) | Sağlık Skoru |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Baseline** | İlk `packages/` AST & import grafiği zemin denetimi (`382` üretim `.ts` dosyası) | **2** | **23** | **44** (maks. `CC=31`) | **32** (maks. `10` param) | **22** (maks. `31` metot) | **7–8** | — |
+| **Faz 1** | `AntiSpaghettiValidator`, `ArchitectureHealthAuditor`, `aegis arch:health` CLI (`packages/cli/src/commands/arch-health-command.ts`) implemente edildi | **0** | 23 | 44 | 32 | 22 | 7–8 | — |
+| **Faz 2** | Ölçeklenmiş sağlık skoru normalize edildi; tüm `import type` çevrimleri (**Pure DAG**) ve `CC >= 20` sıcak noktaları temizlendi; `CI_GATES` içine `Architecture Health Gate` (`packages/cli/src/commands/ci-audit-command.ts`) eklendi | **0** | **0** | `0` (`CC >= 20` yok) | Azaltıldı | Azaltıldı | Azaltıldı | **80/100** |
+| **Faz 3** | Kalan tüm `CYCLOMATIC_COMPLEXITY`, `TS_005_GOD_CLASS` ve `ARCH_001_HIGH_FAN_OUT` ihlalleri RFC-012 delegasyon/tablo kalıplarıyla sıfırlandı | **0** | **0** | **0** | Kalan uyarılar | **0** | **0** | **98/100** |
+| **Faz 4** | Son `TS_004_MAX_PARAMS` ve `<250`-satır bütçe baskısı (`LineBudgetRadar`) uyarıları giderildi; kalıcı CI kapısı `aegis arch:health --strict --max-cycles=0 --min-score=95` olarak kilitlendi | **0** | **0** | **0** | **0** | **0** | **0** | **100/100 hedefi** |
+
+---
+
+## 🎯 8. Kabul Kriterleri (Acceptance Criteria)
+
+- [x] `IronCageValidator` (`packages/core/iron-cage/src/cage-validator.ts`) ve `AntiSpaghettiValidator` (`packages/core/iron-cage/src/anti-spaghetti-rules.ts`) üzerinden `CYCLOMATIC_COMPLEXITY` (`maxCyclomaticComplexity`), `TS_004_MAX_PARAMS`, `TS_005_GOD_CLASS` ve `ARCH_001_HIGH_FAN_OUT` kuralları aktif olarak uygulanır.
+- [x] `ArchitectureHealthAuditor` (`packages/core/iron-cage/src/architecture-health-auditor.ts`), `ARCH_001_HIGH_FAN_OUT` ve `ARCH_002_CIRCULAR_DEPENDENCY` kurallarıyla runtime ve type-only döngüleri ayrıştırır, `0-100` normalize edilmiş sağlık skoru ve RFC-012 reçeteleri üretir.
+- [x] `aegis arch:health` (`aegis arch:audit`) komutu `--json`, `--strict`, `--max-cycles` ve `--min-score` bayraklarıyla çalışır ve `CI_GATES` içinde `Architecture Health Gate` (`aegis arch:health --strict --max-cycles=0 --min-score=95`) olarak kalıcıdır.
+- [x] 4 fazlı iyileştirme sonunda monorepodaki 2 runtime döngüsü, 23 type-only döngüsü (Pure DAG), 44 CC ihlali, 22 God Class, 7–8 yüksek fan-out dosyası, 32 parametre ihlali ve `<250`-satır bütçe baskısı uyarıları tamamen giderilmiştir.
