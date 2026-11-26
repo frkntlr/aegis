@@ -86,10 +86,11 @@ export function resolveContainedPath(
   if (hasUnsafePathSyntax(inputPath)) {
     return { ok: false, reason: 'Invalid or unsafe path syntax.' };
   }
+  const normalizedInput = inputPath.replace(/\\/g, '/');
   const baseResolved = path.resolve(repoRoot);
-  const targetResolved = path.isAbsolute(inputPath)
-    ? path.resolve(inputPath)
-    : path.resolve(baseResolved, inputPath);
+  const targetResolved = path.isAbsolute(normalizedInput)
+    ? path.resolve(normalizedInput)
+    : path.resolve(baseResolved, normalizedInput);
   if (!isPathWithinBase(baseResolved, targetResolved)) {
     return { ok: false, reason: 'Path escapes repository root.' };
   }
