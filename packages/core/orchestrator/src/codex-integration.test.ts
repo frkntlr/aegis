@@ -121,7 +121,14 @@ test('Codex install keeps custom instructions and is idempotent after isolation 
 test('teamwork emits native Codex payload while keeping Antigravity payload intact', () => {
   const profile = getSubagentProfiles().find(p => p.roleType === 'docs');
   assert.ok(profile);
-  const track = TeamworkTrackBuilder.buildTrack('docs', profile, 'Document contracts', ['docs/api.md'], 'Docs', true);
+  const track = TeamworkTrackBuilder.buildTrack({
+    roleType: 'docs',
+    profile,
+    desc: 'Document contracts',
+    files: ['docs/api.md'],
+    label: 'Docs',
+    deterministic: true
+  });
   assert.equal(track.invocationPayload.Model, 'flash');
   assert.ok(track.invocationPayload.Prompt.includes('invoke_subagent'));
   assert.match(track.codexInvocationPayload?.task_name ?? '', /^[a-z0-9_]+$/);

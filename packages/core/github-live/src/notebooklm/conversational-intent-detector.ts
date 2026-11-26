@@ -50,29 +50,41 @@ const STATUS_PATTERNS = [
 export class ConversationalIntentDetector {
   public static detect(prompt: string): DetectedIntent {
     if (!prompt || typeof prompt !== 'string') {
-      return ConversationalIntentDetector.buildResult('NONE', false, 0, '', 'none');
+      return ConversationalIntentDetector.buildResult({
+        type: 'NONE', matched: false, confidence: 0, rawPrompt: '', suggestedAction: 'none'
+      });
     }
 
     const trimmed = prompt.trim();
     const browser = ConversationalIntentDetector.extractBrowserPreference(trimmed);
 
     if (ConversationalIntentDetector.matchesAny(trimmed, SWITCH_PATTERNS)) {
-      return ConversationalIntentDetector.buildResult('ACCOUNT_SWITCH', true, 0.95, trimmed, 'execute_account_switch', browser);
+      return ConversationalIntentDetector.buildResult({
+        type: 'ACCOUNT_SWITCH', matched: true, confidence: 0.95, rawPrompt: trimmed, suggestedAction: 'execute_account_switch', preferredBrowser: browser
+      });
     }
 
     if (ConversationalIntentDetector.matchesAny(trimmed, RESET_PATTERNS)) {
-      return ConversationalIntentDetector.buildResult('SESSION_RESET', true, 0.92, trimmed, 'reset_session', browser);
+      return ConversationalIntentDetector.buildResult({
+        type: 'SESSION_RESET', matched: true, confidence: 0.92, rawPrompt: trimmed, suggestedAction: 'reset_session', preferredBrowser: browser
+      });
     }
 
     if (ConversationalIntentDetector.matchesAny(trimmed, REAUTH_PATTERNS)) {
-      return ConversationalIntentDetector.buildResult('FORCE_REAUTH', true, 0.90, trimmed, 'force_reauth', browser);
+      return ConversationalIntentDetector.buildResult({
+        type: 'FORCE_REAUTH', matched: true, confidence: 0.90, rawPrompt: trimmed, suggestedAction: 'force_reauth', preferredBrowser: browser
+      });
     }
 
     if (ConversationalIntentDetector.matchesAny(trimmed, STATUS_PATTERNS)) {
-      return ConversationalIntentDetector.buildResult('AUTH_STATUS', true, 0.85, trimmed, 'check_auth_status', browser);
+      return ConversationalIntentDetector.buildResult({
+        type: 'AUTH_STATUS', matched: true, confidence: 0.85, rawPrompt: trimmed, suggestedAction: 'check_auth_status', preferredBrowser: browser
+      });
     }
 
-    return ConversationalIntentDetector.buildResult('NONE', false, 0, trimmed, 'none', browser);
+    return ConversationalIntentDetector.buildResult({
+      type: 'NONE', matched: false, confidence: 0, rawPrompt: trimmed, suggestedAction: 'none', preferredBrowser: browser
+    });
   }
 
   public static isAccountSwitchIntent(prompt: string): boolean {
@@ -94,21 +106,14 @@ export class ConversationalIntentDetector {
     return patterns.some(p => p.test(text));
   }
 
-  private static buildResult(
-    type: NlmIntentType,
-    matched: boolean,
-    confidence: number,
-    rawPrompt: string,
-    suggestedAction: string,
-    preferredBrowser?: string
-  ): DetectedIntent {
+  private static buildResult(intent: DetectedIntent): DetectedIntent {
     return {
-      type,
-      matched,
-      confidence,
-      rawPrompt,
-      preferredBrowser,
-      suggestedAction
+      type: intent.type,
+      matched: intent.matched,
+      confidence: intent.confidence,
+      rawPrompt: intent.rawPrompt,
+      preferredBrowser: intent.preferredBrowser,
+      suggestedAction: intent.suggestedAction
     };
   }
 }

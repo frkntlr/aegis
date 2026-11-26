@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogIgnored } from '@aegis/shared';
 import { isSafeIdentifier, resolveContainedPath } from './path-containment.js';
-import type { SystemIssue } from './realtime-metrics.js';
+import type { SystemIssue } from './metrics-types.js';
 
 export function collectSourceFiles(dir: string): string[] {
   const results: string[] = [];

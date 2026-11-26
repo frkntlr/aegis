@@ -116,32 +116,75 @@ export function validateStoredRun(value: unknown, id: string, root: string): ass
   if (run.state !== expected) throw new Error('Invalid persisted run state: task outcomes disagree');
 }
 
-function validateStoredTask(task: OrchestraTask, run: OrchestraRun, root: string): void {
-  requireIdentifier(task.id);
-  const arrays = [task.dependsOn, task.children, task.targetFiles];
-  if (!['pending', 'reserved', 'running', 'waiting', 'deferred', 'done', 'failed', 'blocked'].includes(task.state) ||
-      arrays.some(values => !Array.isArray(values) || values.some(value => typeof value !== 'string')) ||
-      !Number.isSafeInteger(task.phase) || task.phase < 1 || !Number.isSafeInteger(task.depth) ||
-      task.depth < 0 || task.depth > run.options.maxDepth || typeof task.title !== 'string' || !task.title.trim()) {
+const VALID_TASK_STATES = new Set<string>([
+  'pending', 'reserved', 'running', 'waiting', 'deferred', 'done', 'failed', 'blocked'
+]);
+const TERMINAL_TASK_STATES = new Set<string>(['done', 'failed', 'blocked']);
+
+const isStringArray = (values: unknown): boolean =>
+  Array.isArray(values) && values.every(value => typeof value === 'string');
+
+function hasValidTaskMetrics(task: OrchestraTask, maxDepth: number): boolean {
+  if (!Number.isSafeInteger(task.phase) || task.phase < 1) return false;
+  if (!Number.isSafeInteger(task.depth) || task.depth < 0 || task.depth > maxDepth) return false;
+  return typeof task.title === 'string' && task.title.trim().length > 0;
+}
+
+function validateTaskCoreFields(task: OrchestraTask, maxDepth: number): void {
+  const validState = VALID_TASK_STATES.has(task.state);
+  const validArrays = [task.dependsOn, task.children, task.targetFiles].every(isStringArray);
+  if (!validState || !validArrays || !hasValidTaskMetrics(task, maxDepth)) {
     throw new Error('Invalid persisted orchestra task');
   }
+}
+
+function hasMissingExecutionEvidence(task: OrchestraTask): boolean {
+  if (task.state === 'running') return !task.agentId?.trim();
+  if (task.state === 'reserved') return !task.reservationId?.trim();
+  if (TERMINAL_TASK_STATES.has(task.state)) return !task.evidence?.trim();
+  return false;
+}
+
+function validateTaskExecutionState(task: OrchestraTask): void {
+  if (task.state === 'deferred' && !task.recovery) {
+    throw new Error('Deferred task is missing recovery checkpoint');
+  }
+  if (task.recovery) validateRecovery(task.recovery);
+  if (hasMissingExecutionEvidence(task)) {
+    throw new Error('Persisted task is missing execution evidence');
+  }
+}
+
+function validateParentLink(task: OrchestraTask, parent: OrchestraTask | undefined): void {
+  if (!task.parentId) {
+    if (task.depth !== 0) throw new Error('Invalid persisted task hierarchy');
+    return;
+  }
+  const invalidParent = !parent || !parent.children.includes(task.id)
+    || task.depth !== parent.depth + 1 || task.phase !== parent.phase;
+  if (invalidParent) throw new Error('Invalid persisted task hierarchy');
+}
+
+function validateTaskHierarchy(task: OrchestraTask, tasks: OrchestraTask[]): void {
+  const parent = task.parentId ? tasks.find(other => other.id === task.parentId) : undefined;
+  validateParentLink(task, parent);
+  const hasInvalidChild = task.children.some(
+    id => !tasks.some(child => child.id === id && child.parentId === task.id)
+  );
+  if (hasInvalidChild) throw new Error('Invalid persisted child relationship');
+  if (!parent) return;
+  const parentKeys = new Set(parent.targetFiles.map(fileScopeKey));
+  if (task.targetFiles.some(file => !parentKeys.has(fileScopeKey(file)))) {
+    throw new Error('Invalid persisted child scope');
+  }
+}
+
+function validateStoredTask(task: OrchestraTask, run: OrchestraRun, root: string): void {
+  requireIdentifier(task.id);
+  validateTaskCoreFields(task, run.options.maxDepth);
   if (JSON.stringify(normalizeFiles(root, task.targetFiles)) !== JSON.stringify(task.targetFiles)) {
     throw new Error('Invalid persisted target scope');
   }
-  if (task.state === 'deferred' && !task.recovery) throw new Error('Deferred task is missing recovery checkpoint');
-  if (task.recovery) validateRecovery(task.recovery);
-  if ((task.state === 'running' && !task.agentId?.trim()) ||
-      (task.state === 'reserved' && !task.reservationId?.trim()) ||
-      (['done', 'failed', 'blocked'].includes(task.state) && !task.evidence?.trim())) {
-    throw new Error('Persisted task is missing execution evidence');
-  }
-  const parent = task.parentId ? run.tasks.find(other => other.id === task.parentId) : undefined;
-  if (task.parentId ? !parent || !parent.children.includes(task.id) || task.depth !== parent.depth + 1 || task.phase !== parent.phase
-    : task.depth !== 0) throw new Error('Invalid persisted task hierarchy');
-  if (task.children.some(id => !run.tasks.some(child => child.id === id && child.parentId === task.id))) {
-    throw new Error('Invalid persisted child relationship');
-  }
-  if (parent && task.targetFiles.some(file => !parent.targetFiles.map(fileScopeKey).includes(fileScopeKey(file)))) {
-    throw new Error('Invalid persisted child scope');
-  }
+  validateTaskExecutionState(task);
+  validateTaskHierarchy(task, run.tasks);
 }

@@ -147,6 +147,45 @@ aegis test:offline packages/core/watchdog --soft --json
 
 ---
 
+## 4.5. RFC-053 Anti-Spaghetti ve Mimari Sağlık Kapısı (`aegis arch:health` / `aegis arch:audit`)
+
+Tekil dosya ve satır sınırlarını denetleyen `aegis cage:check` (300 satır/dosya, 40 satır/fonksiyon), geçmişte modüller arası bağımlılık grafiğini ve sınıf kohezyonunu göremediği için yapısal şişkinliği (*monolithic bloat*) tek başına engelleyememekteydi (`CageValidatorOptions.maxCyclomaticComplexity` tanımlı ancak uygulanmamış durumdaydı). **RFC-053**, `ArchitectureHealthAuditor` ve **Demir Kafes v2 Anti-Spaghetti Kuralları** ile bu boşluğu kapatır.
+
+### Demir Kafes v2 Anti-Spaghetti Kuralları
+- **`CYCLOMATIC_COMPLEXITY`:** Fonksiyon ve metotlardaki dallanma/karar karmaşıklığını (`if`, döngü, `switch/case`, `catch`, `?:`, `&&`, `||`, `??`) AST üzerinde sayar ve karmaşıklık sıcak noktalarını sınırlar.
+- **`TS_004_MAX_PARAMS`:** Aşırı pozisyonel parametre alan imzaları (*parameter bloat*) tespit eder ve tiplenmiş *Options / Parameter Object* sözleşmelerine dönüştürülmesini ister.
+- **`TS_005_GOD_CLASS`:** Çok fazla metot ve sorumluluk biriktiren *god class* yapılarını yakalar; RFC-012 **Facade + Delegasyon** kalıbıyla ayrıştırılmasını reçete eder.
+- **`ARCH_001_HIGH_FAN_OUT`:** Bir modülün aşırı sayıda dış modülü import etmesini (*high fan-out* / yüksek dışa bağımlılık) tespit eder.
+- **`ARCH_002_CIRCULAR_DEPENDENCY`:** Proje import grafiğindeki döngüsel bağımlılıkları yakalar; çalışma zamanı (`runtime`) döngülerini yalnızca tip (`type-only`) döngülerinden net biçimde ayırır.
+
+### `ArchitectureHealthAuditor` Yetenekleri
+- **0–100 Mimari Sağlık Skoru:** Döngüsel bağımlılıklar, siklomatik karmaşıklık sıcak noktaları, parametre şişkinliği, god class yoğunluğu ve yüksek fan-out üzerinden deterministik sağlık puanı üretir.
+- **Runtime vs. Type-Only Döngü Ayrımı:** Gerçek çalışma zamanı yükleme riski taşıyan değer (`runtime`) import döngülerini `import type` döngülerinden ayrıştırarak önceliklendirir.
+- **RFC-012 Ayrıştırma Reçeteleri:** Tespit edilen her ihlal için kör satır bölmesi yerine [RFC-012](./rfc/RFC-012-demir-kafes-autonomous-architectural-decomposition-anti-degradation-engine.md) uyumlu Guard Clause, Parameter Object, POP ve Facade/Delegasyon önerileri sunar.
+
+### Sürekli Önleme İş Akışı (`cage:check` + `arch:health`)
+```bash
+# 1. Dosya ve fonksiyon seviyesi Demir Kafes denetimi
+aegis cage:check
+
+# 2. Proje geneli mimari sağlık ve bağımlılık grafiği denetimi
+aegis arch:health
+# veya takma adı:
+aegis arch:audit
+
+# 3. Katı CI / Pre-push kapısı (sıfır döngü, minimum skor ve JSON raporu)
+aegis arch:health --strict --max-cycles=0 --min-score=85 --json
+```
+
+| Bayrak | Açıklama |
+| --- | --- |
+| `--json` | Sağlık skoru, runtime/type-only döngüler, sıcak noktalar ve RFC-012 reçetelerini JSON formatında döndürür. |
+| `--strict` | Anti-spaghetti kural ihlallerinde çıkışı hata koduyla (`exit code 1`) reddeder. |
+| `--max-cycles=<n>` | Tolere edilen azami döngüsel bağımlılık sınırını belirler. |
+| `--min-score=<n>` | Zorunlu minimum `0-100` mimari sağlık skorunu belirler. |
+
+---
+
 ## 5. 3-Fazlı Adaptif Watchdog & Devre Kesici (Circuit Breaker)
 
 Uzun süren işlemler veya sonsuz döngüye giren testler için akıllı izleme katmanı devrededir:
@@ -177,3 +216,4 @@ Eğer bir görev aynı hatayı üst üste 3 kez üretirse veya sürekli aynı te
 - [RFC-014: Socratic Evidence-Based Diagnostic Engine](./rfc/RFC-014-socratic-evidence-based-diagnostic-dialogue-engine.md)
 - [RFC-024: Next-Gen Evidence-Based Bug Triage Engine](./rfc/RFC-024-next-gen-evidence-based-bug-triage-engine-incremental-caching-multi-core-parallelism-blast-radius-stratification.md)
 - [RFC-050: Autonomous Fail-Safe Offline Test Shield and Self-Restoring Network Harness](rfc/RFC-050-autonomous-fail-safe-offline-test-shield-and-self-restoring-network-harness.md)
+- [RFC-053: Anti-Spaghetti and Monolithic Bloat Architecture Health Engine](rfc/RFC-053-anti-spaghetti-and-monolithic-bloat-architecture-health-engine.md)

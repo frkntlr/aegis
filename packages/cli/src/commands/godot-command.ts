@@ -186,35 +186,45 @@ export async function handleGodotTest(projectDirArg?: string, scenarioArg?: stri
   }
 }
 
+function runGodotUiScaffold(args: string[]): void {
+  const type = (args[0] || 'menu') as UiScaffoldType;
+  const name = args[1] || 'menu';
+  const outDir = args[2] || process.cwd();
+  const res = GodotUiScaffolder.scaffold(type, { name, outputDir: outDir });
+  console.log(`🎨 Godot UI Scaffolding Complete: [${type.toUpperCase()}] "${res.name}"`);
+  for (const f of res.filesWritten) console.log(` • Created: ${f}`);
+}
+
+function runGodotUiLint(target: string): void {
+  const report = GodotUiLinter.lintScene(target);
+  console.log(`🎨 Godot UI Scene Linter Report for: ${target}`);
+  console.log(` • Score: ${report.score}/100 | Status: ${report.valid ? '✅ VALID' : '❌ ISSUES FOUND'} | Nodes: ${report.nodeCount}`);
+  for (const iss of report.issues) {
+    console.log(`   [${iss.severity.toUpperCase()}] ${iss.nodeName} (${iss.rule}): ${iss.message}`);
+    console.log(`     💡 Fix: ${iss.fixSuggestion}`);
+  }
+}
+
+const UI_ACTION_HANDLERS: Record<string, (args: string[]) => void> = {
+  perf: args => handleGodotUiPerf(args[0]),
+  audit: args => handleGodotUiPerf(args[0]),
+  optimize: args => handleGodotUiOptimize(args[0]),
+  fix: args => handleGodotUiOptimize(args[0]),
+  scaffold: runGodotUiScaffold,
+  create: runGodotUiScaffold
+};
+
 export function handleGodotUi(subcmd = 'lint', ...args: string[]): void {
   showBanner();
   const act = subcmd.toLowerCase();
-  if (act === 'perf' || act === 'audit') {
-    handleGodotUiPerf(args[0]);
-    return;
-  }
-  if (act === 'optimize' || act === 'fix') {
-    handleGodotUiOptimize(args[0]);
-    return;
-  }
-  if (act === 'scaffold' || act === 'create') {
-    const type = (args[0] || 'menu') as UiScaffoldType;
-    const name = args[1] || 'menu';
-    const outDir = args[2] || process.cwd();
-    const res = GodotUiScaffolder.scaffold(type, { name, outputDir: outDir });
-    console.log(`🎨 Godot UI Scaffolding Complete: [${type.toUpperCase()}] "${res.name}"`);
-    for (const f of res.filesWritten) console.log(` • Created: ${f}`);
+  const actionHandler = UI_ACTION_HANDLERS[act];
+  if (actionHandler) {
+    actionHandler(args);
     return;
   }
   const target = args[0] || (subcmd.endsWith('.tscn') ? subcmd : process.cwd());
   if (target.endsWith('.tscn')) {
-    const report = GodotUiLinter.lintScene(target);
-    console.log(`🎨 Godot UI Scene Linter Report for: ${target}`);
-    console.log(` • Score: ${report.score}/100 | Status: ${report.valid ? '✅ VALID' : '❌ ISSUES FOUND'} | Nodes: ${report.nodeCount}`);
-    for (const iss of report.issues) {
-      console.log(`   [${iss.severity.toUpperCase()}] ${iss.nodeName} (${iss.rule}): ${iss.message}`);
-      console.log(`     💡 Fix: ${iss.fixSuggestion}`);
-    }
+    runGodotUiLint(target);
     return;
   }
   if (act === 'lint') {
@@ -224,34 +234,32 @@ export function handleGodotUi(subcmd = 'lint', ...args: string[]): void {
   handleGodotInspect(target);
 }
 
+const GODOT_SUBCOMMANDS: Record<string, (args: string[]) => void | Promise<void>> = {
+  init: args => handleGodotInit(args[1], args[2]),
+  inspect: args => handleGodotInspect(args[1]),
+  status: () => handleGodotStatus(),
+  query: args => handleGodotQuery(args[1]),
+  doctool: () => handleGodotDoctool(),
+  validate: args => handleGodotValidate(args[1]),
+  run: args => handleGodotRun(args[1], ...args.slice(2)),
+  playtest: args => handleGodotPlaytest(args[1], ...args.slice(2)),
+  tree: args => handleGodotTree(...args.slice(1)),
+  test: args => handleGodotTest(args[1], args[2])
+};
+
 export async function handleGodot(args: string[]): Promise<void> {
   const subcommand = args[0] || 'status';
-  if (subcommand === 'init') {
-    handleGodotInit(args[1], args[2]);
-  } else if (subcommand === 'ui' || subcommand.startsWith('ui:')) {
+  if (subcommand === 'ui' || subcommand.startsWith('ui:')) {
     const sub = subcommand.includes(':') ? subcommand.split(':')[1] : args[1];
     const subArgs = subcommand.includes(':') ? args.slice(1) : args.slice(2);
     handleGodotUi(sub, ...subArgs);
-  } else if (subcommand === 'inspect') {
-    handleGodotInspect(args[1]);
-  } else if (subcommand === 'status') {
-    handleGodotStatus();
-  } else if (subcommand === 'query') {
-    handleGodotQuery(args[1]);
-  } else if (subcommand === 'doctool') {
-    handleGodotDoctool();
-  } else if (subcommand === 'validate') {
-    handleGodotValidate(args[1]);
-  } else if (subcommand === 'run') {
-    handleGodotRun(args[1], ...args.slice(2));
-  } else if (subcommand === 'playtest') {
-    handleGodotPlaytest(args[1], ...args.slice(2));
-  } else if (subcommand === 'tree') {
-    handleGodotTree(...args.slice(1));
-  } else if (subcommand === 'test') {
-    await handleGodotTest(args[1], args[2]);
-  } else {
-    console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|ui|status|inspect|query|doctool|validate|run|playtest|tree]`);
+    return;
   }
+  const handler = GODOT_SUBCOMMANDS[subcommand];
+  if (handler) {
+    await handler(args);
+    return;
+  }
+  console.log(`Unknown godot subcommand: '${subcommand}'. Usage: aegis godot [init|ui|status|inspect|query|doctool|validate|run|playtest|tree]`);
 }
 

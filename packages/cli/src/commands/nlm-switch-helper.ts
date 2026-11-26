@@ -5,14 +5,11 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import {
-  AccountSwitchLifecycleManager,
-  AmbientCdpScanner,
-  AmbientCookieVaultExtractor,
-  SessionCredentialsManager
-} from '@aegis/github-live';
+import { AccountSwitchLifecycleManager } from '@aegis/github-live';
 import { showBanner } from './banner.js';
-import { runBrowserAuth } from './nlm-auth-helper.js';
+import { runBrowserAuth } from './nlm-session-helpers.js';
+
+export { runZeroClickSessionImport } from './nlm-session-helpers.js';
 
 export async function handleNlmSwitch(...args: string[]): Promise<void> {
   showBanner();
@@ -40,28 +37,4 @@ export async function handleNlmSwitch(...args: string[]): Promise<void> {
   } else {
     console.error('❌ Account switch could not be completed.');
   }
-}
-
-export async function runZeroClickSessionImport(): Promise<boolean> {
-  console.log('🔍 Checking running browsers and profile vaults for active Google session...');
-
-  // Step 1: Probe open Google tabs via ambient CDP ports
-  const cdpRes = await AmbientCdpScanner.discoverAndHarvest();
-  if (cdpRes.success && cdpRes.cookies) {
-    SessionCredentialsManager.saveCredentials(cdpRes.cookies);
-    console.log(`✅ Zero-Click Session Detected on CDP port ${cdpRes.port} (${cdpRes.matchedUrl})!`);
-    console.log('   Saved session credentials without manual entry.');
-    return true;
-  }
-
-  // Step 2: Extract from local Chromium vaults (Edge / Brave / Chrome)
-  const vaultRes = AmbientCookieVaultExtractor.extractFromAllVaults();
-  if (vaultRes.success && vaultRes.cookies) {
-    SessionCredentialsManager.saveCredentials(vaultRes.cookies);
-    console.log(`✅ Zero-Click Session Extracted from ${vaultRes.browser?.toUpperCase()} profile vault!`);
-    console.log(`   Saved session credentials without manual entry.`);
-    return true;
-  }
-
-  return false;
 }

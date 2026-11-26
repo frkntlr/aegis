@@ -50,30 +50,35 @@ export function mcpTeamworkReport(args: Record<string, unknown> = {}): string {
   return saveResult ? `${text}\n\n📄 Report saved to: ${saveResult.relativePath}` : text;
 }
 
+type TeamworkMcpHandler = (args: Record<string, unknown>) => string | Promise<string>;
+
+const TEAMWORK_TOOL_HANDLERS: Record<string, TeamworkMcpHandler> = {
+  teamwork_plan: (args) => mcpTeamworkPlan(args),
+  teamwork_status: () => mcpTeamworkStatus(),
+  teamwork_compact: (args) => mcpTeamworkCompact(args),
+  teamwork_analyze: (args) => mcpTeamworkAnalyze(args),
+  teamwork_dag: (args) => mcpTeamworkDag(args),
+  teamwork_mesh_read: (args) => mcpTeamworkMeshRead(args),
+  teamwork_mesh_post: (args) => mcpTeamworkMeshPost(args),
+  teamwork_broadcast: (args) => mcpTeamworkBroadcast(args),
+  teamwork_peers: (args) => mcpTeamworkPeers(args),
+  teamwork_waves: (args) => mcpTeamworkWaves(args),
+  teamwork_conflicts: () => mcpTeamworkConflicts(),
+  teamwork_scale: (args) => mcpTeamworkScale(args),
+  teamwork_doc_synthesize: (args) => mcpTeamworkDocSynthesize(args),
+  teamwork_tools: (args) => mcpTeamworkTools(args),
+  teamwork_report: (args) => mcpTeamworkReport(args),
+  teamwork_test: (args) => mcpTeamworkTest(args),
+  teamwork_advance: (args) => mcpTeamworkAdvance(args),
+  teamwork_clear: () => mcpTeamworkClear(),
+  teamwork_matrix: (args) => mcpTeamworkMatrix(args),
+  teamwork_batch: (args) => mcpTeamworkBatch(args),
+  teamwork_deliberate: (args) => mcpTeamworkDeliberate(args),
+  teamwork_swarm: (args) => mcpTeamworkAnalysisSwarm(args)
+};
+
 export async function executeTeamworkTool(canonical: string, args: Record<string, unknown>): Promise<string | null> {
-  switch (canonical) {
-    case 'teamwork_plan': return mcpTeamworkPlan(args);
-    case 'teamwork_status': return mcpTeamworkStatus();
-    case 'teamwork_compact': return mcpTeamworkCompact(args);
-    case 'teamwork_analyze': return mcpTeamworkAnalyze(args);
-    case 'teamwork_dag': return mcpTeamworkDag(args);
-    case 'teamwork_mesh_read': return mcpTeamworkMeshRead(args);
-    case 'teamwork_mesh_post': return mcpTeamworkMeshPost(args);
-    case 'teamwork_broadcast': return mcpTeamworkBroadcast(args);
-    case 'teamwork_peers': return mcpTeamworkPeers(args);
-    case 'teamwork_waves': return mcpTeamworkWaves(args);
-    case 'teamwork_conflicts': return mcpTeamworkConflicts();
-    case 'teamwork_scale': return mcpTeamworkScale(args);
-    case 'teamwork_doc_synthesize': return mcpTeamworkDocSynthesize(args);
-    case 'teamwork_tools': return mcpTeamworkTools(args);
-    case 'teamwork_report': return mcpTeamworkReport(args);
-    case 'teamwork_test': return await mcpTeamworkTest(args);
-    case 'teamwork_advance': return mcpTeamworkAdvance(args);
-    case 'teamwork_clear': return mcpTeamworkClear();
-    case 'teamwork_matrix': return mcpTeamworkMatrix(args);
-    case 'teamwork_batch': return mcpTeamworkBatch(args);
-    case 'teamwork_deliberate': return mcpTeamworkDeliberate(args);
-    case 'teamwork_swarm': return await mcpTeamworkAnalysisSwarm(args);
-    default: return null;
-  }
+  const handler = TEAMWORK_TOOL_HANDLERS[canonical];
+  if (!handler) return null;
+  return await handler(args);
 }

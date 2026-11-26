@@ -160,16 +160,41 @@ function buildPromptFooter(roleType: RoleType, roleIdentity: string): string {
   ].join('\n');
 }
 
-export function compileTrackPrompt(
-  profile: SubagentProfile,
-  trackDesc: string,
-  files: string[],
-  subagentName?: string,
-  dependsOn?: string[],
-  phase?: number,
-  groundingContext?: string,
-  upstreamContracts?: string
-): string {
+export interface CompileTrackPromptOptions {
+  profile: SubagentProfile;
+  trackDesc: string;
+  files: string[];
+  subagentName?: string;
+  dependsOn?: string[];
+  phase?: number;
+  groundingContext?: string;
+  upstreamContracts?: string;
+}
+
+export interface CompileCompactPromptOptions {
+  profile: SubagentProfile;
+  trackDesc: string;
+  files: string[];
+  subagentName?: string;
+  dependsOn?: string[];
+  phase?: number;
+  upstreamContracts?: string;
+  targetSymbols?: string[];
+}
+
+export interface CompileUltraLeanPromptOptions {
+  profile: SubagentProfile;
+  desc: string;
+  files: string[];
+  subagentName?: string;
+  targetSymbols?: string[];
+  contract?: string;
+  phase?: number;
+  dependsOn?: string[];
+}
+
+export function compileTrackPrompt(options: CompileTrackPromptOptions): string {
+  const { profile, trackDesc, files, subagentName, dependsOn, phase, groundingContext, upstreamContracts } = options;
   const targetStr = files.length > 0 ? files.map(f => `- \`${f}\``).join('\n') : '- Read-only; do not edit project files';
   const roleIdentity = subagentName ?? profile.name;
   const groundBlock = groundingContext ? `\n${groundingContext.trim()}\n` : '';
@@ -182,16 +207,8 @@ export function compileTrackPrompt(
     `\n${buildPromptFooter(profile.roleType, roleIdentity)}`;
 }
 
-export function compileCompactTrackPrompt(
-  profile: SubagentProfile,
-  trackDesc: string,
-  files: string[],
-  subagentName?: string,
-  dependsOn?: string[],
-  phase?: number,
-  upstreamContracts?: string,
-  targetSymbols?: string[]
-): string {
+export function compileCompactTrackPrompt(options: CompileCompactPromptOptions): string {
+  const { profile, trackDesc, files, subagentName, dependsOn, phase, upstreamContracts, targetSymbols } = options;
   const roleId = subagentName ?? profile.name;
   const deps = dependsOn?.length ? `|deps:[${dependsOn.join(',')}]` : '';
   const ph = phase ? `|W${phase}` : '';
@@ -206,16 +223,8 @@ export function compileCompactTrackPrompt(
     `COMM:tw:post progress | Conclude:[ROLE_COMPLETE: ${roleId}]`;
 }
 
-export function compileUltraLeanPrompt(
-  profile: SubagentProfile,
-  desc: string,
-  files: string[],
-  subagentName?: string,
-  targetSymbols?: string[],
-  contract?: string,
-  phase?: number,
-  dependsOn?: string[]
-): string {
+export function compileUltraLeanPrompt(options: CompileUltraLeanPromptOptions): string {
+  const { profile, desc, files, subagentName, targetSymbols, contract, phase, dependsOn } = options;
   const roleId = subagentName ?? profile.name;
   const targetStr = files.length > 0 ? files.join(', ') : 'general';
   const symStr = targetSymbols?.length ? `\nANCHORS:[${targetSymbols.join(', ')}]` : '';

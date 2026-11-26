@@ -32,33 +32,35 @@ function handleCachedHit(check: ReturnType<TriageCacheRadar['checkFileStat']>, r
   }
 }
 
-function handleUncachedFile(
-  file: string,
-  rel: string,
-  stat: fs.Stats,
-  validator: IronCageValidator,
-  radar: TriageCacheRadar | null,
-  acc: CageScanAcc
-): void {
+interface UncachedFileContext {
+  file: string;
+  rel: string;
+  stat: fs.Stats;
+  validator: IronCageValidator;
+  radar: TriageCacheRadar | null;
+  acc: CageScanAcc;
+}
+
+function handleUncachedFile(ctx: UncachedFileContext): void {
   let content: string;
   try {
-    content = fs.readFileSync(file, 'utf8');
+    content = fs.readFileSync(ctx.file, 'utf8');
   } catch {
     return;
   }
-  const res = validator.validateFileContent(rel, content);
+  const res = ctx.validator.validateFileContent(ctx.rel, content);
   let quotaAlert: { file: string; lines: number; msg: string } | undefined;
   if (res.passed) {
-    acc.passedCount++;
-    const r = LineBudgetRadar.analyze(rel, content);
+    ctx.acc.passedCount++;
+    const r = LineBudgetRadar.analyze(ctx.rel, content);
     if (r.status === 'CRITICAL_QUOTA' || r.status === 'EXCEEDED') {
-      quotaAlert = { file: rel, lines: r.fileLines, msg: r.advice?.title || 'Kritik kota' };
-      acc.radarAlerts.push(quotaAlert);
+      quotaAlert = { file: ctx.rel, lines: r.fileLines, msg: r.advice?.title || 'Kritik kota' };
+      ctx.acc.radarAlerts.push(quotaAlert);
     }
   } else {
-    for (const v of res.violations) acc.violations.push({ file: rel, rule: v.rule, msg: v.message });
+    for (const v of res.violations) ctx.acc.violations.push({ file: ctx.rel, rule: v.rule, msg: v.message });
   }
-  if (radar) radar.recordFile(rel, stat.mtimeMs, stat.size, content, res.violations, quotaAlert);
+  if (ctx.radar) ctx.radar.recordFile(ctx.rel, ctx.stat.mtimeMs, ctx.stat.size, content, res.violations, quotaAlert);
 }
 
 function scanCageFiles(files: string[], noCache = false): CageScanAcc {
@@ -74,7 +76,7 @@ function scanCageFiles(files: string[], noCache = false): CageScanAcc {
       if (check.hit) {
         handleCachedHit(check, rel, acc);
       } else {
-        handleUncachedFile(file, rel, stat, validator, radar, acc);
+        handleUncachedFile({ file, rel, stat, validator, radar, acc });
       }
     } catch (err: unknown) {
       debugLogIgnored('CageCheckRunner:scanFile', err);
@@ -85,31 +87,32 @@ function scanCageFiles(files: string[], noCache = false): CageScanAcc {
   return acc;
 }
 
-export function handleCageCheck(rawArgs?: string | string[]): void {
-  const opts = parseCageCheckArgs(rawArgs);
-  if (!opts.jsonOutput) showBanner();
-  const base = opts.targetDir
-    ? path.resolve(resolveSafeRepoRoot(), opts.targetDir)
-    : (fs.existsSync(path.resolve(resolveSafeRepoRoot(), 'packages')) ? path.resolve(resolveSafeRepoRoot(), 'packages') : resolveSafeRepoRoot());
-  if (!opts.jsonOutput) console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(resolveSafeRepoRoot(), base) || '.'}...`);
-  const files = collectSourceFiles(base);
-  if (!fs.existsSync(base) || files.length === 0) {
-    const error = fs.existsSync(base) ? 'No source files found for Iron Cage audit' : 'Iron Cage audit target does not exist';
-    if (opts.jsonOutput) console.log(JSON.stringify({ filesScanned: 0, compliantCount: 0, violations: [], clean: false, error }));
-    else console.error(`Iron Cage audit failed: ${error}: ${base}`);
-    process.exitCode = 1;
-    return;
-  }
-  const { passedCount, violations, radarAlerts, cachedCount } = scanCageFiles(files, opts.noCache);
+function resolveCageBaseDir(targetDir?: string): string {
+  const root = resolveSafeRepoRoot();
+  if (targetDir) return path.resolve(root, targetDir);
+  const pkgDir = path.resolve(root, 'packages');
+  return fs.existsSync(pkgDir) ? pkgDir : root;
+}
 
-  if (opts.jsonOutput) {
-    console.log(JSON.stringify({ filesScanned: files.length, cachedCount, compliantCount: passedCount, violations, radarAlerts, clean: violations.length === 0 }, null, 2));
+function reportMissingCageTarget(base: string, jsonOutput?: boolean): void {
+  const error = fs.existsSync(base) ? 'No source files found for Iron Cage audit' : 'Iron Cage audit target does not exist';
+  if (jsonOutput) {
+    console.log(JSON.stringify({ filesScanned: 0, compliantCount: 0, violations: [], clean: false, error }));
+  } else {
+    console.error(`Iron Cage audit failed: ${error}: ${base}`);
+  }
+  process.exitCode = 1;
+}
+
+function reportCageResults(totalFiles: number, scan: CageScanAcc, jsonOutput?: boolean): void {
+  const { passedCount, violations, radarAlerts, cachedCount } = scan;
+  if (jsonOutput) {
+    console.log(JSON.stringify({ filesScanned: totalFiles, cachedCount, compliantCount: passedCount, violations, radarAlerts, clean: violations.length === 0 }, null, 2));
     if (violations.length > 0 && process.env.NODE_ENV !== 'test') process.exit(1);
     return;
   }
-
-  console.log(` • Files Scanned: ${files.length} (${cachedCount} cached, 0ms)`);
-  console.log(` • Compliant:     ${passedCount} / ${files.length} (${Math.round((passedCount / files.length) * 100)}%)`);
+  console.log(` • Files Scanned: ${totalFiles} (${cachedCount} cached, 0ms)`);
+  console.log(` • Compliant:     ${passedCount} / ${totalFiles} (${Math.round((passedCount / totalFiles) * 100)}%)`);
   printRadarAlerts(radarAlerts);
   if (violations.length === 0) {
     console.log('✅ Demir Kafes (Iron Cage): 100% CLEAN - No violations found!');
@@ -118,4 +121,18 @@ export function handleCageCheck(rawArgs?: string | string[]): void {
   console.log(`⚠️  Violations Found (${violations.length}):`);
   for (const v of violations) console.log(`   - [${v.rule}] ${v.file}: ${v.msg}`);
   if (process.env.NODE_ENV !== 'test') process.exit(1);
+}
+
+export function handleCageCheck(rawArgs?: string | string[]): void {
+  const opts = parseCageCheckArgs(rawArgs);
+  if (!opts.jsonOutput) showBanner();
+  const base = resolveCageBaseDir(opts.targetDir);
+  if (!opts.jsonOutput) console.log(`🔍 Running Iron Cage Project Audit on: ${path.relative(resolveSafeRepoRoot(), base) || '.'}...`);
+  const files = collectSourceFiles(base);
+  if (!fs.existsSync(base) || files.length === 0) {
+    reportMissingCageTarget(base, opts.jsonOutput);
+    return;
+  }
+  const scan = scanCageFiles(files, opts.noCache);
+  reportCageResults(files.length, scan, opts.jsonOutput);
 }

@@ -31,6 +31,20 @@ interface CandidateMeta {
   isCode: boolean; isTest: boolean; isPkgSrc: boolean;
 }
 
+function scoreKeywordMatch(meta: CandidateMeta, kw: string): number {
+  if (meta.basename === `${kw}${meta.ext}` || meta.basename.startsWith(`${kw}.`)) return 25;
+  if (meta.basename.includes(kw)) return 15;
+  if (meta.lowerPath.includes(`/${kw}/`) || meta.lowerPath.includes(kw)) return 8;
+  return 0;
+}
+
+function scoreCodeBonus(meta: CandidateMeta, currentScore: number): number {
+  if (!meta.isCode || currentScore <= 0) return 0;
+  if (meta.isPkgSrc) return 27;
+  if (!meta.isTest && (meta.lowerPath.includes('src/') || meta.lowerPath.includes('packages/'))) return 20;
+  return 12;
+}
+
 export class FastSemanticAnalyzer {
   private repoRoot: string;
   private cachedFiles: { files: string[]; timestamp: number } | null = null;
@@ -168,34 +182,14 @@ export class FastSemanticAnalyzer {
   }
 
   public scoreCandidate(filePath: string, keywords: string[], hasTestIntent?: boolean): number {
-    let score = 0;
     const meta = this.getCandidateMeta(filePath);
-    const { lowerPath, basename, ext, isCode, isTest, isPkgSrc } = meta;
-
+    let score = 0;
     for (const kw of keywords) {
-      if (basename === `${kw}${ext}` || basename.startsWith(`${kw}.`)) {
-        score += 25;
-      } else if (basename.includes(kw)) {
-        score += 15;
-      } else if (lowerPath.includes(`/${kw}/`) || lowerPath.includes(kw)) {
-        score += 8;
-      }
+      score += scoreKeywordMatch(meta, kw);
     }
-
-    if (isCode && score > 0) {
-      score += 12;
-      if (isPkgSrc) {
-        score += 15;
-      } else if (!isTest && (lowerPath.includes('src/') || lowerPath.includes('packages/'))) {
-        score += 8;
-      }
-    }
-
+    score += scoreCodeBonus(meta, score);
     const testIntent = hasTestIntent ?? keywords.some(k => TEST_INTENT_WORDS.has(k));
-    if (isTest && !testIntent) {
-      score -= 15;
-    }
-
+    if (meta.isTest && !testIntent) score -= 15;
     return score;
   }
 

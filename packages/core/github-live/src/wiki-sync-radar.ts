@@ -190,7 +190,7 @@ function performNetworkReconcile(params: ReconcileParams, start: number, manifes
     return { success: false, message: `Failed to fetch remote wiki: ${msg}`, pulled: false, pushed: false, cached: false, durationMs: Date.now() - start };
   }
 
-  return applyDivergence(cloneDir, remoteRepo, start, manifestPath, env, token);
+  return applyDivergence({ cloneDir, remoteRepo, start, manifestPath, env, token });
 }
 
 function handleBehindMerge(cloneDir: string, behind: number, env: NodeJS.ProcessEnv) {
@@ -239,14 +239,17 @@ function resolveDivergenceAction(
   return { pulled: false, pushed: false, message: 'Wiki up to date with remote.', lastStatus: 'clean' };
 }
 
-function applyDivergence(
-  cloneDir: string,
-  remoteRepo: string,
-  start: number,
-  manifestPath: string,
-  env: NodeJS.ProcessEnv,
-  token?: string
-): WikiFastSyncResult {
+interface ApplyDivergenceParams {
+  cloneDir: string;
+  remoteRepo: string;
+  start: number;
+  manifestPath: string;
+  env: NodeJS.ProcessEnv;
+  token?: string;
+}
+
+function applyDivergence(params: ApplyDivergenceParams): WikiFastSyncResult {
+  const { cloneDir, remoteRepo, start, manifestPath, env, token } = params;
   const div = WikiSyncRadar.getCommitDivergence(cloneDir);
   const action = resolveDivergenceAction(cloneDir, div, env, token);
   const sha = WikiSyncRadar.getHeadSha(cloneDir);

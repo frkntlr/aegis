@@ -10,6 +10,38 @@ export interface WorktreeRegistryEntry {
   branch?: string;
 }
 
+function extractWorktreeEntries(data: unknown): WorktreeRegistryEntry[] {
+  if (Array.isArray(data)) return data as WorktreeRegistryEntry[];
+  if (data && typeof data === 'object' && 'worktrees' in data) {
+    const entries = (data as { worktrees: unknown }).worktrees;
+    if (Array.isArray(entries)) return entries as WorktreeRegistryEntry[];
+  }
+  return [];
+}
+
+function matchWorktreeEntry(list: WorktreeRegistryEntry[], normCwd: string): string | null {
+  const isWin = process.platform === 'win32';
+  const testCwd = isWin ? normCwd.toLowerCase() : normCwd;
+  for (const wt of list) {
+    if (!wt.path) continue;
+    const wtNorm = wt.path.replace(/\\/g, '/');
+    const targetNorm = isWin ? wtNorm.toLowerCase() : wtNorm;
+    if (testCwd === targetNorm || testCwd.startsWith(`${targetNorm}/`)) {
+      return wt.agentName || wt.name || path.basename(wtNorm);
+    }
+  }
+  return null;
+}
+
+function matchRoleByPathSuffix(norm: string): string | null {
+  const roles = ['solver', 'qa', 'docs', 'ui'];
+  for (const part of norm.split('/')) {
+    const matched = roles.find(r => part === r || part.endsWith(`-${r}`));
+    if (matched) return matched;
+  }
+  return null;
+}
+
 export class ActiveHeadResolver {
   public static resolveActiveWorktree(cwd = process.cwd(), repoRoot?: string): string {
     const norm = cwd.replace(/\\/g, '/');
@@ -23,15 +55,7 @@ export class ActiveHeadResolver {
     const segmentMatch = norm.match(/(?:experimental|worktrees|\.worktrees)\/([^/]+)/);
     if (segmentMatch) return segmentMatch[1];
 
-    const parts = norm.split('/');
-    for (const part of parts) {
-      if (part.endsWith('-solver') || part === 'solver') return 'solver';
-      if (part.endsWith('-qa') || part === 'qa') return 'qa';
-      if (part.endsWith('-docs') || part === 'docs') return 'docs';
-      if (part.endsWith('-ui') || part === 'ui') return 'ui';
-    }
-
-    return 'default';
+    return matchRoleByPathSuffix(norm) ?? 'default';
   }
 
   private static findRepoRoot(startDir: string): string | null {
@@ -53,22 +77,8 @@ export class ActiveHeadResolver {
 
     try {
       const data = readJsonSafe<unknown>(jsonPath);
-      const list: WorktreeRegistryEntry[] = Array.isArray(data)
-        ? data
-        : (data && typeof data === 'object' && 'worktrees' in data && Array.isArray((data as { worktrees: unknown[] }).worktrees))
-          ? (data as { worktrees: WorktreeRegistryEntry[] }).worktrees
-          : [];
-
-      const isWin = process.platform === 'win32';
-      const testCwd = isWin ? normCwd.toLowerCase() : normCwd;
-      for (const wt of list) {
-        if (!wt.path) continue;
-        const wtNorm = wt.path.replace(/\\/g, '/');
-        const targetNorm = isWin ? wtNorm.toLowerCase() : wtNorm;
-        if (testCwd === targetNorm || testCwd.startsWith(`${targetNorm}/`)) {
-          return wt.agentName || wt.name || path.basename(wtNorm);
-        }
-      }
+      const list = extractWorktreeEntries(data);
+      return matchWorktreeEntry(list, normCwd);
     } catch (err: unknown) {
       debugLogIgnored('active-head-resolver', err);
     }

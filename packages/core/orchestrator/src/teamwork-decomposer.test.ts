@@ -152,14 +152,14 @@ test('TeamworkDecomposer shards single source file into specialized intra-file A
 
 test('compileUltraLeanPrompt generates compact prompt under 200 tokens with anchors and contract', () => {
   const profile = getSubagentProfiles()[0];
-  const prompt = compileUltraLeanPrompt(
+  const prompt = compileUltraLeanPrompt({
     profile,
-    'Implement fast tokenizer',
-    ['src/tokenizer.ts'],
-    'issue-solver [tokenizer]',
-    ['tokenizeString', 'TokenKind'],
-    'export interface Token { kind: TokenKind; value: string }'
-  );
+    desc: 'Implement fast tokenizer',
+    files: ['src/tokenizer.ts'],
+    subagentName: 'issue-solver [tokenizer]',
+    targetSymbols: ['tokenizeString', 'TokenKind'],
+    contract: 'export interface Token { kind: TokenKind; value: string }'
+  });
   assert.ok(prompt.includes(profile.badge));
   assert.ok(prompt.includes('ACT:issue-solver [tokenizer]'));
   assert.ok(prompt.includes('FILES:[src/tokenizer.ts]'));
@@ -167,9 +167,15 @@ test('compileUltraLeanPrompt generates compact prompt under 200 tokens with anch
   assert.ok(prompt.includes('CONTRACT:export interface Token'));
   assert.ok(prompt.includes('ROLE_COMPLETE: issue-solver [tokenizer]'));
 
-  const compact = compileCompactTrackPrompt(
-    profile, 'Implement fast tokenizer', ['src/tokenizer.ts'], 'issue-solver [tokenizer]', ['Audit'], 1, 'export interface Token'
-  );
+  const compact = compileCompactTrackPrompt({
+    profile,
+    trackDesc: 'Implement fast tokenizer',
+    files: ['src/tokenizer.ts'],
+    subagentName: 'issue-solver [tokenizer]',
+    dependsOn: ['Audit'],
+    phase: 1,
+    upstreamContracts: 'export interface Token'
+  });
   assert.ok(compact.includes(profile.badge));
   assert.ok(compact.includes('TASK:issue-solver [tokenizer]|W1|deps:[Audit]'));
   assert.ok(compact.includes('FILES:[src/tokenizer.ts]'));

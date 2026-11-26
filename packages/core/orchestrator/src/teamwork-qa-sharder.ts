@@ -1,4 +1,4 @@
-import type { DecomposedSubtask } from './teamwork-decomposer.js';
+import type { DecomposedSubtask } from './teamwork-decomposer-types.js';
 
 export function hasDimensionedQaHelper(tasks: DecomposedSubtask[]): boolean {
   return tasks.some(t => t.roleType === 'qa' && ['StaticAudit', 'TypeSafety', 'SafetyGate'].includes(t.label));

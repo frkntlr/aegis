@@ -118,14 +118,17 @@ function upsertStagedTracks(inboxArray: unknown[], tracks: TeamworkTrack[], obje
   }
 }
 
-export function stageTracksIntoInboxHelper(
-  repoRoot: string,
-  planId: string,
-  objective: string,
-  tracks: TeamworkTrack[],
-  worktreeManager: WorktreeManager,
-  shouldLock = true
-): void {
+export interface StageTracksOptions {
+  repoRoot: string;
+  planId: string;
+  objective: string;
+  tracks: TeamworkTrack[];
+  worktreeManager: WorktreeManager;
+  shouldLock?: boolean;
+}
+
+export function stageTracksIntoInboxHelper(options: StageTracksOptions): void {
+  const { repoRoot, planId, objective, tracks, worktreeManager, shouldLock = true } = options;
   const inboxPath = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
   try { fs.mkdirSync(path.dirname(inboxPath), { recursive: true }); } catch (err: unknown) {
     debugLogIgnored('TeamworkStaging:mkdirInbox', err);

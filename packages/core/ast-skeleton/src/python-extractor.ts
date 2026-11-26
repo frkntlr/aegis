@@ -1,6 +1,15 @@
 import type { SkeletonResult } from './ts-extractor.js';
 import type { LanguageExtractor } from './extractor-registry.js';
 
+interface PythonDeclarationContext {
+  lines: string[];
+  index: number;
+  line: string;
+  trimmed: string;
+  pendingDecorators: string[];
+  output: string[];
+}
+
 export class PythonSkeletonExtractor implements LanguageExtractor {
   public readonly languageId = 'python';
   public readonly supportedExtensions = ['.py'];
@@ -41,7 +50,7 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
         continue;
       }
 
-      i = this.handleDeclaration(lines, i, line, trimmed, pendingDecorators, output);
+      i = this.handleDeclaration({ lines, index: i, line, trimmed, pendingDecorators, output });
     }
 
     return output;
@@ -55,45 +64,38 @@ export class PythonSkeletonExtractor implements LanguageExtractor {
       /^[A-Za-z_]\w*(?:\s*:\s*[^=]+)?\s*=\s*(?!=)/.test(trimmed);
   }
 
-  private handleDeclaration(
-    lines: string[],
-    i: number,
-    line: string,
-    trimmed: string,
-    pendingDecorators: string[],
-    output: string[]
-  ): number {
+  private emitFunctionSkeleton(ctx: PythonDeclarationContext): number {
+    const { lines, index, line, pendingDecorators, output } = ctx;
+    this.flushDecorators(pendingDecorators, output);
+    const { header, nextIndex } = this.consumeHeader(lines, index);
+    const indent = line.match(/^\s*/)?.[0] ?? '';
+    const baseIndent = indent.length;
+    output.push(header);
+    output.push(`${indent}    ...`);
+    return this.skipBlock(lines, nextIndex, baseIndent);
+  }
+
+  private handleDeclaration(ctx: PythonDeclarationContext): number {
+    const { lines, index, line, trimmed, pendingDecorators, output } = ctx;
     if (trimmed.startsWith('def ') || trimmed.startsWith('async def ')) {
-      this.flushDecorators(pendingDecorators, output);
-      const { header, nextIndex } = this.consumeHeader(lines, i);
-      const indent = line.match(/^\s*/)?.[0] ?? '';
-      const baseIndent = (line.match(/^\s*/)?.[0] ?? '').length;
-      output.push(header);
-      output.push(`${indent}    ...`);
-      return this.skipBlock(lines, nextIndex, baseIndent);
+      return this.emitFunctionSkeleton(ctx);
     }
 
     if (trimmed.startsWith('class ')) {
       this.flushDecorators(pendingDecorators, output);
-      const { header, nextIndex } = this.consumeHeader(lines, i);
+      const { header, nextIndex } = this.consumeHeader(lines, index);
       output.push(header);
       return nextIndex;
     }
 
-    if (trimmed.startsWith('import ') || trimmed.startsWith('from ')) {
+    if (trimmed.startsWith('import ') || trimmed.startsWith('from ') || this.isTopLevelAssignment(line, trimmed)) {
       this.flushDecorators(pendingDecorators, output);
       output.push(line);
-      return i + 1;
-    }
-
-    if (this.isTopLevelAssignment(line, trimmed)) {
-      this.flushDecorators(pendingDecorators, output);
-      output.push(line);
-      return i + 1;
+      return index + 1;
     }
 
     pendingDecorators.length = 0;
-    return i + 1;
+    return index + 1;
   }
 
   private flushDecorators(pending: string[], output: string[]): void {

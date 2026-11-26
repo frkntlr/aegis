@@ -2,8 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { GitHubLiveAdapter, GitHubProjectsAdapter, GitHubTokenResolver, RateLimitInfo } from '@aegis/github-live';
-import type { SystemIssue } from './realtime-metrics.js';
+import type { GitHubKanbanStatus, SystemIssue } from './metrics-types.js';
 import { INITIAL_DEFAULT_ISSUES, buildIssueBody, buildQualityGateComment } from './kanban-templates.js';
+
+export type { GitHubKanbanStatus } from './metrics-types.js';
 
 export interface GitHubKanbanOptions {
   repoRoot?: string;
@@ -11,15 +13,6 @@ export interface GitHubKanbanOptions {
   adapter?: GitHubLiveAdapter;
   projectsAdapter?: GitHubProjectsAdapter;
   projectNumber?: number;
-}
-
-export interface GitHubKanbanStatus {
-  connected: boolean;
-  owner: string;
-  repo: string;
-  user: string;
-  issuesCount: number;
-  rateRemaining?: number;
 }
 
 export class GitHubKanbanService {

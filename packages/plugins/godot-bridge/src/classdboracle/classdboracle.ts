@@ -3,6 +3,15 @@ import { BUILTIN_GODOT_CLASSES } from './builtin-classes.js';
 import { DoctoolRunner } from './doctool-runner.js';
 import type { ClassInfo, MethodInfo, PropertyInfo, SignalInfo, ValidationResult } from './classdb-types.js';
 
+interface ValidateLineContext {
+  line: string;
+  lineNo: number;
+  baseClass: string;
+  localMethods: Set<string>;
+  file?: string;
+  out: ValidationResult[];
+}
+
 export class ClassDbOracle {
   private readonly classes: Map<string, ClassInfo> = new Map();
   private readonly doctoolRunner: DoctoolRunner;
@@ -86,7 +95,7 @@ export class ClassDbOracle {
     const localMethods = this.extractLocalFunctions(sourceCode);
     const lines = sourceCode.split('\n');
     for (let i = 0; i < lines.length; i++) {
-      this.validateLine(lines[i], i + 1, baseClass, localMethods, filePath, results);
+      this.validateLine({ line: lines[i], lineNo: i + 1, baseClass, localMethods, file: filePath, out: results });
     }
     return results;
   }
@@ -111,35 +120,25 @@ export class ClassDbOracle {
     return match ? match[1] : undefined;
   }
 
-  private validateLine(
-    line: string,
-    lineNo: number,
-    baseClass: string,
-    localMethods: Set<string>,
-    file: string | undefined,
-    out: ValidationResult[]
-  ): void {
-    const trimmed = line.trim();
+  private validateLine(ctx: ValidateLineContext): void {
+    const trimmed = ctx.line.trim();
     if (!trimmed || trimmed.startsWith('#')) return;
 
     const matches = trimmed.matchAll(/(?:self\.)?([a-zA-Z_]\w*)\s*\(/g);
     for (const match of matches) {
       const methodName = match[1];
       const isExplicitSelf = match[0].startsWith('self.');
-      if (localMethods.has(methodName) || this.queryMethod(baseClass, methodName)) continue;
+      if (ctx.localMethods.has(methodName) || this.queryMethod(ctx.baseClass, methodName)) continue;
 
+      const suggestion = this.suggestSimilarMethod(ctx.baseClass, methodName);
       if (isExplicitSelf) {
-        const suggestion = this.suggestSimilarMethod(baseClass, methodName);
         const message = suggestion
-          ? `Unknown method '${methodName}' called on base class '${baseClass}'. Did you mean '${suggestion}'?`
-          : `Unknown method '${methodName}' called on base class '${baseClass}'.`;
-        out.push({ file, line: lineNo, severity: 'error', symbol: methodName, message });
-      } else {
-        const suggestion = this.suggestSimilarMethod(baseClass, methodName);
-        if (suggestion) {
-          const message = `Unknown Godot method '${methodName}' called on '${baseClass}'. Did you mean '${suggestion}'?`;
-          out.push({ file, line: lineNo, severity: 'error', symbol: methodName, message });
-        }
+          ? `Unknown method '${methodName}' called on base class '${ctx.baseClass}'. Did you mean '${suggestion}'?`
+          : `Unknown method '${methodName}' called on base class '${ctx.baseClass}'.`;
+        ctx.out.push({ file: ctx.file, line: ctx.lineNo, severity: 'error', symbol: methodName, message });
+      } else if (suggestion) {
+        const message = `Unknown Godot method '${methodName}' called on '${ctx.baseClass}'. Did you mean '${suggestion}'?`;
+        ctx.out.push({ file: ctx.file, line: ctx.lineNo, severity: 'error', symbol: methodName, message });
       }
     }
   }

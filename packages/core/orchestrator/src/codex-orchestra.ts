@@ -6,8 +6,14 @@ import type { TeamworkPlan } from './teamwork-types.js';
 import { OrchestraStore } from './codex-orchestra-store.js';
 import { getTask, reserveDispatches, settle } from './codex-orchestra-scheduler.js';
 import { fileScopeKey, newTask, normalizedOptions, resolvePlanDependencies, validateGraph } from './codex-orchestra-validation.js';
-import type { OrchestraDispatch, OrchestraOptions, OrchestraRun, OrchestraTaskInput } from './codex-orchestra-types.js';
-import type { OrchestraDeferralInput, OrchestraRecoveryStatus } from './codex-orchestra-types.js';
+import type {
+  OrchestraDeferralInput,
+  OrchestraDispatch,
+  OrchestraOptions,
+  OrchestraRecoveryStatus,
+  OrchestraRun,
+  OrchestraTaskInput
+} from './codex-orchestra-types.js';
 import { deferOrchestraTask, recoveryStatus } from './codex-orchestra-recovery.js';
 
 export * from './codex-orchestra-types.js';

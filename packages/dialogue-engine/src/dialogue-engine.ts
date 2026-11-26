@@ -14,6 +14,15 @@ import { ArmoredPrescriptionBuilder } from './armored-prescription-builder.js';
 import { AstTriangulator, TriangulatedContext } from './ast-triangulator.js';
 import { DynamicHypothesisGenerator } from './hypothesis-generator.js';
 
+interface EvidenceSessionInput {
+  sessionId: string;
+  rawInput: string;
+  evidence?: ParsedEvidence;
+  memorySlice?: MemorySymbolSlice;
+  budgetReport?: LineBudgetReport;
+  triangulated?: TriangulatedContext;
+}
+
 export class DialogueEngine {
   private sessions: Map<string, DialogueSession> = new Map();
   private ports: DialogueEnginePorts;
@@ -83,39 +92,34 @@ export class DialogueEngine {
       budgetReport = await this.ports.budgetInspector.inspectBudget(evidence.filePath);
     }
 
-    const session = this.buildEvidenceSession(sessionId, rawLogOrError, evidence, memorySlice, budgetReport, triangulated);
+    const session = this.buildEvidenceSession({
+      sessionId, rawInput: rawLogOrError, evidence, memorySlice, budgetReport, triangulated
+    });
     this.sessions.set(sessionId, session);
     return session;
   }
 
-  private buildEvidenceSession(
-    sessionId: string,
-    rawInput: string,
-    evidence?: ParsedEvidence,
-    memorySlice?: MemorySymbolSlice,
-    budgetReport?: LineBudgetReport,
-    triangulated?: TriangulatedContext
-  ): DialogueSession {
-    const category = SymptomClassifier.classify(rawInput);
-    const options = DynamicHypothesisGenerator.generate(category, triangulated, budgetReport);
+  private buildEvidenceSession(input: EvidenceSessionInput): DialogueSession {
+    const category = SymptomClassifier.classify(input.rawInput);
+    const options = DynamicHypothesisGenerator.generate(category, input.triangulated, input.budgetReport);
     const initialRecord: DialogueTurnRecord = {
       turn: 1,
       phase: TurnPhase.TURN_1_SYMPTOM,
-      userInput: rawInput,
+      userInput: input.rawInput,
       systemResponse: `Identified category: ${category}. Evidence analyzed.`,
       timestamp: new Date().toISOString()
     };
     return {
-      sessionId,
+      sessionId: input.sessionId,
       phase: TurnPhase.TURN_1_SYMPTOM,
       turnCount: 1,
       category,
       availableOptions: options,
       history: [initialRecord],
       isResolved: false,
-      evidence,
-      memorySlice,
-      budgetReport
+      evidence: input.evidence,
+      memorySlice: input.memorySlice,
+      budgetReport: input.budgetReport
     };
   }
 

@@ -1,10 +1,13 @@
-import { RoleClassifier } from './role-classifier.js';
-import type { DecomposedSubtask } from './teamwork-decomposer.js';
+import type { DecomposedSubtask, DecomposeOptions } from './teamwork-decomposer-types.js';
 import { TeamworkSharder } from './teamwork-sharder.js';
 import { TeamworkTrackBuilder } from './teamwork-track-builder.js';
+import { TeamworkHierarchicalTree } from './teamwork-hierarchical-tree.js';
+import { SemanticAIDecomposer } from './semantic-ai-decomposer.js';
 import type { TeamworkGroundingEngine } from './teamwork-grounding.js';
 import type { SubagentProfile } from './teamwork-prompts.js';
-import type { TeamworkTrack } from './teamwork-types.js';
+import type { ComplexityAnalysisResult } from './task-complexity-analyzer.js';
+import type { DeliberationResult } from './teamwork-deliberation-types.js';
+import type { PlanTeamworkOptions, TeamworkTrack } from './teamwork-types.js';
 
 export function alignSubtaskPhases(subtasks: DecomposedSubtask[], files: string[]): void {
   for (const t of subtasks) {
@@ -40,7 +43,7 @@ export function scaleSemanticSubtasks(
 }
 
 export function reconcileSemanticSubtasks(subtasks: DecomposedSubtask[], files: string[], objective: string): void {
-  if (!subtasks.some(t => t.roleType === 'solver') && files.some(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'))) {
+  if (!subtasks.some(t => t.roleType === 'solver') && files.some(f => TeamworkSharder.isSourceFile(f))) {
     subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [], phase: 1, dependsOn: [] });
   }
   if (!subtasks.some(t => t.roleType === 'qa')) {
@@ -64,4 +67,52 @@ export function buildCoordinatorTracks(
     upstreamFilesMap.set(sub.label, sub.targetFiles);
   }
   return tracks;
+}
+
+export function resolveSemanticSubtasks(
+  objective: string,
+  files: string[],
+  complexity: ComplexityAnalysisResult,
+  options: PlanTeamworkOptions = {}
+): DecomposedSubtask[] {
+  let subtasks = SemanticAIDecomposer.toDecomposedSubtasks(SemanticAIDecomposer.decompose(objective, files));
+  reconcileSemanticSubtasks(subtasks, files, objective);
+  const max = options.maxConcurrency ?? 0;
+  const isScaling = complexity.tier === 'COMPLEX' || complexity.tier === 'HYPER_SCALE' || Boolean(options.autoScale) || max > 1;
+  if (isScaling) {
+    subtasks = scaleSemanticSubtasks(subtasks, files, objective, options.maxConcurrency ?? complexity.optimalAgentCount);
+  }
+  const roles = options.selectedRoles;
+  return roles?.length ? subtasks.filter(t => roles.includes(t.roleType)) : subtasks;
+}
+
+export function buildDecomposeOptions(
+  objective: string,
+  complexity: ComplexityAnalysisResult,
+  options: PlanTeamworkOptions = {}
+): DecomposeOptions {
+  const max = options.maxConcurrency ?? 0;
+  const isScaling = max > 1 || Boolean(options.autoScale) || Boolean(options.treeSpecialists);
+  const useSuggested = complexity.tier === 'TRIVIAL' && !options.explicitRole && !isScaling;
+  return {
+    maxConcurrency: options.maxConcurrency ?? complexity.optimalAgentCount,
+    autoScale: options.autoScale ?? (complexity.tier === 'HYPER_SCALE'),
+    selectedRoles: options.selectedRoles ?? (useSuggested ? complexity.suggestedRoles : undefined),
+    explicitRole: options.explicitRole,
+    treeSpecialists: options.treeSpecialists ?? (complexity.shouldEnableHierarchicalTree && TeamworkHierarchicalTree.isHierarchicalRequested(objective))
+  };
+}
+
+export function annotateCodexMission(tracks: TeamworkTrack[], objective: string): void {
+  for (const track of tracks) {
+    if (track.codexInvocationPayload) {
+      track.codexInvocationPayload.message = `Mission: ${objective}\n${track.codexInvocationPayload.message}`;
+    }
+  }
+}
+
+export function formatDeliberationSummary(delibResult?: DeliberationResult): string {
+  if (!delibResult) return '';
+  const status = delibResult.consensus.status.toUpperCase();
+  return ` Deliberation [${status}]: ${delibResult.consensus.agreedStrategy} (Score: ${delibResult.consensus.consensusScore}%)`;
 }

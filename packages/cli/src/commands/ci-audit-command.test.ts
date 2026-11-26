@@ -21,8 +21,8 @@ import {
   type CiStepDefinition
 } from './ci-audit-command.js';
 
-test('CI_GATES contains all 10 deterministic pipeline gates', () => {
-  assert.strictEqual(CI_GATES.length, 10);
+test('CI_GATES contains all 11 deterministic pipeline gates', () => {
+  assert.strictEqual(CI_GATES.length, 11);
   const ids = CI_GATES.map(g => g.id);
   assert.deepStrictEqual(ids, [
     'build',
@@ -30,6 +30,7 @@ test('CI_GATES contains all 10 deterministic pipeline gates', () => {
     'lint',
     'deps:drift',
     'cage:check',
+    'arch:health',
     'verify',
     'test',
     'inspect',
@@ -38,12 +39,13 @@ test('CI_GATES contains all 10 deterministic pipeline gates', () => {
   ]);
 
   const coreGates = CI_GATES.filter(g => g.isCore);
-  assert.strictEqual(coreGates.length, 5);
+  assert.strictEqual(coreGates.length, 6);
   const coreIds = coreGates.map(g => g.id);
   assert.ok(coreIds.includes('build'));
   assert.ok(coreIds.includes('typecheck'));
   assert.ok(coreIds.includes('lint'));
   assert.ok(coreIds.includes('cage:check'));
+  assert.ok(coreIds.includes('arch:health'));
   assert.ok(coreIds.includes('test'));
 });
 
@@ -75,11 +77,16 @@ test('matchesStep resolves gates by ID, alias, or name', () => {
   const godotGate = CI_GATES.find(g => g.id === 'godot')!;
   assert.strictEqual(matchesStep(godotGate, 'godot'), true);
   assert.strictEqual(matchesStep(godotGate, 'godot:status'), true);
+
+  const archGate = CI_GATES.find(g => g.id === 'arch:health')!;
+  assert.strictEqual(matchesStep(archGate, 'arch'), true);
+  assert.strictEqual(matchesStep(archGate, 'arch:health'), true);
+  assert.strictEqual(matchesStep(archGate, 'archhealth'), true);
 });
 
 test('filterCiGates filters correctly for fast mode and specific steps', () => {
   const fastGates = filterCiGates(CI_GATES, { fast: true });
-  assert.strictEqual(fastGates.length, 5);
+  assert.strictEqual(fastGates.length, 6);
   assert.ok(fastGates.every(g => g.isCore));
 
   const stepGate = filterCiGates(CI_GATES, { step: 'mutate' });
@@ -90,7 +97,7 @@ test('filterCiGates filters correctly for fast mode and specific steps', () => {
   assert.strictEqual(unknown.length, 0);
 
   const all = filterCiGates(CI_GATES, {});
-  assert.strictEqual(all.length, 10);
+  assert.strictEqual(all.length, 11);
 });
 
 test('formatDuration formats milliseconds and seconds appropriately', () => {
@@ -162,7 +169,7 @@ test('handleCiAudit runs cleanly with custom runner and supports json output', a
     assert.ok(jsonStr, 'Expected JSON output containing success: true');
     const parsed = JSON.parse(jsonStr!);
     assert.strictEqual(parsed.success, true);
-    assert.strictEqual(parsed.passedCount, 5);
+    assert.strictEqual(parsed.passedCount, 6);
   } finally {
     console.log = origLog;
   }

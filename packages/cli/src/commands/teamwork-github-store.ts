@@ -17,22 +17,38 @@ function linksPath(planId: string): string {
   return path.join(resolveSafeRepoRoot(), '.aegis/teamwork-github', `${planId}.json`);
 }
 
+function isValidIssueEntry(
+  entry: GitHubTrackingEntry,
+  repository: string | undefined,
+  seen: Set<string>
+): boolean {
+  if (!entry || typeof entry.trackId !== 'string' || !entry.trackId || seen.has(entry.trackId)) return false;
+  if (!Number.isSafeInteger(entry.issueNumber) || entry.issueNumber <= 0) return false;
+  const expected = `https://github.com/${repository}/issues/${entry.issueNumber}`.toLowerCase();
+  if (typeof entry.issueUrl !== 'string' || entry.issueUrl.toLowerCase() !== expected) return false;
+  return entry.status === 'open' || entry.status === 'closed';
+}
+
+function validateDiscussionLink(links: GitHubPlanLinks): void {
+  if (!links.discussion) return;
+  const prefix = `https://github.com/${links.repository}/discussions/`;
+  const url = links.discussion.url;
+  const validPrefix = Boolean(links.repository) && typeof url === 'string' && url.toLowerCase().startsWith(prefix.toLowerCase());
+  if (!validPrefix || !/^[1-9]\d*$/.test(url.slice(prefix.length))) {
+    throw new Error('Invalid saved GitHub discussion link; reconcile before retrying');
+  }
+}
+
 function validateLinks(links: GitHubPlanLinks): void {
   if (links.repository && !/^[^/\s]+\/[^/\s]+$/.test(links.repository)) throw new Error('Invalid saved repository identity');
   const seen = new Set<string>();
   for (const entry of links.entries) {
-    if (!entry || typeof entry.trackId !== 'string' || !entry.trackId || seen.has(entry.trackId) ||
-        !Number.isSafeInteger(entry.issueNumber) || entry.issueNumber <= 0 ||
-        typeof entry.issueUrl !== 'string' || entry.issueUrl.toLowerCase() !== `https://github.com/${links.repository}/issues/${entry.issueNumber}`.toLowerCase() ||
-        !['open', 'closed'].includes(entry.status)) throw new Error('Invalid saved GitHub issue link; reconcile before retrying');
+    if (!isValidIssueEntry(entry, links.repository, seen)) {
+      throw new Error('Invalid saved GitHub issue link; reconcile before retrying');
+    }
     seen.add(entry.trackId);
   }
-  const discussionPrefix = `https://github.com/${links.repository}/discussions/`;
-  if (links.discussion && (!links.repository || typeof links.discussion.url !== 'string' ||
-      !links.discussion.url.toLowerCase().startsWith(discussionPrefix.toLowerCase()) ||
-      !/^[1-9]\d*$/.test(links.discussion.url.slice(discussionPrefix.length)))) {
-    throw new Error('Invalid saved GitHub discussion link; reconcile before retrying');
-  }
+  validateDiscussionLink(links);
 }
 
 export function readGitHubPlanLinks(planId: string): GitHubPlanLinks {

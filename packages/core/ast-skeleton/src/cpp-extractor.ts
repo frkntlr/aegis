@@ -1,6 +1,58 @@
 import type { SkeletonResult } from './ts-extractor.js';
 import type { LanguageExtractor } from './extractor-registry.js';
 
+interface CppBlockState {
+  braceCount: number;
+  foundOpen: boolean;
+  inComment: boolean;
+}
+
+function skipCppString(chars: string, j: number): number {
+  const q = chars[j++];
+  while (j < chars.length && chars[j] !== q) {
+    if (chars[j] === '\\') j += 2;
+    else j++;
+  }
+  return j + 1;
+}
+
+function advanceCppComment(s: string, j: number, state: CppBlockState): number {
+  if (s[j] === '*' && s[j + 1] === '/') {
+    state.inComment = false;
+    return j + 2;
+  }
+  return j + 1;
+}
+
+function stepCppCodeChar(s: string, j: number, state: CppBlockState): number {
+  if (s[j] === '/' && s[j + 1] === '*') {
+    state.inComment = true;
+    return j + 2;
+  }
+  if (s[j] === '"' || s[j] === "'") {
+    return skipCppString(s, j);
+  }
+  if (s[j] === '{') {
+    state.braceCount++;
+    state.foundOpen = true;
+  } else if (s[j] === '}') {
+    state.braceCount--;
+  }
+  return j + 1;
+}
+
+function scanCppBlockLine(s: string, state: CppBlockState): void {
+  let j = 0;
+  while (j < s.length) {
+    if (state.inComment) {
+      j = advanceCppComment(s, j, state);
+      continue;
+    }
+    if (s[j] === '/' && s[j + 1] === '/') break;
+    j = stepCppCodeChar(s, j, state);
+  }
+}
+
 export class CppSkeletonExtractor implements LanguageExtractor {
   public readonly languageId = 'cpp';
   public readonly supportedExtensions = ['.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx'];
@@ -84,38 +136,12 @@ export class CppSkeletonExtractor implements LanguageExtractor {
     return parts.join('\n');
   }
 
-  private skipString(chars: string, j: number): number {
-    const q = chars[j++];
-    while (j < chars.length && chars[j] !== q) {
-      if (chars[j] === '\\') j += 2;
-      else j++;
-    }
-    return j + 1;
-  }
-
   private skipBlock(lines: string[], startIndex: number): number {
-    let braceCount = 0;
-    let foundOpen = false;
-    let inComment = false;
+    const state: CppBlockState = { braceCount: 0, foundOpen: false, inComment: false };
     let i = startIndex;
-
     while (i < lines.length) {
-      const s = lines[i];
-      let j = 0;
-      while (j < s.length) {
-        if (inComment) {
-          if (s[j] === '*' && s[j + 1] === '/') { inComment = false; j += 2; }
-          else j++;
-          continue;
-        }
-        if (s[j] === '/' && s[j + 1] === '/') break;
-        if (s[j] === '/' && s[j + 1] === '*') { inComment = true; j += 2; continue; }
-        if (s[j] === '"' || s[j] === "'") { j = this.skipString(s, j); continue; }
-        if (s[j] === '{') { braceCount++; foundOpen = true; }
-        else if (s[j] === '}') braceCount--;
-        j++;
-      }
-      if (foundOpen && braceCount <= 0) return i + 1;
+      scanCppBlockLine(lines[i], state);
+      if (state.foundOpen && state.braceCount <= 0) return i + 1;
       i++;
     }
     return i + 1;

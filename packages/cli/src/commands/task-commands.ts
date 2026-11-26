@@ -9,16 +9,12 @@ import {
   updateTaskInboxStatus,
   listInboxTasks,
   clearInboxTasks,
-  matchesTaskRole
+  matchesTaskRole,
+  type TaskInboxItem
 } from './task-inbox.js';
+import { normalizeRole, closeGitHubIssueIfConfigured } from './task-role-helpers.js';
 
-export function normalizeRole(rawRole?: string): string {
-  const r = (rawRole || 'solver').toLowerCase().trim();
-  if (r.includes('qa')) return 'qa-hunter';
-  if (r.includes('ui')) return 'ui-specialist';
-  if (r.includes('doc')) return 'doc-architect';
-  return 'issue-solver';
-}
+export { normalizeRole, closeGitHubIssueIfConfigured } from './task-role-helpers.js';
 
 function roleToWorktree(role: string): string {
   if (role === 'qa-hunter') return 'experimental/qa';
@@ -66,12 +62,6 @@ export function handleTaskClaim(issueArg?: string, roleArg?: string): void {
   console.log(`🎯 Task #${issueNum} claimed by [${role.toUpperCase()}]! Status: IN_PROGRESS.`);
 }
 
-/** Local completion is not remote quality proof; closure uses the explicit evidence workflow. */
-export async function closeGitHubIssueIfConfigured(issueNum: number, _agent?: string): Promise<void> {
-  console.log(`Local task complete; GitHub issue #${issueNum} remains open until explicit proof-based closure.`);
-  console.log('Use aegis tw:gh:close <full-commit-hash> "<summary>" <remote-issue-number> <proof.json>.');
-}
-
 function parseReleaseArgs(args: string[]): { issueArg: string; status: 'pending' | 'in_progress' | 'done' | 'blocked'; reasonArg?: string } {
   const statusIdx = args.findIndex(a => {
     const l = a.toLowerCase();
@@ -90,6 +80,41 @@ function parseReleaseArgs(args: string[]): { issueArg: string; status: 'pending'
   return { issueArg, status, reasonArg };
 }
 
+function findMatchingTasksForRelease(tasks: TaskInboxItem[], issueArg: string): TaskInboxItem[] {
+  const parsedNum = parseInt(issueArg, 10);
+  if (Number.isFinite(parsedNum) && parsedNum > 0) {
+    return tasks.filter(t => t.issueNumber === parsedNum);
+  }
+  const query = issueArg.toLowerCase();
+  const raw = tasks.filter(t =>
+    t.trackId?.toLowerCase() === query ||
+    matchesTaskRole(t.role, issueArg, t.issueNumber, t.trackId) ||
+    Boolean(t.title?.toLowerCase().includes(query))
+  );
+  const inProgress = raw.filter(t => t.status === 'in_progress');
+  return inProgress.length > 0 ? inProgress : raw;
+}
+
+async function releaseSingleTask(
+  task: TaskInboxItem,
+  status: TaskInboxItem['status'],
+  wtManager: WorktreeManager,
+  mesh: TeamworkMesh
+): Promise<void> {
+  if (task.targetFiles && task.targetFiles.length > 0) wtManager.releaseFiles(task.targetFiles);
+  updateTaskInboxStatus(task.issueNumber, status);
+  if (status === 'done' || status === 'blocked') {
+    try {
+      mesh.postActivity(task.claimedBy || task.role, { status, activity: `Task #${task.issueNumber} marked ${status}` });
+    } catch (err: unknown) {
+      debugLogIgnored('TaskCommands:handleTaskRelease', err);
+    }
+  }
+  if (status === 'done' && task.isGitHubIssue === true) {
+    await closeGitHubIssueIfConfigured(task.issueNumber, task.claimedBy || task.role);
+  }
+}
+
 export async function handleTaskRelease(...args: string[]): Promise<void> {
   showBanner();
   if (args.length === 0 || !args[0]) {
@@ -98,23 +123,11 @@ export async function handleTaskRelease(...args: string[]): Promise<void> {
   }
   const { issueArg, status, reasonArg } = parseReleaseArgs(args);
   const wtManager = new WorktreeManager({ persistLocks: true });
-  const tasks = listInboxTasks();
-  const parsedNum = parseInt(issueArg, 10);
-  const hasNum = Number.isFinite(parsedNum) && parsedNum > 0;
-
-  const rawMatched = hasNum
-    ? tasks.filter(t => t.issueNumber === parsedNum)
-    : tasks.filter(t => (t.trackId && t.trackId.toLowerCase() === issueArg.toLowerCase()) || matchesTaskRole(t.role, issueArg, t.issueNumber, t.trackId) || (t.title && t.title.toLowerCase().includes(issueArg.toLowerCase())));
-  const matched = (!hasNum && rawMatched.some(t => t.status === 'in_progress')) ? rawMatched.filter(t => t.status === 'in_progress') : rawMatched;
-
+  const matched = findMatchingTasksForRelease(listInboxTasks(), issueArg);
   const mesh = new TeamworkMesh();
-  for (const t of matched) {
-    if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
-    updateTaskInboxStatus(t.issueNumber, status);
-    if (status === 'done' || status === 'blocked') {
-      try { mesh.postActivity(t.claimedBy || t.role, { status, activity: `Task #${t.issueNumber} marked ${status}` }); } catch (err: unknown) { debugLogIgnored('TaskCommands:handleTaskRelease', err); }
-    }
-    if (status === 'done' && t.isGitHubIssue === true) await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
+
+  for (const task of matched) {
+    await releaseSingleTask(task, status, wtManager, mesh);
   }
 
   if (matched.length === 0) wtManager.releaseFileLocks(issueArg);

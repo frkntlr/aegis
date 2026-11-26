@@ -1,4 +1,4 @@
-import type { McpToolMeta } from './mcp-tool-schemas.js';
+import type { McpToolMeta } from './mcp-tool-schema-types.js';
 
 export const GODOT_MCP_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
   aegis_godot_status: {

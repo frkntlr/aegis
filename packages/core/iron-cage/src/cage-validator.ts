@@ -2,6 +2,7 @@ import ts from 'typescript';
 import type { CageValidationResult, CageViolation } from '@aegis/shared';
 import { GDScriptRulesValidator } from './gdscript-rules.js';
 import { CleanArchitectureValidator } from './clean-architecture-rules.js';
+import { AntiSpaghettiValidator } from './anti-spaghetti-rules.js';
 
 export interface CageValidatorOptions {
   maxFunctionLines?: number;
@@ -18,10 +19,12 @@ interface ScanState {
 export class IronCageValidator {
   private maxFunctionLines: number;
   private maxFileLines: number;
+  private maxCyclomaticComplexity: number;
 
   constructor(options: CageValidatorOptions = {}) {
     this.maxFunctionLines = options.maxFunctionLines ?? 40;
     this.maxFileLines = options.maxFileLines ?? 300;
+    this.maxCyclomaticComplexity = options.maxCyclomaticComplexity ?? 35;
   }
 
   private isCallableNode(node: ts.Node): boolean {
@@ -90,6 +93,14 @@ export class IronCageValidator {
     };
 
     walk(sourceFile);
+
+    const antiSpaghetti = new AntiSpaghettiValidator({
+      maxCyclomaticComplexity: this.maxCyclomaticComplexity,
+      maxParams: Number.MAX_SAFE_INTEGER,
+      maxClassMethods: Number.MAX_SAFE_INTEGER,
+      maxFileImports: Number.MAX_SAFE_INTEGER
+    });
+    violations.push(...antiSpaghetti.validateSourceFile(filePath, sourceFile));
   }
 
   private checkFunctionLimit(

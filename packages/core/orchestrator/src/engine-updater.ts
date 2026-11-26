@@ -9,59 +9,60 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as cp from 'node:child_process';
 import { cleanGitEnv, debugLogIgnored, readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
-import { VersionManager, type BumpType } from './version-manager.js';
+import { VersionManager } from './version-manager.js';
 import { refreshEngineInstallations, resolveUpdateEngineRoot } from './engine-update-refresh.js';
 import { runEngineUpdate } from './engine-update-run.js';
+import type {
+  EngineUpdateOptions,
+  EngineUpdateResult,
+  EngineVersionReport,
+  MonorepoPackageInfo
+} from './engine-update-types.js';
 
-export interface MonorepoPackageInfo {
-  name: string;
-  version: string;
+export type {
+  EngineUpdateOptions,
+  EngineUpdateResult,
+  EngineVersionReport,
+  MonorepoPackageInfo
+} from './engine-update-types.js';
+
+function runGitCommand(args: string[], cwd: string, timeout = 15000): string | null {
+  try {
+    return cp.execFileSync('git', args, { cwd, timeout, env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+  } catch { return null; }
 }
 
-export interface EngineVersionReport {
-  currentVersion: string;
-  localCommit: string;
-  remoteCommit: string;
-  branch: string;
-  driftStatus: 'synced' | 'behind' | 'ahead' | 'diverged' | 'offline';
-  behindCount: number;
-  aheadCount: number;
-  worktreesCount: number;
-  monorepoPackages: MonorepoPackageInfo[];
-  installedShims: string[];
-  mcpToolCount: number;
-  latestTag: string | null;
-  upgradeAvailable: boolean;
-  nextRecommendedVersion: string;
-  nextPatch?: string;
-  nextMinor?: string;
-  timestamp: string;
+function calculateRepoDrift(
+  repoRoot: string, branch: string, localCommit: string, remoteCommit: string
+): { driftStatus: 'synced' | 'behind' | 'ahead' | 'diverged' | 'offline'; behindCount: number; aheadCount: number } {
+  if (remoteCommit === 'offline') return { driftStatus: 'offline', behindCount: 0, aheadCount: 0 };
+  if (localCommit === remoteCommit) return { driftStatus: 'synced', behindCount: 0, aheadCount: 0 };
+
+  const countRev = runGitCommand(['rev-list', '--left-right', '--count', `HEAD...origin/${branch}`], repoRoot);
+  if (!countRev) return { driftStatus: 'diverged', behindCount: 0, aheadCount: 0 };
+
+  const [aheadStr, behindStr] = countRev.split(/\s+/);
+  const aheadCount = parseInt(aheadStr, 10) || 0;
+  const behindCount = parseInt(behindStr, 10) || 0;
+
+  if (behindCount > 0 && aheadCount > 0) return { driftStatus: 'diverged', behindCount, aheadCount };
+  if (behindCount > 0) return { driftStatus: 'behind', behindCount, aheadCount: 0 };
+  if (aheadCount > 0) return { driftStatus: 'ahead', behindCount: 0, aheadCount };
+  return { driftStatus: 'synced', behindCount: 0, aheadCount: 0 };
 }
 
-export interface EngineUpdateOptions {
-  clean?: boolean;
-  pull?: boolean;
-  force?: boolean;
-  checkOnly?: boolean;
-  repoRoot?: string;
-  projectRoot?: string;
-  bump?: BumpType;
+function listInstalledShimsHelper(): string[] {
+  const userHome = os.homedir();
+  const binDir = path.resolve(userHome, '.gemini', 'antigravity', 'bin');
+  if (!fs.existsSync(binDir)) return [];
+  return fs.readdirSync(binDir).filter(f => f.startsWith('aegis') || f.startsWith('tw'));
 }
 
-export interface EngineUpdateResult {
-  engineRoot?: string;
-  success: boolean;
-  previousVersion: string;
-  newVersion: string;
-  commitHash: string;
-  cleaned: boolean;
-  built: boolean;
-  reinstalledShims: number;
-  syncedPlugins: boolean;
-  syncedIdes: string[];
-  syncedWorktrees: number;
-  durationMs: number;
-  message: string;
+function countMcpToolsHelper(): number {
+  const userHome = os.homedir();
+  const mcpDir = path.resolve(userHome, '.gemini', 'antigravity', 'mcp', 'aegis');
+  if (!fs.existsSync(mcpDir)) return 0;
+  return fs.readdirSync(mcpDir).filter(f => f.endsWith('.json')).length;
 }
 
 export class EngineUpdater {
@@ -72,12 +73,6 @@ export class EngineUpdater {
     } catch {
       return null;
     }
-  }
-
-  private static git(args: string[], cwd: string, timeout = 15000): string | null {
-    try {
-      return cp.execFileSync('git', args, { cwd, timeout, env: cleanGitEnv(), stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
-    } catch { return null; }
   }
 
   public static discoverMonorepoPackages(repoRoot: string): MonorepoPackageInfo[] {
@@ -117,13 +112,13 @@ export class EngineUpdater {
 
     const localCommit = this.safeExec('git rev-parse --short HEAD', root) || 'unknown';
     const branch = this.safeExec('git rev-parse --abbrev-ref HEAD', root) || 'master';
-    const remoteRaw = this.git(['ls-remote', 'origin', `refs/heads/${branch}`], root);
+    const remoteRaw = runGitCommand(['ls-remote', 'origin', `refs/heads/${branch}`], root);
     const remoteCommit = remoteRaw ? remoteRaw.split(/\s+/)[0]?.slice(0, 7) || 'unknown' : 'offline';
 
-    const { driftStatus, behindCount, aheadCount } = this.calculateDrift(root, branch, localCommit, remoteCommit);
+    const { driftStatus, behindCount, aheadCount } = calculateRepoDrift(root, branch, localCommit, remoteCommit);
     const monorepoPackages = this.discoverMonorepoPackages(root);
-    const installedShims = this.listInstalledShims();
-    const mcpToolCount = this.countMcpTools();
+    const installedShims = listInstalledShimsHelper();
+    const mcpToolCount = countMcpToolsHelper();
     const wtOutput = this.safeExec('git worktree list', root);
     const worktreesCount = wtOutput ? wtOutput.split('\n').filter(Boolean).length : 1;
     const grade = VersionManager.checkVersionGrade(currentVersion, root);
@@ -138,25 +133,6 @@ export class EngineUpdater {
       upgradeAvailable: grade.upgradeAvailable, nextRecommendedVersion: nextRecommended,
       nextPatch: grade.nextPatch, nextMinor: grade.nextMinor, timestamp: new Date().toISOString()
     };
-  }
-
-  private static calculateDrift(
-    repoRoot: string, branch: string, localCommit: string, remoteCommit: string
-  ): { driftStatus: 'synced' | 'behind' | 'ahead' | 'diverged' | 'offline'; behindCount: number; aheadCount: number } {
-    if (remoteCommit === 'offline') return { driftStatus: 'offline', behindCount: 0, aheadCount: 0 };
-    if (localCommit === remoteCommit) return { driftStatus: 'synced', behindCount: 0, aheadCount: 0 };
-
-    const countRev = this.git(['rev-list', '--left-right', '--count', `HEAD...origin/${branch}`], repoRoot);
-    if (!countRev) return { driftStatus: 'diverged', behindCount: 0, aheadCount: 0 };
-
-    const [aheadStr, behindStr] = countRev.split(/\s+/);
-    const aheadCount = parseInt(aheadStr, 10) || 0;
-    const behindCount = parseInt(behindStr, 10) || 0;
-
-    if (behindCount > 0 && aheadCount > 0) return { driftStatus: 'diverged', behindCount, aheadCount };
-    if (behindCount > 0) return { driftStatus: 'behind', behindCount, aheadCount: 0 };
-    if (aheadCount > 0) return { driftStatus: 'ahead', behindCount: 0, aheadCount };
-    return { driftStatus: 'synced', behindCount: 0, aheadCount: 0 };
   }
 
   public static cleanWorkspace(repoRoot?: string): { cachesRemoved: string[]; locksCleared: number } {
@@ -176,7 +152,7 @@ export class EngineUpdater {
   }
 
   public static pullLatest(repoRoot: string): { pulled: boolean; error?: string } {
-    const out = this.git(['pull', '--ff-only'], repoRoot, 30000);
+    const out = runGitCommand(['pull', '--ff-only'], repoRoot, 30000);
     if (out === null) return { pulled: false, error: 'Git pull failed or network timed out' };
     return { pulled: true };
   }
@@ -198,20 +174,6 @@ export class EngineUpdater {
 
   public static reinstallPC(repoRoot: string, projectRoot = process.cwd()): { shimsCount: number; idesSynced: string[]; worktreesSynced: number } {
     return refreshEngineInstallations(repoRoot, projectRoot);
-  }
-
-  private static listInstalledShims(): string[] {
-    const userHome = os.homedir();
-    const binDir = path.resolve(userHome, '.gemini', 'antigravity', 'bin');
-    if (!fs.existsSync(binDir)) return [];
-    return fs.readdirSync(binDir).filter(f => f.startsWith('aegis') || f.startsWith('tw'));
-  }
-
-  private static countMcpTools(): number {
-    const userHome = os.homedir();
-    const mcpDir = path.resolve(userHome, '.gemini', 'antigravity', 'mcp', 'aegis');
-    if (!fs.existsSync(mcpDir)) return 0;
-    return fs.readdirSync(mcpDir).filter(f => f.endsWith('.json')).length;
   }
 
   public static runUpdate(options: EngineUpdateOptions = {}): EngineUpdateResult {

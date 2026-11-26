@@ -6,12 +6,9 @@
 
 import { CORE_MCP_TOOL_SCHEMAS } from './mcp-tool-schemas-core.js';
 import { GODOT_MCP_TOOL_SCHEMAS } from './mcp-tool-schemas-godot.js';
+import type { McpToolMeta } from './mcp-tool-schema-types.js';
 
-export interface McpToolMeta {
-  desc: string;
-  props: Record<string, unknown>;
-  req: string[];
-}
+export type { McpToolMeta } from './mcp-tool-schema-types.js';
 
 export const AEGIS_TOOL_SCHEMAS: Record<string, McpToolMeta> = {
   ...CORE_MCP_TOOL_SCHEMAS,

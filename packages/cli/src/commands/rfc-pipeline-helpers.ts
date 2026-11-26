@@ -198,18 +198,25 @@ export async function createLiveIssueIfOnline(
   return { issueNum, issueUrl };
 }
 
-export function printPipelineSummary(
-  fileName: string, discUrl: string | undefined, issueNum: number, issueUrl: string, title: string, proposedFiles: string[]
-): void {
+export interface PipelineSummaryOptions {
+  fileName: string;
+  discUrl?: string;
+  issueNum: number;
+  issueUrl: string;
+  title: string;
+  proposedFiles: string[];
+}
+
+export function printPipelineSummary(opts: PipelineSummaryOptions): void {
   console.log('\n══════════════════════════════════════════════════════════════');
   console.log('🏛️  RFC LIFECYCLE PIPELINE COMPLETED');
   console.log('══════════════════════════════════════════════════════════════');
-  console.log(` • 📑 RFC Document:   docs/rfc/${fileName}`);
-  console.log(` • 💬 Discussion:     ${discUrl || 'Offline / Local'}`);
-  console.log(` • 🎯 GitHub Issue:   #${issueNum} ${issueUrl ? '(' + issueUrl + ')' : ''}`);
-  console.log(` • 📥 TIP Task Inbox: Staged in .aegis/task-inbox.json (#${issueNum})`);
+  console.log(` • 📑 RFC Document:   docs/rfc/${opts.fileName}`);
+  console.log(` • 💬 Discussion:     ${opts.discUrl || 'Offline / Local'}`);
+  console.log(` • 🎯 GitHub Issue:   #${opts.issueNum} ${opts.issueUrl ? '(' + opts.issueUrl + ')' : ''}`);
+  console.log(` • 📥 TIP Task Inbox: Staged in .aegis/task-inbox.json (#${opts.issueNum})`);
   console.log(` • 🏛️ GitHub Wiki:   Clean architecture synced to Wiki & RFC-Index`);
   console.log(` • 📝 README.md:     Synchronized with active RFCs & 43 Native MCP tools`);
-  console.log(` • 👥 Teamwork Swarm: npm run aegis -- teamwork plan "${title}" ${proposedFiles.join(' ')}`);
+  console.log(` • 👥 Teamwork Swarm: npm run aegis -- teamwork plan "${opts.title}" ${opts.proposedFiles.join(' ')}`);
   console.log('══════════════════════════════════════════════════════════════\n');
 }

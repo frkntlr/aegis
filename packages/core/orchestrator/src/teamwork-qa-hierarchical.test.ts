@@ -41,7 +41,12 @@ test('TeamworkHierarchicalTree provides role-specific child subagent directives'
 test('compileTrackPrompt includes Hierarchical Subagents and Dynamic Mesh guidance in footer', () => {
   const profiles = getSubagentProfiles();
   const qaProfile = profiles.find(p => p.roleType === 'qa')!;
-  const prompt = compileTrackPrompt(qaProfile, 'Audit test suite', ['src/test.ts'], 'qa-hunter [Audit]');
+  const prompt = compileTrackPrompt({
+    profile: qaProfile,
+    trackDesc: 'Audit test suite',
+    files: ['src/test.ts'],
+    subagentName: 'qa-hunter [Audit]'
+  });
 
   assert.ok(prompt.includes('### Hierarchical Subagents & Dynamic Mesh'));
   assert.ok(prompt.includes('invoke_subagent only when the host exposes it and capacity permits'));

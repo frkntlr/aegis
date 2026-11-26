@@ -40,7 +40,7 @@ export class EngineAnalysisTools {
   private triageGate = new EvidenceBasedTriageGate();
   private memory = new CodebaseMemoryEngine({ persistToDisk: false });
 
-  constructor(private readonly repoRoot?: string) {}
+  constructor(protected readonly repoRoot?: string) {}
 
   private scanFilesForCage(root: string, files: string[]) {
     let compliant = 0;

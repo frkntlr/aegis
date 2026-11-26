@@ -21,6 +21,15 @@ export interface LineBudgetAnalysis {
   formattedReport: string;
 }
 
+interface BuildReportOptions {
+  filePath: string;
+  fileLines: number;
+  maxFile: number;
+  fileQuota: number;
+  status: 'SAFE' | 'WARNING' | 'CRITICAL_QUOTA' | 'EXCEEDED';
+  advice?: DecompositionAdvice;
+}
+
 export class LineBudgetRadar {
   public static readonly DEFAULT_MAX_FILE_LINES = 300;
   public static readonly DEFAULT_MAX_FUNC_LINES = 40;
@@ -38,7 +47,14 @@ export class LineBudgetRadar {
 
     const status = LineBudgetRadar.resolveStatus(fileLines, maxFile);
     const advice = LineBudgetRadar.resolveAdvice(status, fileLines, maxFile, maxFunc);
-    const formattedReport = LineBudgetRadar.buildReport(filePath, fileLines, maxFile, fileQuota, status, advice);
+    const formattedReport = LineBudgetRadar.buildReport({
+      filePath,
+      fileLines,
+      maxFile,
+      fileQuota,
+      status,
+      advice
+    });
 
     return {
       filePath,
@@ -83,14 +99,8 @@ export class LineBudgetRadar {
     };
   }
 
-  private static buildReport(
-    filePath: string,
-    fileLines: number,
-    maxFile: number,
-    fileQuota: number,
-    status: 'SAFE' | 'WARNING' | 'CRITICAL_QUOTA' | 'EXCEEDED',
-    advice?: DecompositionAdvice
-  ): string {
+  private static buildReport(opts: BuildReportOptions): string {
+    const { filePath, fileLines, maxFile, fileQuota, status, advice } = opts;
     const icon = status === 'SAFE' ? '✅' : status === 'WARNING' ? '⚠️' : '🛑';
     const lines = [
       `📏 Demir Kafes Line Budget Radar [${icon} ${status}]:`,

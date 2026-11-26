@@ -1,8 +1,8 @@
-import type { EngineUpdater, EngineUpdateOptions, EngineUpdateResult } from './engine-updater.js';
+import type { EngineUpdateOptions, EngineUpdateResult, EngineUpdateRunner } from './engine-update-types.js';
 import { VersionManager } from './version-manager.js';
 import { resolveUpdateEngineRoot } from './engine-update-refresh.js';
 
-export function runEngineUpdate(updater: typeof EngineUpdater, options: EngineUpdateOptions): EngineUpdateResult {
+export function runEngineUpdate(updater: EngineUpdateRunner, options: EngineUpdateOptions): EngineUpdateResult {
   const start = Date.now();
   const result: EngineUpdateResult = { success: false, previousVersion: 'unknown', newVersion: 'unknown',
     commitHash: 'unknown', cleaned: false, built: false, reinstalledShims: 0,

@@ -43,8 +43,9 @@ test('stageTracksIntoInboxHelper prevents duplicate IDs and updates existing tra
     );
 
     const wt = new WorktreeManager({ repoRoot: tmpDir, persistLocks: false });
-    stageTracksIntoInboxHelper(tmpDir, 'tw-10', 'First objective', [makeTrack('t-1', 'solver-1'), makeTrack('t-2', 'solver-2')], wt, false);
-    stageTracksIntoInboxHelper(tmpDir, 'tw-10', 'Updated objective', [makeTrack('t-1', 'solver-1'), makeTrack('t-3', 'solver-3')], wt, false);
+    const baseOpts = { repoRoot: tmpDir, planId: 'tw-10', worktreeManager: wt, shouldLock: false };
+    stageTracksIntoInboxHelper({ ...baseOpts, objective: 'First objective', tracks: [makeTrack('t-1', 'solver-1'), makeTrack('t-2', 'solver-2')] });
+    stageTracksIntoInboxHelper({ ...baseOpts, objective: 'Updated objective', tracks: [makeTrack('t-1', 'solver-1'), makeTrack('t-3', 'solver-3')] });
 
     const inbox = readJsonSafe<Array<{ id: number; issueNumber: number; trackId?: string; acceptanceCriteria?: string[] }>>(
       path.join(aegisDir, 'task-inbox.json')

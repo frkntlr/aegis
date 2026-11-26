@@ -5,6 +5,7 @@
  */
 
 import { RoleClassifier, type RoleType } from './role-classifier.js';
+import type { DecomposedSubtask, DecomposeOptions } from './teamwork-decomposer-types.js';
 import { TeamworkSharder } from './teamwork-sharder.js';
 import { TeamworkHierarchicalTree } from './teamwork-hierarchical-tree.js';
 import { TeamworkDocSharder } from './teamwork-doc-sharder.js';
@@ -16,23 +17,7 @@ import {
 } from './teamwork-objective-parser.js';
 
 export { TeamworkSharder, TeamworkHierarchicalTree, TeamworkDocSharder };
-
-export interface DecomposedSubtask {
-  roleType: RoleType;
-  label: string;
-  title: string;
-  targetFiles: string[];
-  dependsOn?: string[];
-  phase?: number;
-}
-
-export interface DecomposeOptions {
-  maxConcurrency?: number;
-  autoScale?: boolean;
-  selectedRoles?: RoleType[];
-  explicitRole?: string;
-  treeSpecialists?: boolean;
-}
+export type { DecomposedSubtask, DecomposeOptions } from './teamwork-decomposer-types.js';
 
 export class TeamworkDecomposer {
   public static decompose(
@@ -40,38 +25,46 @@ export class TeamworkDecomposer {
     targetFiles: string[] = [],
     options?: DecomposeOptions
   ): DecomposedSubtask[] {
-    const selectedRoles = options?.selectedRoles ?? TeamworkHierarchicalTree.detectSelectedRoles(objective, options?.explicitRole);
-    const isTree = options?.treeSpecialists || TeamworkHierarchicalTree.isHierarchicalRequested(objective);
+    const opts = options ?? {};
+    const selectedRoles = opts.selectedRoles ?? TeamworkHierarchicalTree.detectSelectedRoles(objective, opts.explicitRole);
+    const isTree = Boolean(opts.treeSpecialists || TeamworkHierarchicalTree.isHierarchicalRequested(objective));
+    const maxConcurrency = opts.maxConcurrency ?? 12;
 
-    const rawItems = this.splitObjective(objective);
-    const parsed = rawItems.map(item => classifyRawItemHelper(item));
-    let subtasks = enrichSubtasksHelper(parsed);
-    if (selectedRoles && selectedRoles.length > 0) {
-      subtasks = subtasks.filter(t => selectedRoles.includes(t.roleType));
-    }
-    this.ensureRequiredTracks(subtasks, objective, targetFiles, selectedRoles);
+    const initial = this.buildInitialSubtasks(objective, targetFiles, selectedRoles);
+    const subtasks = isTree
+      ? TeamworkHierarchicalTree.expandHierarchicalRoles(initial.subtasks, selectedRoles, objective, targetFiles)
+      : initial.subtasks;
 
-    if (isTree) {
-      subtasks = TeamworkHierarchicalTree.expandHierarchicalRoles(subtasks, selectedRoles, objective, targetFiles);
-    }
-
-    if (rawItems.length <= 1) {
-      this.shardSolversAndQa(subtasks, targetFiles, objective, options);
-    }
-    TeamworkDocSharder.shardDocsBySpecialists(subtasks, targetFiles, objective, options?.maxConcurrency ?? 12);
+    if (initial.isSingleItem) this.shardSolversAndQa(subtasks, targetFiles, objective, opts);
+    TeamworkDocSharder.shardDocsBySpecialists(subtasks, targetFiles, objective, maxConcurrency);
     TeamworkSharder.partitionFiles(subtasks, targetFiles);
     this.assignPhasesAndDependencies(subtasks);
 
-    const shouldScale = !isTree && Boolean(
-      options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 4) ||
-      (targetFiles.length === 0 && options?.maxConcurrency && options.maxConcurrency > 1) ||
-      (targetFiles.length === 1 && options?.autoScale) ||
-      (targetFiles.length >= 2 && options?.maxConcurrency && options.maxConcurrency > 1)
-    );
-    if (shouldScale) {
-      return this.shardMaxConcurrency(subtasks, targetFiles, options?.maxConcurrency ?? 12);
+    return this.shouldScaleConcurrency(isTree, targetFiles.length, opts)
+      ? this.shardMaxConcurrency(subtasks, targetFiles, maxConcurrency)
+      : subtasks;
+  }
+
+  private static buildInitialSubtasks(
+    objective: string,
+    targetFiles: string[],
+    selectedRoles: RoleType[] | null
+  ): { subtasks: DecomposedSubtask[]; isSingleItem: boolean } {
+    const rawItems = this.splitObjective(objective);
+    let subtasks = enrichSubtasksHelper(rawItems.map(item => classifyRawItemHelper(item)));
+    if (selectedRoles?.length) {
+      subtasks = subtasks.filter(t => selectedRoles.includes(t.roleType));
     }
-    return subtasks;
+    this.ensureRequiredTracks(subtasks, objective, targetFiles, selectedRoles);
+    return { subtasks, isSingleItem: rawItems.length <= 1 };
+  }
+
+  private static shouldScaleConcurrency(isTree: boolean, fileCount: number, options?: DecomposeOptions): boolean {
+    if (isTree || !options) return false;
+    if (options.autoScale) return true;
+    const max = options.maxConcurrency ?? 0;
+    if (max > 4) return true;
+    return max > 1 && fileCount !== 1;
   }
 
   private static shardSolversAndQa(

@@ -1,5 +1,5 @@
 import type { RoleType } from './role-classifier.js';
-import type { DecomposedSubtask } from './teamwork-decomposer.js';
+import type { DecomposedSubtask } from './teamwork-decomposer-types.js';
 
 const STOP_WORDS = new Set([
   've', 'and', 'ile', 'with', 'for', 'the', 'bir', 'bu', 'da', 'de',
@@ -98,17 +98,43 @@ export function extractLabelHelper(title: string, role: RoleType): string {
   return candidate.charAt(0).toUpperCase() + candidate.slice(1).slice(0, 15);
 }
 
+interface RoleClassificationRule {
+  readonly roleType: RoleType;
+  readonly prefixes?: readonly string[];
+  readonly keywords: readonly string[];
+}
+
+const ROLE_CLASSIFICATION_RULES: readonly RoleClassificationRule[] = [
+  {
+    roleType: 'qa',
+    keywords: ['audit', 'triage', 'kafes', 'denetim', 'test', 'doğrula', 'dogrula']
+  },
+  {
+    roleType: 'ui',
+    keywords: ['ui', 'theme', 'hud', 'pause menu', 'layout', 'arayüz', 'arayuz', 'tema', 'görsel', 'gorsel', 'ekran']
+  },
+  {
+    roleType: 'docs',
+    prefixes: ['doc'],
+    keywords: ['wiki', 'rfc', 'dokümantasyon', 'dokumantasyon', 'document', 'belge']
+  }
+];
+
+function matchesClassificationRule(lowerTitle: string, rule: RoleClassificationRule): boolean {
+  if (rule.prefixes?.some(prefix => lowerTitle.startsWith(prefix))) {
+    return true;
+  }
+  return rule.keywords.some(keyword => lowerTitle.includes(keyword));
+}
+
+function detectRoleType(lowerTitle: string): RoleType {
+  const matched = ROLE_CLASSIFICATION_RULES.find(rule => matchesClassificationRule(lowerTitle, rule));
+  return matched?.roleType ?? 'solver';
+}
+
 export function classifyRawItemHelper(raw: string): { roleType: RoleType; label: string; title: string } {
   const title = raw.replace(/^(\d+[\.\)]|\*|-|•)\s*/, '').trim();
-  const lower = title.toLowerCase();
-  let roleType: RoleType = 'solver';
-  if (lower.includes('audit') || lower.includes('triage') || lower.includes('kafes') || lower.includes('denetim') || lower.includes('test') || lower.includes('doğrula') || lower.includes('dogrula')) {
-    roleType = 'qa';
-  } else if (lower.includes('ui') || lower.includes('theme') || lower.includes('hud') || lower.includes('pause menu') || lower.includes('layout') || lower.includes('arayüz') || lower.includes('arayuz') || lower.includes('tema') || lower.includes('görsel') || lower.includes('gorsel') || lower.includes('ekran')) {
-    roleType = 'ui';
-  } else if (lower.startsWith('doc') || lower.includes('wiki') || lower.includes('rfc') || lower.includes('dokümantasyon') || lower.includes('dokumantasyon') || lower.includes('document') || lower.includes('belge')) {
-    roleType = 'docs';
-  }
+  const roleType = detectRoleType(title.toLowerCase());
   return { roleType, label: extractLabelHelper(title, roleType), title };
 }
 

@@ -12,58 +12,61 @@ import { DependencyMapper, type DiscoveredDependency } from './dependency-mapper
 import { Context7Registry } from './context7-registry.js';
 import { JitDocSynthesizer } from './jit-doc-synthesizer.js';
 import { Context7BuiltinDocs } from './context7-builtin-docs.js';
+import type { Context7DocEntry, Context7QueryResult } from './context7-types.js';
 
-export interface Context7DocEntry {
-  library: string;
-  topic: string;
-  version: string;
-  summary: string;
-  signatures: string[];
-  codeExample?: string;
-  breakingChanges?: string[];
+export type { Context7DocEntry, Context7QueryResult } from './context7-types.js';
+
+function findRepoRoot(start = process.cwd()): string {
+  let cur = path.resolve(start);
+  while (cur) {
+    if (fs.existsSync(path.join(cur, '.git')) || fs.existsSync(path.join(cur, '.aegis'))) return cur;
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return start;
 }
 
-export interface Context7QueryResult {
-  matched: boolean;
-  doc?: Context7DocEntry;
-  source: 'builtin' | 'cache' | 'miss' | 'jit';
+function makeDocKey(lib: string, topic: string): string {
+  return `${lib.toLowerCase()}::${topic.toLowerCase()}`;
+}
+
+function queryDiskCache(library: string, topic: string, cacheDir?: string): Context7DocEntry | null {
+  const targetDir = cacheDir || path.resolve(findRepoRoot(), '.aegis', 'cache', 'context7');
+  if (!fs.existsSync(targetDir)) return null;
+  try {
+    const files = fs.readdirSync(targetDir);
+    for (const f of files) {
+      if (!f.endsWith('.json') || f === 'docs.json') continue;
+      if (f.toLowerCase().startsWith(library.toLowerCase())) {
+        const entry = readJsonSafe<Context7DocEntry>(path.join(targetDir, f));
+        if (entry.library.toLowerCase() === library.toLowerCase() && (!topic || entry.topic.toLowerCase().includes(topic.toLowerCase()))) {
+          return entry;
+        }
+      }
+    }
+  } catch (err: unknown) {
+    debugLogIgnored('context7-bridge:queryDiskCache', err);
+  }
+  return null;
 }
 
 export class Context7Bridge {
   private docs = new Map<string, Context7DocEntry>();
 
   constructor() {
-    this.initBuiltinDocs();
-  }
-
-  private initBuiltinDocs(): void {
     for (const doc of Context7BuiltinDocs.getBuiltinDocs()) {
       this.registerDoc(doc);
     }
     Context7Registry.registerAll(doc => this.registerDoc(doc));
   }
 
-  private static findRepoRoot(start = process.cwd()): string {
-    let cur = path.resolve(start);
-    while (cur) {
-      if (fs.existsSync(path.join(cur, '.git')) || fs.existsSync(path.join(cur, '.aegis'))) return cur;
-      const parent = path.dirname(cur);
-      if (parent === cur) break;
-      cur = parent;
-    }
-    return start;
-  }
-
-  private makeKey(lib: string, topic: string): string {
-    return `${lib.toLowerCase()}::${topic.toLowerCase()}`;
-  }
-
   public registerDoc(entry: Context7DocEntry): void {
-    this.docs.set(this.makeKey(entry.library, entry.topic), entry);
+    this.docs.set(makeDocKey(entry.library, entry.topic), entry);
   }
 
   public query(library: string, topic: string, cacheDir?: string): Context7QueryResult {
-    const key = this.makeKey(library, topic);
+    const key = makeDocKey(library, topic);
     const exact = this.docs.get(key);
     if (exact) {
       return { matched: true, doc: exact, source: 'builtin' };
@@ -76,7 +79,7 @@ export class Context7Bridge {
       return { matched: true, doc: libMatch, source: 'builtin' };
     }
 
-    const diskDoc = this.queryDiskCache(library, topic, cacheDir);
+    const diskDoc = queryDiskCache(library, topic, cacheDir);
     if (diskDoc) {
       this.registerDoc(diskDoc);
       return { matched: true, doc: diskDoc, source: 'cache' };
@@ -89,26 +92,6 @@ export class Context7Bridge {
     }
 
     return { matched: false, source: 'miss' };
-  }
-
-  private queryDiskCache(library: string, topic: string, cacheDir?: string): Context7DocEntry | null {
-    const targetDir = cacheDir || path.resolve(Context7Bridge.findRepoRoot(), '.aegis', 'cache', 'context7');
-    if (!fs.existsSync(targetDir)) return null;
-    try {
-      const files = fs.readdirSync(targetDir);
-      for (const f of files) {
-        if (!f.endsWith('.json') || f === 'docs.json') continue;
-        if (f.toLowerCase().startsWith(library.toLowerCase())) {
-          const entry = readJsonSafe<Context7DocEntry>(path.join(targetDir, f));
-          if (entry.library.toLowerCase() === library.toLowerCase() && (!topic || entry.topic.toLowerCase().includes(topic.toLowerCase()))) {
-            return entry;
-          }
-        }
-      }
-    } catch (err: unknown) {
-      debugLogIgnored('context7-bridge:queryDiskCache', err);
-    }
-    return null;
   }
 
   public resolveGodotTopic(codeOrClass: string): 'physics' | 'ui' | 'signals' | 'lifecycle' {

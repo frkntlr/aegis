@@ -1,11 +1,7 @@
 import * as path from 'node:path';
-import type { SkeletonResult } from './ts-extractor.js';
+import type { LanguageExtractor } from './extractor-types.js';
 
-export interface LanguageExtractor {
-  readonly languageId: string;
-  readonly supportedExtensions: string[];
-  extract(relativePath: string, content: string): SkeletonResult;
-}
+export type { LanguageExtractor } from './extractor-types.js';
 
 export class ExtractorRegistry {
   private extractorsByExt: Map<string, LanguageExtractor> = new Map();

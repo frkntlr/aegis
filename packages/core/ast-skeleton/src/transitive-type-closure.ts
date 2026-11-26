@@ -14,6 +14,15 @@ import {
   type BoundedTypeClosureResult,
   TransitiveTypeUtils
 } from './transitive-type-utils.js';
+import {
+  buildClosureResult,
+  collectSignatures,
+  emptyClosureResult,
+  findDeclInSource,
+  findTargetNode,
+  loadCachedSourceFile,
+  processTransitiveTypes
+} from './transitive-type-collector.js';
 
 export type { TypeClosureOptions, BoundedTypeClosureResult };
 
@@ -50,21 +59,8 @@ export class TransitiveTypeClosure {
       try {
         return fs.readFileSync(full, 'utf8');
       } catch {
+        // Unreadable target file; skip resolution
         return null;
-      }
-    }
-    return null;
-  }
-
-  private findDeclInSource(sf: ts.SourceFile, typeName: string): string | null {
-    for (const stmt of sf.statements) {
-      if (
-        (ts.isInterfaceDeclaration(stmt) && stmt.name.text === typeName) ||
-        (ts.isTypeAliasDeclaration(stmt) && stmt.name.text === typeName) ||
-        (ts.isEnumDeclaration(stmt) && stmt.name.text === typeName) ||
-        (ts.isClassDeclaration(stmt) && stmt.name?.text === typeName)
-      ) {
-        return stmt.getText(sf);
       }
     }
     return null;
@@ -83,14 +79,9 @@ export class TransitiveTypeClosure {
       if (!isMatch) continue;
       const targetPath = TsCallGraphExtractor.resolveImportPath(curPath, stmt.moduleSpecifier.text);
       if (!targetPath) continue;
-      let targetSf = fileCache.get(targetPath);
-      if (!targetSf) {
-        const code = this.readTargetFile(targetPath);
-        if (!code) continue;
-        targetSf = ts.createSourceFile(targetPath, code, ts.ScriptTarget.Latest, true);
-        fileCache.set(targetPath, targetSf);
-      }
-      const decl = this.findDeclInSource(targetSf, typeName);
+      const targetSf = loadCachedSourceFile(targetPath, fileCache, p => this.readTargetFile(p));
+      if (!targetSf) continue;
+      const decl = findDeclInSource(targetSf, typeName);
       if (decl) return { decl, sf: targetSf, path: targetPath };
     }
     return null;
@@ -102,75 +93,20 @@ export class TransitiveTypeClosure {
     currentPath: string,
     fileCache: Map<string, ts.SourceFile>
   ): { decl: string; sf: ts.SourceFile; path: string } | null {
-    const local = this.findDeclInSource(currentSf, typeName);
+    const local = findDeclInSource(currentSf, typeName);
     if (local) return { decl: local, sf: currentSf, path: currentPath };
 
     const imports = TsCallGraphExtractor.collectImports(currentSf, currentPath);
     const binding = imports.get(typeName);
     if (!binding) return this.resolveReExport(currentSf, typeName, currentPath, fileCache);
 
-    let targetSf = fileCache.get(binding.targetFilePath);
-    if (!targetSf) {
-      const code = this.readTargetFile(binding.targetFilePath);
-      if (code) {
-        targetSf = ts.createSourceFile(binding.targetFilePath, code, ts.ScriptTarget.Latest, true);
-        fileCache.set(binding.targetFilePath, targetSf);
-      }
-    }
+    const targetSf = loadCachedSourceFile(binding.targetFilePath, fileCache, p => this.readTargetFile(p));
+    if (!targetSf) return null;
 
-    if (targetSf) {
-      const q = binding.importedName === 'default' ? typeName : binding.importedName;
-      const decl = this.findDeclInSource(targetSf, q);
-      if (decl) return { decl, sf: targetSf, path: binding.targetFilePath };
-      const reExported = this.resolveReExport(targetSf, q, binding.targetFilePath, fileCache);
-      if (reExported) return reExported;
-    }
-    return null;
-  }
-
-  private findTargetNode(sf: ts.SourceFile, symbolName: string): ts.Node | null {
-    const target = symbolName.includes('.') ? (symbolName.split('.').pop() ?? symbolName) : symbolName;
-    let found: ts.Node | null = null;
-    const walk = (n: ts.Node): void => {
-      if (found) return;
-      if (
-        (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) &&
-        n.name?.getText(sf) === target
-      ) {
-        found = n;
-        return;
-      }
-      if (
-        ts.isVariableDeclaration(n) &&
-        n.name.getText(sf) === target &&
-        n.initializer &&
-        (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))
-      ) {
-        found = n.initializer;
-        return;
-      }
-      ts.forEachChild(n, walk);
-    };
-    walk(sf);
-    return found;
-  }
-
-  private collectSignatures(node: ts.Node, sf: ts.SourceFile): string[] {
-    const names: string[] = [];
-    if (
-      ts.isFunctionDeclaration(node) ||
-      ts.isMethodDeclaration(node) ||
-      ts.isArrowFunction(node) ||
-      ts.isFunctionExpression(node)
-    ) {
-      for (const p of node.parameters) {
-        if (p.type) names.push(...TransitiveTypeClosure.extractTypeIdentifiers(p.type.getText(sf)));
-      }
-      if (node.type) {
-        names.push(...TransitiveTypeClosure.extractTypeIdentifiers(node.type.getText(sf)));
-      }
-    }
-    return [...new Set(names)];
+    const queryName = binding.importedName === 'default' ? typeName : binding.importedName;
+    const decl = findDeclInSource(targetSf, queryName);
+    if (decl) return { decl, sf: targetSf, path: binding.targetFilePath };
+    return this.resolveReExport(targetSf, queryName, binding.targetFilePath, fileCache);
   }
 
   public resolveClosure(
@@ -179,11 +115,11 @@ export class TransitiveTypeClosure {
     sourceCode: string
   ): BoundedTypeClosureResult {
     const sf = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
-    const targetNode = this.findTargetNode(sf, symbolName);
-    if (!targetNode) return this.emptyResult();
+    const targetNode = findTargetNode(sf, symbolName);
+    if (!targetNode) return emptyClosureResult();
 
     const fileCache = new Map<string, ts.SourceFile>([[filePath, sf]]);
-    const firstDegree = this.collectSignatures(targetNode, sf);
+    const firstDegree = collectSignatures(targetNode, sf);
     const fullDeclarations: string[] = [];
     const opaqueStubs: string[] = [];
     const monomorphizedTypes: string[] = [];
@@ -196,80 +132,13 @@ export class TransitiveTypeClosure {
         fullDeclarations.push(res.decl);
         if (this.options.maxDepth > 0) {
           const nested = TransitiveTypeClosure.extractTypeIdentifiers(res.decl);
-          this.processTransitiveTypes(nested, visited, opaqueStubs, monomorphizedTypes);
+          processTransitiveTypes(nested, visited, opaqueStubs, monomorphizedTypes, this.options.enableOpaqueStubbing);
         }
       } else if (this.options.enableOpaqueStubbing) {
         opaqueStubs.push(TransitiveTypeClosure.generateOpaqueStub(name));
       }
     }
 
-    return this.buildResult(fullDeclarations, opaqueStubs, monomorphizedTypes);
-  }
-
-  private processTransitiveTypes(
-    typeNames: string[],
-    visited: Set<string>,
-    opaqueStubs: string[],
-    monomorphizedTypes: string[]
-  ): void {
-    for (const t of typeNames) {
-      if (visited.has(t)) continue;
-      visited.add(t);
-      if (t.includes('<') && t.includes('>')) {
-        const baseName = t.split('<')[0] ?? t;
-        const mono = TransitiveTypeClosure.monomorphizeGeneric(baseName, ['T']);
-        monomorphizedTypes.push(`export type ${mono} = { readonly __monomorphized: true };`);
-      } else if (this.options.enableOpaqueStubbing) {
-        opaqueStubs.push(TransitiveTypeClosure.generateOpaqueStub(t));
-      }
-    }
-  }
-
-  private emptyResult(): BoundedTypeClosureResult {
-    return {
-      fullDeclarations: [], opaqueStubs: [], monomorphizedTypes: [],
-      formattedBlock: '', exceededBudget: false, totalLines: 0
-    };
-  }
-
-  private buildResult(
-    fullDecls: string[],
-    stubs: string[],
-    mono: string[]
-  ): BoundedTypeClosureResult {
-    const lines: string[] = [];
-    if (fullDecls.length > 0) {
-      lines.push('// 📦 [Ambient Type Closure - Param & Return Types]', ...fullDecls);
-    }
-    if (stubs.length > 0) {
-      lines.push('// 🛡️ [Transitive Opaque Stubs - Zero Context Bloat]', ...stubs);
-    }
-    if (mono.length > 0) {
-      lines.push('// ⚡ [Monomorphized Call-Site Generic Types]', ...mono);
-    }
-
-    const totalLines = lines.join('\n').split('\n').length;
-    const exceededBudget = totalLines > this.options.lineBudget;
-
-    let formattedBlock: string;
-    if (exceededBudget) {
-      const summary = [
-        `// ⚠️ [Token Guardrail] Type closure (${totalLines} lines) exceeded budget (${this.options.lineBudget}).`,
-        '// Collapsed to opaque stubs to protect context window:',
-        ...stubs
-      ];
-      formattedBlock = summary.join('\n');
-    } else {
-      formattedBlock = lines.join('\n\n');
-    }
-
-    return {
-      fullDeclarations: fullDecls,
-      opaqueStubs: stubs,
-      monomorphizedTypes: mono,
-      formattedBlock,
-      exceededBudget,
-      totalLines
-    };
+    return buildClosureResult(fullDeclarations, opaqueStubs, monomorphizedTypes, this.options.lineBudget);
   }
 }

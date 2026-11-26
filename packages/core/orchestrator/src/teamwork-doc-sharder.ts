@@ -4,7 +4,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import type { DecomposedSubtask } from './teamwork-decomposer.js';
+import type { DecomposedSubtask } from './teamwork-decomposer-types.js';
 
 export interface PartitionedDocFiles {
   wiki: string[];

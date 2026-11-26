@@ -10,13 +10,46 @@ export interface GitHubClientOptions {
   autoConnectLive?: boolean;
 }
 
-export class GitHubClient {
-  private issues: Map<number, GitHubIssue> = new Map();
+export class GitHubIssueRegistry {
+  protected issues: Map<number, GitHubIssue> = new Map();
+
+  public registerIssue(issue: GitHubIssue): void {
+    this.issues.set(issue.number, issue);
+  }
+
+  public listReadyIssues(): GitHubIssue[] {
+    return Array.from(this.issues.values()).filter(
+      i => i.status === 'ready' && !i.labels.includes('status:done')
+    );
+  }
+
+  public listAllIssues(): GitHubIssue[] {
+    return Array.from(this.issues.values());
+  }
+
+  public getIssue(issueNumber: number): GitHubIssue | undefined {
+    return this.issues.get(issueNumber);
+  }
+
+  public updateIssueStatus(issueNumber: number, status: GitHubIssue['status']): boolean {
+    const issue = this.issues.get(issueNumber);
+    if (!issue) return false;
+    issue.status = status;
+    issue.labels = [...issue.labels.filter(l => !l.startsWith('status:')), `status:${status}`];
+    if (status === 'ready' || status === 'done') {
+      issue.assignee = undefined;
+    }
+    return true;
+  }
+}
+
+export class GitHubClient extends GitHubIssueRegistry {
   private selfSpawnCounter: Map<number, number> = new Map(); // parentIssueId -> count
   private readonly maxSelfSpawned: number;
   private liveAdapter?: GitHubLiveAdapter;
 
   constructor(options: GitHubClientOptions = {}) {
+    super();
     this.maxSelfSpawned = options.maxSelfSpawnedIssues ?? 3;
     if (options.liveAdapter) {
       this.liveAdapter = options.liveAdapter;
@@ -53,24 +86,6 @@ export class GitHubClient {
       count++;
     }
     return count;
-  }
-
-  public registerIssue(issue: GitHubIssue): void {
-    this.issues.set(issue.number, issue);
-  }
-
-  public listReadyIssues(): GitHubIssue[] {
-    return Array.from(this.issues.values()).filter(
-      i => i.status === 'ready' && !i.labels.includes('status:done')
-    );
-  }
-
-  public listAllIssues(): GitHubIssue[] {
-    return Array.from(this.issues.values());
-  }
-
-  public getIssue(issueNumber: number): GitHubIssue | undefined {
-    return this.issues.get(issueNumber);
   }
 
   public async fetchIssue(issueNumber: number): Promise<GitHubIssue | undefined> {
@@ -120,17 +135,6 @@ export class GitHubClient {
       debugLogIgnored('github-client:claimLiveIssue', err);
     }
     return claimRes;
-  }
-
-  public updateIssueStatus(issueNumber: number, status: GitHubIssue['status']): boolean {
-    const issue = this.issues.get(issueNumber);
-    if (!issue) return false;
-    issue.status = status;
-    issue.labels = [...issue.labels.filter(l => !l.startsWith('status:')), `status:${status}`];
-    if (status === 'ready' || status === 'done') {
-      issue.assignee = undefined;
-    }
-    return true;
   }
 
   public async completeIssue(

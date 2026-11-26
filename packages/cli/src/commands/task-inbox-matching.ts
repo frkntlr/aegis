@@ -1,4 +1,4 @@
-import type { TaskInboxData, TaskInboxItem } from './task-inbox.js';
+import type { TaskInboxData, TaskInboxItem } from './task-inbox-types.js';
 
 export function isTaskDependenciesSatisfied(task: TaskInboxItem, allTasks: TaskInboxItem[]): boolean {
   if (!task.dependsOn || task.dependsOn.length === 0) return true;
@@ -50,36 +50,50 @@ function hasRoleMismatch(t: string, q: string): boolean {
   return roles.some(r1 => t.includes(r1) && roles.some(r2 => r1 !== r2 && q.includes(r2)));
 }
 
-export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber?: number, trackId?: string): boolean {
-  const cleanQ = roleQuery.toLowerCase().trim().replace(/^@/, '');
-  const cleanT = taskRole.toLowerCase().trim().replace(/^@/, '');
-  if (trackId && trackId.toLowerCase() === cleanQ) return true;
-  if (issueNumber !== undefined && (String(issueNumber) === cleanQ || `#${issueNumber}` === cleanQ)) {
-    return true;
-  }
-  if (hasRoleMismatch(cleanT, cleanQ)) return false;
-  if (cleanT === cleanQ) return true;
+const ROLE_ALIAS_GROUPS: ReadonlyArray<{ key: string; extras: readonly string[] }> = [
+  { key: 'solver', extras: ['issue', 'issue-solver'] },
+  { key: 'qa', extras: ['audit'] },
+  { key: 'ui', extras: [] },
+  { key: 'doc', extras: ['wiki'] }
+];
 
+function matchesIdentifier(cleanQ: string, issueNumber?: number, trackId?: string): boolean {
+  if (trackId && trackId.toLowerCase() === cleanQ) return true;
+  if (issueNumber === undefined) return false;
+  return String(issueNumber) === cleanQ || `#${issueNumber}` === cleanQ;
+}
+
+function matchesBracketLabel(cleanT: string, cleanQ: string): boolean | null {
   const qBracket = cleanQ.match(/\[(.*?)\]/);
   const tBracket = cleanT.match(/\[(.*?)\]/);
   if (qBracket) {
     const qLabel = qBracket[1].trim();
-    if (tBracket) return qLabel === tBracket[1].trim();
-    return cleanT.includes(qLabel);
+    return tBracket ? qLabel === tBracket[1].trim() : cleanT.includes(qLabel);
   }
   if (tBracket) {
     const tLabel = tBracket[1].trim();
     if (cleanQ === tLabel || cleanQ.split(/[\s\-_]+/).includes(tLabel)) return true;
   }
+  return null;
+}
 
-  if (cleanT.startsWith(cleanQ) || cleanQ.startsWith(cleanT)) {
-    return true;
-  }
-  const isGeneric = (k: string): boolean =>
-    cleanQ === k || cleanQ === `${k}-specialist` || cleanQ === `${k}-hunter` || cleanQ === `${k}-architect`;
-  if ((isGeneric('solver') || cleanQ === 'issue' || cleanQ === 'issue-solver') && cleanT.includes('solver')) return true;
-  if ((isGeneric('qa') || cleanQ === 'audit') && cleanT.includes('qa')) return true;
-  if (isGeneric('ui') && cleanT.includes('ui')) return true;
-  if ((isGeneric('doc') || cleanQ === 'wiki') && cleanT.includes('doc')) return true;
-  return false;
+function matchesGenericRole(cleanT: string, cleanQ: string): boolean {
+  return ROLE_ALIAS_GROUPS.some(({ key, extras }) => {
+    if (!cleanT.includes(key)) return false;
+    const aliases = [key, `${key}-specialist`, `${key}-hunter`, `${key}-architect`, ...extras];
+    return aliases.includes(cleanQ);
+  });
+}
+
+export function matchesTaskRole(taskRole: string, roleQuery: string, issueNumber?: number, trackId?: string): boolean {
+  const cleanQ = roleQuery.toLowerCase().trim().replace(/^@/, '');
+  const cleanT = taskRole.toLowerCase().trim().replace(/^@/, '');
+  if (matchesIdentifier(cleanQ, issueNumber, trackId)) return true;
+  if (hasRoleMismatch(cleanT, cleanQ)) return false;
+  if (cleanT === cleanQ) return true;
+
+  const bracketMatch = matchesBracketLabel(cleanT, cleanQ);
+  if (bracketMatch !== null) return bracketMatch;
+  if (cleanT.startsWith(cleanQ) || cleanQ.startsWith(cleanT)) return true;
+  return matchesGenericRole(cleanT, cleanQ);
 }

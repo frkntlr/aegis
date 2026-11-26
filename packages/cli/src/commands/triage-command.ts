@@ -25,43 +25,52 @@ export interface TriageCommandOptions {
   jsonOutput?: boolean;
 }
 
+const SIMPLE_TRIAGE_FLAGS: Record<string, (opts: TriageCommandOptions) => void> = {
+  '--no-cache': o => { o.noCache = true; },
+  '--auto-dispatch': o => { o.autoDispatch = true; },
+  '--debug': o => { o.autoDispatch = true; },
+  '--json': o => { o.jsonOutput = true; }
+};
+
+function readOptionalFlagValue(args: string[], index: number, prefix: string): { value: string | true; step: number } {
+  const arg = args[index];
+  if (arg.startsWith(`${prefix}=`)) {
+    return { value: arg.slice(prefix.length + 1), step: 0 };
+  }
+  const next = args[index + 1];
+  if (next && !next.startsWith('--')) {
+    return { value: next, step: 1 };
+  }
+  return { value: true, step: 0 };
+}
+
+function applyTriageArg(args: string[], index: number, options: TriageCommandOptions): number {
+  const arg = args[index];
+  const simple = SIMPLE_TRIAGE_FLAGS[arg];
+  if (simple) {
+    simple(options);
+    return 0;
+  }
+  if (arg === '--with-tests' || arg.startsWith('--with-tests=')) {
+    const parsed = readOptionalFlagValue(args, index, '--with-tests');
+    options.withTests = parsed.value;
+    return parsed.step;
+  }
+  if (arg === '--with-godot' || arg.startsWith('--with-godot=')) {
+    const parsed = readOptionalFlagValue(args, index, '--with-godot');
+    options.withGodot = parsed.value;
+    return parsed.step;
+  }
+  if (!arg.startsWith('--') && !options.targetDir) options.targetDir = arg;
+  return 0;
+}
+
 export function parseTriageArgs(rawArgs?: string | string[]): TriageCommandOptions {
   const args = Array.isArray(rawArgs) ? rawArgs : (rawArgs ? [rawArgs] : []);
   const options: TriageCommandOptions = {};
-
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--no-cache') {
-      options.noCache = true;
-    } else if (arg === '--auto-dispatch' || arg === '--debug') {
-      options.autoDispatch = true;
-    } else if (arg === '--json') {
-      options.jsonOutput = true;
-    } else if (arg === '--with-tests') {
-      const next = args[i + 1];
-      if (next && !next.startsWith('--')) {
-        options.withTests = next;
-        i++;
-      } else {
-        options.withTests = true;
-      }
-    } else if (arg.startsWith('--with-tests=')) {
-      options.withTests = arg.slice('--with-tests='.length);
-    } else if (arg === '--with-godot') {
-      const next = args[i + 1];
-      if (next && !next.startsWith('--')) {
-        options.withGodot = next;
-        i++;
-      } else {
-        options.withGodot = true;
-      }
-    } else if (arg.startsWith('--with-godot=')) {
-      options.withGodot = arg.slice('--with-godot='.length);
-    } else if (!arg.startsWith('--') && !options.targetDir) {
-      options.targetDir = arg;
-    }
+    i += applyTriageArg(args, i, options);
   }
-
   return options;
 }
 

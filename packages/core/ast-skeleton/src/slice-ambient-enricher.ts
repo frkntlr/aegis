@@ -6,6 +6,36 @@ export interface AmbientEnrichment {
   referencedTypes: string[];
 }
 
+function collectClassMembers(
+  parentClass: ts.ClassDeclaration,
+  sf: ts.SourceFile
+): { fields: string[]; constructorSig: string } {
+  const fields: string[] = [];
+  let constructorSig = '';
+  for (const member of parentClass.members) {
+    if (ts.isPropertyDeclaration(member) && member.name) {
+      const typeStr = member.type ? `: ${member.type.getText(sf)}` : '';
+      fields.push(`  ${member.name.getText(sf)}${typeStr};`);
+    } else if (ts.isConstructorDeclaration(member) && !constructorSig) {
+      const params = member.parameters.map(p => p.getText(sf)).join(', ');
+      constructorSig = `  constructor(${params});`;
+    }
+  }
+  return { fields, constructorSig };
+}
+
+function appendClassContextHeader(
+  className: string,
+  fields: string[],
+  constructorSig: string,
+  out: string[]
+): void {
+  if (fields.length === 0 && !constructorSig) return;
+  out.push(`// 🏛️ [Class Context: ${className}]`);
+  if (constructorSig) out.push(`// ${constructorSig}`);
+  if (fields.length > 0) out.push(...fields.slice(0, 8).map(f => `// ${f}`));
+}
+
 export class SliceAmbientEnricher {
   public static enrichTypeScript(
     symbolName: string,
@@ -81,22 +111,9 @@ export class SliceAmbientEnricher {
     const parentClass = node.parent;
     if (!parentClass || !ts.isClassDeclaration(parentClass)) return;
 
-    const fields: string[] = [];
-    let constructorSig = '';
-    for (const member of parentClass.members) {
-      if (ts.isPropertyDeclaration(member) && member.name) {
-        const typeStr = member.type ? `: ${member.type.getText(sf)}` : '';
-        fields.push(`  ${member.name.getText(sf)}${typeStr};`);
-      } else if (ts.isConstructorDeclaration(member) && !constructorSig) {
-        const params = member.parameters.map(p => p.getText(sf)).join(', ');
-        constructorSig = `  constructor(${params});`;
-      }
-    }
-    if (fields.length > 0 || constructorSig) {
-      out.push(`// 🏛️ [Class Context: ${parentClass.name?.getText(sf) || 'Anonymous'}]`);
-      if (constructorSig) out.push(`// ${constructorSig}`);
-      if (fields.length > 0) out.push(...fields.slice(0, 8).map(f => `// ${f}`));
-    }
+    const { fields, constructorSig } = collectClassMembers(parentClass, sf);
+    const className = parentClass.name?.getText(sf) ?? 'Anonymous';
+    appendClassContextHeader(className, fields, constructorSig, out);
   }
 
   private static enrichReferencedTypes(

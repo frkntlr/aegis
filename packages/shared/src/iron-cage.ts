@@ -16,7 +16,11 @@ export type CageRuleType =
   | 'GD_009_BAND_AID_PREVENTION'
   | 'TS_001_NO_ANY'
   | 'TS_002_EMPTY_CATCH'
-  | 'TS_003_NESTING_DEPTH';
+  | 'TS_003_NESTING_DEPTH'
+  | 'TS_004_MAX_PARAMS'
+  | 'TS_005_GOD_CLASS'
+  | 'ARCH_001_HIGH_FAN_OUT'
+  | 'ARCH_002_CIRCULAR_DEPENDENCY';
 
 export interface CageViolation {
   rule: CageRuleType;

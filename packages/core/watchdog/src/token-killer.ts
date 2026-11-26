@@ -17,6 +17,17 @@ export interface TokenKillerResult {
   errorCount: number;
 }
 
+interface LineProcessState {
+  filtered: string[];
+  passCount: number;
+  failCount: number;
+  errorCount: number;
+  collapsePass: boolean;
+  pruneFrames: boolean;
+  filterNoise: boolean;
+  maxLen: number;
+}
+
 export class RTKTokenKiller {
   public static stripAnsi(text: string): string {
     return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
@@ -57,41 +68,53 @@ export class RTKTokenKiller {
     return noisePrefixes.some(p => trimmed.includes(p));
   }
 
-  private static processLines(rawLines: string[], options: TokenKillerOptions) {
-    const collapsePass = options.collapsePassedTests ?? true;
-    const pruneFrames = options.preserveUserFramesOnly ?? true;
-    const filterNoise = options.filterCompilerNoise ?? true;
-    const filtered: string[] = [];
-    let passCount = 0;
-    let failCount = 0;
-    let errorCount = 0;
+  private static createLineState(options: TokenKillerOptions): LineProcessState {
+    return {
+      filtered: [],
+      passCount: 0,
+      failCount: 0,
+      errorCount: 0,
+      collapsePass: options.collapsePassedTests ?? true,
+      pruneFrames: options.preserveUserFramesOnly ?? true,
+      filterNoise: options.filterCompilerNoise ?? true,
+      maxLen: options.maxLineLength ?? 200
+    };
+  }
 
+  private static shouldSkipLine(line: string, state: LineProcessState): boolean {
+    if (state.pruneFrames && RTKTokenKiller.isInternalStackFrame(line)) return true;
+    return state.filterNoise && RTKTokenKiller.isProgressNoise(line);
+  }
+
+  private static processNonEmptyLine(line: string, trimmed: string, state: LineProcessState): void {
+    if (RTKTokenKiller.shouldSkipLine(line, state)) return;
+    if (/^[✔√]\s+|:\s+[✔√]\s+/.test(trimmed)) {
+      state.passCount++;
+      if (!state.collapsePass) state.filtered.push(line);
+      return;
+    }
+    if (/^[✖x]\s+|:\s+[✖x]\s+|AssertionError|FAILED|ERROR:/.test(trimmed)) {
+      state.failCount++;
+    } else if (/\berror\s+TS\d+:|\bERROR\b/i.test(trimmed)) {
+      state.errorCount++;
+    }
+    state.filtered.push(line.length > state.maxLen ? line.slice(0, state.maxLen) + '…' : line);
+  }
+
+  private static processLines(rawLines: string[], options: TokenKillerOptions) {
+    const state = RTKTokenKiller.createLineState(options);
     for (const line of rawLines) {
       const trimmed = line.trim();
       if (!trimmed) {
-        if (filtered.length > 0 && filtered[filtered.length - 1] !== '') filtered.push('');
+        if (state.filtered.length > 0 && state.filtered[state.filtered.length - 1] !== '') state.filtered.push('');
         continue;
       }
-      if (pruneFrames && RTKTokenKiller.isInternalStackFrame(line)) continue;
-      if (filterNoise && RTKTokenKiller.isProgressNoise(line)) continue;
-      if (/^[✔√]\s+|:\s+[✔√]\s+/.test(trimmed)) {
-        passCount++;
-        if (!collapsePass) filtered.push(line);
-        continue;
-      }
-      if (/^[✖x]\s+|:\s+[✖x]\s+|AssertionError|FAILED|ERROR:/.test(trimmed)) {
-        failCount++;
-      } else if (/\berror\s+TS\d+:|\bERROR\b/i.test(trimmed)) {
-        errorCount++;
-      }
-      const maxLen = options.maxLineLength ?? 200;
-      filtered.push(line.length > maxLen ? line.slice(0, maxLen) + '…' : line);
+      RTKTokenKiller.processNonEmptyLine(line, trimmed, state);
     }
-
-    if (collapsePass && passCount > 0) {
-      filtered.unshift(`[RTK Summary] ✔ ${passCount} passing test(s) collapsed cleanly.`);
+    if (state.collapsePass && state.passCount > 0) {
+      state.filtered.unshift(`[RTK Summary] ✔ ${state.passCount} passing test(s) collapsed cleanly.`);
     }
-    return { filtered, passCount, failCount, errorCount };
+    return { filtered: state.filtered, passCount: state.passCount, failCount: state.failCount, errorCount: state.errorCount };
   }
 
   public static compress(raw: string, options: TokenKillerOptions = {}): TokenKillerResult {

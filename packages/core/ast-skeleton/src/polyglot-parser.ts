@@ -1,4 +1,21 @@
-import type { SymbolEntry } from './symbol-parser.js';
+import { type SymbolEntry, findIndentBlockEnd } from './symbol-parser-types.js';
+
+interface PythonFuncContext {
+  fnMatch: RegExpMatchArray;
+  curClass: string;
+  normPath: string;
+  lines: string[];
+  lineIdx: number;
+  symbols: SymbolEntry[];
+}
+
+interface CSharpMemberContext {
+  lineIdx: number;
+  normPath: string;
+  curClass: string;
+  trimmed: string;
+  symbols: SymbolEntry[];
+}
 
 export class PolyglotParser {
   public static parsePython(filePath: string, content: string): SymbolEntry[] {
@@ -32,46 +49,33 @@ export class PolyglotParser {
 
       const fnMatch = trimmed.match(/^(?:(async)\s+)?def\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
       if (fnMatch) {
-        PolyglotParser.handlePythonFunction(fnMatch, curClass, normPath, lines, i, symbols);
+        PolyglotParser.handlePythonFunction({ fnMatch, curClass, normPath, lines, lineIdx: i, symbols });
       }
     }
     return symbols;
   }
 
-  private static handlePythonFunction(
-    fnMatch: RegExpMatchArray,
-    curClass: string,
-    normPath: string,
-    lines: string[],
-    i: number,
-    symbols: SymbolEntry[]
-  ): void {
+  private static handlePythonFunction(ctx: PythonFuncContext): void {
+    const { fnMatch, curClass, normPath, lines, lineIdx, symbols } = ctx;
     const isAsync = Boolean(fnMatch[1]);
     const fnName = fnMatch[2];
     const prefix = isAsync ? 'async def' : 'def';
     const ret = fnMatch[4] ? ` -> ${fnMatch[4].trim()}` : '';
-    const endLine = PolyglotParser.findPythonEnd(lines, i);
+    const endLine = PolyglotParser.findPythonEnd(lines, lineIdx);
     symbols.push({
       name: fnName, kind: curClass ? 'method' : 'function', filePath: normPath,
-      startLine: i + 1, endLine, signature: `${prefix} ${fnMatch[2]}(${fnMatch[3]})${ret}:`
+      startLine: lineIdx + 1, endLine, signature: `${prefix} ${fnMatch[2]}(${fnMatch[3]})${ret}:`
     });
     if (curClass) {
       symbols.push({
         name: `${curClass}.${fnName}`, kind: 'method', filePath: normPath,
-        startLine: i + 1, endLine, signature: `${prefix} ${fnMatch[2]}(${fnMatch[3]})${ret}:`
+        startLine: lineIdx + 1, endLine, signature: `${prefix} ${fnMatch[2]}(${fnMatch[3]})${ret}:`
       });
     }
   }
 
   public static findPythonEnd(lines: string[], startIdx: number): number {
-    const baseIndent = (lines[startIdx].match(/^[\t\s]*/)?.[0] || '').length;
-    for (let j = startIdx + 1; j < lines.length; j++) {
-      const l = lines[j];
-      if (!l.trim() || l.trim().startsWith('#')) continue;
-      const indent = (l.match(/^[\t\s]*/)?.[0] || '').length;
-      if (indent <= baseIndent) return j;
-    }
-    return lines.length;
+    return findIndentBlockEnd(lines, startIdx, ['#']);
   }
 
   public static parseRust(filePath: string, content: string): SymbolEntry[] {
@@ -163,19 +167,13 @@ export class PolyglotParser {
         continue;
       }
 
-      PolyglotParser.parseCSharpMember(lines, i, normPath, curClass, trimmed, symbols);
+      PolyglotParser.parseCSharpMember({ lineIdx: i, normPath, curClass, trimmed, symbols });
     }
     return symbols;
   }
 
-  private static parseCSharpMember(
-    _lines: string[],
-    i: number,
-    normPath: string,
-    curClass: string,
-    trimmed: string,
-    symbols: SymbolEntry[]
-  ): void {
+  private static parseCSharpMember(ctx: CSharpMemberContext): void {
+    const { lineIdx, normPath, curClass, trimmed, symbols } = ctx;
     const methodMatch = trimmed.match(
       /^(?:public|private|protected|internal|static|async|virtual|override|abstract|sealed|partial|\s)*(?:[\w<>\[\],\s\?]+)\s+([a-zA-Z_]\w*)\s*\((.*?)\)/
     );
@@ -185,8 +183,8 @@ export class PolyglotParser {
         name: methodName,
         kind: curClass ? 'method' : 'function',
         filePath: normPath,
-        startLine: i + 1,
-        endLine: i + 1,
+        startLine: lineIdx + 1,
+        endLine: lineIdx + 1,
         signature: trimmed.replace(/\{.*$/, '').trim()
       });
       return;
@@ -201,8 +199,8 @@ export class PolyglotParser {
         name: propName,
         kind: 'variable',
         filePath: normPath,
-        startLine: i + 1,
-        endLine: i + 1,
+        startLine: lineIdx + 1,
+        endLine: lineIdx + 1,
         signature: trimmed
       });
     }

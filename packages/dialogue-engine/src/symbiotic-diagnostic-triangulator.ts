@@ -193,36 +193,66 @@ export class SymbioticDiagnosticTriangulator {
     return -1;
   }
 
+  private static readonly OPEN_DELIMITERS: Record<string, 'parenDepth' | 'bracketDepth' | 'braceDepth'> = {
+    '(': 'parenDepth',
+    '<': 'bracketDepth',
+    '[': 'bracketDepth',
+    '{': 'braceDepth'
+  };
+
+  private static readonly CLOSE_DELIMITERS: Record<string, 'parenDepth' | 'bracketDepth' | 'braceDepth'> = {
+    ')': 'parenDepth',
+    '>': 'bracketDepth',
+    ']': 'bracketDepth',
+    '}': 'braceDepth'
+  };
+
+  private static updateDepthAndAppend(
+    ch: string,
+    state: { cur: string; parenDepth: number; bracketDepth: number; braceDepth: number }
+  ): void {
+    const openKey = SymbioticDiagnosticTriangulator.OPEN_DELIMITERS[ch];
+    if (openKey) state[openKey]++;
+    const closeKey = SymbioticDiagnosticTriangulator.CLOSE_DELIMITERS[ch];
+    if (closeKey) state[closeKey]--;
+    state.cur += ch;
+  }
+
+  private static stepTokenScan(
+    str: string,
+    i: number,
+    delimiter: string,
+    state: { cur: string; parenDepth: number; bracketDepth: number; braceDepth: number; inQuote: string | null }
+  ): string | null {
+    const ch = str[i];
+    if (state.inQuote) {
+      state.cur += ch;
+      if (ch === state.inQuote && str[i - 1] !== '\\') state.inQuote = null;
+      return null;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      state.inQuote = ch;
+      state.cur += ch;
+      return null;
+    }
+    const atTopLevel = state.parenDepth === 0 && state.bracketDepth === 0 && state.braceDepth === 0;
+    if (ch === delimiter && atTopLevel) {
+      const token = state.cur.trim();
+      state.cur = '';
+      return token;
+    }
+    SymbioticDiagnosticTriangulator.updateDepthAndAppend(ch, state);
+    return null;
+  }
+
   private static splitTokens(str: string, delimiter: string): string[] {
     const tokens: string[] = [];
-    let cur = '';
-    let parenDepth = 0;
-    let bracketDepth = 0;
-    let braceDepth = 0;
-    let inQuote: string | null = null;
-
+    const state = { cur: '', parenDepth: 0, bracketDepth: 0, braceDepth: 0, inQuote: null as string | null };
     for (let i = 0; i < str.length; i++) {
-      const ch = str[i];
-      if (inQuote) {
-        cur += ch;
-        if (ch === inQuote && str[i - 1] !== '\\') inQuote = null;
-      } else if (ch === '"' || ch === "'" || ch === '`') {
-        inQuote = ch;
-        cur += ch;
-      } else if (ch === '(') { parenDepth++; cur += ch; }
-      else if (ch === ')') { parenDepth--; cur += ch; }
-      else if (ch === '<' || ch === '[') { bracketDepth++; cur += ch; }
-      else if (ch === '>' || ch === ']') { bracketDepth--; cur += ch; }
-      else if (ch === '{') { braceDepth++; cur += ch; }
-      else if (ch === '}') { braceDepth--; cur += ch; }
-      else if (ch === delimiter && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
-        tokens.push(cur.trim());
-        cur = '';
-      } else {
-        cur += ch;
-      }
+      const token = SymbioticDiagnosticTriangulator.stepTokenScan(str, i, delimiter, state);
+      if (token !== null) tokens.push(token);
     }
-    if (cur.trim()) tokens.push(cur.trim());
+    if (state.cur.trim()) tokens.push(state.cur.trim());
     return tokens;
   }
 }

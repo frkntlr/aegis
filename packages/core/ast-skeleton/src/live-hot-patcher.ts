@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogIgnored } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
-import type { CodebaseMemoryEngine, MemoryNamespace } from './codebase-memory.js';
+import type { CodebaseMemoryHost, MemoryNamespace } from './codebase-memory-types.js';
 
 export interface HotPatchReport {
   patchedFiles: string[];
@@ -20,7 +20,7 @@ export class LiveHotPatcher {
   }
 
   public static patchDirtyFile(
-    engine: CodebaseMemoryEngine,
+    engine: CodebaseMemoryHost,
     filePath: string,
     worktreeId = 'default'
   ): boolean {
@@ -34,7 +34,7 @@ export class LiveHotPatcher {
   }
 
   public static getOrLoadContent(
-    engine: CodebaseMemoryEngine,
+    engine: CodebaseMemoryHost,
     ns: MemoryNamespace,
     filePath: string,
     worktreeId = 'default'
@@ -55,7 +55,7 @@ export class LiveHotPatcher {
     return stored;
   }
 
-  private static purgeDeletedGitFiles(engine: CodebaseMemoryEngine, ns: MemoryNamespace, worktreeId: string, cwd: string, patched: string[]): void {
+  private static purgeDeletedGitFiles(engine: CodebaseMemoryHost, ns: MemoryNamespace, worktreeId: string, cwd: string, patched: string[]): void {
     const deletedFiles = GitFastSyncEngine.getDeletedFiles(cwd);
     for (const relPath of deletedFiles) {
       const norm = relPath.replace(/\\/g, '/');
@@ -67,7 +67,7 @@ export class LiveHotPatcher {
     }
   }
 
-  private static patchDirtyGitFiles(engine: CodebaseMemoryEngine, ns: MemoryNamespace, worktreeId: string, cwd: string, patched: string[]): void {
+  private static patchDirtyGitFiles(engine: CodebaseMemoryHost, ns: MemoryNamespace, worktreeId: string, cwd: string, patched: string[]): void {
     const dirtyGitFiles = GitFastSyncEngine.getPorcelainStatus(cwd) || [];
     for (const relPath of dirtyGitFiles) {
       const norm = relPath.replace(/\\/g, '/');
@@ -80,7 +80,7 @@ export class LiveHotPatcher {
   }
 
   public static patchUncommitted(
-    engine: CodebaseMemoryEngine,
+    engine: CodebaseMemoryHost,
     ns: MemoryNamespace,
     worktreeId = 'default',
     cwd = process.cwd()

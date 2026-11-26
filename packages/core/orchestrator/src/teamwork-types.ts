@@ -8,7 +8,27 @@ import type { RoleType } from './role-classifier.js';
 import type { SubagentProfile } from './teamwork-prompts.js';
 import type { ComplexityAnalysisResult } from './task-complexity-analyzer.js';
 import type { DeliberationResult } from './teamwork-deliberation-types.js';
-import type { CodexInvocationPayload } from './codex-teamwork.js';
+
+export interface CodexInvocationPayload {
+  task_name: string;
+  message: string;
+  fork_turns: 'all';
+}
+
+export interface PlanTeamworkOptions {
+  deterministic?: boolean;
+  stage?: boolean;
+  acquireLocks?: boolean;
+  maxConcurrency?: number;
+  autoScale?: boolean;
+  selectedRoles?: RoleType[];
+  explicitRole?: string;
+  treeSpecialists?: boolean;
+  research?: boolean;
+  deepAnalyze?: boolean;
+  deliberate?: boolean;
+  semantic?: boolean;
+}
 
 export interface AntigravityInvocationPayload {
   TypeName: string;

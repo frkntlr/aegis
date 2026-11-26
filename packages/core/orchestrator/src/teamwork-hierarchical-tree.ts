@@ -5,7 +5,7 @@
  */
 
 import type { RoleType } from './role-classifier.js';
-import type { DecomposedSubtask } from './teamwork-decomposer.js';
+import type { DecomposedSubtask } from './teamwork-decomposer-types.js';
 
 export interface MicroSpecialistDef {
   label: string;

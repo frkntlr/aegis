@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
-import type { CodebaseMemoryEngine } from './codebase-memory.js';
+import type { CodebaseMemoryHost } from './codebase-memory-types.js';
 
 export interface ColdStartOptions {
   repoRoot?: string;
@@ -70,7 +70,7 @@ export class ColdStartIndexer {
     }
   }
 
-  private indexFileList(engine: CodebaseMemoryEngine, files: string[], worktreeId?: string): { indexed: number; skipped: number } {
+  private indexFileList(engine: CodebaseMemoryHost, files: string[], worktreeId?: string): { indexed: number; skipped: number } {
     let indexed = 0;
     let skipped = 0;
     const active = worktreeId || ActiveHeadResolver.resolveActiveWorktree();
@@ -94,7 +94,7 @@ export class ColdStartIndexer {
   }
 
   public async indexProjectRoot(
-    engine: CodebaseMemoryEngine,
+    engine: CodebaseMemoryHost,
     options: ColdStartOptions = {}
   ): Promise<ColdStartIndexResult> {
     const startTime = Date.now();
@@ -122,7 +122,7 @@ export class ColdStartIndexer {
   }
 
   public indexDirectory(
-    engine: CodebaseMemoryEngine,
+    engine: CodebaseMemoryHost,
     dirPath: string,
     worktreeId?: string
   ): { indexed: number; cached: number; fastSynced?: boolean } {

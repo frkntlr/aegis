@@ -4,7 +4,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import type { Context7DocEntry } from './context7-bridge.js';
+import type { Context7DocEntry } from './context7-types.js';
 
 export class Context7BuiltinDocs {
   public static getBuiltinDocs(): Context7DocEntry[] {

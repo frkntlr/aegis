@@ -13,6 +13,14 @@ export interface TsImportBinding {
   targetFilePath: string;
 }
 
+interface CallResolveContext {
+  filePath: string;
+  caller: string;
+  currentClass: string | undefined;
+  imports: Map<string, TsImportBinding>;
+  out: SymbolCallEdge[];
+}
+
 export class TsCallGraphExtractor {
   public static resolveImportPath(currentFilePath: string, specifier: string): string {
     if (!specifier.startsWith('.')) return specifier;
@@ -61,7 +69,7 @@ export class TsCallGraphExtractor {
       }
 
       if (caller) {
-        TsCallGraphExtractor.checkNodeCall(node, normPath, caller, cls, imports, edges);
+        TsCallGraphExtractor.checkNodeCall(node, { filePath: normPath, caller, currentClass: cls, imports, out: edges });
       }
 
       ts.forEachChild(node, child => visit(child, caller, cls));
@@ -71,16 +79,10 @@ export class TsCallGraphExtractor {
     return edges;
   }
 
-  private static checkNodeCall(
-    node: ts.Node,
-    filePath: string,
-    caller: string,
-    currentClass: string | undefined,
-    imports: Map<string, TsImportBinding>,
-    out: SymbolCallEdge[]
-  ): void {
+  private static checkNodeCall(node: ts.Node, ctx: CallResolveContext): void {
+    const { filePath, caller, imports, out } = ctx;
     if (ts.isCallExpression(node)) {
-      TsCallGraphExtractor.resolveCall(node.expression, filePath, caller, currentClass, imports, out);
+      TsCallGraphExtractor.resolveCall(node.expression, ctx);
     } else if (ts.isNewExpression(node)) {
       TsCallGraphExtractor.resolveNew(node.expression, filePath, caller, imports, out);
     } else if (ts.isTypeReferenceNode(node)) {
@@ -88,14 +90,8 @@ export class TsCallGraphExtractor {
     }
   }
 
-  private static resolveCall(
-    expr: ts.Expression,
-    filePath: string,
-    caller: string,
-    currentClass: string | undefined,
-    imports: Map<string, TsImportBinding>,
-    out: SymbolCallEdge[]
-  ): void {
+  private static resolveCall(expr: ts.Expression, ctx: CallResolveContext): void {
+    const { filePath, caller, currentClass, imports, out } = ctx;
     if (ts.isIdentifier(expr)) {
       const name = expr.text;
       const imp = imports.get(name);

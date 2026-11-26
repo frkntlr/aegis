@@ -16,26 +16,41 @@ const OPTIONS: Record<string, string[]> = {
   start: [], delegate: [], complete: [], fail: [], 'cancel-dispatch': []
 };
 
+const THREE_ARG_COMMANDS = new Set(['start', 'delegate', 'complete', 'fail', 'cancel-dispatch', 'defer']);
+const EVIDENCE_COMMANDS = new Set(['complete', 'fail', 'cancel-dispatch', 'defer']);
+const ZERO_ARG_COMMANDS = new Set(['list', 'status']);
+
+function parseOptionToken(arg: string, command: string, options: Map<string, string>): void {
+  if (arg === '--agent-stopped' && command === 'defer' && !options.has('agent-stopped')) {
+    options.set('agent-stopped', 'true');
+    return;
+  }
+  const match = /^--([a-z-]+)=(.+)$/.exec(arg);
+  if (!match || match[1] === 'agent-stopped' || !OPTIONS[command].includes(match[1]) || options.has(match[1])) {
+    throw new Error(`Unsupported or repeated option: ${arg}`);
+  }
+  options.set(match[1], match[2]);
+}
+
+function validatePositionalCount(command: string, count: number): void {
+  const min = THREE_ARG_COMMANDS.has(command) ? 3 : (ZERO_ARG_COMMANDS.has(command) ? 0 : 1);
+  const max = command === 'status' ? 1 : min;
+  const acceptsEvidence = EVIDENCE_COMMANDS.has(command);
+  if (count < min || (!acceptsEvidence && count > max)) {
+    throw new Error(`Invalid arguments for ${command}`);
+  }
+}
+
 function parseArgs(args: string[]): OrchestraArgs {
   const command = args[0];
   if (!command || !Object.hasOwn(OPTIONS, command)) throw new Error(`Expected ${Object.keys(OPTIONS).join(', ')}`);
   const options = new Map<string, string>();
   const positional: string[] = [];
   for (const arg of args.slice(1)) {
-    if (!arg.startsWith('--')) { positional.push(arg); continue; }
-    if (arg === '--agent-stopped' && command === 'defer' && !options.has('agent-stopped')) {
-      options.set('agent-stopped', 'true'); continue;
-    }
-    const match = /^--([a-z-]+)=(.+)$/.exec(arg);
-    if (!match || match[1] === 'agent-stopped' || !OPTIONS[command].includes(match[1]) || options.has(match[1])) {
-      throw new Error(`Unsupported or repeated option: ${arg}`);
-    }
-    options.set(match[1], match[2]);
+    if (!arg.startsWith('--')) positional.push(arg);
+    else parseOptionToken(arg, command, options);
   }
-  const min = ['start', 'delegate', 'complete', 'fail', 'cancel-dispatch', 'defer'].includes(command) ? 3 : command === 'list' || command === 'status' ? 0 : 1;
-  const max = command === 'status' ? 1 : min;
-  const acceptsEvidence = ['complete', 'fail', 'cancel-dispatch', 'defer'].includes(command);
-  if (positional.length < min || (!acceptsEvidence && positional.length > max)) throw new Error(`Invalid arguments for ${command}`);
+  validatePositionalCount(command, positional.length);
   return { command, positional, options };
 }
 

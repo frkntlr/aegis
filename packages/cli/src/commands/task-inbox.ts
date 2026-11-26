@@ -4,33 +4,10 @@ import * as os from 'node:os';
 import { debugLogIgnored, readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeMutex } from '@aegis/orchestrator';
 import { isTaskDependenciesSatisfied, matchesTaskRole, reconcileBlockedTasks } from './task-inbox-matching.js';
+import type { TaskInboxData, TaskInboxItem } from './task-inbox-types.js';
 
 export { isTaskDependenciesSatisfied, matchesTaskRole } from './task-inbox-matching.js';
-
-export interface TaskInboxItem {
-  id: number;
-  issueNumber: number;
-  title: string;
-  role: string;
-  worktree: string;
-  targetFiles: string[];
-  acceptanceCriteria: string[];
-  prompt: string;
-  status: 'pending' | 'in_progress' | 'done' | 'blocked';
-  stagedAt: string;
-  claimedBy?: string;
-  claimedAt?: string;
-  dependsOn?: string[];
-  phase?: number;
-  isGitHubIssue?: boolean;
-  trackId?: string;
-}
-
-export interface TaskInboxData {
-  version: string;
-  updatedAt: string;
-  tasks: TaskInboxItem[];
-}
+export type { TaskInboxData, TaskInboxItem } from './task-inbox-types.js';
 
 function isTestEnvironment(targetDir?: string): boolean {
   if (process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1' || process.env.AEGIS_TEST_SHIELD === '1') {

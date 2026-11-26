@@ -11,17 +11,22 @@ export class HttpRequestError extends Error {
   }
 }
 
+const LOCAL_ORIGIN_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+function hasCleanHttpOriginUrl(u: URL, rawOrigin: string): boolean {
+  if (u.protocol !== 'http:' || u.origin !== rawOrigin) return false;
+  if (u.username || u.password || u.search || u.hash) return false;
+  return u.pathname === '/';
+}
+
 export function isAllowedLocalOrigin(origin: string | undefined, expectedPort: number): boolean {
   if (origin === undefined) return true;
-  if (!origin || origin === 'null') return false;
+  if (!origin || origin === 'null' || expectedPort <= 0) return false;
   try {
     const u = new URL(origin);
-    if (u.protocol !== 'http:') return false;
-    if (u.username || u.password || u.pathname !== '/' || u.search || u.hash) return false;
-    if (u.origin !== origin) return false;
-    const isLocal = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+    if (!hasCleanHttpOriginUrl(u, origin)) return false;
     const effectivePort = Number(u.port || '80');
-    return isLocal && expectedPort > 0 && effectivePort === expectedPort;
+    return LOCAL_ORIGIN_HOSTS.has(u.hostname) && effectivePort === expectedPort;
   } catch (err: unknown) {
     debugLogIgnored('server-security:isAllowedLocalOrigin', err);
     return false;

@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
-import type { Context7DocEntry } from './context7-bridge.js';
+import type { Context7DocEntry } from './context7-types.js';
 
 interface PackageJsonMeta {
   version?: string;
@@ -19,6 +19,25 @@ interface PackageJsonMeta {
 export interface ManifestEntry {
   version: string;
   symbols: Record<string, { file: string; line: number }>;
+}
+
+export interface UpdateManifestOptions {
+  cacheDir: string;
+  pkgName: string;
+  version: string;
+  symbol: string;
+  file: string;
+  line: number;
+}
+
+function readPackageVersion(pkgDir: string): string {
+  try {
+    const pkg = readJsonSafe<PackageJsonMeta>(path.join(pkgDir, 'package.json'));
+    return pkg.version || '1.0.0';
+  } catch (err: unknown) {
+    debugLogIgnored('jit-doc-synthesizer:version', err);
+    return '1.0.0';
+  }
 }
 
 export class JitDocSynthesizer {
@@ -118,13 +137,12 @@ export class JitDocSynthesizer {
   }
 
   public static updateManifest(
-    cacheDir: string,
-    pkgName: string,
-    version: string,
-    symbol: string,
-    file: string,
-    line: number
+    ...args: [UpdateManifestOptions] | [string, string, string, string, string, number]
   ): void {
+    const opts: UpdateManifestOptions = typeof args[0] === 'string'
+      ? { cacheDir: args[0], pkgName: args[1] as string, version: args[2] as string, symbol: args[3] as string, file: args[4] as string, line: args[5] as number }
+      : args[0];
+    const { cacheDir, pkgName, version, symbol, file, line } = opts;
     const manifestPath = path.join(cacheDir, 'manifest.json');
     let manifest: Record<string, ManifestEntry> = {};
     if (fs.existsSync(manifestPath)) {
@@ -147,14 +165,7 @@ export class JitDocSynthesizer {
     const pkgDir = JitDocSynthesizer.resolvePackageDir(library, rootDir);
     if (!pkgDir) return null;
 
-    let version = '1.0.0';
-    try {
-      const pkg = readJsonSafe<PackageJsonMeta>(path.join(pkgDir, 'package.json'));
-      version = pkg.version || '1.0.0';
-    } catch (err: unknown) {
-      debugLogIgnored('jit-doc-synthesizer:version', err);
-    }
-
+    const version = readPackageVersion(pkgDir);
     const dtsPath = JitDocSynthesizer.resolveEntryDeclaration(pkgDir);
     if (!dtsPath) return null;
 
@@ -168,7 +179,9 @@ export class JitDocSynthesizer {
       fs.mkdirSync(targetCacheDir, { recursive: true });
       const docPath = path.join(targetCacheDir, `${library}__${symbol}.json`);
       fs.writeFileSync(docPath, JSON.stringify(doc, null, 2), 'utf8');
-      JitDocSynthesizer.updateManifest(targetCacheDir, library, version, symbol, dtsPath, sliceResult.line);
+      JitDocSynthesizer.updateManifest({
+        cacheDir: targetCacheDir, pkgName: library, version, symbol, file: dtsPath, line: sliceResult.line
+      });
     } catch (err: unknown) {
       debugLogIgnored('jit-doc-synthesizer:cache', err);
     }

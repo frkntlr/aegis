@@ -16,6 +16,40 @@ export interface CalleeExtractorOptions {
   sourceFileProvider?: (filePath: string) => string | null;
 }
 
+type CallableExpr = ts.ArrowFunction | ts.FunctionExpression;
+
+function isFnExpr(node: ts.Expression | undefined): node is CallableExpr {
+  return !!node && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
+}
+
+function formatCallableSignature(
+  name: string,
+  node: ts.SignatureDeclarationBase,
+  sf: ts.SourceFile,
+  prefix = ''
+): string {
+  const params = node.parameters.map(p => p.getText(sf)).join(', ');
+  const ret = node.type ? `: ${node.type.getText(sf)}` : '';
+  return `${prefix}${name}(${params})${ret};`;
+}
+
+function findClassMemberSignature(
+  stmt: ts.ClassDeclaration,
+  sf: ts.SourceFile,
+  methodName: string,
+  prefix: string
+): string | null {
+  for (const member of stmt.members) {
+    if (ts.isMethodDeclaration(member) && member.name.getText(sf) === methodName) {
+      return formatCallableSignature(methodName, member, sf, prefix);
+    }
+    if (ts.isPropertyDeclaration(member) && member.name.getText(sf) === methodName && isFnExpr(member.initializer)) {
+      return formatCallableSignature(methodName, member.initializer, sf, prefix);
+    }
+  }
+  return null;
+}
+
 export class CalleeSignatureExtractor {
   private options: CalleeExtractorOptions;
   private astCache = new Map<string, ts.SourceFile>();
@@ -39,15 +73,12 @@ export class CalleeSignatureExtractor {
     let target: ts.Node | null = null;
     const walk = (n: ts.Node): void => {
       if (target) return;
-      if ((ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) && n.name && n.name.getText(sf) === targetName) {
+      if ((ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) && n.name?.getText(sf) === targetName) {
         target = n;
         return;
       }
-      const isPropOrVar = (ts.isVariableDeclaration(n) || ts.isPropertyDeclaration(n)) &&
-        n.name.getText(sf) === targetName && n.initializer &&
-        (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer));
-      if (isPropOrVar) {
-        target = (n as { initializer: ts.Node }).initializer;
+      if ((ts.isVariableDeclaration(n) || ts.isPropertyDeclaration(n)) && n.name.getText(sf) === targetName && isFnExpr(n.initializer)) {
+        target = n.initializer;
         return;
       }
       ts.forEachChild(n, walk);
@@ -71,48 +102,33 @@ export class CalleeSignatureExtractor {
     return [...new Set(rawCalls)];
   }
 
-  private formatSignatureFromNode(n: ts.FunctionDeclaration | ts.MethodDeclaration, sf: ts.SourceFile, prefix = ''): string {
-    const name = n.name ? n.name.getText(sf) : 'anonymous';
-    const params = n.parameters.map(p => p.getText(sf)).join(', ');
-    const ret = n.type ? `: ${n.type.getText(sf)}` : '';
-    return `${prefix}${name}(${params})${ret};`;
-  }
-
   private findVariableSignature(stmt: ts.Statement, sf: ts.SourceFile, methodName: string, prefix: string): string | null {
     if (!ts.isVariableStatement(stmt)) return null;
     for (const decl of stmt.declarationList.declarations) {
-      if (decl.name.getText(sf) === methodName && decl.initializer && (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))) {
-        const fn = decl.initializer;
-        const params = fn.parameters.map(p => p.getText(sf)).join(', ');
-        const ret = fn.type ? `: ${fn.type.getText(sf)}` : '';
-        return `${prefix}${methodName}(${params})${ret};`;
+      if (decl.name.getText(sf) === methodName && isFnExpr(decl.initializer)) {
+        return formatCallableSignature(methodName, decl.initializer, sf, prefix);
       }
     }
     return null;
   }
 
+  private findStatementSignature(stmt: ts.Statement, sf: ts.SourceFile, methodName: string, prefix: string): string | null {
+    if (ts.isFunctionDeclaration(stmt) && stmt.name?.getText(sf) === methodName) {
+      return formatCallableSignature(methodName, stmt, sf, prefix);
+    }
+    if (ts.isClassDeclaration(stmt)) {
+      return findClassMemberSignature(stmt, sf, methodName, prefix);
+    }
+    return this.findVariableSignature(stmt, sf, methodName, prefix);
+  }
+
   private findLocalSignature(sf: ts.SourceFile, callText: string): string | null {
-    const methodName = callText.includes('.') ? callText.split('.').pop()! : callText;
-    const prefix = callText.startsWith('this.') ? 'this.' : (callText.includes('.') ? callText.slice(0, callText.lastIndexOf('.') + 1) : '');
+    const dotIdx = callText.lastIndexOf('.');
+    const methodName = dotIdx >= 0 ? callText.slice(dotIdx + 1) : callText;
+    const prefix = callText.startsWith('this.') ? 'this.' : dotIdx >= 0 ? callText.slice(0, dotIdx + 1) : '';
     for (const stmt of sf.statements) {
-      if (ts.isFunctionDeclaration(stmt) && stmt.name?.getText(sf) === methodName) {
-        return this.formatSignatureFromNode(stmt, sf, prefix);
-      }
-      if (ts.isClassDeclaration(stmt)) {
-        for (const member of stmt.members) {
-          if (ts.isMethodDeclaration(member) && member.name?.getText(sf) === methodName) {
-            return this.formatSignatureFromNode(member, sf, prefix);
-          }
-          if (ts.isPropertyDeclaration(member) && member.name?.getText(sf) === methodName && member.initializer && (ts.isArrowFunction(member.initializer) || ts.isFunctionExpression(member.initializer))) {
-            const fn = member.initializer;
-            const params = fn.parameters.map(p => p.getText(sf)).join(', ');
-            const ret = fn.type ? ': ' + fn.type.getText(sf) : '';
-            return prefix + methodName + '(' + params + ')' + ret + ';';
-          }
-        }
-      }
-      const varSig = this.findVariableSignature(stmt, sf, methodName, prefix);
-      if (varSig) return varSig;
+      const sig = this.findStatementSignature(stmt, sf, methodName, prefix);
+      if (sig) return sig;
     }
     return null;
   }

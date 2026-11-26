@@ -17,6 +17,15 @@ interface MonitorState {
   stderrLinesCount: number;
 }
 
+interface WatchdogTimerCheckContext {
+  child: ChildProcess;
+  state: MonitorState;
+  timeoutSeconds: number;
+  interval: NodeJS.Timeout;
+  flags: { stagnated: boolean; timedOut: boolean };
+  onProgress?: (msg: string) => void;
+}
+
 export class HeartbeatMonitor {
   private stagnationThresholdMs: number;
   private extensionStepMs: number;
@@ -88,14 +97,8 @@ export class HeartbeatMonitor {
     return 1000;
   }
 
-  private checkWatchdogTimer(
-    child: ChildProcess,
-    state: MonitorState,
-    timeoutSeconds: number,
-    interval: NodeJS.Timeout,
-    flags: { stagnated: boolean; timedOut: boolean },
-    onProgress?: (msg: string) => void
-  ): void {
+  private checkWatchdogTimer(ctx: WatchdogTimerCheckContext): void {
+    const { child, state, timeoutSeconds, interval, flags, onProgress } = ctx;
     const now = Date.now();
     const timeSinceActivity = now - state.lastActivityTimeMs;
 
@@ -153,7 +156,7 @@ export class HeartbeatMonitor {
     return new Promise((resolve) => {
       this.setupDataListeners(child, state, onProgress);
       const interval = setInterval(() => {
-        this.checkWatchdogTimer(child, state, timeoutSeconds, interval, flags, onProgress);
+        this.checkWatchdogTimer({ child, state, timeoutSeconds, interval, flags, onProgress });
       }, intervalMs);
 
       child.on('close', (exitCode) => {

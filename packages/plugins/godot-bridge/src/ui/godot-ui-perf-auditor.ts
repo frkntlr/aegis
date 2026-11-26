@@ -36,6 +36,45 @@ interface ParsedNode {
   properties: Map<string, string>;
 }
 
+interface OptimizeState {
+  output: string[];
+  fixes: string[];
+  curType: string;
+  curName: string;
+  hasFilter: boolean;
+}
+
+function flushPendingDecorativeFilter(state: OptimizeState, decorativeTypes: ReadonlySet<string>): void {
+  if (state.curName && decorativeTypes.has(state.curType) && !state.hasFilter) {
+    state.output.push('mouse_filter = 2');
+    state.fixes.push(`Added mouse_filter = 2 to decorative node "${state.curName}" (${state.curType})`);
+  }
+}
+
+function processOptimizeLine(line: string, state: OptimizeState, decorativeTypes: ReadonlySet<string>): void {
+  if (line.startsWith('[node ')) {
+    flushPendingDecorativeFilter(state, decorativeTypes);
+    state.curName = line.match(/name="([^"]+)"/)?.[1] || '';
+    state.curType = line.match(/type="([^"]+)"/)?.[1] || '';
+    state.hasFilter = false;
+    state.output.push(line);
+    return;
+  }
+  const trimmed = line.trim();
+  if (trimmed.startsWith('mouse_filter = 0') && decorativeTypes.has(state.curType)) {
+    state.output.push('mouse_filter = 2');
+    state.fixes.push(`Upgraded mouse_filter from 0 to 2 on "${state.curName}"`);
+    state.hasFilter = true;
+    return;
+  }
+  if (trimmed.startsWith('clip_contents = true') && state.curType !== 'ScrollContainer') {
+    state.fixes.push(`Removed redundant clip_contents from "${state.curName}"`);
+    return;
+  }
+  if (trimmed.startsWith('mouse_filter')) state.hasFilter = true;
+  state.output.push(line);
+}
+
 export class GodotUiPerfAuditor {
   private static readonly DECORATIVE_TYPES = new Set([
     'ColorRect', 'TextureRect', 'NinePatchRect', 'Panel', 'MarginContainer',
@@ -137,40 +176,12 @@ export class GodotUiPerfAuditor {
   }
 
   public static optimizeContent(content: string): { optimizedContent: string; fixesApplied: string[] } {
-    const lines = content.split(/\r?\n/);
-    const fixes: string[] = [];
-    const output: string[] = [];
-    let curType = '';
-    let curName = '';
-    let hasFilter = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.startsWith('[node ')) {
-        if (curName && this.DECORATIVE_TYPES.has(curType) && !hasFilter) {
-          output.push('mouse_filter = 2');
-          fixes.push(`Added mouse_filter = 2 to decorative node "${curName}" (${curType})`);
-        }
-        curName = line.match(/name="([^"]+)"/)?.[1] || '';
-        curType = line.match(/type="([^"]+)"/)?.[1] || '';
-        hasFilter = false;
-        output.push(line);
-      } else if (line.trim().startsWith('mouse_filter = 0') && this.DECORATIVE_TYPES.has(curType)) {
-        output.push('mouse_filter = 2');
-        fixes.push(`Upgraded mouse_filter from 0 to 2 on "${curName}"`);
-        hasFilter = true;
-      } else if (line.trim().startsWith('clip_contents = true') && curType !== 'ScrollContainer') {
-        fixes.push(`Removed redundant clip_contents from "${curName}"`);
-      } else {
-        if (line.trim().startsWith('mouse_filter')) hasFilter = true;
-        output.push(line);
-      }
+    const state: OptimizeState = { output: [], fixes: [], curType: '', curName: '', hasFilter: false };
+    for (const line of content.split(/\r?\n/)) {
+      processOptimizeLine(line, state, this.DECORATIVE_TYPES);
     }
-    if (curName && this.DECORATIVE_TYPES.has(curType) && !hasFilter) {
-      output.push('mouse_filter = 2');
-      fixes.push(`Added mouse_filter = 2 to decorative node "${curName}" (${curType})`);
-    }
-    return { optimizedContent: output.join('\n'), fixesApplied: fixes };
+    flushPendingDecorativeFilter(state, this.DECORATIVE_TYPES);
+    return { optimizedContent: state.output.join('\n'), fixesApplied: state.fixes };
   }
 
   private static parseNodes(content: string): ParsedNode[] {

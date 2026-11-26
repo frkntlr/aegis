@@ -39,25 +39,52 @@ export function printTrackPayload(track: TeamworkTrack): void {
   }
 }
 
+const PLAN_FLAG_SETTERS: Record<string, (flags: PlanFlags) => void> = {
+  '--compact': (f) => { f.compact = true; },
+  '-c': (f) => { f.compact = true; },
+  '--json': (f) => { f.json = true; },
+  '-j': (f) => { f.json = true; },
+  '--dry-run': (f) => { f.dryRun = true; },
+  '--client=codex': (f) => { f.codex = true; },
+  '--scale': (f) => { f.maxConcurrency = 12; },
+  '-s': (f) => { f.maxConcurrency = 12; },
+  '--research': (f) => { f.research = true; },
+  '--deep': (f) => { f.deepAnalyze = true; },
+  '--deep-analyze': (f) => { f.deepAnalyze = true; },
+  '--tree': (f) => { f.treeSpecialists = true; },
+  '--specialists': (f) => { f.treeSpecialists = true; },
+  '--semantic': (f) => { f.semantic = true; },
+  '--deliberate': (f) => { f.deliberate = true; },
+  '--reflect': (f) => { f.reflect = true; },
+  '--iterate': (f) => { f.iterate = true; }
+};
+
+const ROLE_FLAG_PREFIXES = ['--role=', '-r=', '--only='] as const;
+const MAX_AGENTS_PREFIXES = ['--max-agents=', '-n='] as const;
+
+function applyPlanFlagArg(arg: string, flags: PlanFlags): boolean {
+  const setter = PLAN_FLAG_SETTERS[arg];
+  if (setter) {
+    setter(flags);
+    return true;
+  }
+  if (ROLE_FLAG_PREFIXES.some(p => arg.startsWith(p))) {
+    flags.explicitRole = arg.split('=')[1];
+    return true;
+  }
+  if (MAX_AGENTS_PREFIXES.some(p => arg.startsWith(p))) {
+    flags.maxConcurrency = parseInt(arg.split('=')[1], 10) || 8;
+    return true;
+  }
+  return false;
+}
+
 export function parsePlanArgs(args: string[]): { files: string[]; flags: PlanFlags } {
   const files: string[] = [];
   const flags: PlanFlags = { compact: false, json: false, dryRun: false };
   for (const a of args) {
-    if (a === '--compact' || a === '-c') flags.compact = true;
-    else if (a === '--json' || a === '-j') flags.json = true;
-    else if (a === '--dry-run') flags.dryRun = true;
-    else if (a === '--client=codex') flags.codex = true;
-    else if (a === '--scale' || a === '-s') flags.maxConcurrency = 12;
-    else if (a === '--research') flags.research = true;
-    else if (a === '--deep' || a === '--deep-analyze') flags.deepAnalyze = true;
-    else if (a === '--tree' || a === '--specialists') flags.treeSpecialists = true;
-    else if (a === '--semantic') flags.semantic = true;
-    else if (a === '--deliberate') flags.deliberate = true;
-    else if (a === '--reflect') flags.reflect = true;
-    else if (a === '--iterate') flags.iterate = true;
-    else if (a.startsWith('--role=') || a.startsWith('-r=') || a.startsWith('--only=')) flags.explicitRole = a.split('=')[1];
-    else if (a.startsWith('--max-agents=') || a.startsWith('-n=')) flags.maxConcurrency = parseInt(a.split('=')[1], 10) || 8;
-    else if (a && !a.startsWith('-')) files.push(a);
+    if (applyPlanFlagArg(a, flags)) continue;
+    if (a && !a.startsWith('-')) files.push(a);
   }
   return { files, flags };
 }

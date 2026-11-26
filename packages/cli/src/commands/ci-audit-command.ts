@@ -55,6 +55,7 @@ export const CI_GATES: readonly CiStepDefinition[] = [
   { id: 'lint', name: 'Monorepo Lint', command: 'npm run lint', isCore: true },
   { id: 'deps:drift', name: 'Topological Dependency Radar', command: 'node packages/cli/dist/bin/aegis.js deps:drift', isCore: false },
   { id: 'cage:check', name: 'Demir Kafes Audit', command: 'node packages/cli/dist/bin/aegis.js cage:check', isCore: true },
+  { id: 'arch:health', name: 'Architecture Health Gate', command: 'node packages/cli/dist/bin/aegis.js arch:health --strict --max-cycles=0 --min-score=0', isCore: true },
   { id: 'verify', name: 'Iron Cage Verification', command: 'node packages/cli/dist/bin/aegis.js verify', isCore: false },
   { id: 'test', name: 'Monorepo Unit Test Suite', command: 'npm test', isCore: true },
   { id: 'inspect', name: 'Zero-Token UI Layout', command: 'node packages/cli/dist/bin/aegis.js inspect packages/plugins/godot-bridge/fixtures/inspect-sample', isCore: false },
@@ -90,7 +91,8 @@ export function matchesStep(gate: CiStepDefinition, query: string): boolean {
     gate.name.toLowerCase().includes(q) ||
     (id === 'godot' && (q === 'godot:status' || q === 'godot-status')) ||
     (id === 'deps:drift' && (q === 'deps' || q === 'drift')) ||
-    (id === 'cage:check' && q === 'cage')
+    (id === 'cage:check' && q === 'cage') ||
+    (id === 'arch:health' && (q === 'arch' || q === 'archhealth'))
   );
 }
 

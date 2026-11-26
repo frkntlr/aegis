@@ -14,6 +14,55 @@ import type {
   AnalysisLens
 } from './teamwork-analysis-types.js';
 
+function getAnalysisMeshPath(repoRoot: string): string {
+  return path.join(repoRoot, '.aegis', 'analysis-mesh.json');
+}
+
+function createDefaultAnalysisState(objective = 'Codebase Analysis'): AnalysisMeshState {
+  return {
+    version: '1.0.0',
+    swarmId: `swarm-${Date.now().toString(36)}`,
+    objective,
+    insights: {},
+    hotspots: [],
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+function loadOrInitAnalysisState(repoRoot: string, persist: boolean): AnalysisMeshState {
+  const filePath = getAnalysisMeshPath(repoRoot);
+  if (persist && fs.existsSync(filePath)) {
+    try {
+      return readJsonSafe<AnalysisMeshState>(filePath);
+    } catch (err: unknown) {
+      debugLogIgnored('TeamworkAnalysisMesh:loadOrInit', err);
+      return createDefaultAnalysisState();
+    }
+  }
+  return createDefaultAnalysisState();
+}
+
+function reloadLatestAnalysisState(repoRoot: string, state: AnalysisMeshState): void {
+  const filePath = getAnalysisMeshPath(repoRoot);
+  if (!fs.existsSync(filePath)) return;
+  try {
+    const loaded = readJsonSafe<AnalysisMeshState>(filePath);
+    if (loaded && loaded.insights) {
+      state.insights = { ...loaded.insights, ...state.insights };
+      state.hotspots = Array.from(new Set([...loaded.hotspots, ...state.hotspots]));
+      state.objective = loaded.objective || state.objective;
+      state.swarmId = loaded.swarmId || state.swarmId;
+    }
+  } catch (err: unknown) { debugLogIgnored('TeamworkAnalysisMesh:reloadLatest', err); }
+}
+
+function updateAnalysisHotspot(state: AnalysisMeshState, target: string): void {
+  if (!target || target === 'general') return;
+  if (!state.hotspots.includes(target)) {
+    state.hotspots.push(target);
+  }
+}
+
 export class TeamworkAnalysisMesh {
   private repoRoot: string;
   private state: AnalysisMeshState;
@@ -22,35 +71,7 @@ export class TeamworkAnalysisMesh {
   constructor(repoRoot?: string, persist = true) {
     this.repoRoot = resolveSafeRepoRoot(repoRoot);
     this.persist = persist;
-    this.state = this.loadOrInitState();
-  }
-
-  private getMeshFilePath(): string {
-    return path.join(this.repoRoot, '.aegis', 'analysis-mesh.json');
-  }
-
-  private loadOrInitState(): AnalysisMeshState {
-    const filePath = this.getMeshFilePath();
-    if (this.persist && fs.existsSync(filePath)) {
-      try {
-        return readJsonSafe<AnalysisMeshState>(filePath);
-      } catch (err: unknown) {
-        debugLogIgnored('TeamworkAnalysisMesh:loadOrInit', err);
-        return this.createDefaultState();
-      }
-    }
-    return this.createDefaultState();
-  }
-
-  private createDefaultState(objective = 'Codebase Analysis'): AnalysisMeshState {
-    return {
-      version: '1.0.0',
-      swarmId: `swarm-${Date.now().toString(36)}`,
-      objective,
-      insights: {},
-      hotspots: [],
-      lastUpdated: new Date().toISOString()
-    };
+    this.state = loadOrInitAnalysisState(this.repoRoot, this.persist);
   }
 
   public initSwarm(swarmId: string, objective: string): void {
@@ -66,7 +87,7 @@ export class TeamworkAnalysisMesh {
   }
 
   public postInsight(data: Omit<AnalysisInsight, 'id' | 'timestamp'>): AnalysisInsight {
-    if (this.persist) this.reloadLatest();
+    if (this.persist) reloadLatestAnalysisState(this.repoRoot, this.state);
     const id = `ins-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const insight: AnalysisInsight = {
       ...data,
@@ -74,24 +95,10 @@ export class TeamworkAnalysisMesh {
       timestamp: new Date().toISOString()
     };
     this.state.insights[id] = insight;
-    this.updateHotspot(data.target);
+    updateAnalysisHotspot(this.state, data.target);
     this.state.lastUpdated = insight.timestamp;
     if (this.persist) this.saveState();
     return insight;
-  }
-
-  private reloadLatest(): void {
-    const filePath = this.getMeshFilePath();
-    if (!fs.existsSync(filePath)) return;
-    try {
-      const loaded = readJsonSafe<AnalysisMeshState>(filePath);
-      if (loaded && loaded.insights) {
-        this.state.insights = { ...loaded.insights, ...this.state.insights };
-        this.state.hotspots = Array.from(new Set([...loaded.hotspots, ...this.state.hotspots]));
-        this.state.objective = loaded.objective || this.state.objective;
-        this.state.swarmId = loaded.swarmId || this.state.swarmId;
-      }
-    } catch (err: unknown) { debugLogIgnored('TeamworkAnalysisMesh:reloadLatest', err); }
   }
 
   public batchPost(list: Array<Omit<AnalysisInsight, 'id' | 'timestamp'>>): AnalysisInsight[] {
@@ -102,15 +109,8 @@ export class TeamworkAnalysisMesh {
     return result;
   }
 
-  private updateHotspot(target: string): void {
-    if (!target || target === 'general') return;
-    if (!this.state.hotspots.includes(target)) {
-      this.state.hotspots.push(target);
-    }
-  }
-
   public query(filter?: AnalysisMeshFilter): AnalysisInsight[] {
-    if (this.persist) this.reloadLatest();
+    if (this.persist) reloadLatestAnalysisState(this.repoRoot, this.state);
     const all = Object.values(this.state.insights);
     if (!filter) return all;
 
@@ -128,19 +128,19 @@ export class TeamworkAnalysisMesh {
   }
 
   public getHotspots(): string[] {
-    if (this.persist) this.reloadLatest();
+    if (this.persist) reloadLatestAnalysisState(this.repoRoot, this.state);
     return [...this.state.hotspots];
   }
 
   public getMeshState(): AnalysisMeshState {
-    if (this.persist) this.reloadLatest();
+    if (this.persist) reloadLatestAnalysisState(this.repoRoot, this.state);
     return { ...this.state };
   }
 
   public clear(): void {
-    this.state = this.createDefaultState();
+    this.state = createDefaultAnalysisState();
     if (this.persist) {
-      const filePath = this.getMeshFilePath();
+      const filePath = getAnalysisMeshPath(this.repoRoot);
       if (fs.existsSync(filePath)) {
         try { fs.unlinkSync(filePath); } catch (err: unknown) { debugLogIgnored('TeamworkAnalysisMesh:clear', err); }
       }
@@ -152,7 +152,7 @@ export class TeamworkAnalysisMesh {
     try {
       const aegisDir = path.join(this.repoRoot, '.aegis');
       if (!fs.existsSync(aegisDir)) fs.mkdirSync(aegisDir, { recursive: true });
-      const filePath = this.getMeshFilePath();
+      const filePath = getAnalysisMeshPath(this.repoRoot);
       tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
       fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2), 'utf8');
       try {

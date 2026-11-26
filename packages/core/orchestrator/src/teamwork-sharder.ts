@@ -5,13 +5,78 @@
  */
 
 import { RoleClassifier } from './role-classifier.js';
-import type { DecomposedSubtask } from './teamwork-decomposer.js';
+import type { DecomposedSubtask } from './teamwork-decomposer-types.js';
 import {
   hasDimensionedQaHelper,
   resolveCompanionSubtasksHelper,
   shardQaByDimensionsHelper,
   shardQaByFilesHelper
 } from './teamwork-qa-sharder.js';
+
+function distributeClustersToBucketsHelper(
+  clusterMap: Map<string, string[]>,
+  optimalK: number
+): Array<{ name: string; files: string[] }> {
+  const buckets = Array.from({ length: optimalK }, () => ({ name: '', files: [] as string[] }));
+  const sorted = Array.from(clusterMap.entries()).sort((a, b) => b[1].length - a[1].length);
+  for (const [key, files] of sorted) {
+    const bucket = buckets.reduce((min, b) => (b.files.length < min.files.length ? b : min), buckets[0]);
+    bucket.name = bucket.name ? `${bucket.name}-${key}` : key;
+    bucket.files.push(...files);
+  }
+  return buckets;
+}
+
+function shardSingleFileSectionsHelper(subtasks: DecomposedSubtask[], singleFile: string, objective: string): DecomposedSubtask[] {
+  const solvers: DecomposedSubtask[] = [
+    { roleType: 'solver', label: 'Logic', title: `${objective} [Logic]: ${singleFile}`, targetFiles: [`${singleFile}#logic`], phase: 1, dependsOn: [] },
+    { roleType: 'solver', label: 'Contract', title: `${objective} [Contract]: ${singleFile}`, targetFiles: [`${singleFile}#contract`], phase: 1, dependsOn: [] },
+    { roleType: 'solver', label: 'Safety', title: `${objective} [Safety]: ${singleFile}`, targetFiles: [`${singleFile}#safety`], phase: 1, dependsOn: [] }
+  ];
+  const baseName = singleFile.replace(/\\/g, '/').replace(/\.[^/.]+$/, '');
+  const base = baseName.split('/').pop() || baseName;
+  const others = resolveCompanionSubtasksHelper(subtasks, `${baseName}.test.ts`, `docs/${base}.md`, objective);
+  if (!hasDimensionedQaHelper(others) && !hasDimensionedQaHelper(subtasks)) {
+    shardQaByDimensionsHelper(others, objective, `${baseName}.test.ts`);
+  }
+  return [...solvers, ...others];
+}
+
+function shardGeneralScopeSectionsHelper(subtasks: DecomposedSubtask[], objective: string, maxConcurrency: number): DecomposedSubtask[] {
+  const solvers = subtasks.filter(t => t.roleType === 'solver');
+  if (solvers.length !== 1) return subtasks;
+  const baseTitle = solvers[0]?.title || objective;
+  const shardedSolvers: DecomposedSubtask[] = [
+    { roleType: 'solver', label: 'Logic', title: `${baseTitle} [Logic]: Core algorithms & calculations`, targetFiles: [], phase: 1, dependsOn: [] },
+    { roleType: 'solver', label: 'Adapter', title: `${baseTitle} [Adapter]: Pipeline, CLI & interface routing`, targetFiles: [], phase: 1, dependsOn: [] }
+  ];
+  if (maxConcurrency >= 3) {
+    shardedSolvers.push({ roleType: 'solver', label: 'State', title: `${baseTitle} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
+  }
+  const others = subtasks.filter(t => t.roleType !== 'solver');
+  if (!hasDimensionedQaHelper(others) && !hasDimensionedQaHelper(subtasks)) {
+    shardQaByDimensionsHelper(others, objective);
+  }
+  return [...shardedSolvers, ...others];
+}
+
+function shardMultiSolversHelper(
+  subtasks: DecomposedSubtask[],
+  allFiles: string[],
+  objective: string,
+  maxConcurrency: number,
+  partitionFn: (tasks: DecomposedSubtask[], files: string[]) => void
+): DecomposedSubtask[] {
+  const solvers = subtasks.filter(t => t.roleType === 'solver');
+  if (!subtasks.some(s => s.label === 'State') && subtasks.length < maxConcurrency) {
+    subtasks.splice(solvers.length, 0, { roleType: 'solver', label: 'State', title: `${objective} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
+  }
+  if (!hasDimensionedQaHelper(subtasks)) {
+    shardQaByDimensionsHelper(subtasks, objective);
+  }
+  partitionFn(subtasks, allFiles);
+  return subtasks;
+}
 
 export class TeamworkSharder {
   public static isSourceFile(file: string): boolean {
@@ -138,62 +203,6 @@ export class TeamworkSharder {
     });
   }
 
-  private static distributeClustersToBuckets(clusterMap: Map<string, string[]>, optimalK: number): Array<{ name: string; files: string[] }> {
-    const buckets = Array.from({ length: optimalK }, () => ({ name: '', files: [] as string[] }));
-    const sorted = Array.from(clusterMap.entries()).sort((a, b) => b[1].length - a[1].length);
-    for (const [key, files] of sorted) {
-      const bucket = buckets.reduce((min, b) => (b.files.length < min.files.length ? b : min), buckets[0]);
-      bucket.name = bucket.name ? `${bucket.name}-${key}` : key;
-      bucket.files.push(...files);
-    }
-    return buckets;
-  }
-
-  private static shardSingleFileSections(subtasks: DecomposedSubtask[], singleFile: string, objective: string): DecomposedSubtask[] {
-    const solvers: DecomposedSubtask[] = [
-      { roleType: 'solver', label: 'Logic', title: `${objective} [Logic]: ${singleFile}`, targetFiles: [`${singleFile}#logic`], phase: 1, dependsOn: [] },
-      { roleType: 'solver', label: 'Contract', title: `${objective} [Contract]: ${singleFile}`, targetFiles: [`${singleFile}#contract`], phase: 1, dependsOn: [] },
-      { roleType: 'solver', label: 'Safety', title: `${objective} [Safety]: ${singleFile}`, targetFiles: [`${singleFile}#safety`], phase: 1, dependsOn: [] }
-    ];
-    const baseName = singleFile.replace(/\\/g, '/').replace(/\.[^/.]+$/, '');
-    const base = baseName.split('/').pop() || baseName;
-    const others = resolveCompanionSubtasksHelper(subtasks, `${baseName}.test.ts`, `docs/${base}.md`, objective);
-    if (!this.hasDimensionedQa(others) && !this.hasDimensionedQa(subtasks)) {
-      this.shardQaByDimensions(others, objective, `${baseName}.test.ts`);
-    }
-    return [...solvers, ...others];
-  }
-
-  private static shardGeneralScopeSections(subtasks: DecomposedSubtask[], objective: string, maxConcurrency: number): DecomposedSubtask[] {
-    const solvers = subtasks.filter(t => t.roleType === 'solver');
-    if (solvers.length !== 1) return subtasks;
-    const baseTitle = solvers[0]?.title || objective;
-    const shardedSolvers: DecomposedSubtask[] = [
-      { roleType: 'solver', label: 'Logic', title: `${baseTitle} [Logic]: Core algorithms & calculations`, targetFiles: [], phase: 1, dependsOn: [] },
-      { roleType: 'solver', label: 'Adapter', title: `${baseTitle} [Adapter]: Pipeline, CLI & interface routing`, targetFiles: [], phase: 1, dependsOn: [] }
-    ];
-    if (maxConcurrency >= 3) {
-      shardedSolvers.push({ roleType: 'solver', label: 'State', title: `${baseTitle} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
-    }
-    const others = subtasks.filter(t => t.roleType !== 'solver');
-    if (!this.hasDimensionedQa(others) && !this.hasDimensionedQa(subtasks)) {
-      this.shardQaByDimensions(others, objective);
-    }
-    return [...shardedSolvers, ...others];
-  }
-
-  private static shardMultiSolvers(subtasks: DecomposedSubtask[], allFiles: string[], objective: string, maxConcurrency: number): DecomposedSubtask[] {
-    const solvers = subtasks.filter(t => t.roleType === 'solver');
-    if (!subtasks.some(s => s.label === 'State') && subtasks.length < maxConcurrency) {
-      subtasks.splice(solvers.length, 0, { roleType: 'solver', label: 'State', title: `${objective} [State]: Transitions, cache & event loop`, targetFiles: [], phase: 1, dependsOn: [] });
-    }
-    if (!this.hasDimensionedQa(subtasks)) {
-      this.shardQaByDimensions(subtasks, objective);
-    }
-    this.partitionFiles(subtasks, allFiles);
-    return subtasks;
-  }
-
   public static shardSmartClusters(
     subtasks: DecomposedSubtask[],
     allFiles: string[],
@@ -202,20 +211,20 @@ export class TeamworkSharder {
   ): DecomposedSubtask[] {
     const sourceFiles = allFiles.filter(f => this.isSourceFile(f));
     if (allFiles.length === 1 && sourceFiles.length === 1 && maxConcurrency > 1) {
-      return this.shardSingleFileSections(subtasks, sourceFiles[0], objective);
+      return shardSingleFileSectionsHelper(subtasks, sourceFiles[0], objective);
     }
     if (sourceFiles.length === 0 && maxConcurrency > 1) {
-      return this.shardGeneralScopeSections(subtasks, objective, maxConcurrency);
+      return shardGeneralScopeSectionsHelper(subtasks, objective, maxConcurrency);
     }
     const solvers = subtasks.filter(t => t.roleType === 'solver');
     if (solvers.length > 1 && maxConcurrency >= 6) {
-      return this.shardMultiSolvers(subtasks, allFiles, objective, maxConcurrency);
+      return shardMultiSolversHelper(subtasks, allFiles, objective, maxConcurrency, (tasks, files) => this.partitionFiles(tasks, files));
     }
     if (sourceFiles.length <= 1) return subtasks;
 
     const clusterMap = this.clusterFilesBySubsystem(sourceFiles);
     const optimalK = this.calculateOptimalConcurrency(clusterMap.size, sourceFiles.length, maxConcurrency);
-    const buckets = this.distributeClustersToBuckets(clusterMap, optimalK);
+    const buckets = distributeClustersToBucketsHelper(clusterMap, optimalK);
 
     const shardedSolvers: DecomposedSubtask[] = buckets.filter(b => b.files.length > 0).map((b, idx) => {
       const label = b.name.slice(0, 15) || `Solver-${idx + 1}`;

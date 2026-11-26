@@ -108,25 +108,61 @@ export function handleTeamworkMatrix(objectiveArg?: string, ...files: string[]):
   console.log(coordinator.formatLiveMatrix(plan));
 }
 
+type TeamworkRouteHandler = (all: string[], jsonFlag?: string) => void;
+
+const MESH_ROUTE_HANDLERS: Record<string, (all: string[]) => void> = {
+  mesh: (all) => handleTeamworkMesh(all[1], ...all.slice(2)),
+  peers: (all) => handleTeamworkPeers(all[1]),
+  post: (all) => handleTeamworkPost(all[1], ...all.slice(2)),
+  broadcast: (all) => handleTeamworkBroadcast(all[1], ...all.slice(2)),
+  waves: (all) => handleTeamworkWaves(all[1], ...all.slice(2)),
+  radar: () => handleTeamworkConflicts(),
+  conflicts: () => handleTeamworkConflicts(),
+  scale: (all) => handleTeamworkScale(all[1], ...all.slice(2)),
+  batch: (all) => handleTeamworkBatch(all[1], ...all.slice(2)),
+  doc: (all) => handleTeamworkDoc(all[1], ...all.slice(2)),
+  synthesize: (all) => handleTeamworkDoc(all[1], ...all.slice(2)),
+  advance: (all) => handleTeamworkAdvance(all[1]),
+  tools: (all) => handleTeamworkTools(all[1], ...all.slice(2)),
+  tool: (all) => handleTeamworkTools(all[1], ...all.slice(2)),
+  arsenal: (all) => handleTeamworkTools(all[1], ...all.slice(2)),
+  reflect: (all) => handleTeamworkReflect(all[1], ...all.slice(2)),
+  iterate: (all) => handleTeamworkIterate(all[1], ...all.slice(2)),
+  gh: (all) => { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); },
+  github: (all) => { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); },
+  swarm: (all) => { void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(all[1], ...all.slice(2))); },
+  deliberate: (all) => { void import('./teamwork-deliberate-command.js').then(m => m.handleTeamworkDeliberate(all[1], ...all.slice(2))); },
+  deliberation: (all) => { void import('./teamwork-deliberate-command.js').then(m => m.handleTeamworkDeliberate(all[1], ...all.slice(2))); },
+  test: (all) => { void import('./test-command.js').then(m => m.handleTestCommand(...all.slice(1))); }
+};
+
+const CORE_ROUTE_HANDLERS: Record<string, TeamworkRouteHandler> = {
+  resume: (all) => handleCodexOrchestra('resume', ...all.slice(1).filter(arg => arg !== '--json' && arg !== '-j')),
+  status: (_all, jsonFlag) => handleTeamworkStatus(jsonFlag),
+  '--json': (_all, jsonFlag) => handleTeamworkStatus(jsonFlag),
+  '-j': (_all, jsonFlag) => handleTeamworkStatus(jsonFlag),
+  clear: (_all, jsonFlag) => handleTeamworkClear(jsonFlag),
+  reset: (_all, jsonFlag) => handleTeamworkClear(jsonFlag),
+  compact: (all) => handleTeamworkCompact(all[1]),
+  briefing: (all) => handleTeamworkCompact(all[1]),
+  '--compact': (all) => handleTeamworkCompact(all[1]),
+  '-c': (all) => handleTeamworkCompact(all[1]),
+  plan: (all) => handleTeamworkPlan(all[1], ...all.slice(2)),
+  run: (all) => handleTeamworkPlan(all[1], ...all.slice(2)),
+  setup: (all) => handleTeamworkSetup(all[1]),
+  init: (all) => handleTeamworkSetup(all[1]),
+  dag: (all) => handleTeamworkDag(all[1], ...all.slice(2)),
+  matrix: (all) => handleTeamworkMatrix(all[1], ...all.slice(2)),
+  table: (all) => handleTeamworkMatrix(all[1], ...all.slice(2)),
+  analyze: (all) => handleTeamworkAnalyze(all[1], ...all.slice(2)),
+  search: (all) => handleTeamworkAnalyze(all[1], ...all.slice(2))
+};
+
 function routeMeshSubcommands(norm: string, all: string[]): boolean {
-  if (norm === 'mesh') { handleTeamworkMesh(all[1], ...all.slice(2)); return true; }
-  if (norm === 'peers') { handleTeamworkPeers(all[1]); return true; }
-  if (norm === 'post') { handleTeamworkPost(all[1], ...all.slice(2)); return true; }
-  if (norm === 'broadcast') { handleTeamworkBroadcast(all[1], ...all.slice(2)); return true; }
-  if (norm === 'waves') { handleTeamworkWaves(all[1], ...all.slice(2)); return true; }
-  if (norm === 'radar' || norm === 'conflicts') { handleTeamworkConflicts(); return true; }
-  if (norm === 'scale') { handleTeamworkScale(all[1], ...all.slice(2)); return true; }
-  if (norm === 'batch') { handleTeamworkBatch(all[1], ...all.slice(2)); return true; }
-  if (norm === 'doc' || norm === 'synthesize') { handleTeamworkDoc(all[1], ...all.slice(2)); return true; }
-  if (norm === 'advance') { handleTeamworkAdvance(all[1]); return true; }
-  if (norm === 'tools' || norm === 'tool' || norm === 'arsenal') { handleTeamworkTools(all[1], ...all.slice(2)); return true; }
-  if (norm === 'reflect') { handleTeamworkReflect(all[1], ...all.slice(2)); return true; }
-  if (norm === 'iterate') { handleTeamworkIterate(all[1], ...all.slice(2)); return true; }
-  if (norm === 'gh' || norm === 'github') { void import('./teamwork-gh-command.js').then(m => m.handleTeamworkGitHub(all[1], ...all.slice(2))); return true; }
-  if (norm === 'swarm') { void import('./teamwork-analysis-swarm-command.js').then(m => m.handleTeamworkAnalysisSwarm(all[1], ...all.slice(2))); return true; }
-  if (norm === 'deliberate' || norm === 'deliberation') { void import('./teamwork-deliberate-command.js').then(m => m.handleTeamworkDeliberate(all[1], ...all.slice(2))); return true; }
-  if (norm === 'test') { void import('./test-command.js').then(m => m.handleTestCommand(...all.slice(1))); return true; }
-  return false;
+  const handler = MESH_ROUTE_HANDLERS[norm];
+  if (!handler) return false;
+  handler(all);
+  return true;
 }
 
 export function handleTeamwork(subcmd?: string, ...args: string[]): void {
@@ -135,30 +171,17 @@ export function handleTeamwork(subcmd?: string, ...args: string[]): void {
   const norm = first ? first.toLowerCase() : '';
   const jsonFlag = all.find(a => a === '--json' || a === '-j');
 
-  if (norm === 'resume') {
-    handleCodexOrchestra('resume', ...all.slice(1).filter(arg => arg !== '--json' && arg !== '-j')); return;
-  }
-  if (!first || norm === 'status' || norm === '--json' || norm === '-j') {
+  if (!first) {
     handleTeamworkStatus(jsonFlag);
-  } else if (norm === 'clear' || norm === 'reset') {
-    handleTeamworkClear(jsonFlag);
-  } else if (norm === 'compact' || norm === 'briefing' || norm === '--compact' || norm === '-c') {
-    handleTeamworkCompact(all[1]);
-  } else if (norm === 'plan' || norm === 'run') {
-    handleTeamworkPlan(all[1], ...all.slice(2));
-  } else if (norm === 'setup' || norm === 'init') {
-    handleTeamworkSetup(all[1]);
-  } else if (routeMeshSubcommands(norm, all)) {
     return;
-  } else if (norm === 'dag') {
-    handleTeamworkDag(all[1], ...all.slice(2));
-  } else if (norm === 'matrix' || norm === 'table') {
-    handleTeamworkMatrix(all[1], ...all.slice(2));
-  } else if (norm === 'analyze' || norm === 'search') {
-    handleTeamworkAnalyze(all[1], ...all.slice(2));
-  } else {
-    handleTeamworkPlan(all[0], ...all.slice(1));
   }
+  const coreHandler = CORE_ROUTE_HANDLERS[norm];
+  if (coreHandler) {
+    coreHandler(all, jsonFlag);
+    return;
+  }
+  if (routeMeshSubcommands(norm, all)) return;
+  handleTeamworkPlan(all[0], ...all.slice(1));
 }
 
 export function handleTeamworkCompact(objectiveArg?: string): void {

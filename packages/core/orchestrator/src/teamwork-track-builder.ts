@@ -16,6 +16,19 @@ import type { TeamworkTrack } from './teamwork-types.js';
 import { ROLE_SPECIALISTS } from './teamwork-hierarchical-tree.js';
 import { buildCodexInvocation } from './codex-teamwork.js';
 
+export interface BuildTrackInput {
+  roleType: RoleType;
+  profile: SubagentProfile;
+  desc: string;
+  files: string[];
+  label: string;
+  deterministic?: boolean;
+  dependsOn?: string[];
+  phase?: number;
+  groundingContext?: string;
+  upstreamContracts?: string;
+}
+
 export class TeamworkTrackBuilder {
   public static hashPlan(objective: string, files: string[]): string {
     const sorted = [...files].sort().join(',');
@@ -78,50 +91,61 @@ export class TeamworkTrackBuilder {
     const grounding = sub.roleType === 'qa' ? this.enrichQaGrounding(baseGrounding) : baseGrounding;
     const upstreamContracts = sub.roleType === 'qa' ? this.enrichQaContracts(baseContracts, upstreamItems) : baseContracts;
 
-    return this.buildTrack(
-      sub.roleType,
+    return this.buildTrack({
+      roleType: sub.roleType,
       profile,
-      sub.title,
-      sub.targetFiles,
-      sub.label,
-      isDet,
-      resolvedDeps,
-      sub.phase ?? 1,
-      grounding,
+      desc: sub.title,
+      files: sub.targetFiles,
+      label: sub.label,
+      deterministic: isDet,
+      dependsOn: resolvedDeps,
+      phase: sub.phase ?? 1,
+      groundingContext: grounding,
       upstreamContracts
-    );
+    });
   }
 
-  public static buildTrack(
+  private static createTrackId(
     roleType: RoleType,
-    profile: SubagentProfile,
+    label: string,
     desc: string,
     files: string[],
-    label: string,
-    deterministic = false,
-    dependsOn: string[] = [],
-    phase = 1,
-    groundingContext?: string,
-    upstreamContracts?: string
-  ): TeamworkTrack {
+    deterministic: boolean
+  ): string {
+    const suffix = deterministic
+      ? crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 6)
+      : Date.now().toString(36);
+    return `${roleType}-${label.toLowerCase()}-${suffix}`;
+  }
+
+  private static buildTrackFromInput(input: BuildTrackInput): TeamworkTrack {
+    const {
+      roleType, profile, desc, files, label,
+      deterministic = false, dependsOn = [], phase = 1,
+      groundingContext, upstreamContracts
+    } = input;
     const subagentName = `${profile.name} [${label}]`;
-    const id = deterministic
-      ? `${roleType}-${label.toLowerCase()}-${crypto.createHash('sha256').update(`${desc}:${[...files].sort().join(',')}`).digest('hex').slice(0, 6)}`
-      : `${roleType}-${label.toLowerCase()}-${Date.now().toString(36)}`;
+    const id = this.createTrackId(roleType, label, desc, files, deterministic);
     const contracts = this.sanitizeQaContracts(roleType, upstreamContracts);
-    const prompt = compileTrackPrompt(profile, desc, files, subagentName, dependsOn, phase, groundingContext, contracts);
+    const prompt = compileTrackPrompt({
+      profile,
+      trackDesc: desc,
+      files,
+      subagentName,
+      dependsOn,
+      phase,
+      groundingContext,
+      upstreamContracts: contracts
+    });
     const spec = ROLE_SPECIALISTS[roleType]?.find(s => s.label.toLowerCase() === label.toLowerCase());
     const assignedAegisTools = spec ? spec.assignedTools : (profile.aegisTools ?? []);
+    const codexContext = [groundingContext, contracts, `Assigned Aegis tools: ${assignedAegisTools.join(', ')}`].filter(Boolean).join('\n');
     return {
       id, roleType, subagentName,
       title: `${profile.title} [${label}]`,
       targetFiles: files,
-      prompt,
-      dependsOn,
-      phase,
-      assignedAegisTools,
-      codexInvocationPayload: buildCodexInvocation({ id, title: desc, targetFiles: files, dependsOn, phase, roleType }, desc,
-        [groundingContext, contracts, `Assigned Aegis tools: ${assignedAegisTools.join(', ')}`].filter(Boolean).join('\n')),
+      prompt, dependsOn, phase, assignedAegisTools,
+      codexInvocationPayload: buildCodexInvocation({ id, title: desc, targetFiles: files, dependsOn, phase, roleType }, desc, codexContext),
       invocationPayload: {
         TypeName: profile.name,
         Role: `${profile.title} - ${label}`,
@@ -130,5 +154,44 @@ export class TeamworkTrackBuilder {
         Model: profile.defaultModel ?? 'inherit'
       }
     };
+  }
+
+  public static buildTrack(input: BuildTrackInput): TeamworkTrack;
+  /** @deprecated Pass a {@link BuildTrackInput} options object instead. */
+  public static buildTrack(
+    roleType: RoleType,
+    profile: SubagentProfile,
+    desc: string,
+    files: string[],
+    ...legacyArgs: [
+      label: string,
+      deterministic?: boolean,
+      dependsOn?: string[],
+      phase?: number,
+      groundingContext?: string,
+      upstreamContracts?: string
+    ]
+  ): TeamworkTrack;
+  public static buildTrack(
+    roleOrInput: RoleType | BuildTrackInput,
+    ...rest: [
+      SubagentProfile?, string?, string[]?, string?, boolean?, string[]?, number?, string?, string?
+    ]
+  ): TeamworkTrack {
+    const input: BuildTrackInput = typeof roleOrInput === 'object'
+      ? roleOrInput
+      : {
+          roleType: roleOrInput,
+          profile: rest[0]!,
+          desc: rest[1]!,
+          files: rest[2]!,
+          label: rest[3]!,
+          deterministic: rest[4],
+          dependsOn: rest[5],
+          phase: rest[6],
+          groundingContext: rest[7],
+          upstreamContracts: rest[8]
+        };
+    return this.buildTrackFromInput(input);
   }
 }

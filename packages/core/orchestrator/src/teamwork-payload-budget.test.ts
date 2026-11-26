@@ -9,8 +9,18 @@ const contract = 'Upstream contract: State { value: number }';
 
 test('both client payloads stay bounded while retaining scope, contracts and verification', () => {
   for (const profile of getSubagentProfiles()) {
-    const track = TeamworkTrackBuilder.buildTrack(profile.roleType, profile, objective,
-      ['src/state.ts'], 'Measure', true, ['upstream-track'], 2, grounding, contract);
+    const track = TeamworkTrackBuilder.buildTrack({
+      roleType: profile.roleType,
+      profile,
+      desc: objective,
+      files: ['src/state.ts'],
+      label: 'Measure',
+      deterministic: true,
+      dependsOn: ['upstream-track'],
+      phase: 2,
+      groundingContext: grounding,
+      upstreamContracts: contract
+    });
     const legacy = track.invocationPayload.Prompt;
     const native = track.codexInvocationPayload!.message;
     assert.equal(track.prompt, legacy);
@@ -38,7 +48,14 @@ test('both client payloads stay bounded while retaining scope, contracts and ver
 
 test('empty file scopes remain read-only for both clients', () => {
   const profile = getSubagentProfiles()[0];
-  const track = TeamworkTrackBuilder.buildTrack('solver', profile, 'Inspect status', [], 'Read', true);
+  const track = TeamworkTrackBuilder.buildTrack({
+    roleType: 'solver',
+    profile,
+    desc: 'Inspect status',
+    files: [],
+    label: 'Read',
+    deterministic: true
+  });
   assert.match(track.prompt, /Read-only; do not edit project files/);
   assert.match(track.codexInvocationPayload!.message, /read-only; do not edit project files/);
 });

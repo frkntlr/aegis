@@ -17,6 +17,16 @@ export interface DashboardServerOptions {
   metricsService?: RealtimeMetricsService;
 }
 
+function sendBodyResponse(res: http.ServerResponse, status: number, contentType: string, body: string): void {
+  res.writeHead(status, { 'Content-Type': contentType });
+  res.end(body);
+}
+
+function parseRoutePath(rawUrl?: string): string {
+  const pathPart = (rawUrl ?? '/').split('?')[0];
+  return pathPart || '/';
+}
+
 export class DashboardServer {
   private server: http.Server | null = null;
   private port: number;
@@ -160,8 +170,7 @@ export class DashboardServer {
   private handleRoutes(req: http.IncomingMessage, res: http.ServerResponse): void {
     const origin = req.headers.origin;
     if (origin !== undefined && !isAllowedLocalOrigin(origin, this.port)) {
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: 'Forbidden: Invalid Origin' }));
+      sendBodyResponse(res, 403, 'application/json', JSON.stringify({ success: false, error: 'Forbidden: Invalid Origin' }));
       return;
     }
     if (req.method === 'OPTIONS') {
@@ -170,30 +179,23 @@ export class DashboardServer {
       res.end();
       return;
     }
-
-    const rawUrl = req.url || '/';
-    const url = rawUrl.split('?')[0] || '/';
-    if (url === '/' || url === '/index.html') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(getDashboardHtml());
-    } else if (url === '/api/events') {
-      this.handleEventsSse(req, res);
-    } else if (url === '/api/status' && req.method === 'GET') {
-      this.setCorsHeaders(res, origin);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(this.getStatusPayload()));
-    } else if (url === '/api/projects' && req.method === 'GET') {
-      this.setCorsHeaders(res, origin);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ projects: this.hub.listProjects(), active: this.hub.getActiveContext().id }));
-    } else if (url === '/api/projects/focus' && req.method === 'POST') {
-      this.handleFocusApi(req, res);
-    } else if (url === '/api/action' && req.method === 'POST') {
-      this.handleActionApi(req, res);
-    } else {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not Found');
+    const url = parseRoutePath(req.url);
+    const routes: Record<string, () => void> = {
+      '/': () => sendBodyResponse(res, 200, 'text/html; charset=utf-8', getDashboardHtml()),
+      '/index.html': () => sendBodyResponse(res, 200, 'text/html; charset=utf-8', getDashboardHtml()),
+      '/api/events': () => this.handleEventsSse(req, res),
+      'GET /api/status': () => { this.setCorsHeaders(res, origin); sendBodyResponse(res, 200, 'application/json', JSON.stringify(this.getStatusPayload())); },
+      'GET /api/projects': () => { this.setCorsHeaders(res, origin); sendBodyResponse(res, 200, 'application/json', JSON.stringify({ projects: this.hub.listProjects(), active: this.hub.getActiveContext().id })); },
+      'POST /api/projects/focus': () => { void this.handleFocusApi(req, res); },
+      'POST /api/action': () => { void this.handleActionApi(req, res); }
+    };
+    const methodKey = `${req.method ?? ''} ${url}`;
+    const handler = (Object.hasOwn(routes, url) ? routes[url] : undefined) ?? (Object.hasOwn(routes, methodKey) ? routes[methodKey] : undefined);
+    if (handler) {
+      handler();
+      return;
     }
+    sendBodyResponse(res, 404, 'text/plain', 'Not Found');
   }
 
   public start(): Promise<number> {

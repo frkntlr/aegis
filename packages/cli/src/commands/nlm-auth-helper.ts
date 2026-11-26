@@ -7,19 +7,19 @@
 
 import {
   SessionCredentialsManager,
-  NativeBrowserCdpAttacher,
-  NativeBrowserSpawner,
   HttpRotateEngine,
   MultiRootTokenResolver,
   type AuthChallengeContext,
   type AuthResolutionAction
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
-import { runZeroClickSessionImport } from './nlm-switch-helper.js';
+import { runBrowserAuth, runZeroClickSessionImport } from './nlm-session-helpers.js';
 import {
   promptUser,
   promptInteractiveAuthResolution as runInteractivePrompt
 } from './nlm-auth-interactive.js';
+
+export { runBrowserAuth } from './nlm-session-helpers.js';
 
 export async function handleNlmAuth(...args: string[]): Promise<void> {
   showBanner();
@@ -49,39 +49,45 @@ export async function handleNlmAuth(...args: string[]): Promise<void> {
   runStatusCheck();
 }
 
+function reportActiveSession(inspect: ReturnType<typeof SessionCredentialsManager.inspectCredentials>): void {
+  console.log('✅ Google NotebookLM session is already active and valid!');
+  console.log(` • Source: [${inspect.source.toUpperCase()}] (${inspect.path || 'in-memory'})`);
+  console.log(` • Binding Token (SID): ${inspect.hasSid ? '✅' : '❌'}`);
+  console.log(` • Session Token (__Secure-1PSIDTS): ${inspect.hasPsidts ? '✅' : '❌'}`);
+  console.log('\n💡 Session is ready to use without launching a browser.');
+  console.log('   To re-authenticate or switch accounts, run:\n   aegis nlm:auth --browser --force');
+}
+
+function tryClipboardAutoImport(): boolean {
+  const clip = SessionCredentialsManager.tryExtractFromClipboard();
+  if (!clip.found || !clip.cookies) return false;
+  console.log('📋 Valid Google cookies detected in clipboard! Importing automatically...');
+  const save = SessionCredentialsManager.saveCredentials(clip.cookies);
+  if (!save.success) return false;
+  console.log(`✅ Session credentials imported from clipboard and saved to: ${save.path}`);
+  return true;
+}
+
+async function tryAutoImportBeforeBrowser(
+  inspect: ReturnType<typeof SessionCredentialsManager.inspectCredentials>
+): Promise<boolean> {
+  if (inspect.hasSid && !inspect.hasPsidts) {
+    console.log('🔄 Expired or partial session detected. Attempting headless HTTP rotation...');
+    if (await runSilentRotate()) return true;
+  }
+  if (tryClipboardAutoImport()) return true;
+  return await runZeroClickSessionImport();
+}
+
 async function handleBrowserCommand(args: string[], isForce: boolean): Promise<void> {
   const inspect = SessionCredentialsManager.inspectCredentials();
   if (inspect.active && !isForce) {
-    console.log('✅ Google NotebookLM session is already active and valid!');
-    console.log(` • Source: [${inspect.source.toUpperCase()}] (${inspect.path || 'in-memory'})`);
-    console.log(` • Binding Token (SID): ${inspect.hasSid ? '✅' : '❌'}`);
-    console.log(` • Session Token (__Secure-1PSIDTS): ${inspect.hasPsidts ? '✅' : '❌'}`);
-    console.log('\n💡 Session is ready to use without launching a browser.');
-    console.log('   To re-authenticate or switch accounts, run:\n   aegis nlm:auth --browser --force');
+    reportActiveSession(inspect);
     return;
   }
-
-  if (inspect.hasSid && !inspect.hasPsidts && !isForce) {
-    console.log('🔄 Expired or partial session detected. Attempting headless HTTP rotation...');
-    const rotated = await runSilentRotate();
-    if (rotated) return;
+  if (!isForce && await tryAutoImportBeforeBrowser(inspect)) {
+    return;
   }
-
-  const clip = SessionCredentialsManager.tryExtractFromClipboard();
-  if (clip.found && clip.cookies && !isForce) {
-    console.log('📋 Valid Google cookies detected in clipboard! Importing automatically...');
-    const save = SessionCredentialsManager.saveCredentials(clip.cookies);
-    if (save.success) {
-      console.log(`✅ Session credentials imported from clipboard and saved to: ${save.path}`);
-      return;
-    }
-  }
-
-  if (!isForce) {
-    const zeroClick = await runZeroClickSessionImport();
-    if (zeroClick) return;
-  }
-
   await launchBrowserFlow(args);
 }
 
@@ -174,55 +180,6 @@ async function runPasteAuth(providedCookie?: string): Promise<void> {
   } else {
     console.error(`❌ Failed to save credentials: ${res.error}`);
   }
-}
-
-export async function runBrowserAuth(preferredName?: string, port = 9222): Promise<boolean> {
-  console.log('🌐 Checking system browser CDP interface on port ' + port + '...');
-  const isRunning = await NativeBrowserCdpAttacher.isCdpActive(port);
-
-  if (!isRunning) {
-    console.log('🚀 Spawning Chromium-family browser with isolated user-data-dir...');
-    const spawnRes = NativeBrowserSpawner.spawn({ browserName: preferredName, port });
-    if (!spawnRes.success) {
-      console.error(`❌ ${spawnRes.error || 'Failed to spawn browser.'}`);
-      return false;
-    }
-    console.log(` • Browser: ${spawnRes.browser?.name.toUpperCase()} (PID: ${spawnRes.pid || 'attached'})`);
-    console.log(` • Isolated Profile: ${spawnRes.userDataDir}`);
-    console.log('⏳ Waiting for browser CDP debugging interface to bind...');
-
-    const ready = await NativeBrowserCdpAttacher.waitForCdp(port, '127.0.0.1', 20000);
-    if (!ready) {
-      console.error('❌ Browser process started but CDP port ' + port + ' timed out.');
-      return false;
-    }
-  }
-
-  return await executeHarvestWorkflow(port);
-}
-
-async function executeHarvestWorkflow(port: number): Promise<boolean> {
-  console.log('🔑 Waiting for Google NotebookLM session (sign in if prompted in browser)...');
-  const harvest = await NativeBrowserCdpAttacher.harvestSessionCookies({
-    port,
-    maxWaitMs: 180000,
-    pollIntervalMs: 1500,
-    autoClose: true
-  });
-
-  if (!harvest.success || !harvest.cookies) {
-    console.error(`❌ Authentication capture failed: ${harvest.error || 'No cookies received.'}`);
-    return false;
-  }
-
-  const saveRes = SessionCredentialsManager.saveCredentials(harvest.cookies);
-  if (saveRes.success) {
-    console.log(`✅ NotebookLM session captured and saved successfully to: ${saveRes.path}`);
-    return true;
-  }
-
-  console.error(`❌ Failed to persist captured session credentials: ${saveRes.error}`);
-  return false;
 }
 
 export async function promptInteractiveAuthResolution(ctx: AuthChallengeContext): Promise<AuthResolutionAction> {

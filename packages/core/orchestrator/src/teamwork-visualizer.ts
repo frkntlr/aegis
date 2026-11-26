@@ -4,7 +4,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import type { TeamworkPlan, TeamworkTrack } from './teamwork-coordinator.js';
+import type { TeamworkPlan, TeamworkTrack } from './teamwork-types.js';
 
 export class TeamworkVisualizer {
   public static formatLiveMatrix(

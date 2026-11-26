@@ -57,41 +57,54 @@ function printLockStatus(activeLock: ActiveLockInfo): void {
   console.log(`\n🔒 Mutex Status:   ${lockMsg}`);
 }
 
+function resolveMemoryWorktree(worktreeId?: string): string {
+  if (worktreeId && worktreeId !== 'default' && worktreeId !== '--json') {
+    return worktreeId;
+  }
+  return ActiveHeadResolver.resolveActiveWorktree();
+}
+
+function printDiffBudget(budget: NonNullable<MemoryQueryResult['diffBudget']>): void {
+  console.log('\n📏 Demir Kafes Line Budget:');
+  console.log(` • File Lines:     ${budget.fileLines}/${budget.maxFileLines} (Quota: ${budget.fileQuotaRemaining} lines)`);
+  if (budget.funcLines !== undefined) {
+    console.log(` • Function Lines: ${budget.funcLines}/${budget.maxFunctionLines} (Quota: ${budget.funcQuotaRemaining} lines)`);
+  }
+}
+
+function printListSection(heading: string, items: string[] | undefined, prefix = '   '): void {
+  if (!items || items.length === 0) return;
+  console.log(heading);
+  for (const item of items) console.log(`${prefix}${item}`);
+}
+
 function printMemoryQueryResult(res: MemoryQueryResult, worktreeId?: string): void {
   console.log(`🧠 Codebase Memory: '${res.symbol}' [${res.filePath || 'virtual'}] (Worktree: ${worktreeId || 'default'})`);
   console.log(` • Sliced Tokens:  ~${res.tokenSavingsPercent}% Token Savings`);
   console.log(` • Upstream:       ${res.callers.length > 0 ? res.callers.map(formatEdgeEndpoint).join(', ') : 'None'}`);
   console.log(` • Downstream:     ${res.callees.length > 0 ? res.callees.map(formatEdgeEndpoint).join(', ') : 'None'}`);
   console.log(` • Blast Radius:   ${res.blastRadius.length} file(s)`);
-
   if (res.activeLock) printLockStatus(res.activeLock);
+  if (res.diffBudget) printDiffBudget(res.diffBudget);
+  printListSection('\n📚 Ground-Truth Engine Documentation (Context7):', res.groundTruthDocs);
+  printListSection('\n🌐 Ground-Truth External Contracts (Context7):', res.externalContracts);
+  printListSection('\n🛡️  Demir Kafes Guardrails:', res.constitutionRules.slice(0, 4), '   - ');
+  if (res.slice) console.log('\n' + res.slice);
+}
 
-  if (res.diffBudget) {
-    console.log('\n📏 Demir Kafes Line Budget:');
-    console.log(` • File Lines:     ${res.diffBudget.fileLines}/${res.diffBudget.maxFileLines} (Quota: ${res.diffBudget.fileQuotaRemaining} lines)`);
-    if (res.diffBudget.funcLines !== undefined) {
-      console.log(` • Function Lines: ${res.diffBudget.funcLines}/${res.diffBudget.maxFunctionLines} (Quota: ${res.diffBudget.funcQuotaRemaining} lines)`);
-    }
+function ensureMemoryIndexed(engine: CodebaseMemoryEngine, activeWorktree: string): void {
+  const stats = engine.getMemoryStats(activeWorktree);
+  const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
+  if (stats.totalFiles === 0 && !isTest) {
+    engine.indexDirectory(fs.existsSync('packages') ? 'packages' : '.', activeWorktree);
   }
+}
 
-  if (res.groundTruthDocs.length > 0) {
-    console.log('\n📚 Ground-Truth Engine Documentation (Context7):');
-    for (const d of res.groundTruthDocs) console.log(`   ${d}`);
+function readOptionalRawLogs(rawLogsPath?: string): string | undefined {
+  if (rawLogsPath && rawLogsPath !== '--json' && fs.existsSync(rawLogsPath)) {
+    return fs.readFileSync(rawLogsPath, 'utf8');
   }
-
-  if (res.externalContracts && res.externalContracts.length > 0) {
-    console.log('\n🌐 Ground-Truth External Contracts (Context7):');
-    for (const c of res.externalContracts) console.log(`   ${c}`);
-  }
-
-  if (res.constitutionRules.length > 0) {
-    console.log('\n🛡️  Demir Kafes Guardrails:');
-    for (const r of res.constitutionRules.slice(0, 4)) console.log(`   - ${r}`);
-  }
-
-  if (res.slice) {
-    console.log('\n' + res.slice);
-  }
+  return undefined;
 }
 
 export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsPath?: string): void {
@@ -101,25 +114,10 @@ export function handleMemoryQuery(symbol?: string, worktreeId?: string, rawLogsP
     console.error('❌ Usage: aegis memory:query <symbol> [worktreeId] [rawLogsPath] [--json]');
     process.exit(1);
   }
-
-  const activeWorktree = (worktreeId && worktreeId !== 'default' && worktreeId !== '--json')
-    ? worktreeId
-    : ActiveHeadResolver.resolveActiveWorktree();
-
+  const activeWorktree = resolveMemoryWorktree(worktreeId);
   const engine = getSharedMemoryEngine();
-  const stats = engine.getMemoryStats(activeWorktree);
-  const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
-  if (stats.totalFiles === 0 && !isTest) {
-    const scanDir = fs.existsSync('packages') ? 'packages' : '.';
-    engine.indexDirectory(scanDir, activeWorktree);
-  }
-
-  let rawLogs: string | undefined;
-  if (rawLogsPath && rawLogsPath !== '--json' && fs.existsSync(rawLogsPath)) {
-    rawLogs = fs.readFileSync(rawLogsPath, 'utf8');
-  }
-
-  const res = engine.queryMemory(symbol, { worktreeId: activeWorktree, rawLogs });
+  ensureMemoryIndexed(engine, activeWorktree);
+  const res = engine.queryMemory(symbol, { worktreeId: activeWorktree, rawLogs: readOptionalRawLogs(rawLogsPath) });
   if (isJson) {
     console.log(JSON.stringify(res, null, 2));
     return;

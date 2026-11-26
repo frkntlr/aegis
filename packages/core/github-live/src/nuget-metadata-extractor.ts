@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
-import type { Context7DocEntry } from './context7-bridge.js';
+import type { Context7DocEntry } from './context7-types.js';
 
 export interface NuGetPackageRef {
   name: string;

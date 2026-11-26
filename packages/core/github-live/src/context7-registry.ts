@@ -1,4 +1,4 @@
-import type { Context7DocEntry } from './context7-bridge.js';
+import type { Context7DocEntry } from './context7-types.js';
 
 export class Context7Registry {
   public static registerAll(register: (doc: Context7DocEntry) => void): void {

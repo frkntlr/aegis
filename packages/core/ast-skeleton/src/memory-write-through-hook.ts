@@ -1,4 +1,4 @@
-import type { CodebaseMemoryEngine } from './codebase-memory.js';
+import type { CodebaseMemoryHost } from './codebase-memory-types.js';
 
 export interface WriteThroughOptions {
   debounceMs?: number;
@@ -12,7 +12,7 @@ export class MemoryWriteThroughHook {
   private onPersistError?: (err: unknown) => void;
 
   constructor(
-    private readonly engine: CodebaseMemoryEngine,
+    private readonly engine: CodebaseMemoryHost,
     options: WriteThroughOptions = {}
   ) {
     this.debounceMs = options.debounceMs ?? 100;

@@ -1,6 +1,49 @@
 import type { SkeletonResult } from './ts-extractor.js';
 import type { LanguageExtractor } from './extractor-registry.js';
 
+interface GoBlockState {
+  braceCount: number;
+  foundOpen: boolean;
+  inComment: boolean;
+  inRaw: boolean;
+}
+
+function skipGoString(chars: string, j: number): number {
+  const q = chars[j++];
+  while (j < chars.length && chars[j] !== q) {
+    if (chars[j] === '\\') j += 2;
+    else j++;
+  }
+  return j + 1;
+}
+
+function advanceGoComment(s: string, j: number, state: GoBlockState): number {
+  if (s[j] === '*' && s[j + 1] === '/') {
+    state.inComment = false;
+    return j + 2;
+  }
+  return j + 1;
+}
+
+function stepGoCodeChar(s: string, j: number, state: GoBlockState): number {
+  if (s.startsWith('/*', j)) { state.inComment = true; return j + 2; }
+  if (s[j] === '`') { state.inRaw = true; return j + 1; }
+  if (s[j] === '"' || s[j] === "'") return skipGoString(s, j);
+  if (s[j] === '{') { state.braceCount++; state.foundOpen = true; }
+  else if (s[j] === '}') state.braceCount--;
+  return j + 1;
+}
+
+function scanGoBlockLine(s: string, state: GoBlockState): void {
+  let j = 0;
+  while (j < s.length) {
+    if (state.inComment) { j = advanceGoComment(s, j, state); continue; }
+    if (state.inRaw) { if (s[j++] === '`') state.inRaw = false; continue; }
+    if (s[j] === '/' && s[j + 1] === '/') break;
+    j = stepGoCodeChar(s, j, state);
+  }
+}
+
 export class GoSkeletonExtractor implements LanguageExtractor {
   public readonly languageId = 'go';
   public readonly supportedExtensions = ['.go'];
@@ -70,44 +113,12 @@ export class GoSkeletonExtractor implements LanguageExtractor {
     return parts.join('\n');
   }
 
-  private skipString(chars: string, j: number): number {
-    const q = chars[j++];
-    while (j < chars.length && chars[j] !== q) {
-      if (chars[j] === '\\') j += 2;
-      else j++;
-    }
-    return j + 1;
-  }
-
   private skipBlock(lines: string[], startIndex: number): number {
-    let braceCount = 0;
-    let foundOpen = false;
-    let inComment = false;
-    let inRaw = false;
+    const state: GoBlockState = { braceCount: 0, foundOpen: false, inComment: false, inRaw: false };
     let i = startIndex;
-
     while (i < lines.length) {
-      const s = lines[i];
-      let j = 0;
-      while (j < s.length) {
-        if (inComment) {
-          if (s[j] === '*' && s[j + 1] === '/') { inComment = false; j += 2; }
-          else j++;
-          continue;
-        }
-        if (inRaw) {
-          if (s[j++] === '`') inRaw = false;
-          continue;
-        }
-        if (s[j] === '/' && s[j + 1] === '/') break;
-        if (s[j] === '/' && s[j + 1] === '*') { inComment = true; j += 2; continue; }
-        if (s[j] === '`') { inRaw = true; j++; continue; }
-        if (s[j] === '"' || s[j] === "'") { j = this.skipString(s, j); continue; }
-        if (s[j] === '{') { braceCount++; foundOpen = true; }
-        else if (s[j] === '}') braceCount--;
-        j++;
-      }
-      if (foundOpen && braceCount <= 0) return i + 1;
+      scanGoBlockLine(lines[i], state);
+      if (state.foundOpen && state.braceCount <= 0) return i + 1;
       i++;
     }
     return i + 1;

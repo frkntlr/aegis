@@ -1,4 +1,4 @@
-import type { SystemIssue } from './realtime-metrics.js';
+import type { SystemIssue } from './metrics-types.js';
 
 export const INITIAL_DEFAULT_ISSUES: SystemIssue[] = [
   {

@@ -31,28 +31,25 @@ const CATEGORY_OPTIONS: Record<DiagnosticCategory, ClarificationOption[]> = {
   ]
 };
 
+interface ClassificationRule {
+  category: DiagnosticCategory;
+  keywords: string[];
+}
+
+const CLASSIFICATION_RULES: ClassificationRule[] = [
+  { category: DiagnosticCategory.GODOT_ENGINE, keywords: ['godot', 'gdscript', 'tscn', 'tres', 'aspect', 'classdb'] },
+  { category: DiagnosticCategory.MUTATION_GAP, keywords: ['mutation', 'mutant', 'survived', 'kill score'] },
+  { category: DiagnosticCategory.MCP_SECURITY, keywords: ['mcp', 'unauthorized', 'destructive tool', 'tool rate'] },
+  { category: DiagnosticCategory.PERFORMANCE, keywords: ['slow', 'latency', 'timeout', 'cpu'] },
+  { category: DiagnosticCategory.GIT_COLLISION, keywords: ['git', 'lock', 'conflict', 'worktree'] },
+  { category: DiagnosticCategory.CAGE_VIOLATION, keywords: ['cage', 'demir kafes', 'complexity', 'line limit', 'function', 'file length'] }
+];
+
 export class SymptomClassifier {
   public static classify(input: string): DiagnosticCategory {
     const text = input.toLowerCase();
-    if (text.includes('godot') || text.includes('gdscript') || text.includes('tscn') || text.includes('tres') || text.includes('aspect') || text.includes('classdb')) {
-      return DiagnosticCategory.GODOT_ENGINE;
-    }
-    if (text.includes('mutation') || text.includes('mutant') || text.includes('survived') || text.includes('kill score')) {
-      return DiagnosticCategory.MUTATION_GAP;
-    }
-    if (text.includes('mcp') || text.includes('unauthorized') || text.includes('destructive tool') || text.includes('tool rate')) {
-      return DiagnosticCategory.MCP_SECURITY;
-    }
-    if (text.includes('slow') || text.includes('latency') || text.includes('timeout') || text.includes('cpu')) {
-      return DiagnosticCategory.PERFORMANCE;
-    }
-    if (text.includes('git') || text.includes('lock') || text.includes('conflict') || text.includes('worktree')) {
-      return DiagnosticCategory.GIT_COLLISION;
-    }
-    if (text.includes('cage') || text.includes('demir kafes') || text.includes('complexity') || text.includes('line limit') || text.includes('function') || text.includes('file length')) {
-      return DiagnosticCategory.CAGE_VIOLATION;
-    }
-    return DiagnosticCategory.UNKNOWN;
+    const matched = CLASSIFICATION_RULES.find(rule => rule.keywords.some(kw => text.includes(kw)));
+    return matched ? matched.category : DiagnosticCategory.UNKNOWN;
   }
 
   public static getClarificationOptions(category: DiagnosticCategory): ClarificationOption[] {

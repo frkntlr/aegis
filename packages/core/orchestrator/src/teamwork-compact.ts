@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import { RTKTokenKiller } from '@aegis/watchdog';
-import type { TeamworkPlan, TeamworkStatusReport } from './teamwork-coordinator.js';
+import type { TeamworkPlan, TeamworkStatusReport } from './teamwork-types.js';
 
 export interface CompactOutputResult {
   compressedText: string;

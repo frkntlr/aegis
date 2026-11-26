@@ -34,6 +34,15 @@ export interface DeepWorkflowResult {
   sourceCount?: number;
 }
 
+interface IngestionParams {
+  notebookId: string;
+  topic: string;
+  taskId: string;
+  pollRes: ResearchPollResult;
+  existingSources: NotebookSourceSummary[];
+  options: DeepWorkflowOptions;
+}
+
 const MAX_SAFE_SOURCE_COUNT = 45;
 
 export class NotebookLmDeepResearchWorkflow {
@@ -67,13 +76,9 @@ export class NotebookLmDeepResearchWorkflow {
   }
 
   private async processIngestion(
-    notebookId: string,
-    topic: string,
-    taskId: string,
-    pollRes: ResearchPollResult,
-    existingSources: NotebookSourceSummary[],
-    options: DeepWorkflowOptions
+    params: IngestionParams
   ): Promise<{ ingestedSourceId?: string; curatedImportCount: number; prunedCount: number }> {
+    const { notebookId, topic, taskId, pollRes, existingSources, options } = params;
     const ingestMode = options.ingestMode ?? 'curated';
     if (ingestMode === 'digest' && pollRes.synthesis) {
       const digestDoc = NotebookLmDeepResearchWorkflow.formatDigest(topic, pollRes);
@@ -99,9 +104,9 @@ export class NotebookLmDeepResearchWorkflow {
 
     const pollRes = await this.pollUntilComplete(notebookId, taskId, options);
     const existingSources = await this.fetchSafeSources(notebookId);
-    const { ingestedSourceId, curatedImportCount, prunedCount } = await this.processIngestion(
+    const { ingestedSourceId, curatedImportCount, prunedCount } = await this.processIngestion({
       notebookId, topic, taskId, pollRes, existingSources, options
-    );
+    });
 
     const sourceCount = existingSources.length + (ingestedSourceId ? 1 : curatedImportCount) - prunedCount;
     return {

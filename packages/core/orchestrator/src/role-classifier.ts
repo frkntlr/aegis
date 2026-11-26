@@ -21,19 +21,61 @@ interface FileHits {
   solver: number;
 }
 
+interface KeywordMatchOptions {
+  text: string;
+  words: readonly string[];
+  role: RoleType;
+  scores: Record<RoleType, number>;
+  reasons: string[];
+  label: string;
+}
+
+interface FileRoleRule {
+  role: RoleType;
+  matches: (hits: FileHits) => boolean;
+  reason: (count: number) => string;
+}
+
+const UI_THEME_EXTS = ['.tres', '.theme'] as const;
+const UI_THEME_DIRS = ['/theme/', '/themes/'] as const;
+const UI_SCRIPT_EXTS = ['.tscn', '.gd'] as const;
+const UI_NAME_MARKERS = [
+  '/ui/', 'menu', 'hud', 'dialog', 'screen', 'modal',
+  'widget', 'popup', 'toast', 'button', 'toolbar', 'window'
+] as const;
+
+const FILE_ROLE_RULES: readonly FileRoleRule[] = [
+  {
+    role: 'docs',
+    matches: h => h.docs > h.qa && h.docs > h.solver && h.docs > h.ui,
+    reason: count => `Dosya analizi: Markdown/Wiki dosyaları (${count} adet)`
+  },
+  {
+    role: 'ui',
+    matches: h => h.ui > 0 && h.ui >= h.qa && h.ui >= h.solver,
+    reason: count => `Dosya analizi: Tema/Arayüz dosyaları (${count} adet)`
+  },
+  {
+    role: 'qa',
+    matches: h => h.qa > h.solver,
+    reason: count => `Dosya analizi: Test/Sahne dosyaları (${count} adet)`
+  },
+  {
+    role: 'solver',
+    matches: h => h.solver > 0,
+    reason: count => `Dosya analizi: Kaynak kod dosyaları (${count} adet)`
+  }
+];
+
 export class RoleClassifier {
   public static readonly CONFIDENCE_THRESHOLD = 60;
 
   public static isUiFile(filePath: string): boolean {
     const lower = filePath.toLowerCase().replace(/\\/g, '/');
-    if (lower.endsWith('.tres') || lower.endsWith('.theme') || lower.includes('/theme/') || lower.includes('/themes/')) {
-      return true;
-    }
-    const isUiNamed = lower.includes('/ui/') || lower.includes('menu') || lower.includes('hud') ||
-      lower.includes('dialog') || lower.includes('screen') || lower.includes('modal') ||
-      lower.includes('widget') || lower.includes('popup') || lower.includes('toast') ||
-      lower.includes('button') || lower.includes('toolbar') || lower.includes('window');
-    return (lower.endsWith('.tscn') || lower.endsWith('.gd')) && isUiNamed;
+    if (UI_THEME_EXTS.some(ext => lower.endsWith(ext))) return true;
+    if (UI_THEME_DIRS.some(dir => lower.includes(dir))) return true;
+    if (!UI_SCRIPT_EXTS.some(ext => lower.endsWith(ext))) return false;
+    return UI_NAME_MARKERS.some(marker => lower.includes(marker));
   }
 
   public classify(input: RoleInferenceInput): RoleInferenceResult {
@@ -95,27 +137,19 @@ export class RoleClassifier {
     return hits;
   }
 
+  private isExclusiveHit(hits: FileHits, role: RoleType): boolean {
+    const total = hits.docs + hits.ui + hits.qa + hits.solver;
+    return hits[role] > 0 && hits[role] === total;
+  }
+
   private evaluateTargetFiles(files: string[], scores: Record<RoleType, number>, reasons: string[]): void {
     if (files.length === 0) return;
-    const h = this.countFileHits(files);
-    const isExclDocs = h.docs > 0 && h.ui === 0 && h.qa === 0 && h.solver === 0;
-    const isExclUi = h.ui > 0 && h.docs === 0 && h.qa === 0 && h.solver === 0;
-    const isExclQa = h.qa > 0 && h.docs === 0 && h.ui === 0 && h.solver === 0;
-    const isExclSolver = h.solver > 0 && h.docs === 0 && h.ui === 0 && h.qa === 0;
-
-    if (h.docs > h.qa && h.docs > h.solver && h.docs > h.ui) {
-      scores.docs += isExclDocs ? 45 : 35;
-      reasons.push(`Dosya analizi: Markdown/Wiki dosyaları (${h.docs} adet)`);
-    } else if (h.ui > 0 && h.ui >= h.qa && h.ui >= h.solver) {
-      scores.ui += isExclUi ? 45 : 35;
-      reasons.push(`Dosya analizi: Tema/Arayüz dosyaları (${h.ui} adet)`);
-    } else if (h.qa > h.solver) {
-      scores.qa += isExclQa ? 45 : 35;
-      reasons.push(`Dosya analizi: Test/Sahne dosyaları (${h.qa} adet)`);
-    } else if (h.solver > 0) {
-      scores.solver += isExclSolver ? 45 : 35;
-      reasons.push(`Dosya analizi: Kaynak kod dosyaları (${h.solver} adet)`);
-    }
+    const hits = this.countFileHits(files);
+    const rule = FILE_ROLE_RULES.find(r => r.matches(hits));
+    if (!rule) return;
+    const points = this.isExclusiveHit(hits, rule.role) ? 45 : 35;
+    scores[rule.role] += points;
+    reasons.push(rule.reason(hits[rule.role]));
   }
 
   private evaluateSemantics(text: string, scores: Record<RoleType, number>, reasons: string[]): void {
@@ -132,18 +166,17 @@ export class RoleClassifier {
     const qaKeywords = ['test et', 'denetle', 'inspect', 'boundingbox', 'visual', 'görsel', 'layout', 'telemetry', 'playtest', 'aspect ratio'];
     const solverKeywords = ['çöz', 'onarım', 'fix', 'bug', 'hata', 'implement', 'algorithm', 'refactor', 'mutation', 'demir kafes'];
 
-    this.matchKeywords(lower, docsKeywords, 'docs', scores, reasons, 'Dokümantasyon');
-    this.matchKeywords(lower, uiKeywords, 'ui', scores, reasons, 'UI & Tema');
-    this.matchKeywords(lower, qaKeywords, 'qa', scores, reasons, 'Test & Denetim');
-    this.matchKeywords(lower, solverKeywords, 'solver', scores, reasons, 'Hata onarımı');
+    this.matchKeywords({ text: lower, words: docsKeywords, role: 'docs', scores, reasons, label: 'Dokümantasyon' });
+    this.matchKeywords({ text: lower, words: uiKeywords, role: 'ui', scores, reasons, label: 'UI & Tema' });
+    this.matchKeywords({ text: lower, words: qaKeywords, role: 'qa', scores, reasons, label: 'Test & Denetim' });
+    this.matchKeywords({ text: lower, words: solverKeywords, role: 'solver', scores, reasons, label: 'Hata onarımı' });
   }
 
-  private matchKeywords(text: string, words: string[], role: RoleType, scores: Record<RoleType, number>, reasons: string[], label: string): void {
-    const matches = words.filter(k => text.includes(k));
-    if (matches.length > 0) {
-      scores[role] += matches.length > 1 ? 25 : 15;
-      reasons.push(`Metin analizi: ${label} anahtar kelimeleri`);
-    }
+  private matchKeywords(opts: KeywordMatchOptions): void {
+    const matches = opts.words.filter(k => opts.text.includes(k));
+    if (matches.length === 0) return;
+    opts.scores[opts.role] += matches.length > 1 ? 25 : 15;
+    opts.reasons.push(`Metin analizi: ${opts.label} anahtar kelimeleri`);
   }
 
   private resolveBestRole(scores: Record<RoleType, number>): { role: RoleType; score: number } {

@@ -4,6 +4,19 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+interface PolyglotAmbientRule {
+  ext: string;
+  tag: string;
+  prefix: string;
+  prefixes: readonly string[];
+}
+
+const POLYGLOT_AMBIENT_RULES: readonly PolyglotAmbientRule[] = [
+  { ext: '.py', tag: 'Python', prefix: '#', prefixes: ['import ', 'from ', 'class '] },
+  { ext: '.rs', tag: 'Rust', prefix: '//', prefixes: ['use ', 'pub use ', 'mod '] },
+  { ext: '.go', tag: 'Go', prefix: '//', prefixes: ['package ', 'import ', 'type '] }
+];
+
 export class SliceAmbientExtractor {
   public static extractGdscriptAmbient(content: string): string {
     const lines = content.split(/\r?\n/);
@@ -38,24 +51,18 @@ export class SliceAmbientExtractor {
   }
 
   public static extractPolyglotAmbient(filePath: string, content: string): string {
-    const lines = content.split(/\r?\n/);
-    const ambient: string[] = [];
-    const isPy = filePath.endsWith('.py');
-    const isRs = filePath.endsWith('.rs');
-    const prefix = isPy ? '#' : '//';
+    const rule = POLYGLOT_AMBIENT_RULES.find(r => filePath.endsWith(r.ext));
+    if (!rule) return '';
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (isPy && (trimmed.startsWith('import ') || trimmed.startsWith('from ') || trimmed.startsWith('class '))) {
-        ambient.push(trimmed);
-      } else if (isRs && (trimmed.startsWith('use ') || trimmed.startsWith('pub use ') || trimmed.startsWith('mod '))) {
-        ambient.push(trimmed);
-      } else if (filePath.endsWith('.go') && (trimmed.startsWith('package ') || trimmed.startsWith('import ') || trimmed.startsWith('type '))) {
-        ambient.push(trimmed);
-      }
-    }
+    const ambient = content
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(trimmed => rule.prefixes.some(prefix => trimmed.startsWith(prefix)));
     if (ambient.length === 0) return '';
-    const tag = isPy ? 'Python' : (isRs ? 'Rust' : 'Go');
-    return [`${prefix} 🌐 [${tag} Ambient State - Imports & Scope]`, ...ambient.map(l => `${prefix} - ${l}`)].join('\n');
+
+    return [
+      `${rule.prefix} 🌐 [${rule.tag} Ambient State - Imports & Scope]`,
+      ...ambient.map(line => `${rule.prefix} - ${line}`)
+    ].join('\n');
   }
 }

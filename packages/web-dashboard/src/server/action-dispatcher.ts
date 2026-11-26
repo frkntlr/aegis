@@ -4,16 +4,82 @@ import type { IdeLauncher, UniversalToolchainSync } from '@aegis/orchestrator';
 import { RoleClassifier } from '@aegis/orchestrator';
 import { LoopBreaker, type OrphanTaskReclaimer } from '@aegis/watchdog';
 import type { AegisEngineService } from './engine-service.js';
-import type { SystemIssue } from './realtime-metrics.js';
+import type { SystemIssue } from './metrics-types.js';
 import { isSafeIdentifier, requireExistingRepoRoot, resolveContainedPath } from './path-containment.js';
 
 type SupportedIde = 'Google Antigravity' | 'Cursor AI' | 'VS Code' | 'Universal IDE';
+type EngineToolHandler = (svc: AegisEngineService, payload: Record<string, unknown>) => Promise<Record<string, unknown>> | Record<string, unknown>;
+
+const ENGINE_TOOL_HANDLERS: Record<string, EngineToolHandler> = {
+  ui_inspector: (svc, p) => svc.runUiInspector(p.layoutPath as string | undefined),
+  mutation_gate: (svc, p) => svc.runMutationGate(p.filePath as string | undefined),
+  adaptive_timeout: (svc, p) => ({ ...svc.runAdaptiveTimeout(Number(p.files ?? 2), Number(p.tests ?? 4)) }),
+  mcp_security: (svc, p) => svc.runMcpSecurity(p.agent as string, p.mcpTool as string),
+  diff_validator: (svc, p) => svc.runDiffValidator(p.diffText as string),
+  immutable_oracle: (svc, p) => svc.runOracleAudit(p.files as string[]),
+  oracle_audit: (svc, p) => svc.runOracleAudit(p.files as string[]),
+  cage_check: (svc, p) => svc.runCageCheck(p.dir as string | undefined),
+  bug_triage: (svc, p) => svc.runBugTriage(p.dir as string | undefined),
+  symbol_find: (svc, p) => svc.runSymbolFind(p.query as string | undefined),
+  relational_trace: (svc, p) => svc.runRelationalTrace(p.target as string | undefined),
+  memory_query: (svc, p) => svc.runMemoryQuery(p.symbol as string | undefined, p.worktreeId as string | undefined),
+  memory_stats: (svc, p) => svc.runMemoryStats(p.worktreeId as string | undefined),
+  ast_search: (svc, p) => svc.runAstSearch(p.pattern as string | undefined, p.dir as string | undefined),
+  rtk_compress: (svc, p) => svc.runRtkCompress(p.text as string | undefined),
+  context7_query: (svc, p) => svc.runContext7Query(p.library as string | undefined, p.topic as string | undefined)
+};
 const ALLOWED_IDES: ReadonlySet<string> = new Set<SupportedIde>([
   'Google Antigravity',
   'Cursor AI',
   'VS Code',
   'Universal IDE'
 ]);
+const IDE_SYNC_ACTIONS = new Set(['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings']);
+
+type HubActiveContext = ReturnType<ProjectHub['getActiveContext']>;
+
+async function handleCreateTask(hubCtx: HubActiveContext, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const issue = await hubCtx.metrics.createIssue((payload.title as string) || 'Yeni Görev', (payload.targetFiles as string[]) || []);
+  return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu.`, issue };
+}
+
+function assignTaskInProgress(
+  ctx: HubActiveContext,
+  issue: SystemIssue,
+  payload: Record<string, unknown>,
+  loopBreaker?: LoopBreaker
+): Record<string, unknown> {
+  const breaker = loopBreaker ?? new LoopBreaker();
+  if (breaker.isBlocked(issue.number)) {
+    return {
+      success: false,
+      message: `🛑 Görev #${issue.number} 3 başarısız deneme nedeniyle kilitlendi (Circuit Breaker aktif). Önce hatayı çözün veya kilidi kaldırın.`
+    };
+  }
+  let agent = payload.agentName as string | undefined;
+  if (!agent || agent === 'auto') {
+    agent = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles }).role;
+  } else if (typeof agent !== 'string' || !isSafeIdentifier(agent)) {
+    return { success: false, message: 'Geçersiz ajan adı.' };
+  }
+  const ide = (payload.ideType as string) || 'Google Antigravity';
+  const lockRes = ctx.wtManager.acquireFileLocks(agent, issue.targetFiles);
+  if (!lockRes.success) {
+    return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
+  }
+  ctx.metrics.moveTask(issue.number, 'in_progress', agent, ide);
+  return { success: true, message: `Görev #${issue.number} [@${agent}] (${ide}) atandı.` };
+}
+
+function handleReleaseLocks(hubCtx: HubActiveContext, payload: Record<string, unknown>): Record<string, unknown> {
+  const rawAgent = payload.agentName;
+  if (rawAgent !== undefined && (typeof rawAgent !== 'string' || !isSafeIdentifier(rawAgent))) {
+    return { success: false, error: 'Invalid agentName.' };
+  }
+  hubCtx.wtManager.releaseFileLocks((rawAgent as string) || 'solver');
+  hubCtx.metrics.releaseIssueLocks(rawAgent as string | undefined);
+  return { success: true, message: 'Kilitler boşaltıldı.' };
+}
 
 export interface ActionDispatcherContext {
   hub: ProjectHub;
@@ -72,29 +138,21 @@ export class ActionDispatcher {
   public async executeAction(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const hubRes = this.handleProjectAndSync(action, payload);
     if (hubRes) return hubRes;
+    if (IDE_SYNC_ACTIONS.has(action)) return this.handleIdeAndSync(action, payload);
+
+    const directMap: Record<string, () => Record<string, unknown>> = {
+      auto: () => this.handleAutoAction(),
+      move_task: () => this.handleMoveTask(payload),
+      reclaim_orphans: () => this.handleReclaimOrphans(),
+      complete_task: () => this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' })
+    };
+    const directHandler = Object.hasOwn(directMap, action) ? directMap[action] : undefined;
+    if (directHandler) return directHandler();
 
     const hubCtx = this.ctx.hub.getActiveContext();
-    if (action === 'auto') return this.handleAutoAction();
-    if (action === 'move_task') return this.handleMoveTask(payload);
-    if (action === 'reclaim_orphans') return this.handleReclaimOrphans();
     if (action === 'sync_github') return this.handleSyncGitHub(hubCtx);
-    if (['launch_ide', 'sync_toolchain', 'run_engine_tool', 'save_settings', 'update_settings'].includes(action)) {
-      return this.handleIdeAndSync(action, payload);
-    }
-    if (action === 'create_task') {
-      const issue = await hubCtx.metrics.createIssue((payload.title as string) || 'Yeni Görev', (payload.targetFiles as string[]) || []);
-      return { success: true, message: `GitHub Görevi #${issue.number} oluşturuldu.`, issue };
-    }
-    if (action === 'complete_task') return this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' });
-    if (action === 'release_locks') {
-      const rawAgent = payload.agentName;
-      if (rawAgent !== undefined && (typeof rawAgent !== 'string' || !isSafeIdentifier(rawAgent))) {
-        return { success: false, error: 'Invalid agentName.' };
-      }
-      hubCtx.wtManager.releaseFileLocks((rawAgent as string) || 'solver');
-      hubCtx.metrics.releaseIssueLocks(rawAgent as string | undefined);
-      return { success: true, message: 'Kilitler boşaltıldı.' };
-    }
+    if (action === 'create_task') return handleCreateTask(hubCtx, payload);
+    if (action === 'release_locks') return handleReleaseLocks(hubCtx, payload);
     return { success: false, error: 'Bilinmeyen aksiyon: ' + action };
   }
 
@@ -106,27 +164,7 @@ export class ActionDispatcher {
     if (!issue) return { success: false, message: `Görev #${num} bulunamadı.` };
 
     if (targetStatus === 'in_progress') {
-      const breaker = this.ctx.loopBreaker ?? new LoopBreaker();
-      if (breaker.isBlocked(num)) {
-        return {
-          success: false,
-          message: `🛑 Görev #${num} 3 başarısız deneme nedeniyle kilitlendi (Circuit Breaker aktif). Önce hatayı çözün veya kilidi kaldırın.`
-        };
-      }
-      let agent = payload.agentName as string | undefined;
-      if (!agent || agent === 'auto') {
-        const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
-        agent = inf.role;
-      } else if (typeof agent !== 'string' || !isSafeIdentifier(agent)) {
-        return { success: false, message: 'Geçersiz ajan adı.' };
-      }
-      const ide = (payload.ideType as string) || 'Google Antigravity';
-      const lockRes = ctx.wtManager.acquireFileLocks(agent, issue.targetFiles);
-      if (!lockRes.success) {
-        return { success: false, message: `Kilit çakışması: ${lockRes.conflictingFiles.join(', ')}` };
-      }
-      ctx.metrics.moveTask(num, 'in_progress', agent, ide);
-      return { success: true, message: `Görev #${num} [@${agent}] (${ide}) atandı.` };
+      return assignTaskInProgress(ctx, issue, payload, this.ctx.loopBreaker);
     }
 
     if (targetStatus === 'done' || targetStatus === 'ready') {
@@ -205,23 +243,13 @@ export class ActionDispatcher {
 
   private async handleRunEngineTool(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const t = payload.tool;
-    let res: Record<string, unknown>;
-    if (t === 'ui_inspector') res = this.ctx.engineSvc.runUiInspector(payload.layoutPath as string | undefined);
-    else if (t === 'mutation_gate') res = this.ctx.engineSvc.runMutationGate(payload.filePath as string | undefined);
-    else if (t === 'adaptive_timeout') res = { ...this.ctx.engineSvc.runAdaptiveTimeout(Number(payload.files ?? 2), Number(payload.tests ?? 4)) };
-    else if (t === 'mcp_security') res = this.ctx.engineSvc.runMcpSecurity(payload.agent as string, payload.mcpTool as string);
-    else if (t === 'diff_validator') res = await this.ctx.engineSvc.runDiffValidator(payload.diffText as string);
-    else if (t === 'immutable_oracle' || t === 'oracle_audit') res = await this.ctx.engineSvc.runOracleAudit(payload.files as string[]);
-    else if (t === 'cage_check') res = this.ctx.engineSvc.runCageCheck(payload.dir as string | undefined);
-    else if (t === 'bug_triage') res = this.ctx.engineSvc.runBugTriage(payload.dir as string | undefined);
-    else if (t === 'symbol_find') res = this.ctx.engineSvc.runSymbolFind(payload.query as string | undefined);
-    else if (t === 'relational_trace') res = this.ctx.engineSvc.runRelationalTrace(payload.target as string | undefined);
-    else if (t === 'memory_query') res = this.ctx.engineSvc.runMemoryQuery(payload.symbol as string | undefined, payload.worktreeId as string | undefined);
-    else if (t === 'memory_stats') res = this.ctx.engineSvc.runMemoryStats(payload.worktreeId as string | undefined);
-    else if (t === 'ast_search') res = this.ctx.engineSvc.runAstSearch(payload.pattern as string | undefined, payload.dir as string | undefined);
-    else if (t === 'rtk_compress') res = this.ctx.engineSvc.runRtkCompress(payload.text as string | undefined);
-    else if (t === 'context7_query') res = this.ctx.engineSvc.runContext7Query(payload.library as string | undefined, payload.topic as string | undefined);
-    else return { success: false, error: 'Bilinmeyen araç: ' + t, message: 'Bilinmeyen araç: ' + t };
+    const handler = typeof t === 'string' && Object.hasOwn(ENGINE_TOOL_HANDLERS, t)
+      ? ENGINE_TOOL_HANDLERS[t]
+      : undefined;
+    if (!handler) {
+      return { success: false, error: 'Bilinmeyen araç: ' + t, message: 'Bilinmeyen araç: ' + t };
+    }
+    const res = await handler(this.ctx.engineSvc, payload);
     return { success: true, result: res, message: (res.summary as string) || 'Motor aracı çalıştırıldı.' };
   }
 

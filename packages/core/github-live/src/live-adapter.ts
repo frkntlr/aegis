@@ -1,29 +1,16 @@
 import { debugLogIgnored } from '@aegis/shared';
 import type { GitHubIssue } from './types.js';
+import {
+  extractIssueBodyDetails,
+  parseRateLimitHeaders,
+  resolveIssueStatusFromLabels,
+  shouldRetryGitHubRequest,
+  type GitHubUser,
+  type RateLimitInfo,
+  type RawGitHubIssue
+} from './live-adapter-helpers.js';
 
-export interface GitHubUser {
-  login: string;
-  name: string;
-  id: number;
-}
-
-export interface RateLimitInfo {
-  limit: number;
-  remaining: number;
-  resetDate: string;
-}
-
-export interface RawGitHubIssue {
-  id: number;
-  number: number;
-  title: string;
-  body?: string;
-  state?: string;
-  html_url?: string;
-  url?: string;
-  assignee?: { login?: string } | null;
-  labels?: Array<string | { name: string }>;
-}
+export type { GitHubUser, RateLimitInfo, RawGitHubIssue } from './live-adapter-helpers.js';
 
 export interface LiveAdapterOptions {
   token: string;
@@ -54,18 +41,6 @@ export class GitHubLiveAdapter {
     this.retryDelayMs = options.retryDelayMs ?? 100;
   }
 
-  private parseRateLimit(response: Response): RateLimitInfo {
-    const limit = parseInt(response.headers.get('x-ratelimit-limit') || '5000', 10);
-    const remaining = parseInt(response.headers.get('x-ratelimit-remaining') || '4999', 10);
-    const resetTime = parseInt(response.headers.get('x-ratelimit-reset') || '0', 10);
-    const resetDate = resetTime ? new Date(resetTime * 1000).toISOString() : new Date().toISOString();
-    return { limit, remaining, resetDate };
-  }
-
-  private shouldRetry(status: number, attempt: number): boolean {
-    return attempt < this.maxRetries && (status === 429 || status === 503);
-  }
-
   private async request<T>(path: string, init: RequestInit = {}): Promise<{ data: T; rateLimit: RateLimitInfo }> {
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
     const headers = new Headers(init.headers);
@@ -76,9 +51,9 @@ export class GitHubLiveAdapter {
     let attempt = 0;
     while (true) {
       const response = await this.fetch(url, { ...init, headers });
-      const rateLimit = this.parseRateLimit(response);
+      const rateLimit = parseRateLimitHeaders(response);
 
-      if (this.shouldRetry(response.status, attempt)) {
+      if (shouldRetryGitHubRequest(response.status, attempt, this.maxRetries)) {
         attempt++;
         const retryAfter = parseInt(response.headers.get('retry-after') || '0', 10);
         const rawDelay = retryAfter > 0 ? retryAfter * 1000 : this.retryDelayMs * 2 ** (attempt - 1);
@@ -206,35 +181,12 @@ export class GitHubLiveAdapter {
     }
   }
 
-  private extractBodyDetails(body: string, targetFiles: string[]): string[] {
-    const criteria: string[] = [];
-    for (const line of body.split('\n')) {
-      const match = line.trim().match(/^-\s*\[([ xX])\]\s*(.+)$/);
-      if (match) {
-        criteria.push(match[2].trim());
-      } else {
-        const fileMatch = line.trim().match(/^-\s*`([^`]+)`/);
-        if (fileMatch) targetFiles.push(fileMatch[1].trim());
-      }
-    }
-    return criteria;
-  }
-
-  private resolveStatus(labels: string[], state?: string): GitHubIssue['status'] {
-    if (state === 'closed') return 'done';
-    if (labels.includes('status:blocked')) return 'blocked';
-    if (labels.includes('status:done')) return 'done';
-    if (labels.includes('status:review')) return 'review';
-    if (labels.includes('status:in_progress')) return 'in_progress';
-    return 'ready';
-  }
-
   public transformRawIssue(raw: RawGitHubIssue): GitHubIssue {
     const labels = Array.isArray(raw.labels) ? raw.labels.map((l: string | { name: string }) => (typeof l === 'string' ? l : l.name)) : [];
     const body = raw.body || '';
     const targetFiles = labels.filter((l: string) => l.startsWith('lock:')).map((l: string) => l.replace('lock:', '').trim());
-    const criteria = this.extractBodyDetails(body, targetFiles);
-    const status = this.resolveStatus(labels, raw.state);
+    const criteria = extractIssueBodyDetails(body, targetFiles);
+    const status = resolveIssueStatusFromLabels(labels, raw.state);
     const cleanLabels = status === 'done'
       ? [...labels.filter((l: string) => !l.startsWith('status:')), 'status:done']
       : labels;

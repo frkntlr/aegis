@@ -1,14 +1,80 @@
 import ts from 'typescript';
 import { PolyglotParser } from './polyglot-parser.js';
+import { type SymbolEntry } from './symbol-parser-types.js';
+import { parseGdFunction, attachFallbackClass, findGdFuncEnd } from './symbol-parser-gd.js';
 
-export interface SymbolEntry {
-  name: string;
-  kind: 'class' | 'function' | 'method' | 'signal' | 'interface' | 'variable' | 'type';
-  filePath: string;
-  startLine: number;
-  endLine: number;
-  signature: string;
-  docstring?: string;
+export type { SymbolEntry } from './symbol-parser-types.js';
+
+function getLineRange(node: ts.Node, sf: ts.SourceFile): { start: number; end: number } {
+  const start = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+  const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+  return { start, end };
+}
+
+function createTsTypeEntry(node: ts.TypeAliasDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
+  const { start, end } = getLineRange(node, sf);
+  return { name: node.name.text, kind: 'type', filePath, startLine: start, endLine: end, signature: `type ${node.name.text}` };
+}
+
+function collectVarFuncs(node: ts.VariableStatement, sf: ts.SourceFile, filePath: string, out: SymbolEntry[]): void {
+  for (const decl of node.declarationList.declarations) {
+    if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+    if (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) {
+      const { start, end } = getLineRange(decl, sf);
+      const name = decl.name.text;
+      out.push({ name, kind: 'function', filePath, startLine: start, endLine: end, signature: `const ${name} = (...)` });
+    }
+  }
+}
+
+function createTsClassEntry(node: ts.ClassDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
+  const { start, end } = getLineRange(node, sf);
+  const name = node.name?.text || 'anonymous';
+  return { name, kind: 'class', filePath, startLine: start, endLine: end, signature: `class ${name}` };
+}
+
+function createTsInterfaceEntry(node: ts.InterfaceDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
+  const { start, end } = getLineRange(node, sf);
+  const name = node.name.text;
+  return { name, kind: 'interface', filePath, startLine: start, endLine: end, signature: `interface ${name}` };
+}
+
+function createTsFuncEntry(node: ts.FunctionDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
+  const { start, end } = getLineRange(node, sf);
+  const name = node.name?.text || 'anonymous';
+  const params = node.parameters.map(p => p.getText(sf)).join(', ');
+  const ret = node.type ? `: ${node.type.getText(sf)}` : '';
+  return { name, kind: 'function', filePath, startLine: start, endLine: end, signature: `function ${name}(${params})${ret}` };
+}
+
+function createTsMethodEntry(node: ts.MethodDeclaration, sf: ts.SourceFile, filePath: string, parentClass: string): SymbolEntry {
+  const { start, end } = getLineRange(node, sf);
+  const name = node.name.getText(sf);
+  const params = node.parameters.map(p => p.getText(sf)).join(', ');
+  const ret = node.type ? `: ${node.type.getText(sf)}` : '';
+  return {
+    name: `${parentClass}.${name}`,
+    kind: 'method',
+    filePath,
+    startLine: start,
+    endLine: end,
+    signature: `${name}(${params})${ret}`
+  };
+}
+
+function findBlockEnd(lines: string[], startIdx: number): number {
+  let braceCount = 0;
+  let hasBraces = false;
+  for (let j = startIdx; j < lines.length; j++) {
+    const l = lines[j].replace(/\/\/.*$/, '').replace(/#.*$/, '');
+    const open = (l.match(/\{/g) || []).length;
+    const close = (l.match(/\}/g) || []).length;
+    if (open > 0) hasBraces = true;
+    braceCount += open - close;
+    if (hasBraces && braceCount <= 0) return j + 1;
+  }
+  if (hasBraces) return lines.length;
+  return findGdFuncEnd(lines, startIdx);
 }
 
 export class SymbolParser {
@@ -19,83 +85,26 @@ export class SymbolParser {
 
     const visit = (node: ts.Node, parentClass?: string) => {
       if (ts.isClassDeclaration(node) && node.name) {
-        symbols.push(SymbolParser.createTsClassEntry(node, sf, normPath));
+        symbols.push(createTsClassEntry(node, sf, normPath));
         ts.forEachChild(node, child => visit(child, node.name?.text));
         return;
       }
       if (ts.isInterfaceDeclaration(node) && node.name) {
-        symbols.push(SymbolParser.createTsInterfaceEntry(node, sf, normPath));
+        symbols.push(createTsInterfaceEntry(node, sf, normPath));
       } else if (ts.isTypeAliasDeclaration(node) && node.name) {
-        symbols.push(SymbolParser.createTsTypeEntry(node, sf, normPath));
+        symbols.push(createTsTypeEntry(node, sf, normPath));
       } else if (ts.isFunctionDeclaration(node) && node.name) {
-        symbols.push(SymbolParser.createTsFuncEntry(node, sf, normPath));
+        symbols.push(createTsFuncEntry(node, sf, normPath));
       } else if (ts.isMethodDeclaration(node) && node.name && parentClass) {
-        symbols.push(SymbolParser.createTsMethodEntry(node, sf, normPath, parentClass));
+        symbols.push(createTsMethodEntry(node, sf, normPath, parentClass));
       } else if (ts.isVariableStatement(node)) {
-        SymbolParser.collectVarFuncs(node, sf, normPath, symbols);
+        collectVarFuncs(node, sf, normPath, symbols);
       }
       ts.forEachChild(node, child => visit(child, parentClass));
     };
 
     visit(sf);
     return symbols;
-  }
-
-  private static createTsTypeEntry(node: ts.TypeAliasDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
-    const { start, end } = SymbolParser.getLineRange(node, sf);
-    return { name: node.name.text, kind: 'type', filePath, startLine: start, endLine: end, signature: `type ${node.name.text}` };
-  }
-
-  private static collectVarFuncs(node: ts.VariableStatement, sf: ts.SourceFile, filePath: string, out: SymbolEntry[]): void {
-    for (const decl of node.declarationList.declarations) {
-      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
-      if (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) {
-        const { start, end } = SymbolParser.getLineRange(decl, sf);
-        const name = decl.name.text;
-        out.push({ name, kind: 'function', filePath, startLine: start, endLine: end, signature: `const ${name} = (...)` });
-      }
-    }
-  }
-
-  private static getLineRange(node: ts.Node, sf: ts.SourceFile): { start: number; end: number } {
-    const start = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-    const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
-    return { start, end };
-  }
-
-  private static createTsClassEntry(node: ts.ClassDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
-    const { start, end } = SymbolParser.getLineRange(node, sf);
-    const name = node.name?.text || 'anonymous';
-    return { name, kind: 'class', filePath, startLine: start, endLine: end, signature: `class ${name}` };
-  }
-
-  private static createTsInterfaceEntry(node: ts.InterfaceDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
-    const { start, end } = SymbolParser.getLineRange(node, sf);
-    const name = node.name.text;
-    return { name, kind: 'interface', filePath, startLine: start, endLine: end, signature: `interface ${name}` };
-  }
-
-  private static createTsFuncEntry(node: ts.FunctionDeclaration, sf: ts.SourceFile, filePath: string): SymbolEntry {
-    const { start, end } = SymbolParser.getLineRange(node, sf);
-    const name = node.name?.text || 'anonymous';
-    const params = node.parameters.map(p => p.getText(sf)).join(', ');
-    const ret = node.type ? `: ${node.type.getText(sf)}` : '';
-    return { name, kind: 'function', filePath, startLine: start, endLine: end, signature: `function ${name}(${params})${ret}` };
-  }
-
-  private static createTsMethodEntry(node: ts.MethodDeclaration, sf: ts.SourceFile, filePath: string, parentClass: string): SymbolEntry {
-    const { start, end } = SymbolParser.getLineRange(node, sf);
-    const name = node.name.getText(sf);
-    const params = node.parameters.map(p => p.getText(sf)).join(', ');
-    const ret = node.type ? `: ${node.type.getText(sf)}` : '';
-    return {
-      name: `${parentClass}.${name}`,
-      kind: 'method',
-      filePath,
-      startLine: start,
-      endLine: end,
-      signature: `${name}(${params})${ret}`
-    };
   }
 
   public static parseGDScript(filePath: string, content: string): SymbolEntry[] {
@@ -126,48 +135,10 @@ export class SymbolParser {
         symbols.push({ name: sig[1], kind: 'signal', filePath: normPath, startLine: i + 1, endLine: i + 1, signature: `signal ${sig[1]}${sig[2]}`.trim() });
       }
       const fn = codeOnly.match(/^(?:@\w+(?:\([^)]*\))?\s+)*(?:static\s+)?func\s+([a-zA-Z_]\w*)\s*\((.*?)\)(?:\s*->\s*([^:]+))?:/);
-      if (fn) SymbolParser.parseGdFunction(lines, i, normPath, curClass, codeOnly, fn, symbols);
+      if (fn) parseGdFunction({ lines, lineIdx: i, normPath, curClass, codeOnly, fnMatch: fn, symbols });
     }
-    SymbolParser.attachFallbackClass(normPath, curClass, lines.length, symbols);
+    attachFallbackClass(normPath, curClass, lines.length, symbols);
     return symbols;
-  }
-
-  private static parseGdFunction(lines: string[], i: number, normPath: string, curClass: string, codeOnly: string, fn: RegExpMatchArray, symbols: SymbolEntry[]): void {
-    const fnName = curClass ? `${curClass}.${fn[1]}` : fn[1];
-    const startLine = SymbolParser.findDecoratorStart(lines, i + 1);
-    const endLine = SymbolParser.findGdFuncEnd(lines, i);
-    symbols.push({ name: fnName, kind: curClass ? 'method' : 'function', filePath: normPath, startLine, endLine, signature: codeOnly.replace(/:$/, '') });
-    if (!curClass) {
-      const fallback = normPath.split('/').pop()?.replace(/\.[^.]+$/, '') || '';
-      if (fallback) {
-        symbols.push({ name: `${fallback}.${fn[1]}`, kind: 'method', filePath: normPath, startLine, endLine, signature: codeOnly.replace(/:$/, '') });
-      }
-    }
-  }
-
-  private static attachFallbackClass(normPath: string, curClass: string, lineCount: number, symbols: SymbolEntry[]): void {
-    if (curClass) return;
-    const fallback = normPath.split('/').pop()?.replace(/\.[^.]+$/, '') || '';
-    if (fallback) {
-      symbols.unshift({ name: fallback, kind: 'class', filePath: normPath, startLine: 1, endLine: lineCount, signature: `class ${fallback}` });
-    }
-  }
-
-  private static findDecoratorStart(lines: string[], lineNum: number): number {
-    let start = lineNum;
-    while (start > 1 && lines[start - 2].trim().startsWith('@')) start--;
-    return start;
-  }
-
-  private static findGdFuncEnd(lines: string[], startIdx: number): number {
-    const baseIndent = (lines[startIdx].match(/^[\t\s]*/)?.[0] || '').length;
-    for (let j = startIdx + 1; j < lines.length; j++) {
-      const l = lines[j];
-      if (!l.trim() || l.trim().startsWith('#') || l.trim().startsWith('//')) continue;
-      const indent = (l.match(/^[\t\s]*/)?.[0] || '').length;
-      if (indent <= baseIndent) return j;
-    }
-    return lines.length;
   }
 
   public static parseGeneric(filePath: string, content: string): SymbolEntry[] {
@@ -186,30 +157,15 @@ export class SymbolParser {
       const trimmed = lines[i].trim();
       const fn = trimmed.match(fnPattern);
       if (fn) {
-        const endLine = SymbolParser.findBlockEnd(lines, i);
+        const endLine = findBlockEnd(lines, i);
         symbols.push({ name: fn[1], kind: 'function', filePath: normPath, startLine: i + 1, endLine, signature: trimmed });
       }
       const cls = trimmed.match(clsPattern);
       if (cls) {
-        const endLine = SymbolParser.findBlockEnd(lines, i);
+        const endLine = findBlockEnd(lines, i);
         symbols.push({ name: cls[1], kind: 'class', filePath: normPath, startLine: i + 1, endLine, signature: trimmed });
       }
     }
     return symbols;
-  }
-
-  private static findBlockEnd(lines: string[], startIdx: number): number {
-    let braceCount = 0;
-    let hasBraces = false;
-    for (let j = startIdx; j < lines.length; j++) {
-      const l = lines[j].replace(/\/\/.*$/, '').replace(/#.*$/, '');
-      const open = (l.match(/\{/g) || []).length;
-      const close = (l.match(/\}/g) || []).length;
-      if (open > 0) hasBraces = true;
-      braceCount += open - close;
-      if (hasBraces && braceCount <= 0) return j + 1;
-    }
-    if (hasBraces) return lines.length;
-    return SymbolParser.findGdFuncEnd(lines, startIdx);
   }
 }

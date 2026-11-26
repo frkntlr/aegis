@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import * as ts from 'typescript';
 import { debugLogIgnored, formatErrorMessage, readJsonSafe, stripBom } from '@aegis/shared';
 import { MutationGate, type Mutant } from './mutation-gate.js';
+import { buildBaseTestArgs, collectTestFiles, findNearestFile, writeHookFiles } from './mutation-runner-helpers.js';
 
 export interface RunFileMutationTestOptions {
   filePath: string;
@@ -47,6 +48,15 @@ interface TargetContext {
 
 interface CompiledMutant { mutant: Mutant; code: string; }
 
+interface ExecuteMutantsOptions {
+  ctx: TargetContext;
+  sampled: CompiledMutant[];
+  totalMutants: number;
+  skippedCompileErrors: number;
+  thresholdPercent: number;
+  testTimeoutMs: number;
+}
+
 function failClosed(filePath: string, reason: string): MutationRunReport {
   return {
     filePath, totalMutants: 0, sampledMutants: 0, killedMutants: 0,
@@ -55,64 +65,7 @@ function failClosed(filePath: string, reason: string): MutationRunReport {
   };
 }
 
-function findNearestFile(startDir: string, relTarget: string): string | null {
-  let cur = path.resolve(startDir);
-  while (true) {
-    if (fs.existsSync(path.join(cur, relTarget))) return cur;
-    const parent = path.dirname(cur);
-    if (parent === cur) return null;
-    cur = parent;
-  }
-}
-
-function findDependentTests(distDir: string, distJs: string, allTests: string[]): string[] {
-  const entries = fs.readdirSync(distDir, { recursive: true }).map(String);
-  const jsFiles = entries.filter(e => /\.(js|mjs|cjs)$/.test(e)).map(e => path.resolve(distDir, e));
-  const rev = new Map<string, string[]>();
-  const importRe = /(?:from|import\s*\(?|require\()\s*['"](\.[^'"]+)['"]/g;
-  for (const file of jsFiles) {
-    let text = '';
-    try { text = fs.readFileSync(file, 'utf8'); } catch (err: unknown) { debugLogIgnored('mutation-runner:depScan', err); continue; }
-    for (const m of text.matchAll(importRe)) {
-      const raw = path.resolve(path.dirname(file), m[1]);
-      const target = fs.existsSync(raw) ? raw : ([`${raw}.js`, `${raw}.mjs`, `${raw}.cjs`].find(c => fs.existsSync(c)) ?? raw);
-      const list = rev.get(target) ?? [];
-      list.push(file);
-      rev.set(target, list);
-    }
-  }
-  const targetPath = path.resolve(distJs);
-  const directSet = new Set(rev.get(targetPath) ?? []);
-  const directTests = allTests.filter(t => directSet.has(path.resolve(t)));
-  if (directTests.length > 0) return directTests;
-  const visited = new Set<string>([targetPath]);
-  const queue = [targetPath];
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    for (const imp of rev.get(cur) ?? []) {
-      if (!visited.has(imp)) { visited.add(imp); queue.push(imp); }
-    }
-  }
-  return allTests.filter(t => visited.has(path.resolve(t)));
-}
-
-function collectTestFiles(distDir: string, stem: string, distJs: string): string[] {
-  if (!fs.existsSync(distDir)) return [];
-  const entries = fs.readdirSync(distDir, { recursive: true }).map(String);
-  const all = entries.filter(e => e.endsWith('.test.js') || e.endsWith('.test.mjs') || e.endsWith('.test.cjs')).map(e => path.join(distDir, e));
-  const exact = all.filter(f => path.basename(f) === `${stem}.test.js` || path.basename(f) === `${stem}.test.mjs` || path.basename(f) === `${stem}.test.cjs`);
-  if (exact.length > 0) return exact;
-  const dependent = findDependentTests(distDir, distJs, all);
-  return dependent.length > 0 ? dependent : all;
-}
-
-function buildBaseTestArgs(pkgRoot: string, testFiles: string[]): string[] {
-  const root = findNearestFile(pkgRoot, path.join('scripts', 'test-workspace.cjs'));
-  const pre = root ? ['--require', path.join(root, 'scripts', 'test-workspace.cjs')] : [];
-  return [...pre, '--test', '--test-timeout=20000', ...testFiles];
-}
-
-function resolveTargetContext(options: RunFileMutationTestOptions): TargetContext | MutationRunReport {
+function resolveTargetPaths(options: RunFileMutationTestOptions): { displayPath: string; targetTs: string; pkgRoot: string } | MutationRunReport {
   const repoRoot = options.repoRoot ? path.resolve(options.repoRoot) : process.cwd();
   const targetTs = path.isAbsolute(options.filePath) ? path.resolve(options.filePath) : path.resolve(repoRoot, options.filePath);
   const relDisplay = path.relative(repoRoot, targetTs).replace(/\\/g, '/');
@@ -120,6 +73,10 @@ function resolveTargetContext(options: RunFileMutationTestOptions): TargetContex
   if (!fs.existsSync(targetTs)) return failClosed(displayPath, `Source file not found: ${targetTs}`);
   const pkgRoot = findNearestFile(path.dirname(targetTs), 'package.json');
   if (!pkgRoot) return failClosed(displayPath, `Package root (package.json) not found for ${displayPath}`);
+  return { displayPath, targetTs, pkgRoot };
+}
+
+function resolveModuleMode(targetTs: string, pkgRoot: string, displayPath: string): { isEsm: boolean } | MutationRunReport {
   let isEsm = targetTs.endsWith('.mts');
   try {
     if (readJsonSafe<{ type?: string }>(path.join(pkgRoot, 'package.json')).type === 'module') isEsm = true;
@@ -130,16 +87,24 @@ function resolveTargetContext(options: RunFileMutationTestOptions): TargetContex
   if (isEsm && typeof (nodeModule as { register?: unknown }).register !== 'function') {
     return failClosed(displayPath, 'ESM mutation hook requires Node >= 20.6 with node:module register()');
   }
-  const relFromSrc = path.relative(path.join(pkgRoot, 'src'), targetTs);
+  return { isEsm };
+}
+
+function resolveTargetContext(options: RunFileMutationTestOptions): TargetContext | MutationRunReport {
+  const paths = resolveTargetPaths(options);
+  if ('baselinePassed' in paths) return paths;
+  const mode = resolveModuleMode(paths.targetTs, paths.pkgRoot, paths.displayPath);
+  if ('baselinePassed' in mode) return mode;
+  const relFromSrc = path.relative(path.join(paths.pkgRoot, 'src'), paths.targetTs);
   if (!relFromSrc || relFromSrc.startsWith('..') || path.isAbsolute(relFromSrc)) {
-    return failClosed(displayPath, `Target file must be inside package src/: ${displayPath}`);
+    return failClosed(paths.displayPath, `Target file must be inside package src/: ${paths.displayPath}`);
   }
-  const distJs = path.join(pkgRoot, 'dist', relFromSrc.replace(/\.mts$/, '.mjs').replace(/\.cts$/, '.cjs').replace(/\.ts$/, '.js'));
-  if (!fs.existsSync(distJs)) return failClosed(displayPath, `Compiled dist target not found: ${distJs}`);
-  const stem = path.basename(targetTs).replace(/\.(ts|mts|cts)$/, '');
-  const testFiles = collectTestFiles(path.join(pkgRoot, 'dist'), stem, distJs);
-  if (testFiles.length === 0) return failClosed(displayPath, `No compiled unit tests (*.test.js) found in ${path.join(pkgRoot, 'dist')}`);
-  return { displayPath, targetTs, pkgRoot, distJs, isEsm, baseArgs: buildBaseTestArgs(pkgRoot, testFiles) };
+  const distJs = path.join(paths.pkgRoot, 'dist', relFromSrc.replace(/\.(mts|cts|ts)$/, ext => (ext === '.mts' ? '.mjs' : ext === '.cts' ? '.cjs' : '.js')));
+  if (!fs.existsSync(distJs)) return failClosed(paths.displayPath, `Compiled dist target not found: ${distJs}`);
+  const stem = path.basename(paths.targetTs).replace(/\.(ts|mts|cts)$/, '');
+  const testFiles = collectTestFiles(path.join(paths.pkgRoot, 'dist'), stem, distJs);
+  if (testFiles.length === 0) return failClosed(paths.displayPath, `No compiled unit tests (*.test.js) found in ${path.join(paths.pkgRoot, 'dist')}`);
+  return { displayPath: paths.displayPath, targetTs: paths.targetTs, pkgRoot: paths.pkgRoot, distJs, isEsm: mode.isEsm, baseArgs: buildBaseTestArgs(paths.pkgRoot, testFiles) };
 }
 
 function runNodeTest(pkgRoot: string, args: string[], timeoutMs: number, extraEnv?: Record<string, string>): boolean {
@@ -175,43 +140,8 @@ function sampleMutants<T>(items: T[], maxCount: number): T[] {
   return Array.from({ length: maxCount }, (_, i) => items[Math.floor((i * items.length) / maxCount)]);
 }
 
-const NORM_JS = [
-  "const norm = (p) => { try { p = fs.realpathSync(p); } catch (e) { if (process.env.AEGIS_DEBUG === '1') process.stderr.write(String(e)); }",
-  "  return process.platform === 'win32' ? p.toLowerCase() : p; };"
-].join('\n');
-
-function writeHookFiles(tempDir: string): { preloadCjs: string; hooksMjs: string; mutantFile: string } {
-  const preloadCjs = path.join(tempDir, 'preload.cjs');
-  const hooksMjs = path.join(tempDir, 'hooks.mjs');
-  const mutantFile = path.join(tempDir, 'mutant.js');
-  fs.writeFileSync(hooksMjs, [
-    "import fs from 'node:fs';\nimport { fileURLToPath } from 'node:url';", NORM_JS,
-    "const targetNorm = process.env.AEGIS_MUTANT_TARGET ? norm(process.env.AEGIS_MUTANT_TARGET) : '';",
-    "export async function load(url, context, nextLoad) {",
-    "  if (targetNorm && process.env.AEGIS_MUTANT_FILE && url.startsWith('file:')) {",
-    "    try { if (norm(fileURLToPath(url)) === targetNorm) return { format: 'module', shortCircuit: true, source: fs.readFileSync(process.env.AEGIS_MUTANT_FILE, 'utf8') }; }",
-    "    catch (e) { if (process.env.AEGIS_DEBUG === '1') process.stderr.write(String(e)); }",
-    "  } return nextLoad(url, context); }"
-  ].join('\n'), 'utf8');
-  fs.writeFileSync(preloadCjs, [
-    "const fs = require('node:fs');\nconst Module = require('node:module');\nconst { pathToFileURL } = require('node:url');", NORM_JS,
-    "const targetNorm = process.env.AEGIS_MUTANT_TARGET ? norm(process.env.AEGIS_MUTANT_TARGET) : '';",
-    "if (process.env.AEGIS_MUTANT_ESM === '1' && process.env.AEGIS_MUTANT_HOOKS && typeof Module.register === 'function') {",
-    "  Module.register(pathToFileURL(process.env.AEGIS_MUTANT_HOOKS).href);",
-    "} else if (targetNorm && process.env.AEGIS_MUTANT_FILE) {",
-    "  for (const ext of ['.js', '.cjs']) {",
-    "    const orig = Module._extensions[ext];",
-    "    if (orig) {",
-    "      Module._extensions[ext] = function patched(mod, filename) {",
-    "        if (norm(filename) === targetNorm) return mod._compile(fs.readFileSync(process.env.AEGIS_MUTANT_FILE, 'utf8'), filename);",
-    "        return orig.call(this, mod, filename); }; } } }"
-  ].join('\n'), 'utf8');
-  return { preloadCjs, hooksMjs, mutantFile };
-}
-
-function executeSampledMutants(
-  ctx: TargetContext, sampled: CompiledMutant[], totalMutants: number, skippedCompileErrors: number, thresholdPercent: number, testTimeoutMs: number
-): MutationRunReport {
+function executeSampledMutants(opts: ExecuteMutantsOptions): MutationRunReport {
+  const { ctx, sampled, totalMutants, skippedCompileErrors, thresholdPercent, testTimeoutMs } = opts;
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mut-'));
   let killedMutants = 0;
   const survivors: MutantSummary[] = [];
@@ -272,5 +202,8 @@ export function runFileMutationTest(options: RunFileMutationTestOptions): Mutati
       survivors: []
     };
   }
-  return executeSampledMutants(resolved, sampleMutants(compiled, maxMutants), mutants.length, skipped, threshold, mutantTimeout);
+  return executeSampledMutants({
+    ctx: resolved, sampled: sampleMutants(compiled, maxMutants),
+    totalMutants: mutants.length, skippedCompileErrors: skipped, thresholdPercent: threshold, testTimeoutMs: mutantTimeout
+  });
 }

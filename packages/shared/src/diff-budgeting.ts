@@ -26,6 +26,15 @@ export interface DiffBudgetOptions {
   maxFunctionLines?: number;
 }
 
+interface WarningStringOptions {
+  fileLines: number;
+  maxFileLines: number;
+  fileQuota: number;
+  funcBudget: { quota?: number; exceeded?: boolean };
+  directive?: string;
+  maxFuncLines?: number;
+}
+
 export class PreEmptiveDiffBudgeting {
   public static readonly DEFAULT_MAX_FILE_LINES = 300;
   public static readonly DEFAULT_MAX_FUNCTION_LINES = 40;
@@ -43,7 +52,14 @@ export class PreEmptiveDiffBudgeting {
     const funcBudget = PreEmptiveDiffBudgeting.calcFuncBudget(funcLines, maxFunc);
     const isExceeded = fileExceeded || Boolean(funcBudget.exceeded);
     const directive = PreEmptiveDiffBudgeting.resolveDirective(fileLines, maxFile, funcLines, maxFunc);
-    const formattedWarning = PreEmptiveDiffBudgeting.buildWarningString(fileLines, maxFile, fileQuota, funcBudget, directive, maxFunc);
+    const formattedWarning = PreEmptiveDiffBudgeting.buildWarningString({
+      fileLines,
+      maxFileLines: maxFile,
+      fileQuota,
+      funcBudget,
+      directive,
+      maxFuncLines: maxFunc
+    });
 
     return {
       fileLines,
@@ -78,24 +94,18 @@ export class PreEmptiveDiffBudgeting {
     return undefined;
   }
 
-  private static buildWarningString(
-    fLines: number,
-    maxF: number,
-    fQuota: number,
-    funcBudget: { quota?: number; exceeded?: boolean },
-    directive?: string,
-    maxFunc = PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES
-  ): string {
+  private static buildWarningString(opts: WarningStringOptions): string {
+    const maxFunc = opts.maxFuncLines ?? PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES;
     const lines = [
       '🛡️ Demir Kafes Proaktif Kotası:',
-      `   - Hedef Dosya: ${fLines} satır (Azami Tavan: ${maxF}) -> Bu dosyaya EN FAZLA ${fQuota} satır ekleyebilirsiniz!`
+      `   - Hedef Dosya: ${opts.fileLines} satır (Azami Tavan: ${opts.maxFileLines}) -> Bu dosyaya EN FAZLA ${opts.fileQuota} satır ekleyebilirsiniz!`
     ];
-    if (funcBudget.quota !== undefined) {
+    if (opts.funcBudget.quota !== undefined) {
       lines.push(
-        `   - Hedef Fonksiyon: ${maxFunc - funcBudget.quota} satır (Azami Tavan: ${maxFunc}) -> Bu fonksiyona EN FAZLA ${funcBudget.quota} satır ekleyebilirsiniz!`
+        `   - Hedef Fonksiyon: ${maxFunc - opts.funcBudget.quota} satır (Azami Tavan: ${maxFunc}) -> Bu fonksiyona EN FAZLA ${opts.funcBudget.quota} satır ekleyebilirsiniz!`
       );
     }
-    if (directive) lines.push(`   ${directive}`);
+    if (opts.directive) lines.push(`   ${opts.directive}`);
     return lines.join('\n');
   }
 
@@ -116,11 +126,9 @@ export class PreEmptiveDiffBudgeting {
     fileLines: number,
     addedLines: number,
     removedLines: number,
-    funcLines?: number,
-    funcAddedLines?: number,
-    funcRemovedLines?: number,
-    options: DiffBudgetOptions = {}
+    ...rest: [funcLines?: number, funcAddedLines?: number, funcRemovedLines?: number, options?: DiffBudgetOptions]
   ): DiffBudgetCheckResult {
+    const [funcLines, funcAddedLines, funcRemovedLines, options = {}] = rest;
     const maxF = options.maxFileLines ?? PreEmptiveDiffBudgeting.DEFAULT_MAX_FILE_LINES;
     const maxFn = options.maxFunctionLines ?? PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES;
     const newFileLines = fileLines + addedLines - removedLines;

@@ -1,15 +1,24 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import ts from 'typescript';
-import type { SymbolDatabase, SymbolEntry } from './symbol-indexer.js';
-import { SymbolIndexer } from './symbol-indexer.js';
+import { SymbolIndexer, type SymbolDatabase, type SymbolEntry } from './symbol-indexer.js';
 import { TransitiveTypeResolver } from './transitive-type-resolver.js';
 import { TransitiveTypeClosure } from './transitive-type-closure.js';
 import { CalleeSignatureExtractor } from './callee-signature-extractor.js';
-import { TypeScriptSkeletonExtractor } from './ts-extractor.js';
 import { SliceAmbientEnricher } from './slice-ambient-enricher.js';
 import { SliceAmbientExtractor } from './slice-ambient-extractor.js';
-import { PreEmptiveDiffBudgeting, type DiffBudgetReport } from '@aegis/shared';
+import {
+  buildClassSkeletonData,
+  buildSliceHeader,
+  computeDynamicFromLine,
+  createSliceBudget,
+  formatSliceLines,
+  normalizeSliceContentArgs,
+  type DiffBudgetReport,
+  type SliceContentOptions,
+  type SliceContentRestArgs
+} from './symbol-slice-helpers.js';
+
+export type { SliceContentOptions, SliceContentRestArgs };
 
 export interface SliceResult {
   symbol: string;
@@ -47,8 +56,7 @@ export class SymbolSliceExtractor {
     const matches = this.indexer.findSymbols(query, options.db);
     if (matches.length === 0) return null;
 
-    const target = matches[0];
-    return this.extractSliceFromEntry(target, baseDir, contextLines);
+    return this.extractSliceFromEntry(matches[0], baseDir, contextLines);
   }
 
   public extractSliceFromEntry(entry: SymbolEntry, baseDir = process.cwd(), contextLines = 3): SliceResult | null {
@@ -63,22 +71,9 @@ export class SymbolSliceExtractor {
       }
       return this.sliceContent(entry.name, entry.filePath, content, entry.startLine, entry.endLine, contextLines);
     } catch {
+      // Unreadable target file; treat as non-sliceable
       return null;
     }
-  }
-
-  private findClassDeclaration(sf: ts.SourceFile, name: string): ts.ClassDeclaration | null {
-    let targetClass: ts.ClassDeclaration | null = null;
-    const walk = (n: ts.Node): void => {
-      if (targetClass) return;
-      if (ts.isClassDeclaration(n) && n.name?.text === name) {
-        targetClass = n;
-        return;
-      }
-      ts.forEachChild(n, walk);
-    };
-    walk(sf);
-    return targetClass;
   }
 
   public extractClassSkeletonSlice(
@@ -88,30 +83,29 @@ export class SymbolSliceExtractor {
     startLine: number,
     endLine: number
   ): SliceResult | null {
-    const sf = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
-    const targetClass = this.findClassDeclaration(sf, symbolName);
-    if (!targetClass) return null;
+    const skelData = buildClassSkeletonData(symbolName, filePath, content);
+    if (!skelData) return null;
 
-    const classSkeleton = TypeScriptSkeletonExtractor.formatClassSkeleton(targetClass, sf);
     const closure = this.typeClosure.resolveClosure(symbolName, filePath, content);
     const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
-    const ambientBlock = closure.formattedBlock || ambient.formattedBlock;
-    const totalLines = content.split(/\r?\n/).length;
-    const diffBudget = PreEmptiveDiffBudgeting.calculateBudget(totalLines);
-    const budgetWarning = PreEmptiveDiffBudgeting.formatWarningForSlice(totalLines, undefined, '//');
-    const sliceHeader = this.buildSliceHeader(
-      symbolName, filePath, startLine, endLine, ambientBlock,
-      '// 🧩 [Adaptive ClassSkeleton - Folded Method Bodies]', budgetWarning
-    );
-    const codeSlice = [...sliceHeader, classSkeleton, '// --- End Slice ---'].join('\n');
-    const skelLines = classSkeleton.split('\n').length;
+    const sliceHeader = buildSliceHeader({
+      symbolName,
+      filePath,
+      startLine,
+      endLine,
+      ambientBlock: closure.formattedBlock || ambient.formattedBlock,
+      calleeBlock: '// 🧩 [Adaptive ClassSkeleton - Folded Method Bodies]',
+      budgetWarning: skelData.budgetWarning
+    });
+    const codeSlice = [...sliceHeader, skelData.classSkeleton, '// --- End Slice ---'].join('\n');
+    const skelLines = skelData.classSkeleton.split('\n').length;
     const origLines = Math.max(1, endLine - startLine + 1);
     const savings = Math.max(80, Math.round(((origLines - skelLines) / origLines) * 100));
 
     return {
       symbol: symbolName, filePath, startLine, endLine, codeSlice,
       lineCount: skelLines, originalFileLineCount: origLines,
-      tokenSavingsPercent: savings, ambientTypes: ambient.typeNames, diffBudget
+      tokenSavingsPercent: savings, ambientTypes: ambient.typeNames, diffBudget: skelData.diffBudget
     };
   }
 
@@ -127,46 +121,23 @@ export class SymbolSliceExtractor {
     return SliceAmbientExtractor.extractPolyglotAmbient(filePath, content);
   }
 
-  private computeDynamicFromLine(lines: string[], startLine: number, contextLines: number): number {
-    let from = Math.max(1, startLine - contextLines);
-    let cur = startLine - 1;
-    while (cur >= 1) {
-      const trimmed = lines[cur - 1].trim();
-      if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
-        from = Math.min(from, cur);
-        cur--;
-      } else {
-        break;
-      }
-    }
-    return Math.max(1, from);
-  }
-
-  private formatSliceLines(lines: string[], from: number, to: number, start: number, end: number): string[] {
-    const formatted: string[] = [];
-    for (let i = from; i <= to; i++) {
-      const isTarget = i >= start && i <= end;
-      const marker = isTarget ? '>' : ' ';
-      const lineNumStr = String(i).padStart(4, ' ');
-      formatted.push(`${marker} ${lineNumStr} | ${lines[i - 1]}`);
-    }
-    return formatted;
-  }
-
-  private buildSliceHeader(
-    symbolName: string,
-    filePath: string,
-    startLine: number,
-    endLine: number,
-    ambientBlock?: string,
-    calleeBlock?: string,
-    budgetWarning?: string
-  ): string[] {
-    const header = [`// --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`];
-    if (budgetWarning) header.push(budgetWarning);
-    if (ambientBlock) header.push(ambientBlock);
-    if (calleeBlock) header.push(calleeBlock);
-    return header;
+  private resolveTsAmbientBlocks(symbolName: string, filePath: string, content: string): {
+    headerBlocks: string[];
+    ambientTypes?: string[];
+    calleeSignatures?: string[];
+  } {
+    const headerBlocks: string[] = [];
+    const fileImports = SymbolSliceExtractor.extractFileImports(content);
+    if (fileImports) headerBlocks.push(fileImports);
+    const closure = this.typeClosure.resolveClosure(symbolName, filePath, content);
+    const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
+    const block = closure.formattedBlock || ambient.formattedBlock;
+    if (block) headerBlocks.push(block);
+    const enrichment = SliceAmbientEnricher.enrichTypeScript(symbolName, filePath, content, this.indexer);
+    if (enrichment.headerLines.length > 0) headerBlocks.push(...enrichment.headerLines);
+    const callee = this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content);
+    if (callee.formattedBlock) headerBlocks.push(callee.formattedBlock);
+    return { headerBlocks, ambientTypes: ambient.typeNames, calleeSignatures: callee.signatures };
   }
 
   private resolveAmbientBlocks(symbolName: string, filePath: string, content: string): {
@@ -174,58 +145,34 @@ export class SymbolSliceExtractor {
     ambientTypes?: string[];
     calleeSignatures?: string[];
   } {
-    const isTs = filePath.endsWith('.ts') || filePath.endsWith('.tsx');
-    const isGd = filePath.endsWith('.gd');
-    const isPoly = filePath.endsWith('.py') || filePath.endsWith('.rs') || filePath.endsWith('.go');
-    const headerBlocks: string[] = [];
-
-    if (isTs) {
-      const fileImports = SymbolSliceExtractor.extractFileImports(content);
-      if (fileImports) headerBlocks.push(fileImports);
-      const closure = this.typeClosure.resolveClosure(symbolName, filePath, content);
-      const ambient = this.typeResolver.resolveAmbientClosure(symbolName, filePath, content);
-      const block = closure.formattedBlock || ambient.formattedBlock;
-      if (block) headerBlocks.push(block);
-      const enrichment = SliceAmbientEnricher.enrichTypeScript(symbolName, filePath, content, this.indexer);
-      if (enrichment.headerLines.length > 0) headerBlocks.push(...enrichment.headerLines);
-      const callee = this.calleeExtractor.extractCalleeSignatures(symbolName, filePath, content);
-      if (callee.formattedBlock) headerBlocks.push(callee.formattedBlock);
-      return { headerBlocks, ambientTypes: ambient.typeNames, calleeSignatures: callee.signatures };
+    if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+      return this.resolveTsAmbientBlocks(symbolName, filePath, content);
     }
-    if (isGd) {
+    const headerBlocks: string[] = [];
+    if (filePath.endsWith('.gd')) {
       const gdAmbient = SymbolSliceExtractor.extractGdscriptAmbient(content);
       if (gdAmbient) headerBlocks.push(gdAmbient);
     }
-    if (isPoly) {
+    if (filePath.endsWith('.py') || filePath.endsWith('.rs') || filePath.endsWith('.go')) {
       const polyAmbient = SymbolSliceExtractor.extractPolyglotAmbient(filePath, content);
       if (polyAmbient) headerBlocks.push(polyAmbient);
     }
     return { headerBlocks };
   }
 
-  private createSliceBudget(filePath: string, totalLines: number, startLine: number, endLine: number) {
-    const prefix = (filePath.endsWith('.gd') || filePath.endsWith('.py')) ? '#' : '//';
-    const funcLines = Math.max(1, endLine - startLine + 1);
-    const diffBudget = PreEmptiveDiffBudgeting.calculateBudget(totalLines, funcLines);
-    const budgetWarning = PreEmptiveDiffBudgeting.formatWarningForSlice(totalLines, funcLines, prefix);
-    return { prefix, diffBudget, budgetWarning };
-  }
-
   public sliceContent(
-    symbolName: string,
-    filePath: string,
-    content: string,
-    startLine: number,
-    endLine: number,
-    contextLines = 3
+    nameOrOpts: string | SliceContentOptions,
+    ...rest: SliceContentRestArgs
   ): SliceResult {
+    const { symbolName, filePath, content, startLine, endLine, contextLines } =
+      normalizeSliceContentArgs(nameOrOpts, rest);
     const lines = content.split(/\r?\n/);
-    const from = this.computeDynamicFromLine(lines, startLine, contextLines);
+    const from = computeDynamicFromLine(lines, startLine, contextLines);
     const to = Math.min(lines.length, endLine + contextLines);
     const sanitized = SliceAmbientEnricher.sanitizeTemplateLiterals(lines, from, to);
-    const formattedLines = this.formatSliceLines(sanitized, from, to, startLine, endLine);
+    const formattedLines = formatSliceLines(sanitized, from, to, startLine, endLine);
 
-    const { prefix, diffBudget, budgetWarning } = this.createSliceBudget(filePath, lines.length, startLine, endLine);
+    const { prefix, diffBudget, budgetWarning } = createSliceBudget(filePath, lines.length, startLine, endLine);
     const { headerBlocks, ambientTypes, calleeSignatures } = this.resolveAmbientBlocks(symbolName, filePath, content);
     const sliceHeader = [
       `${prefix} --- Surgical Slice: ${symbolName} [${filePath}:${startLine}-${endLine}] ---`,
@@ -237,17 +184,9 @@ export class SymbolSliceExtractor {
     const savings = lines.length > 0 ? Math.round(((lines.length - slicedLineCount) / lines.length) * 100) : 0;
 
     return {
-      symbol: symbolName,
-      filePath,
-      startLine,
-      endLine,
-      codeSlice,
-      lineCount: slicedLineCount,
-      originalFileLineCount: lines.length,
-      tokenSavingsPercent: Math.max(0, savings),
-      ambientTypes,
-      calleeSignatures,
-      diffBudget
+      symbol: symbolName, filePath, startLine, endLine, codeSlice,
+      lineCount: slicedLineCount, originalFileLineCount: lines.length,
+      tokenSavingsPercent: Math.max(0, savings), ambientTypes, calleeSignatures, diffBudget
     };
   }
 }

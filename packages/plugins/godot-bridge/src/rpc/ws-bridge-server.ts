@@ -19,6 +19,42 @@ export interface WsBridgeServerOptions {
   onLog?: (log: { level: 'info' | 'warn' | 'error'; message: string }) => void;
 }
 
+function closeWsSocket(socket: Socket | null): void {
+  if (!socket) return;
+  if (!socket.destroyed && socket.writable) {
+    try {
+      socket.write(WsFrameCodec.encodeCloseFrame());
+    } catch (err: unknown) {
+      debugLogIgnored('ws-bridge-server:closeSocket', err);
+    }
+  }
+  if (!socket.destroyed) socket.destroy();
+}
+
+function extractWsToken(rawUrl?: string): { valid: boolean; token: string | null } {
+  try {
+    const parsed = new URL(rawUrl || '/', 'http://127.0.0.1');
+    return { valid: true, token: parsed.searchParams.get('token') };
+  } catch (err: unknown) {
+    debugLogIgnored('ws-bridge-server:extractToken', err);
+    return { valid: false, token: null };
+  }
+}
+
+function verifyWsOrigin(origin?: string): boolean {
+  if (!origin) return true;
+  if (origin === 'null') return false;
+  try {
+    const u = new URL(origin);
+    const validProtocol = u.protocol === 'http:' || u.protocol === 'https:';
+    const validHost = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+    return validProtocol && validHost;
+  } catch (err: unknown) {
+    debugLogIgnored('ws-bridge-server:verifyOrigin', err);
+    return false;
+  }
+}
+
 export class WsBridgeServer {
   private server: http.Server | null = null;
   private port: number;
@@ -58,23 +94,11 @@ export class WsBridgeServer {
     });
   }
 
-  private closeSocket(socket: Socket | null): void {
-    if (!socket) return;
-    if (!socket.destroyed && socket.writable) {
-      try {
-        socket.write(WsFrameCodec.encodeCloseFrame());
-      } catch (err: unknown) {
-        debugLogIgnored('ws-bridge-server:closeSocket', err);
-      }
-    }
-    if (!socket.destroyed) socket.destroy();
-  }
-
   public async stop(): Promise<void> {
     const toClose = new Set<Socket>(this.activeSockets);
     if (this.clientSocket) toClose.add(this.clientSocket);
     for (const sock of toClose) {
-      this.closeSocket(sock);
+      closeWsSocket(sock);
     }
     this.activeSockets.clear();
     this.clientSocket = null;
@@ -110,12 +134,12 @@ export class WsBridgeServer {
   }
 
   private handleUpgrade(req: http.IncomingMessage, socket: Socket): void {
-    if (!this.verifyOrigin(req.headers.origin)) {
+    if (!verifyWsOrigin(req.headers.origin)) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
     }
-    const parsedUrl = this.extractToken(req.url);
+    const parsedUrl = extractWsToken(req.url);
     if (!parsedUrl.valid) {
       socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
       socket.destroy();
@@ -144,7 +168,7 @@ export class WsBridgeServer {
     this.clientSocket = socket;
     this.socketBuffer = Buffer.alloc(0);
     this.activeSockets.add(socket);
-    if (previous && previous !== socket) this.closeSocket(previous);
+    if (previous && previous !== socket) closeWsSocket(previous);
     socket.on('data', (chunk) => {
       if (this.clientSocket !== socket) return;
       this.handleSocketData(chunk);
@@ -162,30 +186,6 @@ export class WsBridgeServer {
       this.onLogCb?.({ level: 'warn', message: `Godot connection closed: ${error.message}` });
       socket.destroy();
     });
-  }
-
-  private extractToken(rawUrl?: string): { valid: boolean; token: string | null } {
-    try {
-      const parsed = new URL(rawUrl || '/', 'http://127.0.0.1');
-      return { valid: true, token: parsed.searchParams.get('token') };
-    } catch (err: unknown) {
-      debugLogIgnored('ws-bridge-server:extractToken', err);
-      return { valid: false, token: null };
-    }
-  }
-
-  private verifyOrigin(origin?: string): boolean {
-    if (!origin) return true;
-    if (origin === 'null') return false;
-    try {
-      const u = new URL(origin);
-      const validProtocol = u.protocol === 'http:' || u.protocol === 'https:';
-      const validHost = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
-      return validProtocol && validHost;
-    } catch (err: unknown) {
-      debugLogIgnored('ws-bridge-server:verifyOrigin', err);
-      return false;
-    }
   }
 
   private handleSocketData(chunk: Buffer): void {

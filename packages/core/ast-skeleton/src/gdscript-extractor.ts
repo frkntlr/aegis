@@ -1,6 +1,15 @@
 import type { SkeletonResult } from './ts-extractor.js';
 import type { LanguageExtractor } from './extractor-registry.js';
 
+interface GdDeclarationContext {
+  lines: string[];
+  index: number;
+  line: string;
+  trimmed: string;
+  pendingAnnotations: string[];
+  output: string[];
+}
+
 export class GDScriptSkeletonExtractor implements LanguageExtractor {
   public readonly languageId = 'gdscript';
   public readonly supportedExtensions = ['.gd'];
@@ -37,7 +46,7 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
 
       if (trimmed.startsWith('@')) {
         if (trimmed.includes(' var ') || trimmed.includes('\tvar ')) {
-          i = this.handleDeclaration(lines, i, line, trimmed, pendingAnnotations, output);
+          i = this.handleDeclaration({ lines, index: i, line, trimmed, pendingAnnotations, output });
           continue;
         }
         pendingAnnotations.push(line);
@@ -45,7 +54,7 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
         continue;
       }
 
-      i = this.handleDeclaration(lines, i, line, trimmed, pendingAnnotations, output);
+      i = this.handleDeclaration({ lines, index: i, line, trimmed, pendingAnnotations, output });
     }
 
     if (pendingAnnotations.length > 0) {
@@ -55,17 +64,11 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
     return output;
   }
 
-  private handleDeclaration(
-    lines: string[],
-    i: number,
-    line: string,
-    trimmed: string,
-    pendingAnnotations: string[],
-    output: string[]
-  ): number {
+  private handleDeclaration(ctx: GdDeclarationContext): number {
+    const { lines, index, line, trimmed, pendingAnnotations, output } = ctx;
     if (trimmed.startsWith('func ') || trimmed.startsWith('static func ')) {
       this.flushAnnotations(pendingAnnotations, output);
-      const { header, nextIndex } = this.consumeHeader(lines, i);
+      const { header, nextIndex } = this.consumeHeader(lines, index);
       const indent = line.match(/^(\t|\s)*/)?.[0] ?? '';
       const baseIndent = (line.match(/^[\t\s]*/)?.[0] ?? '').replace(/\t/g, '    ').length;
       const step = indent.includes(' ') && !indent.includes('\t') ? '    ' : '\t';
@@ -77,14 +80,14 @@ export class GDScriptSkeletonExtractor implements LanguageExtractor {
     if (this.isDeclarationLine(trimmed)) {
       this.flushAnnotations(pendingAnnotations, output);
       if (trimmed.startsWith('enum ') && !trimmed.endsWith('}')) {
-        return this.consumeEnumBlock(lines, i, output);
+        return this.consumeEnumBlock(lines, index, output);
       }
       output.push(line);
-      return i + 1;
+      return index + 1;
     }
 
     pendingAnnotations.length = 0;
-    return i + 1;
+    return index + 1;
   }
 
   private isDeclarationLine(trimmed: string): boolean {

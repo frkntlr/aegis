@@ -1,15 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ExtractorRegistry, type LanguageExtractor } from './extractor-registry.js';
-import { TypeScriptSkeletonExtractor, type SkeletonResult } from './ts-extractor.js';
-import { PythonSkeletonExtractor } from './python-extractor.js';
-import { GDScriptSkeletonExtractor } from './gdscript-extractor.js';
-import { TscnSkeletonExtractor } from './tscn-extractor.js';
-import { RustSkeletonExtractor } from './rust-extractor.js';
-import { GoSkeletonExtractor } from './go-extractor.js';
-import { CppSkeletonExtractor } from './cpp-extractor.js';
-import { CSharpSkeletonExtractor } from './csharp-extractor.js';
-import { BashSkeletonExtractor } from './bash-extractor.js';
+import type { SkeletonResult } from './ts-extractor.js';
+import { registerDefaultExtractors } from './default-extractors.js';
 
 export interface ProjectSkeletonMap {
   filesScanned: number;
@@ -29,15 +22,7 @@ export class SkeletonGenerator {
       this.registry = customRegistry;
     } else {
       this.registry = new ExtractorRegistry();
-      this.registry.register(new TypeScriptSkeletonExtractor());
-      this.registry.register(new PythonSkeletonExtractor());
-      this.registry.register(new GDScriptSkeletonExtractor());
-      this.registry.register(new TscnSkeletonExtractor());
-      this.registry.register(new RustSkeletonExtractor());
-      this.registry.register(new GoSkeletonExtractor());
-      this.registry.register(new CppSkeletonExtractor());
-      this.registry.register(new CSharpSkeletonExtractor());
-      this.registry.register(new BashSkeletonExtractor());
+      registerDefaultExtractors(this.registry);
     }
   }
 

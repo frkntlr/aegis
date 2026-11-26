@@ -47,5 +47,12 @@ export async function handleRfcPipeline(rfcArg?: string, descArg?: string): Prom
   updateRfcFileLinks(path.join(rfcDir, doc.fileName), doc.content, discInfo?.url, issueNum, issueUrl);
   const { syncRfcToWikiAndReadme } = await import('./doc-sync-command.js');
   await syncRfcToWikiAndReadme(doc.num, doc.rfcTitle, doc.fileName, doc.content);
-  printPipelineSummary(doc.fileName, discInfo?.url, issueNum, issueUrl, baseIssue.title, parsed.proposedFiles);
+  printPipelineSummary({
+    fileName: doc.fileName,
+    discUrl: discInfo?.url,
+    issueNum,
+    issueUrl,
+    title: baseIssue.title,
+    proposedFiles: parsed.proposedFiles
+  });
 }

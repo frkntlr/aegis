@@ -1,10 +1,6 @@
-import type { TeamworkTrack } from './teamwork-types.js';
+import type { CodexInvocationPayload, TeamworkTrack } from './teamwork-types.js';
 
-export interface CodexInvocationPayload {
-  task_name: string;
-  message: string;
-  fork_turns: 'all';
-}
+export type { CodexInvocationPayload } from './teamwork-types.js';
 
 /** Native host tool schemas vary; the message is portable across Codex clients. */
 export function buildCodexInvocation(track: Pick<TeamworkTrack,

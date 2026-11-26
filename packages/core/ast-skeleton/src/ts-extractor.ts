@@ -1,12 +1,7 @@
 import ts from 'typescript';
-import type { LanguageExtractor } from './extractor-registry.js';
+import type { LanguageExtractor, SkeletonResult } from './extractor-types.js';
 
-export interface SkeletonResult {
-  originalLength: number;
-  skeletonLength: number;
-  tokenSavingsPercent: number;
-  skeletonContent: string;
-}
+export type { SkeletonResult } from './extractor-types.js';
 
 export class TypeScriptSkeletonExtractor implements LanguageExtractor {
   public readonly languageId = 'typescript';

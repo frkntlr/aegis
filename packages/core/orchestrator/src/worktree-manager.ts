@@ -1,16 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { type AgentWorktree, debugLogIgnored, resolveSafeRepoRoot, type WorktreeListResult } from '@aegis/shared';
+import { type AgentWorktree, debugLogIgnored, type WorktreeListResult } from '@aegis/shared';
 import { cleanGitEnv, parseWorktreePorcelainBlock } from './worktree-mutex.js';
-import { WorktreeLockManager } from './worktree-lock-manager.js';
+import { WorktreeLockDelegate, type WorktreeManagerOptions } from './worktree-lock-delegate.js';
 
-export interface WorktreeManagerOptions {
-  repoRoot?: string;
-  worktreePrefix?: string;
-  persistLocks?: boolean;
-  staleTimeoutMs?: number;
-}
+export type { WorktreeManagerOptions } from './worktree-lock-delegate.js';
 
 export function validateAgentName(agentName: string): string {
   if (
@@ -52,24 +47,13 @@ function validateBaseBranch(branch: string): string {
   return branch;
 }
 
-export class WorktreeManager {
-  private repoRoot: string;
-  private worktreePrefix: string;
-  private lockManager: WorktreeLockManager;
+export class WorktreeManager extends WorktreeLockDelegate {
   private cachedWorktrees: { timestamp: number; result: WorktreeListResult } | null = null;
   private readonly WT_CACHE_TTL_MS = 2000;
 
   constructor(options: WorktreeManagerOptions = {}) {
-    this.repoRoot = resolveSafeRepoRoot(options.repoRoot);
-    this.worktreePrefix = options.worktreePrefix ?? 'experimental';
-    this.lockManager = new WorktreeLockManager({
-      repoRoot: this.repoRoot,
-      persistLocks: options.persistLocks,
-      staleTimeoutMs: options.staleTimeoutMs
-    });
+    super(options);
   }
-
-  public getLockManager(): WorktreeLockManager { return this.lockManager; }
 
   public getWorktreePath(agentName: string): string {
     const validName = validateAgentName(agentName);
@@ -192,16 +176,4 @@ export class WorktreeManager {
       return false;
     }
   }
-
-  public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
-    return this.lockManager.acquireFileLocks(agentName, files);
-  }
-  public acquireBatchLocks(batch: Array<{ agentName: string; files: string[] }>): { success: boolean; conflictingFiles: string[] } {
-    return this.lockManager.acquireBatchLocks(batch);
-  }
-  public releaseFileLocks(agentName: string): void { this.lockManager.releaseFileLocks(agentName); }
-  public releaseFiles(files: string[]): void { this.lockManager.releaseFiles(files); }
-  public clearAllLocks(): number { return this.lockManager.clearAllLocks(); }
-  public getLockedFiles(): Map<string, string> { return this.lockManager.getLockedFiles(); }
-  public pruneStaleLocks(maxAgeMs?: number): number { return this.lockManager.pruneStaleLocks(maxAgeMs); }
 }

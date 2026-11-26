@@ -1,6 +1,75 @@
 import type { SkeletonResult } from './ts-extractor.js';
 import type { LanguageExtractor } from './extractor-registry.js';
 
+interface RustBlockState {
+  braceCount: number;
+  foundOpen: boolean;
+  inComment: boolean;
+  inRaw: boolean;
+}
+
+interface RustDeclarationContext {
+  lines: string[];
+  index: number;
+  line: string;
+  trimmed: string;
+  pendingAttributes: string[];
+  output: string[];
+}
+
+function skipStringLiteral(chars: string, j: number): number {
+  const q = chars[j++];
+  while (j < chars.length && chars[j] !== q) {
+    if (chars[j] === '\\') j += 2;
+    else j++;
+  }
+  return j + 1;
+}
+
+function advanceRustComment(s: string, j: number, state: RustBlockState): number {
+  if (s[j] === '*' && s[j + 1] === '/') {
+    state.inComment = false;
+    return j + 2;
+  }
+  return j + 1;
+}
+
+function advanceRustRawString(s: string, j: number, state: RustBlockState): number {
+  if (s[j] === '"' && s[j + 1] === '#') {
+    state.inRaw = false;
+    return j + 2;
+  }
+  return j + 1;
+}
+
+function matchRustCharLiteral(s: string, j: number): number {
+  if (s[j] !== "'") return 0;
+  if (s[j + 2] === "'") return 3;
+  if (s[j + 1] === '\\' && s[j + 3] === "'") return 4;
+  return 0;
+}
+
+function stepRustCodeChar(s: string, j: number, state: RustBlockState): number {
+  if (s.startsWith('/*', j)) { state.inComment = true; return j + 2; }
+  if (s.startsWith('r#"', j)) { state.inRaw = true; return j + 3; }
+  if (s[j] === '"') return skipStringLiteral(s, j);
+  const charLen = matchRustCharLiteral(s, j);
+  if (charLen > 0) return j + charLen;
+  if (s[j] === '{') { state.braceCount++; state.foundOpen = true; }
+  else if (s[j] === '}') state.braceCount--;
+  return j + 1;
+}
+
+function scanRustBlockLine(s: string, state: RustBlockState): void {
+  let j = 0;
+  while (j < s.length) {
+    if (state.inComment) { j = advanceRustComment(s, j, state); continue; }
+    if (state.inRaw) { j = advanceRustRawString(s, j, state); continue; }
+    if (s[j] === '/' && s[j + 1] === '/') break;
+    j = stepRustCodeChar(s, j, state);
+  }
+}
+
 export class RustSkeletonExtractor implements LanguageExtractor {
   public readonly languageId = 'rust';
   public readonly supportedExtensions = ['.rs'];
@@ -41,7 +110,7 @@ export class RustSkeletonExtractor implements LanguageExtractor {
         continue;
       }
 
-      i = this.handleDeclaration(lines, i, line, trimmed, pendingAttributes, output);
+      i = this.handleDeclaration({ lines, index: i, line, trimmed, pendingAttributes, output });
     }
 
     return output;
@@ -57,29 +126,23 @@ export class RustSkeletonExtractor implements LanguageExtractor {
     return prefixes.some(p => trimmed.startsWith(p));
   }
 
-  private handleDeclaration(
-    lines: string[],
-    i: number,
-    line: string,
-    trimmed: string,
-    pendingAttributes: string[],
-    output: string[]
-  ): number {
+  private handleDeclaration(ctx: RustDeclarationContext): number {
+    const { lines, index, line, trimmed, pendingAttributes, output } = ctx;
     if (this.isFunctionStart(trimmed)) {
       this.flushAttributes(pendingAttributes, output);
-      const signature = this.consumeUntilBrace(lines, i);
+      const signature = this.consumeUntilBrace(lines, index);
       output.push(`${signature} { /* body omitted */ }`);
-      return this.skipBlock(lines, i);
+      return this.skipBlock(lines, index);
     }
 
     if (this.isItemDeclaration(trimmed) || this.isTypeDefOrImpl(trimmed)) {
       this.flushAttributes(pendingAttributes, output);
       output.push(line);
-      return i + 1;
+      return index + 1;
     }
 
     pendingAttributes.length = 0;
-    return i + 1;
+    return index + 1;
   }
 
   private isFunctionStart(trimmed: string): boolean {
@@ -114,47 +177,12 @@ export class RustSkeletonExtractor implements LanguageExtractor {
     return parts.join('\n');
   }
 
-  private skipString(chars: string, j: number): number {
-    const q = chars[j++];
-    while (j < chars.length && chars[j] !== q) {
-      if (chars[j] === '\\') j += 2;
-      else j++;
-    }
-    return j + 1;
-  }
-
   private skipBlock(lines: string[], startIndex: number): number {
-    let braceCount = 0;
-    let foundOpen = false;
-    let inComment = false;
-    let inRaw = false;
+    const state: RustBlockState = { braceCount: 0, foundOpen: false, inComment: false, inRaw: false };
     let i = startIndex;
-
     while (i < lines.length) {
-      const s = lines[i];
-      let j = 0;
-      while (j < s.length) {
-        if (inComment) {
-          if (s[j] === '*' && s[j + 1] === '/') { inComment = false; j += 2; }
-          else j++;
-          continue;
-        }
-        if (inRaw) {
-          if (s[j] === '"' && s[j + 1] === '#') { inRaw = false; j += 2; }
-          else j++;
-          continue;
-        }
-        if (s[j] === '/' && s[j + 1] === '/') break;
-        if (s[j] === '/' && s[j + 1] === '*') { inComment = true; j += 2; continue; }
-        if (s[j] === 'r' && s[j + 1] === '#' && s[j + 2] === '"') { inRaw = true; j += 3; continue; }
-        if (s[j] === '"') { j = this.skipString(s, j); continue; }
-        if (s[j] === "'" && s[j + 2] === "'") { j += 3; continue; }
-        if (s[j] === "'" && s[j + 1] === '\\' && s[j + 3] === "'") { j += 4; continue; }
-        if (s[j] === '{') { braceCount++; foundOpen = true; }
-        else if (s[j] === '}') braceCount--;
-        j++;
-      }
-      if (foundOpen && braceCount <= 0) return i + 1;
+      scanRustBlockLine(lines[i], state);
+      if (state.foundOpen && state.braceCount <= 0) return i + 1;
       i++;
     }
     return i + 1;

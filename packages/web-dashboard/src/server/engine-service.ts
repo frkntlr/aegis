@@ -23,18 +23,34 @@ export interface AdaptiveTimeoutReport {
   summary: string;
 }
 
-export class AegisEngineService {
+function failMutationGate(file: string, reason: string, summary: string): Record<string, unknown> {
+  return {
+    tool: 'mutation_gate',
+    file,
+    totalMutants: 0,
+    sampledMutants: 0,
+    killedMutants: 0,
+    survivedMutants: 0,
+    skippedCompileErrors: 0,
+    scorePercent: 0,
+    baselinePassed: false,
+    passed: false,
+    unavailable: true,
+    reason,
+    survivors: [],
+    summary
+  };
+}
+
+export class AegisEngineService extends EngineAnalysisTools {
   private inspector = new BoundingBoxInspector();
   private estimator = new PreExecutionEstimator();
   private mcpManager = new MCPSecurityManager();
   private diffEngine = new DiffEngine();
   private oracle = new ImmutableOracle();
-  private analysisTools: EngineAnalysisTools;
-  private readonly repoRoot?: string;
 
   constructor(repoRoot?: string) {
-    this.repoRoot = repoRoot;
-    this.analysisTools = new EngineAnalysisTools(repoRoot);
+    super(repoRoot);
   }
 
   public runUiInspector(layoutPath?: string): Record<string, unknown> {
@@ -68,37 +84,18 @@ export class AegisEngineService {
     };
   }
 
-  private failMutationGate(file: string, reason: string, summary: string): Record<string, unknown> {
-    return {
-      tool: 'mutation_gate',
-      file,
-      totalMutants: 0,
-      sampledMutants: 0,
-      killedMutants: 0,
-      survivedMutants: 0,
-      skippedCompileErrors: 0,
-      scorePercent: 0,
-      baselinePassed: false,
-      passed: false,
-      unavailable: true,
-      reason,
-      survivors: [],
-      summary
-    };
-  }
-
   public runMutationGate(filePath?: string): Record<string, unknown> {
     if (filePath !== undefined && !filePath.trim()) {
-      return this.failMutationGate('', 'No target file specified.', 'Mutasyon Kapısı Reddedildi: Hedef dosya belirtilmedi ❌');
+      return failMutationGate('', 'No target file specified.', 'Mutasyon Kapısı Reddedildi: Hedef dosya belirtilmedi ❌');
     }
     const rootRes = requireExistingRepoRoot(this.repoRoot);
     if (!rootRes.ok) {
-      return this.failMutationGate(filePath?.trim() || '', rootRes.reason, `Mutasyon Kapısı Engellendi: ${rootRes.reason} ❌`);
+      return failMutationGate(filePath?.trim() || '', rootRes.reason, `Mutasyon Kapısı Engellendi: ${rootRes.reason} ❌`);
     }
     const targetInput = filePath?.trim() || 'packages/core/watchdog/src/pre-execution-estimator.ts';
     const contained = resolveContainedPath(rootRes.root, targetInput, { allowNonExistent: false });
     if (!contained.ok) {
-      return this.failMutationGate(path.basename(targetInput), contained.reason, `Mutasyon Kapısı Engellendi: ${contained.reason} ❌`);
+      return failMutationGate(path.basename(targetInput), contained.reason, `Mutasyon Kapısı Engellendi: ${contained.reason} ❌`);
     }
     const relTarget = path.relative(rootRes.root, contained.realPath);
     const report = runFileMutationTest({ filePath: relTarget, repoRoot: rootRes.root, thresholdPercent: 70 });
@@ -221,41 +218,5 @@ export class AegisEngineService {
       details: rep.details,
       summary: `Oracle Güven Denetimi: ${rep.verdict} (Şüpheli Test: ${rep.suspicious ? 'EVET ⚠️' : 'HAYIR ✅'})`
     };
-  }
-
-  public runCageCheck(dir?: string): Record<string, unknown> {
-    return this.analysisTools.runCageCheck(dir);
-  }
-
-  public runBugTriage(dir?: string): Record<string, unknown> {
-    return this.analysisTools.runBugTriage(dir);
-  }
-
-  public runSymbolFind(query?: string): Record<string, unknown> {
-    return this.analysisTools.runSymbolFind(query);
-  }
-
-  public runRelationalTrace(target?: string): Record<string, unknown> {
-    return this.analysisTools.runRelationalTrace(target);
-  }
-
-  public runMemoryQuery(symbol?: string, worktreeId?: string): Record<string, unknown> {
-    return this.analysisTools.runMemoryQuery(symbol, worktreeId);
-  }
-
-  public runMemoryStats(worktreeId?: string): Record<string, unknown> {
-    return this.analysisTools.runMemoryStats(worktreeId);
-  }
-
-  public runAstSearch(pattern?: string, targetDir?: string): Record<string, unknown> {
-    return this.analysisTools.runAstSearch(pattern, targetDir);
-  }
-
-  public runRtkCompress(text?: string): Record<string, unknown> {
-    return this.analysisTools.runRtkCompress(text);
-  }
-
-  public runContext7Query(library?: string, topic?: string): Record<string, unknown> {
-    return this.analysisTools.runContext7Query(library, topic);
   }
 }
