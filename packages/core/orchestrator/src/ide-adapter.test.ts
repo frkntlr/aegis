@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import {
   IdeAdapterRegistry,
   AntigravityAdapter,
@@ -44,7 +45,7 @@ test('All IDE adapters configure isolation settings properly', () => {
     const agAdapter = new AntigravityAdapter();
     const agRes = agAdapter.setupExclusions(tmpDir);
     assert.strictEqual(agRes.success, true);
-    const agSettings = JSON.parse(fs.readFileSync(agRes.configuredFiles[0], 'utf8'));
+    const agSettings = readJsonSafe<{ 'files.exclude': Record<string, boolean>; 'antigravity.multiAgent': boolean }>(agRes.configuredFiles[0]);
     assert.strictEqual(agSettings['files.exclude']['experimental/**'], true);
     assert.strictEqual(agSettings['antigravity.multiAgent'], true);
 
@@ -55,7 +56,7 @@ test('All IDE adapters configure isolation settings properly', () => {
     const copilotAdapter = new CopilotAdapter();
     const copilotRes = copilotAdapter.setupExclusions(tmpDir);
     assert.strictEqual(copilotRes.success, true);
-    const copilotSettings = JSON.parse(fs.readFileSync(copilotRes.configuredFiles[1], 'utf8'));
+    const copilotSettings = readJsonSafe<{ plugins: Record<string, { enabled: boolean }> }>(copilotRes.configuredFiles[1]);
     assert.strictEqual(copilotSettings.plugins['aegis-copilot'].enabled, true);
 
     const cursorAdapter = new CursorAdapter();
@@ -93,13 +94,13 @@ test('McpSkillsSyncEngine syncs MCP server definitions across capable IDEs', () 
     assert.strictEqual(agResult.syncedServersCount, 2);
 
     const targetFile = agResult?.targetFile || '';
-    const writtenJson = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
+    const writtenJson = readJsonSafe<{ mcpServers: Record<string, unknown> }>(targetFile);
     assert.ok(writtenJson.mcpServers.notebooklm);
     assert.ok(writtenJson.mcpServers.godot);
 
     const copilotResult = results.find(r => r.ideId === 'copilot');
     assert.ok(copilotResult?.supported);
-    const copilotJson = JSON.parse(fs.readFileSync(copilotResult?.targetFile || '', 'utf8'));
+    const copilotJson = readJsonSafe<{ servers: Record<string, unknown> }>(copilotResult?.targetFile || '');
     assert.ok(copilotJson.servers.notebooklm);
     assert.ok(copilotJson.servers.godot);
   } finally {
@@ -128,7 +129,7 @@ test('McpSkillsSyncEngine preserves existing servers and custom properties in VS
     const result = engine.syncToIde(new CopilotAdapter(), tmpDir);
     assert.strictEqual(result.supported, true);
 
-    const parsed = JSON.parse(fs.readFileSync(mcpPath, 'utf8'));
+    const parsed = readJsonSafe<{ customField: string; servers: Record<string, unknown> }>(mcpPath);
     assert.strictEqual(parsed.customField, 'preserved');
     assert.ok(parsed.servers['existing-tool']);
     assert.ok(parsed.servers['aegis-engine']);

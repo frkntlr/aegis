@@ -24,7 +24,7 @@ function parseOptions(args, engine = path.resolve(__dirname, '..')) {
   return options;
 }
 
-function npmInvocation(engine) {
+function npmInvocation() {
   const candidates = [process.env.npm_execpath,
     path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')];
   const cli = candidates.find(file => file && /npm-cli\.js$/.test(file) && fs.existsSync(file));
@@ -80,7 +80,7 @@ function runSetup(options, injected = {}) {
     log(`DRY RUN: dependencies if missing; build; configure ${options.client} in ${options.project}${options.user ? '; install user command shims' + (options.client !== 'antigravity' ? ' and Codex routing' : '') : ''}; check status. No changes made.`);
     return;
   }
-  const npm = injected.npm || npmInvocation(options.engine);
+  const npm = injected.npm || npmInvocation();
   if ((injected.dependenciesMissing || dependenciesMissing)(options.engine)) {
     run(npm[0], [...npm[1], 'install', '--no-audit', '--no-fund'], options.engine);
   }

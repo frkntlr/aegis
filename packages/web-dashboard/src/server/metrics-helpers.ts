@@ -1,5 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
+import { isSafeIdentifier, resolveContainedPath } from './path-containment.js';
 import type { SystemIssue } from './realtime-metrics.js';
 
 export function collectSourceFiles(dir: string): string[] {
@@ -12,11 +14,13 @@ export function collectSourceFiles(dir: string): string[] {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         results.push(...collectSourceFiles(full));
-      } else if (/\.(ts|tsx|py|gd|rs)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
+      } else if (entry.isFile() && /\.(ts|tsx|py|gd|rs)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
         results.push(full);
       }
     }
-  } catch { /* ignore */ }
+  } catch (err: unknown) {
+    debugLogIgnored('metrics-helpers:collectSourceFiles', err);
+  }
   return results;
 }
 
@@ -30,18 +34,27 @@ export function collectTestFiles(dir: string): string[] {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         results.push(...collectTestFiles(full));
-      } else if (/\.(test|spec)\.(ts|js)$/.test(entry.name)) {
+      } else if (entry.isFile() && /\.(test|spec)\.(ts|js)$/.test(entry.name)) {
         results.push(full);
       }
     }
-  } catch { /* ignore */ }
+  } catch (err: unknown) {
+    debugLogIgnored('metrics-helpers:collectTestFiles', err);
+  }
   return results;
 }
 
 export function compilePromptFile(issue: SystemIssue, agentName: string, repoRoot: string): string {
+  if (!isSafeIdentifier(agentName)) {
+    throw new Error(`Invalid agentName for prompt file: ${agentName}`);
+  }
   const promptDir = path.resolve(repoRoot, '.aegis', 'prompts');
   fs.mkdirSync(promptDir, { recursive: true });
-  const promptPath = path.resolve(promptDir, `${agentName}-issue-${issue.number}.md`);
+  const contained = resolveContainedPath(promptDir, `${agentName}-issue-${issue.number}.md`, { allowNonExistent: true });
+  if (!contained.ok) {
+    throw new Error(`Unsafe prompt file path: ${contained.reason}`);
+  }
+  const promptPath = contained.realPath;
   const content = [
     `# 🎯 Task Assignment: #${issue.number} ${issue.title}`,
     `**Assigned Agent:** @${agentName.toUpperCase()} | **Status:** ${issue.status.toUpperCase()}`,

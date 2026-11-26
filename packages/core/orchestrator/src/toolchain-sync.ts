@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { AntigravityInstaller } from './antigravity-installer.js';
 import { CodexInstaller } from './codex-installer.js';
 
@@ -59,8 +60,8 @@ export class UniversalToolchainSync {
           });
         }
       }
-    } catch {
-      // Ignore read errors
+    } catch (err: unknown) {
+      debugLogIgnored('ToolchainSync:discoverSkills', err);
     }
     return skills;
   }
@@ -73,23 +74,18 @@ export class UniversalToolchainSync {
     }
     if (fs.existsSync(cursorMcp)) {
       try {
-        const data = JSON.parse(fs.readFileSync(cursorMcp, 'utf8'));
+        interface RawMcpServerCfg { command?: string; args?: string[]; url?: string; env?: Record<string, string>; disabled?: boolean; }
+        const data = readJsonSafe<{ mcpServers?: Record<string, RawMcpServerCfg> }>(cursorMcp);
         if (data.mcpServers) {
-          interface RawMcpServerCfg { command?: string; args?: string[]; url?: string; env?: Record<string, string>; disabled?: boolean; }
-          for (const [name, cfg] of Object.entries<RawMcpServerCfg>(data.mcpServers)) {
+          for (const [name, cfg] of Object.entries(data.mcpServers)) {
             servers.push({
-              name,
-              command: cfg.command,
-              args: cfg.args,
-              url: cfg.url,
-              env: cfg.env,
-              disabled: cfg.disabled,
-              transport: cfg.url ? 'sse' : 'stdio'
+              name, command: cfg.command, args: cfg.args, url: cfg.url,
+              env: cfg.env, disabled: cfg.disabled, transport: cfg.url ? 'sse' : 'stdio'
             });
           }
         }
-      } catch {
-        // Fallback on corrupt JSON
+      } catch (err: unknown) {
+        debugLogIgnored('ToolchainSync:discoverMcpServers', err);
       }
     }
     if (servers.length === 0) {
@@ -105,11 +101,11 @@ export class UniversalToolchainSync {
   private readExistingServers(jsonPath: string, key: 'mcpServers' | 'servers'): Record<string, unknown> {
     if (!fs.existsSync(jsonPath)) return {};
     try {
-      const parsed = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      const parsed = readJsonSafe<Record<string, unknown>>(jsonPath);
       if (parsed?.[key] && typeof parsed[key] === 'object') {
         return parsed[key] as Record<string, unknown>;
       }
-    } catch { /* ignore corrupt json */ }
+    } catch (err: unknown) { debugLogIgnored('ToolchainSync:readExistingServers', err); }
     return {};
   }
 
@@ -141,7 +137,7 @@ export class UniversalToolchainSync {
         mcpConfig.mcpServers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
       }
       if (!mcpConfig.mcpServers['aegis-engine']) {
-        mcpConfig.mcpServers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js'] };
+        mcpConfig.mcpServers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'] };
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
       this.registerAegisMcpServer(mcpJsonPath);
@@ -165,7 +161,7 @@ export class UniversalToolchainSync {
         mcpConfig.servers[m.name] = m.url ? { url: m.url } : { command: m.command, args: m.args };
       }
       if (!mcpConfig.servers['aegis-engine']) {
-        mcpConfig.servers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js'] };
+        mcpConfig.servers['aegis-engine'] = { command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'] };
       }
       fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
       return true;
@@ -204,17 +200,18 @@ export class UniversalToolchainSync {
     if (!fs.existsSync(path.dirname(mcpJsonPath))) return;
     try {
       const cliPath = path.resolve(this.repoRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js');
-      const nodeExe = fs.existsSync('C:\\Program Files\\nodejs\\node.exe') ? 'C:\\Program Files\\nodejs\\node.exe' : 'node';
-      let data: Record<string, unknown> = {};
-      if (fs.existsSync(mcpJsonPath)) {
-        data = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf8'));
-      }
+      const relCfg = path.relative(this.repoRoot, mcpJsonPath);
+      const isInsideRepo = Boolean(relCfg) && !relCfg.startsWith('..') && !path.isAbsolute(relCfg);
+      const entry = isInsideRepo
+        ? { command: 'node', args: [path.relative(this.repoRoot, cliPath).replace(/\\/g, '/'), 'mcp'] }
+        : { command: process.execPath, args: [cliPath, 'mcp'] };
+      const data = fs.existsSync(mcpJsonPath) ? readJsonSafe<Record<string, unknown>>(mcpJsonPath) : {};
       const key = typeof data.servers === 'object' && data.servers !== null ? 'servers' : 'mcpServers';
       const map = typeof data[key] === 'object' && data[key] !== null ? (data[key] as Record<string, unknown>) : {};
-      map.aegis = { command: nodeExe, args: [cliPath, 'mcp'] };
+      map.aegis = entry;
       data[key] = map;
       fs.writeFileSync(mcpJsonPath, JSON.stringify(data, null, 2), 'utf8');
-    } catch { /* ignore non-fatal */ }
+    } catch (err: unknown) { debugLogIgnored('ToolchainSync:registerAegisMcpServer', err); }
   }
 
   private syncGlobalAntigravity(userHome: string): void {

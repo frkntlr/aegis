@@ -5,6 +5,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import { fetchPostWithTimeout } from './http-transport.js';
 import { MultiRootTokenResolver } from './multi-root-token-resolver.js';
 import type { HttpPostFunction, HttpResponse } from './types.js';
 
@@ -83,7 +84,7 @@ export class HttpRotateEngine {
       return { success: false, error: 'Cannot rotate cookies: Missing SID or secondary binding tokens (OSID / SAPISID).' };
     }
 
-    const postFn = options.httpPost || HttpRotateEngine.defaultFetchPost;
+    const postFn = options.httpPost || ((u, b, o) => fetchPostWithTimeout(u, b, o, 15000));
     const accountsCookieHeader = HttpRotateEngine.buildAccountsCookieHeader(jar);
     const body = '[0,"-0000000000000000000"]';
 
@@ -131,31 +132,5 @@ export class HttpRotateEngine {
     }
 
     return { success: true, refreshedCookies, newPsidts };
-  }
-
-  private static async defaultFetchPost(
-    url: string,
-    body: string,
-    options?: { headers?: Record<string, string>; timeoutMs?: number }
-  ): Promise<HttpResponse> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 15000);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: options?.headers,
-        body,
-        signal: controller.signal
-      });
-      const headerObj: Record<string, string | string[]> = {};
-      res.headers.forEach((v, k) => { headerObj[k.toLowerCase()] = v; });
-      return {
-        status: res.status,
-        text: () => res.text(),
-        headers: headerObj
-      };
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

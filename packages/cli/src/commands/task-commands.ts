@@ -1,4 +1,5 @@
 import { WorktreeManager, TeamworkMesh } from '@aegis/orchestrator';
+import { debugLogIgnored } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { compilePrompt } from './prompt-command.js';
 export { handleTaskVerify } from './task-verification.js';
@@ -111,7 +112,7 @@ export async function handleTaskRelease(...args: string[]): Promise<void> {
     if (t.targetFiles && t.targetFiles.length > 0) wtManager.releaseFiles(t.targetFiles);
     updateTaskInboxStatus(t.issueNumber, status);
     if (status === 'done' || status === 'blocked') {
-      try { mesh.postActivity(t.claimedBy || t.role, { status, activity: `Task #${t.issueNumber} marked ${status}` }); } catch { /* ignore */ }
+      try { mesh.postActivity(t.claimedBy || t.role, { status, activity: `Task #${t.issueNumber} marked ${status}` }); } catch (err: unknown) { debugLogIgnored('TaskCommands:handleTaskRelease', err); }
     }
     if (status === 'done' && t.isGitHubIssue === true) await closeGitHubIssueIfConfigured(t.issueNumber, t.claimedBy || t.role);
   }

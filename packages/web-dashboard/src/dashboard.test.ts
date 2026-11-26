@@ -62,33 +62,32 @@ test('RealtimeMetricsService manages dynamic issues and calculates real AST metr
   assert.ok(cage.label.includes('Uyumlu'));
 });
 
-test('AegisEngineService executes all underlying Aegis core tools successfully', async () => {
-  const engine = new AegisEngineService();
-  const ui = engine.runUiInspector();
-  assert.strictEqual(ui.tool, 'ui_inspector');
-  assert.strictEqual(ui.visionTokens, 0);
-
-  const mut = engine.runMutationGate();
-  assert.strictEqual(mut.tool, 'mutation_gate');
-  assert.strictEqual(mut.passed, true);
-
-  const est = engine.runAdaptiveTimeout(2, 3);
-  assert.strictEqual(est.tool, 'adaptive_timeout');
-  assert.ok(est.timeoutSeconds > 0);
-
-  const mcp = engine.runMcpSecurity('solver', 'ast_skeleton');
-  assert.strictEqual(mcp.allowed, true);
-
-  const diff = await engine.runDiffValidator();
-  assert.strictEqual(diff.isSurgical, true);
-
-  const oracle = await engine.runOracleAudit(['packages/core/iron-cage/src/cage-validator.ts']);
-  assert.strictEqual(oracle.suspicious, false);
+test('AegisEngineService executes underlying Aegis core tools with real fail-closed gates', async () => {
+  const emptyTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-engine-empty-'));
+  try {
+    const isolated = new AegisEngineService(emptyTmp);
+    const ui = isolated.runUiInspector();
+    assert.strictEqual(ui.tool, 'ui_inspector');
+    assert.strictEqual(ui.visionTokens, 0);
+    assert.strictEqual(ui.passed, false);
+    assert.strictEqual(ui.unavailable, true);
+    const mut = isolated.runMutationGate();
+    assert.strictEqual(mut.tool, 'mutation_gate');
+    assert.strictEqual(mut.passed, false);
+    const est = isolated.runAdaptiveTimeout(2, 3);
+    assert.ok(est.tool === 'adaptive_timeout' && est.timeoutSeconds > 0);
+    assert.strictEqual(isolated.runMcpSecurity('solver', 'ast_skeleton').allowed, true);
+    const diff = await isolated.runDiffValidator('--- a/a.ts\n+++ b/a.ts\n@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;\n');
+    assert.strictEqual(diff.isSurgical, true);
+    const oracle = await isolated.runOracleAudit(['src/missing.ts']);
+    assert.ok(oracle.verdict === 'MANUAL_REVIEW_REQUIRED' && oracle.suspicious === true);
+  } finally { fs.rmSync(emptyTmp, { recursive: true, force: true }); }
 });
 
 test('AegisEngineService loads Godot telemetry with nodes array accurately', () => {
-  const engine = new AegisEngineService();
-  const tmpFile = path.join(os.tmpdir(), `aegis-telemetry-test-${Date.now()}.json`);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-telemetry-test-'));
+  const engine = new AegisEngineService(tmpDir);
+  const tmpFile = path.join(tmpDir, 'telemetry.json');
   const godotPayload = {
     viewport: { width: 1080, height: 1920, aspectRatio: '9:16' },
     nodes: [
@@ -103,7 +102,7 @@ test('AegisEngineService loads Godot telemetry with nodes array accurately', () 
     assert.strictEqual(res.elementsChecked, 2);
     assert.strictEqual(res.passed, true);
   } finally {
-    if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
 

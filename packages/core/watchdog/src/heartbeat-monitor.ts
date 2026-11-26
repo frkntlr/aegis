@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { ProcessRunMetrics } from '@aegis/shared';
+import { debugLogIgnored, type ProcessRunMetrics } from '@aegis/shared';
 
 export type ProcessTerminatorHook = (child: ChildProcess, signal: NodeJS.Signals) => void;
 
@@ -43,8 +43,8 @@ export class HeartbeatMonitor {
     if (this.customTerminator) {
       try {
         this.customTerminator(child, signal);
-      } catch {
-        // Ignore custom terminator errors
+      } catch (err: unknown) {
+        debugLogIgnored('HeartbeatMonitor:customTerminator', err);
       }
       return;
     }
@@ -57,22 +57,22 @@ export class HeartbeatMonitor {
             windowsHide: true
           });
           killer.unref();
-        } catch {
-          // Ignore taskkill errors if already terminated
+        } catch (err: unknown) {
+          debugLogIgnored('HeartbeatMonitor:taskkill', err);
         }
       }
     } else if (child.pid && process.platform !== 'win32') {
       try {
         process.kill(-child.pid, signal);
-      } catch {
-        // Fallback to regular kill if not a process group leader
+      } catch (err: unknown) {
+        debugLogIgnored('HeartbeatMonitor:killGroup', err);
       }
     }
 
     try {
       child.kill(signal);
-    } catch {
-      // Ignore if process already closed
+    } catch (err: unknown) {
+      debugLogIgnored('HeartbeatMonitor:killChild', err);
     }
   }
 

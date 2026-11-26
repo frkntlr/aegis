@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { WorktreeMutexShield } from '@aegis/shared';
+import { WorktreeMutexShield, debugLogIgnored } from '@aegis/shared';
 import { NotebookLmNativeClient } from './notebooklm-native-client.js';
 import type { NotebookSourceSummary } from './types.js';
 
@@ -98,8 +98,8 @@ export class SourceFreshnessAuditor {
           map.set(currentRfc, supByMatch ? supByMatch[1] : 'Superseded');
         }
       }
-    } catch {
-      // Safe fallback on file IO errors
+    } catch (err: unknown) {
+      debugLogIgnored('source-freshness:scanSupersededRfcs', err);
     }
     return map;
   }
@@ -130,8 +130,8 @@ export class SourceTombstonePruner {
         try {
           await this.client.deleteSource(candidate.sourceId);
           pruned.push(candidate.sourceId);
-        } catch {
-          // Log or tolerate transient delete errors
+        } catch (err: unknown) {
+          debugLogIgnored('source-freshness:prune', err);
         }
       }
     }

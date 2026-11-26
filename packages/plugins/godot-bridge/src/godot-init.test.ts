@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { GodotInitWorkflow } from './godot-init.js';
 
 test('GodotInitWorkflow initializes addon files and aegis.config.json in target directory', () => {
@@ -18,7 +19,9 @@ test('GodotInitWorkflow initializes addon files and aegis.config.json in target 
     assert.ok(fs.existsSync(path.join(tmpDir, 'project.godot')));
     assert.ok(fs.existsSync(path.join(tmpDir, 'aegis.config.json')));
 
-    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, 'aegis.config.json'), 'utf8'));
+    const config = readJsonSafe<{ engine: string; godot: { bridgePort: number; aspectRatios: string[] } }>(
+      path.join(tmpDir, 'aegis.config.json')
+    );
     assert.strictEqual(config.engine, 'godot');
     assert.strictEqual(config.godot.bridgePort, 6852);
     assert.deepStrictEqual(config.godot.aspectRatios, ['16:9', '21:9', '16:10', '9:16']);
@@ -65,7 +68,9 @@ test('GodotInitWorkflow preserves custom aspect ratios configured in existing ae
 
     GodotInitWorkflow.initProject({ projectDir: tmpDir, bridgePort: 7001 });
 
-    const updated = JSON.parse(fs.readFileSync(path.join(tmpDir, 'aegis.config.json'), 'utf8'));
+    const updated = readJsonSafe<{ godot: { bridgePort: number; aspectRatios: string[] } }>(
+      path.join(tmpDir, 'aegis.config.json')
+    );
     assert.strictEqual(updated.godot.bridgePort, 7001);
     assert.deepStrictEqual(updated.godot.aspectRatios, ['9:16', '9:19.5', '3:4']);
   } finally {

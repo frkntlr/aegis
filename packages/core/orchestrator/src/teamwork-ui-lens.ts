@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import type {
   AnalysisInsight,
   LensExecutionResult
@@ -31,7 +32,7 @@ export class UiVisualLayoutLens {
         } else if (rel.endsWith('.tsx') || rel.endsWith('.html') || rel.endsWith('.css')) {
           this.inspectWebUi(rel, content, insights);
         }
-      } catch { /* ignore read errors */ }
+      } catch (err: unknown) { debugLogIgnored('UiVisualLayoutLens:executeSync', err); }
     }
 
     return { lens: 'ui', agent: 'ui-specialist', durationMs: Date.now() - start, insights };
@@ -51,7 +52,7 @@ export class UiVisualLayoutLens {
         try {
           const entries = fs.readdirSync(full).map(f => path.join(dir, f).replace(/\\/g, '/'));
           discovered.push(...entries.filter(f => f.endsWith('.tscn') || f.endsWith('.tsx') || f.endsWith('.html')));
-        } catch { /* ignore */ }
+        } catch (err: unknown) { debugLogIgnored('UiVisualLayoutLens:collectUiFiles', err); }
       }
     }
     return discovered;

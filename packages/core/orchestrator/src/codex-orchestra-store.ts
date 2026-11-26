@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { readJsonSafe } from '@aegis/shared';
 import { WorktreeMutex } from './worktree-mutex.js';
 import { requireIdentifier, validateStoredRun } from './codex-orchestra-validation.js';
 import type { OrchestraRun } from './codex-orchestra-types.js';
@@ -14,7 +15,7 @@ export class OrchestraStore {
   }
 
   public read(id: string): OrchestraRun {
-    const value: unknown = JSON.parse(fs.readFileSync(this.file(id), 'utf8'));
+    const value: unknown = readJsonSafe<unknown>(this.file(id));
     validateStoredRun(value, id, this.root);
     return value;
   }

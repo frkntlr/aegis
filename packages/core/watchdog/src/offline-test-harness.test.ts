@@ -155,3 +155,25 @@ test('OfflineTestHarness blocks child process network via process_shim injection
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('OfflineTestHarness safely quotes spaced paths and batch metacharacters', async () => {
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-offline-quote-'));
+  const spacedDir = path.join(baseDir, 'dir with space');
+  fs.mkdirSync(spacedDir, { recursive: true });
+  try {
+    fs.writeFileSync(path.join(spacedDir, 'package.json'), '{"name":"tmp"}\n', 'utf8');
+    const marker = path.join(spacedDir, 'injected.txt');
+    const runner = path.join(spacedDir, process.platform === 'win32' ? 'echo-args.cmd' : 'echo-args.sh');
+    fs.writeFileSync(
+      runner,
+      process.platform === 'win32' ? '@echo off\r\necho ARGS:%*\r\n' : '#!/bin/sh\necho "ARGS:$*"\n',
+      { mode: 0o755 }
+    );
+    const harness = new OfflineTestHarness({ cwd: spacedDir, timeoutMs: 10_000, tier: 'proxy_blackhole' });
+    const res = await harness.run(runner, [`ok&type nul>"${marker}"`]);
+    assert.strictEqual(res.passed, true);
+    assert.strictEqual(fs.existsSync(marker), false);
+  } finally {
+    fs.rmSync(baseDir, { recursive: true, force: true });
+  }
+});

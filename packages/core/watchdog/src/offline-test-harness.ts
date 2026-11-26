@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as child_process from 'node:child_process';
+import { debugLogIgnored, resolveNpmInvocation, type NpmInvocation } from '@aegis/shared';
 
 export interface OfflineTestHarnessOptions {
   target?: string;
@@ -49,14 +50,20 @@ export class OfflineTestHarness {
 
   private terminateTree(pid?: number): void {
     if (!pid) return;
+    const safePid = Math.trunc(pid);
     try {
       if (process.platform === 'win32') {
-        child_process.execSync(`taskkill /F /PID ${pid} /T`, { stdio: 'ignore' });
+        child_process.execFileSync('taskkill', ['/F', '/PID', String(safePid), '/T'], { stdio: 'ignore', windowsHide: true });
       } else {
-        process.kill(-pid, 'SIGKILL');
+        process.kill(-safePid, 'SIGKILL');
       }
-    } catch {
-      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore if already exited */ }
+    } catch (err: unknown) {
+      debugLogIgnored('OfflineTestHarness:terminateTree', err);
+      try {
+        process.kill(safePid, 'SIGKILL');
+      } catch (killErr: unknown) {
+        debugLogIgnored('OfflineTestHarness:terminateTreeFallback', killErr);
+      }
     }
   }
 
@@ -97,36 +104,61 @@ export class OfflineTestHarness {
     return env;
   }
 
-  private determineCommand(cwd: string, customCmd?: string, customArgs?: string[]): { cmd: string; args: string[] } {
+  private determineCommand(cwd: string, customCmd?: string, customArgs?: string[]): NpmInvocation {
     if (customCmd) {
-      return { cmd: customCmd, args: customArgs ?? [] };
+      return { command: customCmd, args: customArgs ?? [] };
     }
     if (fs.existsSync(path.resolve(cwd, 'project.godot'))) {
       const args = ['--headless'];
       if (this.options.target) args.push(this.options.target);
-      return { cmd: 'godot', args };
+      return { command: 'godot', args };
     }
-    const isWin = process.platform === 'win32';
-    const npmCmd = isWin ? 'npm.cmd' : 'npm';
     const args = ['test'];
     if (this.options.target) args.push('--', this.options.target);
-    return { cmd: npmCmd, args };
+    return resolveNpmInvocation(args);
+  }
+
+  private quoteBatchArg(arg: string): string {
+    if (/[\0\r\n]/.test(arg)) throw new Error('Command argument contains unsupported control characters');
+    if (arg.length === 0) return '""';
+    if (!/[\s"&|<>^()%!;*?]/.test(arg)) return arg;
+    return `"${arg.replace(/"/g, '""')}"`;
+  }
+
+  private resolveSpawnTarget(spec: NpmInvocation): NpmInvocation {
+    const isWin = process.platform === 'win32';
+    const lower = spec.command.toLowerCase();
+    if (!isWin || (!lower.endsWith('.cmd') && !lower.endsWith('.bat'))) {
+      return spec;
+    }
+    if (/[\0\r\n"]/.test(spec.command)) throw new Error('Batch command path contains invalid characters');
+    const exe = /[\s&|<>^()%!;*?]/.test(spec.command) ? `"${spec.command}"` : spec.command;
+    const quotedArgs = spec.args.map((a) => this.quoteBatchArg(a));
+    const inner = [exe, ...quotedArgs].join(' ');
+    return {
+      command: process.env.ComSpec || 'cmd.exe',
+      args: ['/d', '/s', '/c', `"${inner}"`],
+      windowsVerbatimArguments: true
+    };
   }
 
   private executeProcess(
-    cmd: string,
-    args: string[],
+    spec: NpmInvocation,
     cwd: string,
     env: NodeJS.ProcessEnv,
     timeoutMs: number
   ): Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean; durationMs: number }> {
     return new Promise((resolve) => {
       const start = Date.now();
-      const isWin = process.platform === 'win32';
-      const useShell = isWin && (cmd.endsWith('.cmd') || cmd.endsWith('.bat'));
-      const spawnCmd = useShell ? [cmd, ...args].join(' ') : cmd;
-      const spawnArgs = useShell ? [] : args;
-      const child = child_process.spawn(spawnCmd, spawnArgs, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], shell: useShell, windowsHide: true });
+      const resolved = this.resolveSpawnTarget(spec);
+      const child = child_process.spawn(resolved.command, resolved.args, {
+        cwd,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false,
+        windowsHide: true,
+        windowsVerbatimArguments: resolved.windowsVerbatimArguments
+      });
       let stdout = '';
       let stderr = '';
       let timedOut = false;
@@ -161,9 +193,9 @@ export class OfflineTestHarness {
     const timeoutMs = this.options.timeoutMs ?? 45_000;
     const tier = this.detectTier(cwd);
     const env = this.buildIsolationEnv(cwd, tier);
-    const { cmd, args } = this.determineCommand(cwd, customCmd, customArgs);
+    const spec = this.determineCommand(cwd, customCmd, customArgs);
 
-    const exec = await this.executeProcess(cmd, args, cwd, env, timeoutMs);
+    const exec = await this.executeProcess(spec, cwd, env, timeoutMs);
     const passed = exec.exitCode === 0 && !exec.timedOut;
     const offlineVerified = Boolean(env.AEGIS_OFFLINE_SHIM_ACTIVE === '1' || env.HTTP_PROXY);
 
@@ -174,7 +206,7 @@ export class OfflineTestHarness {
       durationMs: exec.durationMs,
       exitCode: exec.exitCode,
       timedOut: exec.timedOut,
-      command: `${cmd} ${args.join(' ')}`.trim(),
+      command: `${spec.command} ${spec.args.join(' ')}`.trim(),
       tier,
       target: this.options.target
     });

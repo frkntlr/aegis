@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 
 export type RelationalNodeType =
   | 'file'
@@ -169,9 +170,11 @@ export class RelationalGraph {
         fs.renameSync(tmpPath, cachePath);
       } catch {
         fs.copyFileSync(tmpPath, cachePath);
-        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+        try { fs.rmSync(tmpPath, { force: true }); } catch (rmErr: unknown) { debugLogIgnored('RelationalGraph:saveCacheCleanup', rmErr); }
       }
-    } catch { /* ignore non-fatal */ }
+    } catch (err: unknown) {
+      debugLogIgnored('RelationalGraph:saveCache', err);
+    }
   }
 
   public loadCache(cachePath: string): boolean {

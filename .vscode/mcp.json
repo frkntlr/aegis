@@ -1,30 +1,9 @@
 {
   "servers": {
-    "notebooklm": {
-      "command": "node",
-      "args": [
-        "packages/plugins/notebooklm/dist/index.js",
-        "server"
-      ]
-    },
-    "godot": {
-      "command": "node",
-      "args": [
-        "packages/plugins/godot-bridge/dist/bin/godot-mcp.js"
-      ]
-    },
     "aegis-engine": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "--yes",
-        "@aegis/cli",
-        "mcp"
-      ]
-    },
-    "aegis": {
-      "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": [
-        "C:\\Users\\Lenovo\\Documents\\work\\aegis\\packages\\cli\\dist\\bin\\aegis.js",
+        "packages/cli/dist/bin/aegis.js",
         "mcp"
       ]
     }

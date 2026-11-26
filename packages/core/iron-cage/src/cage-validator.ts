@@ -111,7 +111,7 @@ export class IronCageValidator {
 
   private isLineFunctionStart(trimmed: string): boolean {
     const stripped = trimmed.replace(/^export\s+(default\s+)?/, '');
-    const fnRegex = new RegExp('^(public\\s+|private\\s+|protected\\s+|static\\s+)*(async\\s+)?\\w+\\s*\\([^)]*\\)\\s*[:\\w<>\\s]*\\{?');
+    const fnRegex = /^(public\s+|private\s+|protected\s+|static\s+)*(async\s+)?\w+\s*\([^)]*\)\s*[:\w<>\s]*\{?/;
     return stripped.startsWith('function ') ||
       stripped.startsWith('async function ') ||
       stripped.startsWith('func ') ||

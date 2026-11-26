@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 
 export interface DiscoveredDependency {
   name: string;
@@ -17,7 +18,7 @@ export class DependencyMapper {
     if (!fs.existsSync(filePath)) return [];
 
     try {
-      const content = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+      const content = readJsonSafe<Record<string, unknown>>(filePath);
       const deps: DiscoveredDependency[] = [];
       const sections = ['dependencies', 'devDependencies', 'peerDependencies'];
 
@@ -49,7 +50,9 @@ export class DependencyMapper {
           ecosystem: 'godot',
           source: projectGodotPath
         });
-      } catch { /* ignore non-fatal read errors */ }
+      } catch (err: unknown) {
+        debugLogIgnored('dependency-mapper:scanGodotProject', err);
+      }
     }
 
     DependencyMapper.scanGodotAddons(targetDir, deps);
@@ -73,7 +76,9 @@ export class DependencyMapper {
         }
         deps.push({ name: entry.name, version, ecosystem: 'godot', source: pluginCfg });
       }
-    } catch { /* ignore non-fatal read errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('dependency-mapper:scanGodotAddons', err);
+    }
   }
 
   public static scanWorkspace(rootDir: string): DiscoveredDependency[] {

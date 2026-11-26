@@ -1,8 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AgentWorktree, WorktreeListResult } from '@aegis/shared';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { type AgentWorktree, debugLogIgnored, resolveSafeRepoRoot, type WorktreeListResult } from '@aegis/shared';
 import { cleanGitEnv, parseWorktreePorcelainBlock } from './worktree-mutex.js';
 import { WorktreeLockManager } from './worktree-lock-manager.js';
 
@@ -11,6 +10,46 @@ export interface WorktreeManagerOptions {
   worktreePrefix?: string;
   persistLocks?: boolean;
   staleTimeoutMs?: number;
+}
+
+export function validateAgentName(agentName: string): string {
+  if (
+    typeof agentName !== 'string' ||
+    !agentName ||
+    /[\0\r\n/\\]/.test(agentName) ||
+    agentName === '.' ||
+    agentName === '..' ||
+    agentName.includes('..') ||
+    agentName.startsWith('-') ||
+    agentName.startsWith('.') ||
+    agentName.endsWith('.') ||
+    agentName.endsWith('.lock') ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(agentName)
+  ) {
+    throw new Error(`Invalid agent name: ${agentName}`);
+  }
+  return agentName;
+}
+
+function validateBaseBranch(branch: string): string {
+  if (
+    typeof branch !== 'string' ||
+    !branch ||
+    /[\0\r\n\s]/.test(branch) ||
+    branch.startsWith('-') ||
+    branch.startsWith('.') ||
+    branch.endsWith('.') ||
+    branch.startsWith('/') ||
+    branch.endsWith('/') ||
+    branch.includes('..') ||
+    branch.includes('//') ||
+    branch.endsWith('.lock') ||
+    branch.includes('@{') ||
+    !/^[A-Za-z0-9._/-]+$/.test(branch)
+  ) {
+    throw new Error(`Invalid base branch: ${branch}`);
+  }
+  return branch;
 }
 
 export class WorktreeManager {
@@ -31,8 +70,16 @@ export class WorktreeManager {
   }
 
   public getLockManager(): WorktreeLockManager { return this.lockManager; }
+
   public getWorktreePath(agentName: string): string {
-    return path.resolve(this.repoRoot, this.worktreePrefix, agentName);
+    const validName = validateAgentName(agentName);
+    const basePrefixDir = path.resolve(this.repoRoot, this.worktreePrefix);
+    const resolvedTarget = path.resolve(basePrefixDir, validName);
+    const rel = path.relative(basePrefixDir, resolvedTarget);
+    if (!rel || rel === '.' || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+      throw new Error(`Worktree path escapes prefix boundary: ${agentName}`);
+    }
+    return resolvedTarget;
   }
 
   public detectCurrentBranch(): string {
@@ -43,7 +90,9 @@ export class WorktreeManager {
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeManager:detectCurrentBranch', err);
+    }
     return 'master';
   }
 
@@ -51,10 +100,14 @@ export class WorktreeManager {
     this.invalidateWorktreeCache();
     const targetDir = this.getWorktreePath(agentName);
     const branchName = `aegis/${agentName}`;
-    const baseBranch = baseBranchArg || this.detectCurrentBranch();
+    const baseBranch = baseBranchArg !== undefined ? validateBaseBranch(baseBranchArg) : this.detectCurrentBranch();
 
     if (!fs.existsSync(targetDir)) {
-      try { execFileSync('git', ['worktree', 'prune'], { cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv() }); } catch { /* ignore */ }
+      try {
+        execFileSync('git', ['worktree', 'prune'], { cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv() });
+      } catch (err: unknown) {
+        debugLogIgnored('WorktreeManager:ensurePrune', err);
+      }
       fs.mkdirSync(path.dirname(targetDir), { recursive: true });
       try {
         execFileSync('git', ['worktree', 'add', targetDir, '-B', branchName, baseBranch], {
@@ -75,15 +128,28 @@ export class WorktreeManager {
   public removeWorktree(agentName: string): boolean {
     this.invalidateWorktreeCache();
     const targetDir = this.getWorktreePath(agentName);
+    const basePrefixDir = path.resolve(this.repoRoot, this.worktreePrefix);
+    if (targetDir === basePrefixDir || targetDir === this.repoRoot) {
+      throw new Error(`Refusing to remove protected directory: ${targetDir}`);
+    }
     try {
       execFileSync('git', ['worktree', 'remove', targetDir, '--force'], {
         cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv()
       });
       return true;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeManager:gitWorktreeRemove', err);
       if (!fs.existsSync(targetDir)) return false;
-      try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch { /* ignore */ }
-      try { execFileSync('git', ['worktree', 'prune'], { cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv() }); } catch { /* ignore */ }
+      try {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+      } catch (rmErr: unknown) {
+        debugLogIgnored('WorktreeManager:rmSyncFallback', rmErr);
+      }
+      try {
+        execFileSync('git', ['worktree', 'prune'], { cwd: this.repoRoot, stdio: 'pipe', env: cleanGitEnv() });
+      } catch (pruneErr: unknown) {
+        debugLogIgnored('WorktreeManager:removePrune', pruneErr);
+      }
       return true;
     }
   }
@@ -107,7 +173,8 @@ export class WorktreeManager {
       const res = { worktrees, activeCount: worktrees.length };
       this.cachedWorktrees = { timestamp: now, result: res };
       return res;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeManager:listWorktrees', err);
       return { worktrees: [], activeCount: 0 };
     }
   }
@@ -120,7 +187,8 @@ export class WorktreeManager {
         cwd: wtPath, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: cleanGitEnv()
       });
       return output.trim().length > 0;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeManager:hasUnmergedConflicts', err);
       return false;
     }
   }

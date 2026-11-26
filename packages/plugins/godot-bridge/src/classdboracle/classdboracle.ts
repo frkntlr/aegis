@@ -1,4 +1,4 @@
-import { FuzzyMatcher } from '@aegis/shared';
+import { FuzzyMatcher, debugLogIgnored } from '@aegis/shared';
 import { BUILTIN_GODOT_CLASSES } from './builtin-classes.js';
 import { DoctoolRunner } from './doctool-runner.js';
 import type { ClassInfo, MethodInfo, PropertyInfo, SignalInfo, ValidationResult } from './classdb-types.js';
@@ -20,8 +20,8 @@ export class ClassDbOracle {
       for (const [name, info] of dumped.entries()) {
         this.classes.set(name, info);
       }
-    } catch {
-      // Fallback to builtins if runner fails
+    } catch (err: unknown) {
+      debugLogIgnored('classdboracle:ensureLoaded', err);
     }
     this.isLoaded = true;
   }

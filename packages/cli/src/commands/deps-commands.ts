@@ -4,6 +4,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import * as path from 'node:path';
 import { MultiLanguageMetadataManager } from '@aegis/ast-skeleton';
 import {
   ContractDriftRadar,
@@ -12,8 +13,17 @@ import {
 } from '@aegis/github-live';
 import { showBanner } from './banner.js';
 
-function reportProjectReferences(): void {
-  const radar = new ProjectReferencesRadar();
+export interface DepsDriftOptions {
+  projectRoot?: string;
+  cacheDir?: string;
+}
+
+function resolveContractCacheDir(cacheDir?: string): string | undefined {
+  return cacheDir ? path.join(cacheDir, 'context7') : undefined;
+}
+
+function reportProjectReferences(projectRoot?: string): boolean {
+  const radar = new ProjectReferencesRadar(projectRoot);
   const report = radar.scan();
   console.log('\n📐 TypeScript Project References Status:');
   console.log(` • Packages Scanned:      ${report.totalPackages}`);
@@ -24,10 +34,11 @@ function reportProjectReferences(): void {
       console.warn(`   - ${err}`);
     }
   }
+  return report.valid;
 }
 
-function reportTopologicalDependencies(): boolean {
-  const radar = new TopologicalDependencyRadar();
+function reportTopologicalDependencies(projectRoot?: string): boolean {
+  const radar = new TopologicalDependencyRadar(projectRoot);
   const report = radar.scan();
   console.log('\n🧭 Monorepo Topological Dependency Radar (RFC-036):');
   console.log(` • Packages Scanned:      ${report.totalPackages}`);
@@ -42,8 +53,11 @@ function reportTopologicalDependencies(): boolean {
   return report.valid;
 }
 
-function reportEcosystemStatus(): void {
-  const manager = new MultiLanguageMetadataManager();
+function reportEcosystemStatus(options: DepsDriftOptions): boolean {
+  const manager = new MultiLanguageMetadataManager({
+    projectRoot: options.projectRoot,
+    cacheDir: options.cacheDir
+  });
   const { drifted, ledger } = manager.checkEcosystemDrift();
 
   console.log('📦 Multi-Language Ecosystem Status:');
@@ -53,10 +67,16 @@ function reportEcosystemStatus(): void {
     const hashPreview = entry.compositeHash ? entry.compositeHash.substring(0, 12) : 'none';
     console.log(` • [${eco.toUpperCase()}] ${icon} (Hash: ${hashPreview})`);
   }
+  return drifted.length === 0;
 }
 
-async function reportContractDrift(): Promise<boolean> {
-  const radar = new ContractDriftRadar();
+async function reportContractDrift(
+  options: DepsDriftOptions
+): Promise<{ clean: boolean; hasDrift: boolean }> {
+  const radar = new ContractDriftRadar({
+    projectRoot: options.projectRoot,
+    cacheDir: resolveContractCacheDir(options.cacheDir)
+  });
   const driftRes = await radar.evaluateDrift();
 
   if (driftRes.hasDrift) {
@@ -73,30 +93,45 @@ async function reportContractDrift(): Promise<boolean> {
   }
   if (driftRes.shouldBlock) {
     console.error('\n❌ Contract drift contains breaking changes. Worktree tasks should be BLOCKED.');
-    return false;
+    return { clean: false, hasDrift: true };
   }
   console.log('\n✅ No breaking upstream contract changes detected.');
-  return true;
+  return { clean: true, hasDrift: driftRes.hasDrift };
 }
 
-export async function handleDepsDrift(args: string[] = []): Promise<void> {
+async function syncDependencyLedgers(options: DepsDriftOptions): Promise<void> {
+  const manager = new MultiLanguageMetadataManager({
+    projectRoot: options.projectRoot,
+    cacheDir: options.cacheDir
+  });
+  const { ledger } = manager.checkEcosystemDrift();
+  manager.saveLockLedger(ledger);
+  const radar = new ContractDriftRadar({
+    projectRoot: options.projectRoot,
+    cacheDir: resolveContractCacheDir(options.cacheDir)
+  });
+  await radar.recordBaseline();
+  console.log('🔒 Baseline dependency ledgers successfully recorded to .aegis/cache\n');
+}
+
+export async function handleDepsDrift(
+  args: string[] = [],
+  options: DepsDriftOptions = {}
+): Promise<void> {
   const isSync = args.includes('--sync') || args.includes('-s');
+  const isStrict = args.includes('--strict');
   showBanner();
   const modeStr = isSync ? ' (Sync Mode)' : '';
   console.log(`📡 Running Symbiotic Substrate 2.0 Contract Drift Radar${modeStr}...\n`);
   if (isSync) {
-    const manager = new MultiLanguageMetadataManager();
-    const { ledger } = manager.checkEcosystemDrift();
-    manager.saveLockLedger(ledger);
-    const radar = new ContractDriftRadar();
-    await radar.recordBaseline();
-    console.log('🔒 Baseline dependency ledgers successfully recorded to .aegis/cache\n');
+    await syncDependencyLedgers(options);
   }
-  reportEcosystemStatus();
-  const contractClean = await reportContractDrift();
-  reportProjectReferences();
-  const topoClean = reportTopologicalDependencies();
-  if (!contractClean || !topoClean) {
+  const ecoClean = reportEcosystemStatus(options);
+  const contract = await reportContractDrift(options);
+  const refsClean = reportProjectReferences(options.projectRoot);
+  const topoClean = reportTopologicalDependencies(options.projectRoot);
+  const hasStrictDrift = !ecoClean || contract.hasDrift || !refsClean || !topoClean;
+  if (!contract.clean || !topoClean || !refsClean || (isStrict && hasStrictDrift)) {
     process.exitCode = 1;
   }
 }

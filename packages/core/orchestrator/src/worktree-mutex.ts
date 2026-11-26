@@ -1,6 +1,7 @@
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AgentWorktree } from '@aegis/shared';
+import { type AgentWorktree, debugLogIgnored } from '@aegis/shared';
 
 export function parseWorktreePorcelainBlock(block: string, worktreePrefix: string): AgentWorktree | null {
   if (!block.trim()) return null;
@@ -40,13 +41,21 @@ export function matchesLockOwner(owner: string, query: string): boolean {
 }
 
 export class WorktreeMutex {
-  public static safeUnlock(lockDir: string): () => void {
+  public static safeUnlock(lockDir: string, token?: string): () => void {
+    const tokenFile = path.join(lockDir, 'token');
     return () => {
       for (let i = 0; i < 3; i++) {
         try {
+          if (!fs.existsSync(lockDir)) return;
+          if (token) {
+            const currentToken = fs.readFileSync(tokenFile, 'utf8').trim();
+            if (currentToken !== token) return;
+          }
           fs.rmSync(lockDir, { recursive: true, force: true });
           break;
-        } catch { /* ignore */ }
+        } catch (err: unknown) {
+          debugLogIgnored('WorktreeMutex:safeUnlock', err);
+        }
       }
     };
   }
@@ -64,7 +73,7 @@ export class WorktreeMutex {
         return age > 500;
       }
       if (ownerPid === process.pid) {
-        return age > 300;
+        return false;
       }
       process.kill(ownerPid, 0);
       return false;
@@ -79,18 +88,25 @@ export class WorktreeMutex {
   public static acquire(lockFilePath: string, maxRetries = 60, retryDelay = 50): () => void {
     const lockDir = `${lockFilePath}.lock`;
     const pidFile = path.join(lockDir, 'pid');
+    const tokenFile = path.join(lockDir, 'token');
     fs.mkdirSync(path.dirname(lockDir), { recursive: true });
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         fs.mkdirSync(lockDir);
+        const token = crypto.randomUUID();
         fs.writeFileSync(pidFile, String(process.pid), 'utf8');
-        return WorktreeMutex.safeUnlock(lockDir);
+        fs.writeFileSync(tokenFile, token, 'utf8');
+        return WorktreeMutex.safeUnlock(lockDir, token);
       } catch (err: unknown) {
         const code = (err as { code?: string })?.code;
         if (code !== 'EEXIST') throw err;
         if (WorktreeMutex.isLockStale(lockDir, pidFile) || attempt > 30) {
-          try { fs.rmSync(lockDir, { recursive: true, force: true }); } catch { /* ignore */ }
+          try {
+            fs.rmSync(lockDir, { recursive: true, force: true });
+          } catch (rmErr: unknown) {
+            debugLogIgnored('WorktreeMutex:acquireStaleRm', rmErr);
+          }
           continue;
         }
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, retryDelay);

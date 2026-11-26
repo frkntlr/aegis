@@ -1,10 +1,11 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import { type SymbolEntry, SymbolParser } from './symbol-parser.js';
 import { FuzzyMatcher } from './fuzzy-matcher.js';
 
-export { type SymbolEntry } from './symbol-parser.js';
+export type { SymbolEntry } from './symbol-parser.js';
 
 export interface FileSymbols {
   hash: string;
@@ -39,7 +40,9 @@ export class SymbolIndexer {
         const raw = fs.readFileSync(cachePath, 'utf8');
         this.db = JSON.parse(raw);
         return this.db;
-      } catch { /* use empty db on parse error */ }
+      } catch (err: unknown) {
+        debugLogIgnored('SymbolIndexer:loadCache', err);
+      }
     }
     this.db = { version: '1.0.0', lastUpdated: new Date().toISOString(), files: {} };
     return this.db;
@@ -62,9 +65,11 @@ export class SymbolIndexer {
         fs.renameSync(tmpPath, cachePath);
       } catch {
         fs.copyFileSync(tmpPath, cachePath);
-        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+        try { fs.rmSync(tmpPath, { force: true }); } catch (rmErr: unknown) { debugLogIgnored('SymbolIndexer:saveCacheCleanup', rmErr); }
       }
-    } catch { /* ignore non-fatal cache write errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('SymbolIndexer:saveCache', err);
+    }
   }
 
   public indexFile(filePath: string, content: string, mtime = Date.now()): SymbolEntry[] {
@@ -105,7 +110,9 @@ export class SymbolIndexer {
         const stats = fs.statSync(fullPath);
         const content = fs.readFileSync(fullPath, 'utf8');
         this.indexFile(normRel, content, stats.mtimeMs);
-      } catch { /* ignore unreadable files */ }
+      } catch (err: unknown) {
+        debugLogIgnored('SymbolIndexer:indexFiles', err);
+      }
     }
 
     if (cachePath) this.saveCache(cachePath);

@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { AmbientCookieVaultExtractor } from './ambient-cookie-vault-extractor.js';
+import { AmbientFirefoxVaultExtractor } from './ambient-firefox-vault-extractor.js';
 
 function createEncryptedMockCookie(plainValue: string, masterKey: Buffer): Buffer {
   const iv = crypto.randomBytes(12);
@@ -185,4 +186,29 @@ test('extractFromAllVaults extracts from Firefox profile successfully', () => {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test('querySqliteDatabase and queryFirefoxSqlite emit diagnostics when node:sqlite is unavailable', (t) => {
+  const prevDebug = process.env.AEGIS_DEBUG;
+  process.env.AEGIS_DEBUG = '1';
+  t.after(() => {
+    if (prevDebug === undefined) delete process.env.AEGIS_DEBUG;
+    else process.env.AEGIS_DEBUG = prevDebug;
+  });
+
+  const logs: string[] = [];
+  t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
+    logs.push(String(chunk));
+    return true;
+  });
+
+  const throwUnsupported = (): never => {
+    const err = new Error('No such built-in module: node:sqlite') as NodeJS.ErrnoException;
+    err.code = 'ERR_UNKNOWN_BUILTIN_MODULE';
+    throw err;
+  };
+
+  assert.deepStrictEqual(AmbientCookieVaultExtractor.querySqliteDatabase('ignored.db', throwUnsupported), []);
+  assert.deepStrictEqual(AmbientFirefoxVaultExtractor.queryFirefoxSqlite('ignored.sqlite', throwUnsupported), []);
+  assert.strictEqual(logs.filter(l => l.includes('notebooklm-sqlite:unsupported')).length, 2);
 });

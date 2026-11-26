@@ -38,6 +38,9 @@ jobs:
       - name: "Monorepo Lint"
         run: npm run lint
 
+      - name: "Topological Dependency Radar & Contract Drift (RFC-036)"
+        run: node packages/cli/dist/bin/aegis.js deps:drift
+
       - name: "Deterministic Demir Kafes (Iron Cage) Audit"
         run: node packages/cli/dist/bin/aegis.js cage:check
 
@@ -48,7 +51,12 @@ jobs:
         run: npm test
 
       - name: "Zero-Token UI Layout Inspection"
-        run: node packages/cli/dist/bin/aegis.js inspect
+        run: node packages/cli/dist/bin/aegis.js inspect packages/plugins/godot-bridge/fixtures/inspect-sample
+
+      - name: "Godot Bridge Status & Zero-Token UI Verification"
+        run: |
+          node packages/cli/dist/bin/aegis.js godot status
+          node packages/cli/dist/bin/aegis.js godot inspect packages/plugins/godot-bridge/fixtures/inspect-sample
 
       - name: "Mutation Testing Gate"
-        run: node packages/cli/dist/bin/aegis.js mutate
+        run: node packages/cli/dist/bin/aegis.js mutate packages/core/watchdog/src/pre-execution-estimator.ts packages/core/iron-cage/src/line-budget-radar.ts packages/shared/src/json-safe.ts

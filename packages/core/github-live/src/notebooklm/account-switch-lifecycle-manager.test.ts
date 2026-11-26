@@ -9,6 +9,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { AccountSwitchLifecycleManager } from './account-switch-lifecycle-manager.js';
 
 test('archiveCurrentSession copies auth.json to timestamped backup', () => {
@@ -62,7 +63,7 @@ test('executeSwitch succeeds via zero-click CDP harvester', async () => {
     assert.strictEqual(res.method, 'zero_click_cdp');
     assert.strictEqual(res.source, 'https://notebooklm.google.com');
 
-    const updated = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    const updated = readJsonSafe<{ cookies: string }>(authPath);
     assert.ok(updated.cookies.includes('SID=new-cdp-sid'));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

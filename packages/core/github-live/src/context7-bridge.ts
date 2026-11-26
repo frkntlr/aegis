@@ -1,6 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GodotTopicResolver, DeprecationLinter, resolveSafeCacheDir, type DeprecationWarning } from '@aegis/shared';
+import {
+  GodotTopicResolver,
+  DeprecationLinter,
+  debugLogIgnored,
+  readJsonSafe,
+  resolveSafeCacheDir,
+  type DeprecationWarning
+} from '@aegis/shared';
 import { DependencyMapper, type DiscoveredDependency } from './dependency-mapper.js';
 import { Context7Registry } from './context7-registry.js';
 import { JitDocSynthesizer } from './jit-doc-synthesizer.js';
@@ -92,13 +99,15 @@ export class Context7Bridge {
       for (const f of files) {
         if (!f.endsWith('.json') || f === 'docs.json') continue;
         if (f.toLowerCase().startsWith(library.toLowerCase())) {
-          const entry = JSON.parse(fs.readFileSync(path.join(targetDir, f), 'utf8')) as Context7DocEntry;
+          const entry = readJsonSafe<Context7DocEntry>(path.join(targetDir, f));
           if (entry.library.toLowerCase() === library.toLowerCase() && (!topic || entry.topic.toLowerCase().includes(topic.toLowerCase()))) {
             return entry;
           }
         }
       }
-    } catch { /* ignore cache read error */ }
+    } catch (err: unknown) {
+      debugLogIgnored('context7-bridge:queryDiskCache', err);
+    }
     return null;
   }
 
@@ -130,7 +139,9 @@ export class Context7Bridge {
         const fname = `${doc.library.toLowerCase()}-${doc.version.toLowerCase().replace(/[^a-z0-9.]/g, '')}.json`;
         fs.writeFileSync(path.join(cacheDir, fname), JSON.stringify(doc, null, 2), 'utf8');
       }
-    } catch { /* ignore non-fatal cache write errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('context7-bridge:saveToCache', err);
+    }
   }
 
   public loadFromCache(cacheDir = resolveSafeCacheDir('context7')): void {
@@ -138,16 +149,18 @@ export class Context7Bridge {
     try {
       const mainFile = path.join(cacheDir, 'docs.json');
       if (fs.existsSync(mainFile)) {
-        const records = JSON.parse(fs.readFileSync(mainFile, 'utf8')) as Context7DocEntry[];
+        const records = readJsonSafe<Context7DocEntry[]>(mainFile);
         for (const r of records) this.registerDoc(r);
       }
       const files = fs.readdirSync(cacheDir);
       for (const f of files) {
         if (!f.endsWith('.json') || f === 'docs.json') continue;
-        const entry = JSON.parse(fs.readFileSync(path.join(cacheDir, f), 'utf8')) as Context7DocEntry;
+        const entry = readJsonSafe<Context7DocEntry>(path.join(cacheDir, f));
         if (entry.library && entry.topic) this.registerDoc(entry);
       }
-    } catch { /* ignore cache read errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('context7-bridge:loadFromCache', err);
+    }
   }
 
   public injectDocumentationContext(basePrompt: string, targetFiles: string[], codeSnippets: string[] = []): string {

@@ -1,4 +1,4 @@
-﻿/** GitHub lifecycle synchronization. Success requires a real adapter response. */
+/** GitHub lifecycle synchronization. Success requires a real adapter response. */
 import { GitHubLiveAdapter } from './live-adapter.js';
 import { GitHubTokenResolver, type GitHubAuthContext } from './token-resolver.js';
 

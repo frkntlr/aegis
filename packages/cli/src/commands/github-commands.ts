@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { GitHubTokenResolver, GitHubLiveAdapter, GitHubClient, type GitHubIssue } from '@aegis/github-live';
 import { WorktreeManager, TaskDispatcher } from '@aegis/orchestrator';
 import { stageTaskInInbox } from './task-inbox.js';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeAegisDir } from '@aegis/shared';
 import { showBanner } from './banner.js';
 
 export async function handleGhStatus(tokenArg?: string): Promise<void> {
@@ -38,7 +38,7 @@ function stageDispatchedIssue(agentName: string, issue: GitHubIssue): void {
   console.log(` • Agent: ${agentName.toUpperCase()} in experimental/${agentName}`);
   console.log(` • Locks: ${issue.targetFiles.join(', ') || 'General'}`);
   const pDir = path.join(resolveSafeAegisDir(), 'prompts');
-  try { fs.mkdirSync(pDir, { recursive: true }); } catch { /* ignore */ }
+  try { fs.mkdirSync(pDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('GitHubCommands:stageDispatchedIssue', err); }
   const pFile = path.resolve(pDir, `${agentName}-issue-${issue.number}.md`);
   const pContent = `# 🎯 Task: #${issue.number} ${issue.title}\n` +
     `Agent: @${agentName.toUpperCase()} | Status: IN_PROGRESS\n` +
@@ -109,7 +109,7 @@ export async function handleGhSync(tokenArg?: string): Promise<void> {
 export async function handleGhComment(issueNumberStr: string, commentBody: string, tokenArg?: string): Promise<void> {
   showBanner();
   const issueNum = parseInt(issueNumberStr, 10);
-  if (isNaN(issueNum) || !commentBody) {
+  if (Number.isNaN(issueNum) || !commentBody) {
     console.error('❌ Usage: aegis gh:comment <issueNumber> "<commentBody>" [token]');
     process.exit(1);
   }

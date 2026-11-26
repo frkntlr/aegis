@@ -77,3 +77,48 @@ test('WorktreeMutexShield: flags files locked by other agents and produces warni
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('WorktreeMutex same-PID lock is not considered stale before 30s TTL', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mutex-samepid-'));
+  const lockFilePath = path.join(tmpDir, 'locks.json');
+  const lockDir = `${lockFilePath}.lock`;
+  const pidFile = path.join(lockDir, 'pid');
+  try {
+    const unlock = WorktreeMutex.acquire(lockFilePath);
+    const past = new Date(Date.now() - 1000);
+    fs.utimesSync(lockDir, past, past);
+    assert.strictEqual(WorktreeMutex.isLockStale(lockDir, pidFile), false);
+    unlock();
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('WorktreeMutex stale takeover prevents earlier holder unlock from removing new lock', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-mutex-token-'));
+  const lockFilePath = path.join(tmpDir, 'locks.json');
+  const lockDir = `${lockFilePath}.lock`;
+  try {
+    const unlockOld = WorktreeMutex.acquire(lockFilePath);
+    const oldToken = fs.readFileSync(path.join(lockDir, 'token'), 'utf8').trim();
+    assert.ok(oldToken.length > 0);
+
+    // Simulate >30s TTL expiry so second holder steals lockDir
+    const expired = new Date(Date.now() - 35000);
+    fs.utimesSync(lockDir, expired, expired);
+
+    const unlockNew = WorktreeMutex.acquire(lockFilePath);
+    const newToken = fs.readFileSync(path.join(lockDir, 'token'), 'utf8').trim();
+    assert.notStrictEqual(newToken, oldToken);
+
+    // Old holder calling unlock must NOT delete the new holder's lockDir
+    unlockOld();
+    assert.strictEqual(fs.existsSync(lockDir), true);
+    assert.strictEqual(fs.readFileSync(path.join(lockDir, 'token'), 'utf8').trim(), newToken);
+
+    unlockNew();
+    assert.strictEqual(fs.existsSync(lockDir), false);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

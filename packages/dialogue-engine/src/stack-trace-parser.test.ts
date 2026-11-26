@@ -4,15 +4,15 @@ import { PolyglotStackTraceParser, stripAnsi } from './stack-trace-parser.js';
 
 test('PolyglotStackTraceParser parses Node.js V8 stack trace', () => {
   const trace = `Error: Something failed
-    at Watchdog.resetTimer (C:/Users/Lenovo/work/aegis/packages/core/watchdog.ts:42:15)
-    at Object.<anonymous> (C:/Users/Lenovo/work/aegis/packages/cli/main.ts:100:5)`;
+    at Watchdog.resetTimer (C:/Users/dev/work/aegis/packages/core/watchdog.ts:42:15)
+    at Object.<anonymous> (C:/Users/dev/work/aegis/packages/cli/main.ts:100:5)`;
 
   const parser = new PolyglotStackTraceParser();
   const res = parser.parse(trace);
 
   assert.ok(res.primaryLocation);
   assert.strictEqual(res.primaryLocation.symbolName, 'Watchdog.resetTimer');
-  assert.strictEqual(res.primaryLocation.filePath, 'C:/Users/Lenovo/work/aegis/packages/core/watchdog.ts');
+  assert.strictEqual(res.primaryLocation.filePath, 'C:/Users/dev/work/aegis/packages/core/watchdog.ts');
   assert.strictEqual(res.primaryLocation.lineNumber, 42);
   assert.strictEqual(res.primaryLocation.columnNumber, 15);
   assert.strictEqual(res.primaryLocation.format, 'node_v8');

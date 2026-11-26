@@ -4,7 +4,7 @@ const { spawn } = require('node:child_process');
 const { parse } = require('smol-toml');
 
 const root = path.resolve(process.argv[2] || path.join(__dirname, '..'));
-const config = parse(fs.readFileSync(path.join(root, '.codex/config.toml'), 'utf8'));
+const config = parse(fs.readFileSync(path.join(root, '.codex/config.toml'), 'utf8').replace(/^\uFEFF/, ''));
 const server = config.mcp_servers?.aegis;
 if (!server || typeof server.command !== 'string' || server.enabled === false) {
   throw new Error('Expected an enabled stdio mcp_servers.aegis command');

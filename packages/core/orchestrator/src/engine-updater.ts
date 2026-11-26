@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as cp from 'node:child_process';
-import { resolveSafeRepoRoot, cleanGitEnv } from '@aegis/shared';
+import { cleanGitEnv, debugLogIgnored, readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import { VersionManager, type BumpType } from './version-manager.js';
 import { refreshEngineInstallations, resolveUpdateEngineRoot } from './engine-update-refresh.js';
 import { runEngineUpdate } from './engine-update-run.js';
@@ -93,10 +93,9 @@ export class EngineUpdater {
           const pj = path.join(sub, 'package.json');
           if (fs.existsSync(pj)) {
             try {
-              const raw = fs.readFileSync(pj, 'utf8').replace(/^\uFEFF/, '');
-              const parsed = JSON.parse(raw) as { name?: string; version?: string };
+              const parsed = readJsonSafe<{ name?: string; version?: string }>(pj);
               if (parsed.name) pkgs.push({ name: parsed.name, version: parsed.version || '0.1.0' });
-            } catch { /* ignore parse error */ }
+            } catch (err: unknown) { debugLogIgnored('EngineUpdater:discoverPackages', err); }
           }
           scan(sub);
         }
@@ -112,9 +111,8 @@ export class EngineUpdater {
     let currentVersion = '0.1.0';
     if (fs.existsSync(rootPkgPath)) {
       try {
-        const raw = fs.readFileSync(rootPkgPath, 'utf8').replace(/^\uFEFF/, '');
-        currentVersion = (JSON.parse(raw) as { version?: string }).version || '0.1.0';
-      } catch { /* ignore */ }
+        currentVersion = readJsonSafe<{ version?: string }>(rootPkgPath).version || '0.1.0';
+      } catch (err: unknown) { debugLogIgnored('EngineUpdater:getVersionReport', err); }
     }
 
     const localCommit = this.safeExec('git rev-parse --short HEAD', root) || 'unknown';
@@ -206,7 +204,7 @@ export class EngineUpdater {
     const userHome = os.homedir();
     const binDir = path.resolve(userHome, '.gemini', 'antigravity', 'bin');
     if (!fs.existsSync(binDir)) return [];
-    return fs.readdirSync(binDir).filter(f => f.startsWith('aegis') || f.startsWith('tw') || f.startsWith('tr'));
+    return fs.readdirSync(binDir).filter(f => f.startsWith('aegis') || f.startsWith('tw'));
   }
 
   private static countMcpTools(): number {

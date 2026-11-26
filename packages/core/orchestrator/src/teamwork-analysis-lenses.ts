@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import type {
   AnalysisInsight,
   LensExecutionResult
@@ -33,7 +34,7 @@ export class AstStructuralLens {
             timestamp: new Date().toISOString()
           });
         }
-      } catch { /* ignore read errors */ }
+      } catch (err: unknown) { debugLogIgnored('AnalysisLenses:AstStructuralLens', err); }
     }
     return { lens: 'ast', agent: 'ast-architect', durationMs: Date.now() - start, insights };
   }
@@ -92,7 +93,7 @@ export class RelationalMapperLens {
             timestamp: new Date().toISOString()
           });
         }
-      } catch { /* ignore */ }
+      } catch (err: unknown) { debugLogIgnored('AnalysisLenses:RelationalMapperLens', err); }
     }
     return { lens: 'relation', agent: 'relational-mapper', durationMs: Date.now() - start, insights };
   }
@@ -121,7 +122,7 @@ export class GroundingMemoryLens {
             timestamp: new Date().toISOString()
           });
         }
-      } catch { /* ignore */ }
+      } catch (err: unknown) { debugLogIgnored('AnalysisLenses:GroundingMemoryLens', err); }
     }
     return { lens: 'grounding', agent: 'living-grounder', durationMs: Date.now() - start, insights };
   }

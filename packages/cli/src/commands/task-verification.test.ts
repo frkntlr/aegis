@@ -31,7 +31,7 @@ function result(overrides: Partial<TestExecutionResult> = {}): TestExecutionResu
 
 test('task verification waits for actual Godot runtime before reporting success', async t => {
   const { root, output } = fixture(t);
-  let finish: (value: TestExecutionResult) => void = () => {};
+  let finish: (value: TestExecutionResult) => void = () => undefined;
   const runtime = new Promise<TestExecutionResult>(resolve => { finish = resolve; });
   const runner = t.mock.method(GodotTestRunner, 'runPlaytestScenario', async (projectDir: string) => {
     assert.equal(projectDir, root);
@@ -95,4 +95,25 @@ test('cage audit rejects missing and empty source targets with failing JSON evid
     assert.equal(response.filesScanned, 0);
     assert.match(response.error, /does not exist|No source files/);
   }
+});
+
+test('cage audit emits CRITICAL_QUOTA radarAlert for 285-line compliant file', t => {
+  const { root, output } = fixture(t, false);
+  const srcDir = path.join(root, 'radar-src');
+  fs.mkdirSync(srcDir, { recursive: true });
+  const lines = Array.from({ length: 285 }, (_, i) => `export const v${i} = ${i};`).join('\n') + '\n';
+  fs.writeFileSync(path.join(srcDir, 'near-limit.ts'), lines, 'utf8');
+  output.length = 0;
+  process.exitCode = 0;
+  handleCageCheck(['--no-cache', '--json', srcDir]);
+  const response = JSON.parse(output[0]) as {
+    clean: boolean;
+    filesScanned: number;
+    radarAlerts: Array<{ file: string; lines: number; msg: string }>;
+  };
+  assert.equal(process.exitCode, 0);
+  assert.equal(response.clean, true);
+  assert.equal(response.filesScanned, 1);
+  assert.equal(response.radarAlerts.length, 1);
+  assert.equal(response.radarAlerts[0].lines, 285);
 });

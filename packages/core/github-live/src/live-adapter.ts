@@ -1,3 +1,4 @@
+import { debugLogIgnored } from '@aegis/shared';
 import type { GitHubIssue } from './types.js';
 
 export interface GitHubUser {
@@ -200,8 +201,8 @@ export class GitHubLiveAdapter {
         method: 'POST',
         body: JSON.stringify({ name, color, description })
       });
-    } catch {
-      // Ignored if label exists
+    } catch (err: unknown) {
+      debugLogIgnored('live-adapter:ensureLabel', err);
     }
   }
 

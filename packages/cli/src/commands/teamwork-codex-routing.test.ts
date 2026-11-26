@@ -36,7 +36,7 @@ test('batch lookup rejects missing plans and path traversal without replanning',
 });
 
 test('CLI dry-run creates no saved plan or inbox tasks', t => {
-  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'log', () => undefined);
   t.after(() => t.mock.restoreAll());
   const root = resolveSafeRepoRoot();
   const inbox = path.join(root, '.aegis/task-inbox.json');

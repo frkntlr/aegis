@@ -36,7 +36,7 @@ export async function handleProjectSync(
   showBanner();
   const pNum = parseInt(projectNumStr, 10);
   const iNum = parseInt(issueNumStr, 10);
-  if (isNaN(pNum) || isNaN(iNum)) {
+  if (Number.isNaN(pNum) || Number.isNaN(iNum)) {
     console.error('❌ Usage: aegis project:sync <projectNumber> <issueNumber> [ready|in_progress|done]');
     process.exit(1);
   }

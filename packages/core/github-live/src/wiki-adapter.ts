@@ -1,12 +1,24 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeAegisDir } from '@aegis/shared';
 import { execFileSync } from 'node:child_process';
 import { GitHubTokenResolver } from './token-resolver.js';
 import type { WikiFastSyncResult, WikiPage, WikiSyncOptions, WikiSyncStatus } from './types.js';
 import { DEFAULT_WIKI_SUITE } from './wiki-suite.js';
-import { cleanGitEnv, formatWikiMarkdown, parseWikiMarkdown } from './wiki-helpers.js';
+import {
+  buildGitAuthEnv,
+  cleanGitEnv,
+  formatWikiMarkdown,
+  isPathInsideDir,
+  parseWikiMarkdown,
+  redactGitToken
+} from './wiki-helpers.js';
 import { executeFastReconcile, WikiSyncRadar } from './wiki-sync-radar.js';
+import {
+  backupConflictingWikiDir,
+  buildFallbackWikiPages,
+  ensureWikiGitInitialized
+} from './wiki-adapter-helpers.js';
 
 export interface WikiAdapterOptions {
   token?: string;
@@ -32,10 +44,11 @@ export class GitHubWikiLiveAdapter {
   }
 
   public getWikiRemoteUrl(): string {
-    if (this.token) {
-      return `https://x-access-token:${this.token}@github.com/${this.owner}/${this.repo}.wiki.git`;
-    }
     return `https://github.com/${this.owner}/${this.repo}.wiki.git`;
+  }
+
+  private getGitEnv(): NodeJS.ProcessEnv {
+    return buildGitAuthEnv(this.token);
   }
 
   public getWikiWebUrl(): string {
@@ -48,14 +61,15 @@ export class GitHubWikiLiveAdapter {
     }
     const url = this.getWikiRemoteUrl();
     try {
-      execFileSync('git', ['ls-remote', url], { stdio: 'pipe', timeout: 8000, env: cleanGitEnv() });
+      execFileSync('git', ['ls-remote', url], { stdio: 'pipe', timeout: 8000, env: this.getGitEnv() });
       this.cachedAvailability = {
         available: true,
         url: this.getWikiWebUrl(),
         remoteRepo: `${this.owner}/${this.repo}.wiki.git`,
         pageCount: this.listPages().length
       };
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-adapter:checkRemoteAvailability', err);
       this.cachedAvailability = {
         available: false,
         url: this.getWikiWebUrl(),
@@ -75,6 +89,8 @@ export class GitHubWikiLiveAdapter {
       cloneDir: this.cloneDir,
       remoteUrl: this.getWikiRemoteUrl(),
       remoteRepo: `${this.owner}/${this.repo}.wiki.git`,
+      gitEnv: this.getGitEnv(),
+      token: this.token,
       options
     });
   }
@@ -85,27 +101,23 @@ export class GitHubWikiLiveAdapter {
     if (!fs.existsSync(path.join(this.cloneDir, '.git'))) {
       return this.cloneWikiRemote(url);
     }
+    const env = this.getGitEnv();
     try {
+      execFileSync('git', ['-C', this.cloneDir, 'remote', 'set-url', 'origin', url], { stdio: 'pipe', env });
       execFileSync('git', ['-C', this.cloneDir, 'pull', 'origin', 'master', '--allow-unrelated-histories'], {
         stdio: 'pipe',
         timeout: 15000,
-        env: cleanGitEnv()
+        env
       });
       return true;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-adapter:syncFromRemote', err);
       return this.cloneWikiRemote(url);
     }
   }
 
   private backupConflictingWiki(): void {
-    if (!fs.existsSync(this.cloneDir)) return;
-    try {
-      const backupDir = path.join(resolveSafeAegisDir(), `wiki-backup-${Date.now()}`);
-      fs.mkdirSync(path.dirname(backupDir), { recursive: true });
-      fs.cpSync(this.cloneDir, backupDir, { recursive: true });
-    } catch {
-      // Graceful degradation on backup failure
-    }
+    backupConflictingWikiDir(this.cloneDir);
   }
 
   private cloneWikiRemote(url: string): boolean {
@@ -114,9 +126,10 @@ export class GitHubWikiLiveAdapter {
         this.backupConflictingWiki();
         fs.rmSync(this.cloneDir, { recursive: true, force: true });
       }
-      execFileSync('git', ['clone', url, this.cloneDir], { stdio: 'pipe', timeout: 20000, env: cleanGitEnv() });
+      execFileSync('git', ['clone', url, this.cloneDir], { stdio: 'pipe', timeout: 20000, env: this.getGitEnv() });
       return true;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-adapter:cloneWikiRemote', err);
       return false;
     }
   }
@@ -136,7 +149,7 @@ export class GitHubWikiLiveAdapter {
   public getPage(slug: string): WikiPage | undefined {
     const cleanSlug = path.basename(slug).replace(/\.md$/, '');
     const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
-    if (!filePath.startsWith(path.resolve(this.cloneDir))) return undefined;
+    if (!isPathInsideDir(this.cloneDir, filePath)) return undefined;
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf8');
       return parseWikiMarkdown(cleanSlug, raw);
@@ -154,7 +167,7 @@ export class GitHubWikiLiveAdapter {
     const cleanSlug = path.basename(slug).replace(/\.md$/, '') || 'wiki-page';
     fs.mkdirSync(this.cloneDir, { recursive: true });
     const filePath = path.resolve(this.cloneDir, `${cleanSlug}.md`);
-    if (!filePath.startsWith(path.resolve(this.cloneDir))) return false;
+    if (!isPathInsideDir(this.cloneDir, filePath)) return false;
     const formatted = formatWikiMarkdown(title, bullets, content);
     const withoutStamp = (text: string): string => text.replace(/_(?:Published to GitHub Wiki|Cached locally) on: [^\n]+_\s*$/, '');
     const unchanged = fs.existsSync(filePath) && withoutStamp(fs.readFileSync(filePath, 'utf8')) === withoutStamp(formatted);
@@ -163,7 +176,7 @@ export class GitHubWikiLiveAdapter {
 
     if (!fs.existsSync(path.join(this.cloneDir, '.git'))) return !pushImmediate;
     try {
-      const env = cleanGitEnv();
+      const env = this.getGitEnv();
       if (!unchanged) {
         execFileSync('git', ['-C', this.cloneDir, 'add', `${cleanSlug}.md`], { stdio: 'pipe', env });
         execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', `docs(wiki): update ${cleanSlug} living memory`], { stdio: 'pipe', env });
@@ -172,7 +185,8 @@ export class GitHubWikiLiveAdapter {
         execFileSync('git', ['-C', this.cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
       }
       return true;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-adapter:publishPage', err);
       return false;
     }
   }
@@ -205,8 +219,8 @@ export class GitHubWikiLiveAdapter {
         const env = cleanGitEnv();
         execFileSync('git', ['-C', this.cloneDir, 'add', '.'], { stdio: 'pipe', env });
         execFileSync('git', ['-C', this.cloneDir, 'commit', '-m', 'docs(wiki): seed 13-page living architecture suite'], { stdio: 'pipe', env });
-      } catch {
-        // workspace clean
+      } catch (err: unknown) {
+        debugLogIgnored('wiki-adapter:seedCommit', err);
       }
     }
     return { created: createdSlugs.length, pages: createdSlugs };
@@ -221,7 +235,7 @@ export class GitHubWikiLiveAdapter {
     if (div.ahead === 0) {
       return { success: true, message: 'Remote already up-to-date with local wiki memory.' };
     }
-    const env = cleanGitEnv();
+    const env = this.getGitEnv();
     try {
       execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
       return { success: true, message: 'Successfully pushed all wiki pages to GitHub remote.' };
@@ -231,41 +245,17 @@ export class GitHubWikiLiveAdapter {
         execFileSync('git', ['-C', this.cloneDir, 'push', '-u', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
         return { success: true, message: 'Successfully reconciled and pushed wiki pages to remote.' };
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = redactGitToken(err instanceof Error ? err.message : String(err), this.token);
         return { success: false, message: `Failed to push wiki to remote: ${msg}` };
       }
     }
   }
 
   private ensureGitInitialized(): void {
-    fs.mkdirSync(this.cloneDir, { recursive: true });
-    const gitDir = path.join(this.cloneDir, '.git');
-    const env = cleanGitEnv();
-    if (!fs.existsSync(gitDir)) {
-      execFileSync('git', ['init', '-b', 'master', this.cloneDir], { stdio: 'pipe', env });
-      execFileSync('git', ['-C', this.cloneDir, 'config', 'user.name', 'Aegis Fleet'], { stdio: 'pipe', env });
-      execFileSync('git', ['-C', this.cloneDir, 'config', 'user.email', 'aegis@local'], { stdio: 'pipe', env });
-    }
-    const remoteUrl = this.getWikiRemoteUrl();
-    try {
-      execFileSync('git', ['-C', this.cloneDir, 'remote', 'get-url', 'origin'], { stdio: 'pipe', env });
-      execFileSync('git', ['-C', this.cloneDir, 'remote', 'set-url', 'origin', remoteUrl], { stdio: 'pipe', env });
-    } catch {
-      try {
-        execFileSync('git', ['-C', this.cloneDir, 'remote', 'add', 'origin', remoteUrl], { stdio: 'pipe', env });
-      } catch {
-        // remote already configured
-      }
-    }
+    ensureWikiGitInitialized(this.cloneDir, this.getWikiRemoteUrl());
   }
 
   private getFallbackPages(): WikiPage[] {
-    return DEFAULT_WIKI_SUITE.map(p => ({
-      slug: p.slug,
-      title: p.title,
-      threeBulletSummary: p.threeBullets,
-      content: p.content,
-      lastUpdated: new Date().toISOString()
-    }));
+    return buildFallbackWikiPages();
   }
 }

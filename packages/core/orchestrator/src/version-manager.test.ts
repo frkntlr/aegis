@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { VersionManager } from './version-manager.js';
 
 test('VersionManager.bumpSemver bumps semver accurately', () => {
@@ -74,10 +75,10 @@ test('VersionManager.syncMonorepoVersions updates all package.json files and pre
     assert.ok(syncRes.updatedPackages.includes('@aegis/pkg-b'));
     assert.strictEqual(syncRes.updatedPackages.includes('ignored-pkg'), false);
 
-    const updatedRoot = JSON.parse(fs.readFileSync(path.join(tmpDir, 'package.json'), 'utf8')) as { version: string };
-    const updatedA = JSON.parse(fs.readFileSync(path.join(pkgADir, 'package.json'), 'utf8')) as { version: string };
-    const updatedB = JSON.parse(fs.readFileSync(path.join(pkgBDir, 'package.json'), 'utf8')) as { version: string };
-    const unchangedIgnored = JSON.parse(fs.readFileSync(path.join(ignoredDir, 'package.json'), 'utf8')) as { version: string };
+    const updatedRoot = readJsonSafe<{ version: string }>(path.join(tmpDir, 'package.json'));
+    const updatedA = readJsonSafe<{ version: string }>(path.join(pkgADir, 'package.json'));
+    const updatedB = readJsonSafe<{ version: string }>(path.join(pkgBDir, 'package.json'));
+    const unchangedIgnored = readJsonSafe<{ version: string }>(path.join(ignoredDir, 'package.json'));
 
     assert.strictEqual(updatedRoot.version, '0.2.5');
     assert.strictEqual(updatedA.version, '0.2.5');

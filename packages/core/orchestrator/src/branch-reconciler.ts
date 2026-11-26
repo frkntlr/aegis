@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import { cleanGitEnv } from './worktree-mutex.js';
 
 export interface WorktreeInfo {
@@ -76,7 +77,7 @@ export class BranchReconciler {
         });
         stashed = true;
       }
-    } catch { /* proceed if git stash fails */ }
+    } catch (err: unknown) { debugLogIgnored('BranchReconciler:stashPush', err); }
 
     try {
       return fn();
@@ -87,7 +88,7 @@ export class BranchReconciler {
             stdio: 'pipe',
             env: cleanGitEnv()
           });
-        } catch { /* preserve stash on pop conflict */ }
+        } catch (err: unknown) { debugLogIgnored('BranchReconciler:stashPop', err); }
       }
     }
   }
@@ -101,7 +102,7 @@ export class BranchReconciler {
           env: cleanGitEnv()
         }).trim();
         if (br && br !== 'HEAD') return br;
-      } catch { /* fallback */ }
+      } catch (err: unknown) { debugLogIgnored('BranchReconciler:resolveBranchName', err); }
     }
     return agentName.startsWith('aegis/') ? agentName : `aegis/${agentName}`;
   }

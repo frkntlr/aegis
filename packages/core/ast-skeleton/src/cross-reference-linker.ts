@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import { RelationalGraph } from './relational-graph.js';
 import { TscnRelationParser } from './tscn-relation-parser.js';
 import { SymbolParser, type SymbolEntry } from './symbol-parser.js';
@@ -24,7 +25,9 @@ export class CrossReferenceLinker {
       try {
         const content = fs.readFileSync(fullPath, 'utf8');
         this.linkSingleFile(relPath, content);
-      } catch { /* ignore unreadable */ }
+      } catch (err: unknown) {
+        debugLogIgnored('CrossReferenceLinker:linkFiles', err);
+      }
     }
     return this.graph;
   }

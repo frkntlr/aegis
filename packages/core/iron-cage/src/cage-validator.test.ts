@@ -202,10 +202,10 @@ test('GDScriptRulesValidator flags GD_007_COUPLING_PARENT_NODE for upward node p
   const validator = new GDScriptRulesValidator();
   const badScript = `
 func test_coupling():
-	var enemy = $\"../Enemy\"
-	var boss = get_node(\"../Boss\")
+	var enemy = $"../Enemy"
+	var boss = get_node("../Boss")
 	var p = get_parent()
-	var child = $\"Child\"
+	var child = $"Child"
 `.trim();
 
   const violations = validator.validate('scripts/bad_coupling.gd', badScript);

@@ -7,7 +7,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as child_process from 'node:child_process';
-import { resolveSafeRepoRoot, cleanGitEnv } from '@aegis/shared';
+import {
+  cleanGitEnv,
+  debugLogIgnored,
+  type NpmInvocation,
+  resolveNpmInvocation,
+  resolveSafeRepoRoot
+} from '@aegis/shared';
 import { DiagnosticTriageEnricher, type EnrichedDiagnostic } from '@aegis/iron-cage';
 import { GodotTestRunner } from '@aegis/godot-bridge';
 import { OfflineTestHarness } from '@aegis/watchdog';
@@ -37,39 +43,48 @@ export interface ResilientTestResult {
 }
 
 function killProcessTree(pid?: number): void {
-  if (!pid) return;
+  if (typeof pid !== 'number' || !Number.isFinite(pid) || pid <= 0) return;
+  const safePid = Math.trunc(pid);
   try {
     if (process.platform === 'win32') {
-      child_process.execSync(`taskkill /F /PID ${pid} /T`, { stdio: 'ignore' });
+      child_process.execFileSync('taskkill', ['/F', '/PID', String(safePid), '/T'], {
+        stdio: 'ignore',
+        windowsHide: true
+      });
     } else {
-      process.kill(-pid, 'SIGKILL');
+      process.kill(-safePid, 'SIGKILL');
     }
-  } catch {
-    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore if already dead */ }
+  } catch (err: unknown) {
+    debugLogIgnored('TestCommand:killProcessTree', err);
+    try {
+      process.kill(safePid, 'SIGKILL');
+    } catch (killErr: unknown) {
+      debugLogIgnored('TestCommand:killFallback', killErr);
+    }
   }
 }
 
-function buildTestCommand(cwd: string, opts: ResilientTestOptions): { cmd: string; args: string[] } {
+export function buildTestCommand(cwd: string, opts: ResilientTestOptions): NpmInvocation {
   const isGodot = fs.existsSync(path.resolve(cwd, 'project.godot'));
   if (isGodot) {
-    return { cmd: 'godot', args: ['--headless'] };
+    return { command: 'godot', args: ['--headless'] };
   }
-  const isWin = process.platform === 'win32';
-  const npmCmd = isWin ? 'npm.cmd' : 'npm';
   const args = ['test'];
   if (opts.target) args.push('--', opts.target);
   if (opts.bail) args.push('--', '--bail');
-  return { cmd: npmCmd, args };
+  return resolveNpmInvocation(args);
 }
 
-function spawnProcessSafely(cmd: string, args: string[], cwd: string): child_process.ChildProcess {
+function spawnProcessSafely(spec: NpmInvocation, cwd: string): child_process.ChildProcess {
   const env = { ...process.env, ...cleanGitEnv(), CI: 'true', AEGIS_TEST_SHIELD: '1', GIT_TERMINAL_PROMPT: '0' };
-  if (process.platform === 'win32' && cmd.endsWith('.cmd')) {
-    return child_process.spawn([cmd, ...args].join(' '), {
-      cwd, stdio: ['ignore', 'pipe', 'pipe'], env, windowsHide: true, shell: true
-    });
-  }
-  return child_process.spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env, windowsHide: true });
+  return child_process.spawn(spec.command, spec.args, {
+    cwd,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env,
+    windowsHide: true,
+    shell: false,
+    windowsVerbatimArguments: spec.windowsVerbatimArguments
+  });
 }
 
 function wireProcessEvents(
@@ -94,14 +109,13 @@ function wireProcessEvents(
 }
 
 function executeProcessWithWatchdog(
-  cmd: string,
-  args: string[],
+  spec: NpmInvocation,
   cwd: string,
   timeoutMs: number
 ): Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean; durationMs: number }> {
   return new Promise((resolve) => {
     const start = Date.now();
-    const proc = spawnProcessSafely(cmd, args, cwd);
+    const proc = spawnProcessSafely(spec, cwd);
     const timer = setTimeout(() => {
       killProcessTree(proc.pid);
       resolve({ stdout: '', stderr: `Execution timed out after ${timeoutMs}ms`, exitCode: 124, timedOut: true, durationMs: Date.now() - start });
@@ -174,8 +188,8 @@ export async function runResilientTest(options: ResilientTestOptions = {}): Prom
   }
   const isMonorepo = fs.existsSync(path.resolve(root, 'turbo.json'));
   const timeoutMs = options.timeoutMs ?? (isMonorepo ? 90000 : 45000);
-  const { cmd, args } = buildTestCommand(root, options);
-  const raw = await executeProcessWithWatchdog(cmd, args, root, timeoutMs);
+  const spec = buildTestCommand(root, options);
+  const raw = await executeProcessWithWatchdog(spec, root, timeoutMs);
 
   const passed = raw.exitCode === 0 && !raw.timedOut;
   const diag = passed ? undefined : DiagnosticTriageEnricher.classify(`${raw.stderr}\n${raw.stdout}`.trim());

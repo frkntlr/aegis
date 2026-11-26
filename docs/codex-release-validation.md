@@ -37,6 +37,26 @@ Validation environment: Windows, Node.js 25.5.0, 2026-11-11.
 
 ## Reproduction
 
+For the subsequent real Godot bridge, runtime failure propagation and quality
+gate checks, see [live validation](codex-live-validation.md). NotebookLM remote
+validation was attempted but blocked by network `EACCES` before an HTTP response.
+
+### Remaining compatibility audit, 2026-11-11
+
+Native Codex run `178dabd3-25d1-4a60-84d6-9be43da3f381` used three
+workers with implementation, independent QA and local documentation phases.
+This pass added Unicode task-ID persistence, complete mission context in native
+payloads, exact saved-plan batch lookup, Codex-specific MCP wave/batch output,
+explicit authentication choices and nonzero NotebookLM query failure status,
+and rejection of empty Godot telemetry as verification evidence.
+
+Final build and typecheck passed. Lint checked 546 files. The forced monorepo
+test run passed 1,070 tests with 28 successful Turbo tasks and no cached tasks
+in 35.053 seconds. The actual MCP initialize/tools/list/lock_status exchange
+passed in 281 ms. Focused quality gates passed for the affected implementations
+and tests. These checks use local fixtures and mocked integration failures;
+live NotebookLM authentication and Godot runtime/playtests remain unverified.
+
 ```powershell
 npm run build
 npm run typecheck

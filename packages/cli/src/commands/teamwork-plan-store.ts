@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import type { TeamworkPlan } from '@aegis/orchestrator';
 
 export function teamworkPlanPath(planId: string): string {
@@ -24,7 +24,7 @@ export function saveTeamworkPlan(plan: TeamworkPlan): void {
 export function loadTeamworkPlan(planId: string): TeamworkPlan {
   const file = teamworkPlanPath(planId);
   if (!fs.existsSync(file)) throw new Error(`Teamwork plan not found: ${planId}; create and save the plan first`);
-  const plan = JSON.parse(fs.readFileSync(file, 'utf8')) as TeamworkPlan;
+  const plan = readJsonSafe<TeamworkPlan>(file);
   if (plan.planId !== planId || !Array.isArray(plan.tracks)) throw new Error('Invalid saved teamwork plan');
   return plan;
 }

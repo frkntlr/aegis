@@ -70,7 +70,7 @@ function installUserShims(engine, prefix, platform = process.platform) {
   const bin = platform === 'win32' ? prefix : path.join(prefix, 'bin');
   const cli = path.join(engine, 'packages/cli/dist/bin/aegis.js');
   const files = [];
-  for (const name of ['aegis', 'aegist', 'tw', 'tr', 'aegis-tw', 'aegist-tw', 'aegis-tr']) {
+  for (const name of ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw', 'aegis-tr']) {
     const route = /(?:^|-)tw$/.test(name) ? 'tw' : /(?:^|-)tr$/.test(name) ? 'tr' : '';
     if (platform === 'win32') {
       const cmd = path.join(bin, `${name}.cmd`);

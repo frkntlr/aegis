@@ -10,10 +10,11 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as child_process from 'node:child_process';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { SessionCredentialsManager } from './session-credentials-manager.js';
 import { AmbientFirefoxVaultExtractor, type FirefoxProfile } from './ambient-firefox-vault-extractor.js';
 
-export { type FirefoxProfile };
+export type { FirefoxProfile };
 
 export interface BrowserVaultProfile {
   browserName: string;
@@ -84,7 +85,7 @@ export class AmbientCookieVaultExtractor {
   ): Buffer | null {
     try {
       if (!fs.existsSync(localStatePath)) return null;
-      const json = JSON.parse(fs.readFileSync(localStatePath, 'utf8')) as Record<string, unknown>;
+      const json = readJsonSafe<Record<string, unknown>>(localStatePath);
       const osCrypt = json.os_crypt as Record<string, unknown> | undefined;
       const encKeyB64 = typeof osCrypt?.encrypted_key === 'string' ? osCrypt.encrypted_key : null;
       if (!encKeyB64) return null;
@@ -163,11 +164,12 @@ export class AmbientCookieVaultExtractor {
     }
   }
 
-  private static querySqliteDatabase(dbPath: string): Array<{ name: string; encrypted_value: Buffer }> {
+  public static querySqliteDatabase(
+    dbPath: string,
+    sqliteLoader: () => unknown = () => require('node:sqlite')
+  ): Array<{ name: string; encrypted_value: Buffer }> {
     try {
-      // Dynamic import to support node:sqlite cleanly with zero TS build issues
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const sqlite = require('node:sqlite') as {
+      const sqlite = sqliteLoader() as {
         DatabaseSync: new (p: string, opts?: { readOnly?: boolean }) => {
           prepare: (q: string) => { all: () => Array<Record<string, unknown>> };
           close: () => void;
@@ -183,7 +185,14 @@ export class AmbientCookieVaultExtractor {
       } finally {
         db.close();
       }
-    } catch {
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (code === 'ERR_UNKNOWN_BUILTIN_MODULE' || msg.includes('node:sqlite') || msg.includes('Cannot find module')) {
+        debugLogIgnored('notebooklm-sqlite:unsupported', `node:sqlite unavailable on Node ${process.version} (requires >=22.5): ${msg}`);
+      } else {
+        debugLogIgnored('notebooklm-sqlite:chrome', err);
+      }
       return [];
     }
   }

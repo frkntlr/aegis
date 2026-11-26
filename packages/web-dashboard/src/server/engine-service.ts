@@ -1,17 +1,19 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir, cleanGitEnv } from '@aegis/shared';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
+import { BoundingBoxInspector, runFileMutationTest } from '@aegis/telemetry-tester';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { MCPSecurityManager } from '@aegis/mcp-security';
 import { DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
-import { getDashboardHtml } from '../ui/dashboard-html.js';
 import { EngineAnalysisTools } from './engine-analysis-tools.js';
-
-const execFileAsync = promisify(execFile);
+import {
+  collectAuditTestContents,
+  findUncontainedAuditPath,
+  getGitModifiedFiles,
+  loadAuditTestReport,
+  loadTelemetryLayout,
+  readGitDiffHead
+} from './engine-gate-helpers.js';
+import { requireExistingRepoRoot, resolveContainedPath } from './path-containment.js';
 
 export interface AdaptiveTimeoutReport {
   tool: string;
@@ -21,65 +23,37 @@ export interface AdaptiveTimeoutReport {
   summary: string;
 }
 
-interface LoadedLayout {
-  elements: Array<{ id: string; x: number; y: number; width: number; height: number }>;
-  viewport?: { width: number; height: number; name?: string };
-}
-
 export class AegisEngineService {
   private inspector = new BoundingBoxInspector();
   private estimator = new PreExecutionEstimator();
   private mcpManager = new MCPSecurityManager();
   private diffEngine = new DiffEngine();
   private oracle = new ImmutableOracle();
+  private analysisTools: EngineAnalysisTools;
+  private readonly repoRoot?: string;
 
-  private loadElements(layoutPath?: string): LoadedLayout {
-    const candidatePaths = [
-      layoutPath,
-      path.join(resolveSafeAegisDir(), 'ui_telemetry.json'),
-      path.join(resolveSafeAegisDir(), 'telemetry.json')
-    ].filter(Boolean) as string[];
-
-    for (const p of candidatePaths) {
-      if (fs.existsSync(p)) {
-        try {
-          const raw = fs.readFileSync(p, 'utf8');
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) return { elements: parsed };
-          if (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
-            const elements = parsed.nodes.map((n: { id?: string; name?: string; rect?: { x?: number; y?: number; width?: number; height?: number } }) => ({
-              id: n.id || n.name || 'node',
-              x: n.rect?.x ?? 0,
-              y: n.rect?.y ?? 0,
-              width: n.rect?.width ?? 0,
-              height: n.rect?.height ?? 0
-            }));
-            const vp = parsed.viewport ? { width: parsed.viewport.width, height: parsed.viewport.height, name: parsed.viewport.aspectRatio } : undefined;
-            return { elements, viewport: vp };
-          }
-        } catch { /* try next candidate */ }
-      }
-    }
-    return { elements: [] };
+  constructor(repoRoot?: string) {
+    this.repoRoot = repoRoot;
+    this.analysisTools = new EngineAnalysisTools(repoRoot);
   }
 
   public runUiInspector(layoutPath?: string): Record<string, unknown> {
-    const loaded = this.loadElements(layoutPath);
-    let elements = loaded.elements;
-
-    if (elements.length === 0) {
-      const html = getDashboardHtml();
-      const matches = Array.from(html.matchAll(/id=["']([a-zA-Z0-9_\-]+)["']/g));
-      let currentY = 0;
-      elements = matches.slice(0, 8).map(m => {
-        const item = { id: m[1], x: 20, y: currentY, width: 350, height: 50 };
-        currentY += 60;
-        return item;
-      });
+    const loaded = loadTelemetryLayout(layoutPath, this.repoRoot);
+    if (loaded.elements.length === 0) {
+      return {
+        tool: 'ui_inspector',
+        elementsChecked: 0,
+        visionTokens: 0,
+        overlapsCount: 0,
+        passed: false,
+        unavailable: true,
+        reason: 'No usable UI telemetry found (.aegis/ui_telemetry.json). Capture runtime telemetry before inspection.',
+        summary: 'UI Telemetrisi Bulunamadı: .aegis/ui_telemetry.json eksik veya boş ❌'
+      };
     }
 
     const vp = loaded.viewport || { width: 390, height: 844, name: 'Mobile 390x844' };
-    const report = this.inspector.inspectLayout(elements, {
+    const report = this.inspector.inspectLayout(loaded.elements, {
       width: vp.width,
       height: vp.height,
       name: vp.name || `${vp.width}x${vp.height}`
@@ -94,26 +68,54 @@ export class AegisEngineService {
     };
   }
 
-  public runMutationGate(filePath?: string): Record<string, unknown> {
-    const targetFile = filePath || path.resolve(process.cwd(), 'packages/core/watchdog/src/pre-execution-estimator.ts');
-    let code = 'export function calc(x: number) { return x > 0 ? x * 2 : 0; }';
-    if (fs.existsSync(targetFile)) {
-      try {
-        code = fs.readFileSync(targetFile, 'utf8');
-      } catch { /* ignore */ }
-    }
-
-    const gate = new MutationGate({ minThresholdPercent: 70 });
-    const mutants = gate.generateMutants(code);
-    const report = gate.evaluateScore(mutants, (m) => m.originalOp !== m.mutatedOp);
+  private failMutationGate(file: string, reason: string, summary: string): Record<string, unknown> {
     return {
       tool: 'mutation_gate',
-      file: path.basename(targetFile),
+      file,
+      totalMutants: 0,
+      sampledMutants: 0,
+      killedMutants: 0,
+      survivedMutants: 0,
+      skippedCompileErrors: 0,
+      scorePercent: 0,
+      baselinePassed: false,
+      passed: false,
+      unavailable: true,
+      reason,
+      survivors: [],
+      summary
+    };
+  }
+
+  public runMutationGate(filePath?: string): Record<string, unknown> {
+    if (filePath !== undefined && !filePath.trim()) {
+      return this.failMutationGate('', 'No target file specified.', 'Mutasyon Kapısı Reddedildi: Hedef dosya belirtilmedi ❌');
+    }
+    const rootRes = requireExistingRepoRoot(this.repoRoot);
+    if (!rootRes.ok) {
+      return this.failMutationGate(filePath?.trim() || '', rootRes.reason, `Mutasyon Kapısı Engellendi: ${rootRes.reason} ❌`);
+    }
+    const targetInput = filePath?.trim() || 'packages/core/watchdog/src/pre-execution-estimator.ts';
+    const contained = resolveContainedPath(rootRes.root, targetInput, { allowNonExistent: false });
+    if (!contained.ok) {
+      return this.failMutationGate(path.basename(targetInput), contained.reason, `Mutasyon Kapısı Engellendi: ${contained.reason} ❌`);
+    }
+    const relTarget = path.relative(rootRes.root, contained.realPath);
+    const report = runFileMutationTest({ filePath: relTarget, repoRoot: rootRes.root, thresholdPercent: 70 });
+    return {
+      tool: 'mutation_gate',
+      file: path.basename(report.filePath),
       totalMutants: report.totalMutants,
+      sampledMutants: report.sampledMutants,
       killedMutants: report.killedMutants,
+      survivedMutants: report.survivedMutants,
+      skippedCompileErrors: report.skippedCompileErrors,
       scorePercent: report.scorePercent,
+      baselinePassed: report.baselinePassed,
       passed: report.passedThreshold,
-      summary: `Mutasyon Skoru: %${report.scorePercent} (${report.killedMutants}/${report.totalMutants} mutant öldürüldü) - ${report.passedThreshold ? 'PASSED ✅' : 'FAILED ❌'}`
+      reason: report.reason,
+      survivors: report.survivors,
+      summary: `Mutasyon Skoru: %${report.scorePercent} (${report.killedMutants}/${report.sampledMutants} örneklenen mutant öldürüldü) - ${report.passedThreshold ? 'PASSED ✅' : 'FAILED ❌'}`
     };
   }
 
@@ -145,18 +147,35 @@ export class AegisEngineService {
   }
 
   public async runDiffValidator(diffText?: string): Promise<Record<string, unknown>> {
-    let diff = diffText;
-    if (diff === 'git' || diff === 'head') {
-      try {
-        const { stdout } = await execFileAsync('git', ['diff', '-U3', 'HEAD'], {
-          encoding: 'utf8',
-          env: cleanGitEnv()
-        });
-        diff = stdout;
-      } catch { /* ignore */ }
+    if (diffText !== undefined && !diffText.trim()) {
+      return {
+        tool: 'diff_validator',
+        isSurgical: false,
+        addedLines: 0,
+        deletedLines: 0,
+        rejectionReason: 'Empty diff supplied.',
+        summary: 'Diff Reddedildi: Boş diff ❌'
+      };
     }
-    const sample = diff?.trim() ? diff : `@@ -1,3 +1,3 @@\n-const a = 1;\n+const a = 2;`;
-    const res = this.diffEngine.parseAndValidate(sample);
+
+    let diff = diffText;
+    if (diff === undefined || diff === 'git' || diff === 'head') {
+      const gitRes = await readGitDiffHead(this.repoRoot);
+      if (gitRes.error || !gitRes.diff.trim()) {
+        const reason = gitRes.error || 'No uncommitted git diff found against HEAD.';
+        return {
+          tool: 'diff_validator',
+          isSurgical: false,
+          addedLines: 0,
+          deletedLines: 0,
+          rejectionReason: reason,
+          summary: `Diff Reddedildi: ${reason} ❌`
+        };
+      }
+      diff = gitRes.diff;
+    }
+
+    const res = this.diffEngine.parseAndValidate(diff);
     return {
       tool: 'diff_validator',
       isSurgical: res.isSurgical,
@@ -168,24 +187,31 @@ export class AegisEngineService {
   }
 
   public async runOracleAudit(files?: string[]): Promise<Record<string, unknown>> {
-    let targetFiles = files || [];
-    if (targetFiles.length === 0) {
-      try {
-        if (fs.existsSync('.git')) {
-          const { stdout } = await execFileAsync('git', ['status', '--porcelain'], {
-            encoding: 'utf8',
-            env: cleanGitEnv()
-          });
-          targetFiles = stdout.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
-        }
-      } catch { /* ignore */ }
+    const rootRes = requireExistingRepoRoot(this.repoRoot);
+    if (!rootRes.ok) {
+      return { tool: 'immutable_oracle', filesAudited: 0, verdict: 'UNAVAILABLE', suspicious: false, details: [rootRes.reason], summary: 'Oracle Güven Denetimi: UNAVAILABLE (Geçersiz repo kökü) ⚠️' };
     }
-    if (targetFiles.length === 0) targetFiles = ['packages/core/iron-cage/src/cage-validator.ts'];
-
+    const repoRoot = rootRes.root;
+    const targetFiles = files !== undefined
+      ? files.map(f => f.trim()).filter(Boolean)
+      : await getGitModifiedFiles(repoRoot);
+    if (targetFiles.length === 0) {
+      return { tool: 'immutable_oracle', filesAudited: 0, verdict: 'UNAVAILABLE', suspicious: false, details: ['No modified files supplied or detected.'], summary: 'Oracle Güven Denetimi: UNAVAILABLE (Değişen dosya yok) ⚠️' };
+    }
+    const badPath = findUncontainedAuditPath(targetFiles, repoRoot);
+    if (badPath) {
+      return { tool: 'immutable_oracle', filesAudited: targetFiles.length, verdict: 'REJECTED', suspicious: true, details: [`Path containment violation: ${badPath}`], summary: 'Oracle Güven Denetimi: REJECTED (Sınır dışı dosya yolu ⚠️)' };
+    }
+    const testReport = loadAuditTestReport(repoRoot);
+    const testContents = collectAuditTestContents(targetFiles, repoRoot);
+    if (testReport.failedCount === 0 && (!testReport.found || testReport.passedCount <= 0 || testContents.length === 0)) {
+      return { tool: 'immutable_oracle', filesAudited: targetFiles.length, verdict: 'MANUAL_REVIEW_REQUIRED', suspicious: true, details: ['Incomplete test evidence (require executed passing test report and companion test files).'], summary: 'Oracle Güven Denetimi: MANUAL_REVIEW_REQUIRED (Eksik test kanıtı ⚠️)' };
+    }
     const rep = this.oracle.audit({
       modifiedFiles: targetFiles,
-      reportedPassedCount: 1,
-      reportedFailedCount: 0
+      testContents,
+      reportedPassedCount: testReport.passedCount,
+      reportedFailedCount: testReport.failedCount
     });
     return {
       tool: 'immutable_oracle',
@@ -196,10 +222,6 @@ export class AegisEngineService {
       summary: `Oracle Güven Denetimi: ${rep.verdict} (Şüpheli Test: ${rep.suspicious ? 'EVET ⚠️' : 'HAYIR ✅'})`
     };
   }
-
-  private analysisTools: EngineAnalysisTools;
-
-  constructor(repoRoot?: string) { this.analysisTools = new EngineAnalysisTools(repoRoot); }
 
   public runCageCheck(dir?: string): Record<string, unknown> {
     return this.analysisTools.runCageCheck(dir);

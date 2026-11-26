@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import type { NotebookSourceSummary } from './types.js';
 
 export interface PruneScoreBreakdown {
@@ -80,8 +81,8 @@ export class AutonomousPruningEngine {
           return { isSuperseded: true, supersededBy: supMatch ? supMatch[1] : 'Superseded' };
         }
       }
-    } catch {
-      // Safe fallback on file IO errors
+    } catch (err: unknown) {
+      debugLogIgnored('autonomous-pruning-engine:checkSupersededRfc', err);
     }
     return { isSuperseded: false };
   }

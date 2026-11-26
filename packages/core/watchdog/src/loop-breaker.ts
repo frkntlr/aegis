@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 
 export interface LoopBreakerOptions {
   maxFailures?: number;
@@ -53,14 +54,16 @@ export class LoopBreaker {
   private loadDiskCache(): void {
     if (!this.persistToDisk || !fs.existsSync(this.persistPath)) return;
     try {
-      const raw = JSON.parse(fs.readFileSync(this.persistPath, 'utf8'));
+      const raw = readJsonSafe<Record<string, FailureRecord>>(this.persistPath);
       if (typeof raw === 'object' && raw !== null) {
         for (const [k, v] of Object.entries(raw)) {
           const num = parseInt(k, 10);
-          if (!isNaN(num)) this.failures.set(num, v as FailureRecord);
+          if (!Number.isNaN(num)) this.failures.set(num, v as FailureRecord);
         }
       }
-    } catch { /* ignore corrupted disk cache */ }
+    } catch (err: unknown) {
+      debugLogIgnored('LoopBreaker:loadDiskCache', err);
+    }
   }
 
   private saveDiskCache(): void {
@@ -76,9 +79,15 @@ export class LoopBreaker {
         fs.renameSync(tmpPath, this.persistPath);
       } catch {
         fs.copyFileSync(tmpPath, this.persistPath);
-        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+        try {
+          fs.rmSync(tmpPath, { force: true });
+        } catch (rmErr: unknown) {
+          debugLogIgnored('LoopBreaker:saveDiskCacheCleanup', rmErr);
+        }
       }
-    } catch { /* ignore disk write errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('LoopBreaker:saveDiskCache', err);
+    }
   }
 
   private pruneStaleRecords(): void {

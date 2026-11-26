@@ -1,5 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readJsonSafe } from './json-safe.js';
+import { debugLogIgnored } from './runtime-helpers.js';
 
 export interface WorktreeRegistryEntry {
   agentName?: string;
@@ -50,7 +52,7 @@ export class ActiveHeadResolver {
     if (!fs.existsSync(jsonPath)) return null;
 
     try {
-      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8')) as unknown;
+      const data = readJsonSafe<unknown>(jsonPath);
       const list: WorktreeRegistryEntry[] = Array.isArray(data)
         ? data
         : (data && typeof data === 'object' && 'worktrees' in data && Array.isArray((data as { worktrees: unknown[] }).worktrees))
@@ -67,7 +69,9 @@ export class ActiveHeadResolver {
           return wt.agentName || wt.name || path.basename(wtNorm);
         }
       }
-    } catch { /* ignore non-fatal read errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('active-head-resolver', err);
+    }
 
     return null;
   }

@@ -171,9 +171,9 @@ Eğer bir görev aynı hatayı üst üste 3 kez üretirse veya sürekli aynı te
 
 ## 6. İlgili Belgeler
 
-- [`01-architecture-and-memory.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/01-architecture-and-memory.md) — 5-Katmanlı Hafıza Motoru.
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — TIP ve Merge Pipeline.
-- [`04-mcp-server-specification.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/04-mcp-server-specification.md) — `socratic_diagnose`, `triage`, `budget_inspect` araçları.
-- [RFC-014: Socratic Evidence-Based Diagnostic Engine](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-014-socratic-evidence-based-diagnostic-dialogue-engine.md)
-- [RFC-024: Next-Gen Evidence-Based Bug Triage Engine](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-024-next-gen-evidence-based-bug-triage-engine-incremental-caching-multi-core-parallelism-blast-radius-stratification.md)
+- [`01-architecture-and-memory.md`](./01-architecture-and-memory.md) — 5-Katmanlı Hafıza Motoru.
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — TIP ve Merge Pipeline.
+- [`04-mcp-server-specification.md`](./04-mcp-server-specification.md) — `socratic_diagnose`, `triage`, `budget_inspect` araçları.
+- [RFC-014: Socratic Evidence-Based Diagnostic Engine](./rfc/RFC-014-socratic-evidence-based-diagnostic-dialogue-engine.md)
+- [RFC-024: Next-Gen Evidence-Based Bug Triage Engine](./rfc/RFC-024-next-gen-evidence-based-bug-triage-engine-incremental-caching-multi-core-parallelism-blast-radius-stratification.md)
 - [RFC-050: Autonomous Fail-Safe Offline Test Shield and Self-Restoring Network Harness](rfc/RFC-050-autonomous-fail-safe-offline-test-shield-and-self-restoring-network-harness.md)

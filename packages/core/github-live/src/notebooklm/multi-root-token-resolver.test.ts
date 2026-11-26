@@ -9,6 +9,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { readJsonSafe } from '@aegis/shared';
 import { MultiRootTokenResolver } from './multi-root-token-resolver.js';
 
 test('MultiRootTokenResolver resolves token from environment variables', () => {
@@ -73,7 +74,7 @@ test('MultiRootTokenResolver saves cookies to target file accurately', () => {
     const saved = MultiRootTokenResolver.saveCookies('SID=newCookie;', savePath);
     assert.strictEqual(saved, true);
     assert.strictEqual(fs.existsSync(savePath), true);
-    const content = JSON.parse(fs.readFileSync(savePath, 'utf8'));
+    const content = readJsonSafe<{ cookies: string }>(savePath);
     assert.strictEqual(content.cookies, 'SID=newCookie;');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import type { GitHubTrackingEntry } from '@aegis/github-live';
 
 export interface GitHubPlanLinks {
@@ -38,7 +38,7 @@ function validateLinks(links: GitHubPlanLinks): void {
 export function readGitHubPlanLinks(planId: string): GitHubPlanLinks {
   const file = linksPath(planId);
   if (!fs.existsSync(file)) return { planId, entries: [], failures: [] };
-  const links = JSON.parse(fs.readFileSync(file, 'utf8')) as GitHubPlanLinks;
+  const links = readJsonSafe<GitHubPlanLinks>(file);
   if (links.planId !== planId || !Array.isArray(links.entries) || !Array.isArray(links.failures)) {
     throw new Error('Invalid saved GitHub links; recover the record before retrying');
   }

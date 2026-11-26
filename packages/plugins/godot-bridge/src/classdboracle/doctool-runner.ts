@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { readJsonSafe } from '@aegis/shared';
 import { GodotLocator } from '../godot-locator.js';
 import { OracleCache } from './oracle-cache.js';
 import type { ClassInfo, DoctoolRunnerOptions, MethodInfo, PropertyInfo, SignalInfo } from './classdb-types.js';
@@ -80,8 +81,7 @@ export class DoctoolRunner {
       });
       const dumpPath = path.join(tempDir, 'extension_api.json');
       if (!fs.existsSync(dumpPath)) return undefined;
-      const rawText = fs.readFileSync(dumpPath, 'utf8');
-      return JSON.parse(rawText) as RawApiDump;
+      return readJsonSafe<RawApiDump>(dumpPath);
     } catch {
       return undefined;
     } finally {

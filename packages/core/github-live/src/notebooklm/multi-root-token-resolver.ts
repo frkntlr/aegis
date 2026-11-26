@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import type { TokenResolveResult } from './types.js';
 
 export interface TokenResolverOptions {
@@ -92,8 +93,7 @@ export class MultiRootTokenResolver {
 
   private static readAuthFile(filePath: string): string | null {
     try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const json = JSON.parse(raw);
+      const json = readJsonSafe<{ cookies?: unknown }>(filePath);
       if (typeof json === 'object' && json && typeof json.cookies === 'string') {
         return json.cookies;
       }

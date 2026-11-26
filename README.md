@@ -24,15 +24,15 @@ Oyun/workspace içinde `npm run aegis` yerine `aegis` kullan; kökte `package.js
 [![Node: >=20](https://img.shields.io/badge/node->=20.0.0-blue.svg)](https://nodejs.org/)
 [![TypeScript: 5.7+](https://img.shields.io/badge/TypeScript-5.7+-3178C6.svg)](https://www.typescriptlang.org/)
 [![Monorepo: Turborepo](https://img.shields.io/badge/monorepo-turbo-EF4444.svg)](https://turbo.build/)
-[![Demir Kafes: 100% Compliant](https://img.shields.io/badge/Demir%20Kafes-100%25%20Clean%20(455%2B%20Files)-success.svg)](#-deterministik-demir-kafes-iron-cage)
+[![Demir Kafes: 100% Compliant](https://img.shields.io/badge/Demir%20Kafes-100%25%20Clean%20(619%20Files)-success.svg)](#-deterministik-demir-kafes-iron-cage)
 [![MCP Protocol: 54 Native Tools](https://img.shields.io/badge/MCP-54%20Native%20Tools-8A2BE2.svg)](#-yerel-model-context-protocol-mcp-sunucusu-54-araç)
-[![Tests: 812 Passing](https://img.shields.io/badge/Tests-812%20Passing%20(35s)-brightgreen.svg)](#-hızlı-başlangıç-quick-start)
+[![Tests: 1200+ Unit + 149 E2E](https://img.shields.io/badge/Tests-1200%2B%20Unit%20%2B%20149%20E2E-brightgreen.svg)](#-hızlı-başlangıç-quick-start)
 [![Turbo Replay: 86ms](https://img.shields.io/badge/Turbo%20Replay-86ms-blue.svg)](#-hızlı-başlangıç-quick-start)
 [![Living Wiki: 56 Pages Synchronized](https://img.shields.io/badge/Living%20Wiki-56%20Pages%20Synced-10B981.svg)](https://github.com/frkntlr/aegis/wiki)
 
 Aegis; yapay zeka modellerinin dikkatinin dağılması (**context bloat**), bağlam unutması (**context drop**), uydurma metod/kütüphane üretimi (**AI hallucination**), spagetti/ölü kod üretimi ve sonsuz kilitlenme (**infinite regression / stagnation**) problemlerini ortadan kaldıran yeni nesil otonom yazılım mühendisliği motorudur.
 
-Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`, `aegist`, `tw`, `tr`)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Otomatik Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **Yerel CI/CD Kapı Koşucusu (`aegis ci:audit`) & Otomatik Versiyonlama (`aegis update --bump`)**, **54 Yerel Stdio MCP Aracı**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **455+ Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **812 Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **56 Sayfalık Yaşayan GitHub Wiki Ekosistemi** sunar.
+Geliştiricilere ve otonom AI ajanlarına (Google Antigravity, Mulgravity, Cursor, VS Code, Windsurf, Claude Code) **5-Katmanlı Kod Tabanı Hafızası**, **Evrensel CLI (`aegis`, `aegist`, `tw`, `aegis-tr` — POSIX `/usr/bin/tr` çakışması kaldırılmış, `aegis tr` tam pariteli)**, **Çekme Tabanlı Görev Dağıtım Protokolü (TIP)**, **Rol Tabanlı Git Worktree İzolasyonu**, **Yeniden Giriş Güvenli & Bayat Kilit Budamalı (Stale-Lock Pruning) WorktreeLockManager**, **Dinamik Mesh & Atomik JSON Kalıcılığı (Atomics.wait)**, **Yerel CI/CD Kapı Koşucusu (`aegis ci:audit`) & Otomatik Versiyonlama (`aegis update --bump`)**, **54 Yerel Stdio MCP Aracı**, **Gerçek Fail-Closed Kalite Kapıları (`mutate`, `inspect`, `audit`, `godot inspect`) & Güvenlik Sertleştirmesi (RBAC yol sınırlaması, Dashboard XSS/Origin, geçici Wiki auth)**, **Ayrık Godot UI AST Ayrıştırıcısı (GodotUiParser)**, **619 Dosyada Demir Kafes Uyumlu Mimari Ayrıştırma**, **1.200+ Birim + 149 E2E Testlik Doğrulama (86ms Turbo Replay)**, **Sokratik Teşhis Kapısı**, **Multimodal Kalite Kapısı (Playtest-Before-PR)** ve **Yaşayan GitHub Wiki Ekosistemi** sunar.
 
 ---
 
@@ -598,7 +598,7 @@ Google Antigravity içinde doğrudan `/aegis` ve `/tw` slash komutlarıyla çağ
 
 ## 💻 Kapsamlı Evrensel CLI Komut Referansı
 
-Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw <komut>`, `tr <komut>` veya `npm run aegis -- <komut>` şeklinde kullanılabilir. `tr` ve `tw` komutları 22 alt komutun tamamında %100 özellik eşdeğerliğine sahiptir.
+Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw <komut>`, `aegis-tr <komut>` veya `npm run aegis -- <komut>` şeklinde kullanılabilir (`aegis tr` ve `aegis tw` alt komutları 22 alt komutun tamamında %100 özellik eşdeğerliğine sahiptir; global POSIX `/usr/bin/tr` çakışmasını önlemek için üst düzey `tr` ikilisi yerine `aegis-tr` shim'i kurulur).
 
 ### 1. Temel Orkestrasyon & Görev Dağıtımı (TIP)
 | Komut | Açıklama |
@@ -690,8 +690,8 @@ Aegis komut satırı arayüzü doğrudan `aegis <komut>`, `aegist <komut>`, `tw 
 | `aegis diff <diff>` | Cerrahi Unified Diff formatını ve satır bütçesini doğrular. |
 | `aegis audit <files>` | Immutable Oracle güven ve test tahrif denetimini koşturur. |
 | `aegis estimate <files> <tests>` | Değişiklik yarıçapına göre dinamik test çalıştırma süresi tahmin eder. |
-| `aegis mutate [filepath]` | Mutasyon testi kapısını çalıştırır (%70 yakalama barajı). |
-| `aegis inspect` | Sıfır-token BoundingBox UI düzen denetimini koşturur. |
+| `aegis mutate [filepaths...]` | Gerçek derleme + birim test çalıştırmalı, diff-satır kapsamlı ve çoklu hedefli mutasyon testi kapısı (%70 barajı). |
+| `aegis inspect [projectDir]` | Fail-closed sıfır-token BoundingBox UI düzen denetimi (telemetri yoksa veya taşma/çakışma varsa çıkış 1). |
 
 ### 5. Godot 4.x Oyun Motoru Köprüsü
 | Komut | Açıklama |
@@ -792,11 +792,10 @@ Projeye katkı sunan insan geliştiriciler ve yapay zeka ajanları aşağıdaki 
    - `ui-specialist` -> `🎨 [UI SPECIALIST] AKTİF | Arayüz, Tema ve Görsel Cilalama Uzmanı`
    - `doc-architect` -> `📚 [DOC ARCHITECT] AKTİF | GitHub Dokümantasyon ve Proje Mimarı`
 3. **40 Satır / 300 Satır Kuralı:** Hiçbir fonksiyon 40 satırı, hiçbir dosya 300 satırı aşamaz.
-4. **Pre-commit ve Pre-push Kancaları:**
-   - Adım 1: Deterministik Demir Kafes AST Doğrulaması (`cage:check`).
-   - Adım 2: Monorepo Birim Testleri (`npm test`).
-   - Adım 3: Mutasyon Testi Kapısı (`aegis mutate`, %70 barajı).
-   - Adım 4: Yerel CI/CD Pipeline Kapı Doğrulaması (`aegis ci:audit`, 10 GitHub Actions kapısının tamamı).
+4. **Pre-commit, Pre-push ve Yerel CI Kapıları:**
+   - **Pre-commit (5 Adım):** TypeScript Typecheck (`typecheck`) -> Biome Lint (`0` hata/uyarı) -> Demir Kafes (`cage:check`) -> Birim Testleri (`npm test`) -> Diff-Kapsamlı Mutasyon Kapısı (`aegis mutate`, %70 barajı).
+   - **Pre-push (4 Adım):** `typecheck` -> `lint` -> `cage:check` -> `npm test`.
+   - **Yerel CI Denetimi:** `aegis ci:audit` ile 10 GitHub Actions kapısının tamamı tek komutta doğrulanır.
 5. **Multimodal Kalite Kapısı (Playtest-Before-PR):** Oyun sahnelerinde runtime headless playtesti başarıyla geçmeden PR açılamaz.
 6. **Sokratik Teşhis Kapısı:** Hata durumunda kod yazmaya başlamadan önce `aegis debug` ile yığın izi ve hipotezler doğrulanmalıdır.
 7. **Anti-Hang & STDIN Güvenliği:** Asılı kalan paketler (`npx ast-grep`) yasaktır. Daima yerel `aegis ast:search` kullanılır.

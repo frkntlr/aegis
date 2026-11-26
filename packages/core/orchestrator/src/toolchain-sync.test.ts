@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { UniversalToolchainSync } from './toolchain-sync.js';
 import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
@@ -104,13 +105,16 @@ test('UniversalToolchainSync preserves existing custom MCP servers in Cursor and
     const sync = new UniversalToolchainSync(tmpDir);
     sync.syncAll();
 
-    const cursorMcp = JSON.parse(fs.readFileSync(path.join(cursorDir, 'mcp.json'), 'utf8'));
+    const cursorMcp = readJsonSafe<{ mcpServers: Record<string, { command?: string; args?: string[] }> }>(path.join(cursorDir, 'mcp.json'));
     assert.ok(cursorMcp.mcpServers['custom-db']);
     assert.ok(cursorMcp.mcpServers['aegis-engine']);
+    assert.deepStrictEqual(cursorMcp.mcpServers['aegis-engine'].args, ['packages/cli/dist/bin/aegis.js', 'mcp']);
+    assert.deepStrictEqual(cursorMcp.mcpServers.aegis, { command: 'node', args: ['packages/cli/dist/bin/aegis.js', 'mcp'] });
 
-    const vscodeMcp = JSON.parse(fs.readFileSync(path.join(vscodeDir, 'mcp.json'), 'utf8'));
+    const vscodeMcp = readJsonSafe<{ servers: Record<string, { command?: string; args?: string[] }> }>(path.join(vscodeDir, 'mcp.json'));
     assert.ok(vscodeMcp.servers['custom-api']);
     assert.ok(vscodeMcp.servers['aegis-engine']);
+    assert.deepStrictEqual(vscodeMcp.servers['aegis-engine'].args, ['packages/cli/dist/bin/aegis.js', 'mcp']);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

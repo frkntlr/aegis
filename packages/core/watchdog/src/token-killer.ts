@@ -19,7 +19,6 @@ export interface TokenKillerResult {
 
 export class RTKTokenKiller {
   public static stripAnsi(text: string): string {
-    // eslint-disable-next-line no-control-regex
     return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
   }
 

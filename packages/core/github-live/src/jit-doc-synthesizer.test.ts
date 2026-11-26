@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { readJsonSafe } from '@aegis/shared';
 import { JitDocSynthesizer } from './jit-doc-synthesizer.js';
 import { Context7Bridge } from './context7-bridge.js';
 
@@ -43,7 +44,9 @@ test('JitDocSynthesizer synthesizes doc entry and updates manifest', () => {
   assert.ok(doc.signatures.length > 0);
 
   JitDocSynthesizer.updateManifest(tmpDir, 'worker-pkg', '2.1.0', 'WorkerClient', 'index.d.ts', 15);
-  const manifest = JSON.parse(fs.readFileSync(path.join(tmpDir, 'manifest.json'), 'utf8'));
+  const manifest = readJsonSafe<Record<string, { version: string; symbols: Record<string, { line: number }> }>>(
+    path.join(tmpDir, 'manifest.json')
+  );
   assert.strictEqual(manifest['worker-pkg'].version, '2.1.0');
   assert.strictEqual(manifest['worker-pkg'].symbols['WorkerClient'].line, 15);
 });

@@ -30,8 +30,8 @@ export async function promptInteractiveAuthResolution(
   runClipboardAuthFn: () => Promise<boolean>
 ): Promise<AuthResolutionAction> {
   if (!process.stdin.isTTY || process.env.CI) {
-    console.log(`⚠️  Non-interactive environment: defaulting to OFFLINE_FALLBACK for ${ctx.operation}`);
-    return 'OFFLINE_FALLBACK';
+    throw new Error(`NotebookLM authentication failed for ${ctx.operation}: ${ctx.errorDetails}. ` +
+      'User choice required: reauthenticate, explicitly continue local-only, or cancel.');
   }
 
   const clip = SessionCredentialsManager.tryExtractFromClipboard();
@@ -54,7 +54,7 @@ export async function promptInteractiveAuthResolution(
   return await handlePromptChoice(answer, runBrowserAuthFn, runClipboardAuthFn, clip.found && clip.cookies ? clip.cookies : undefined);
 }
 
-async function handlePromptChoice(
+export async function handlePromptChoice(
   choice: string,
   runBrowserAuthFn: () => Promise<boolean>,
   runClipboardAuthFn: () => Promise<boolean>,
@@ -62,24 +62,28 @@ async function handlePromptChoice(
 ): Promise<AuthResolutionAction> {
   if (choice === '1') {
     if (clipCookie) {
-      SessionCredentialsManager.saveCredentials(clipCookie);
-      return 'REAUTH';
+      return requireAuthSuccess(SessionCredentialsManager.saveCredentials(clipCookie).success);
     }
     const ok = await runBrowserAuthFn();
-    return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
+    return requireAuthSuccess(ok);
   }
   if (choice === '2') {
     const ok = await runClipboardAuthFn();
-    return ok ? 'REAUTH' : 'OFFLINE_FALLBACK';
+    return requireAuthSuccess(ok);
   }
   if (choice === '3') {
     const raw = await promptUser('Lütfen Cookie dizesini veya cURL komutunu yapıştırın: ');
     if (raw && raw.trim().length > 0) {
-      SessionCredentialsManager.saveCredentials(raw);
-      return 'REAUTH';
+      return requireAuthSuccess(SessionCredentialsManager.saveCredentials(raw).success);
     }
-    return 'OFFLINE_FALLBACK';
+    return requireAuthSuccess(false);
   }
   if (choice === '5') return 'ABORT';
-  return 'OFFLINE_FALLBACK';
+  if (choice === '4') return 'OFFLINE_FALLBACK';
+  throw new Error('Invalid choice. Select reauthentication, explicit local-only continuation (4), or cancellation (5).');
+}
+
+function requireAuthSuccess(success: boolean): AuthResolutionAction {
+  if (success) return 'REAUTH';
+  throw new Error('NotebookLM reauthentication failed. Choose reauthentication, explicit local-only continuation, or cancellation.');
 }

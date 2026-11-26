@@ -1,3 +1,4 @@
+import { debugLogIgnored } from "@aegis/shared";
 import { WorktreeManager } from "./worktree-manager.js";
 import { RoleClassifier } from "./role-classifier.js";
 import type { GitHubIssue, GitHubClient } from "@aegis/github-live";
@@ -229,7 +230,7 @@ export class TaskDispatcher {
 			finalReason = finalReason
 				? (finalReason.includes(diagnostic) ? finalReason : `${finalReason} | ${diagnostic}`)
 				: diagnostic;
-			try { evalResult.reason = finalReason; } catch { /* ignore if frozen */ }
+			try { evalResult.reason = finalReason; } catch (err: unknown) { debugLogIgnored("TaskDispatcher:handleTaskFailure", err); }
 		}
 
 		if (evalResult.blocked) {

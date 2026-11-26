@@ -5,6 +5,8 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import { debugLogIgnored } from '@aegis/shared';
+
 export interface CdpCookieItem {
   name: string;
   value: string;
@@ -150,8 +152,8 @@ export class NativeBrowserCdpAttacher {
       const listJson = (await listRes.json()) as Array<Record<string, unknown>>;
       const page = listJson.find(p => p.type === 'page' && typeof p.webSocketDebuggerUrl === 'string');
       if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl as string;
-    } catch {
-      // Fallback to version endpoint
+    } catch (err: unknown) {
+      debugLogIgnored('native-browser-cdp:resolveWebSocketUrl', err);
     }
 
     try {

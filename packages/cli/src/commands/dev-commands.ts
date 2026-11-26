@@ -1,18 +1,22 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { PreExecutionEstimator } from '@aegis/watchdog';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { SkeletonGenerator, DiffEngine } from '@aegis/ast-skeleton';
 import { ImmutableOracle } from '@aegis/trust-verifier';
 import { BoundingBoxInspector, MutationGate } from '@aegis/telemetry-tester';
-import { cleanGitEnv, resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import {
   verifyFile,
+  getChangedLinesForFile,
   getChangedSourceFiles,
   runMutationGateOnFile,
-  collectSourceFiles
+  collectSourceFiles,
+  loadInspectBoxes,
+  getGitModifiedFiles,
+  loadAuditTestReport,
+  collectAuditTestContents
 } from './dev-helpers.js';
 import { handleCageCheck } from './cage-check-runner.js';
 
@@ -93,7 +97,8 @@ export function handleDiff(diffText?: string): void {
   if (diffText && fs.existsSync(diffText)) {
     try {
       diffContent = fs.readFileSync(diffText, 'utf8');
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('dev-commands:diff', err);
       diffContent = diffText;
     }
   }
@@ -110,48 +115,38 @@ export function handleDiff(diffText?: string): void {
 export function handleInspect(targetArg?: string): void {
   showBanner();
   console.log('📐 Zero-Token Telemetry UI Inspection (Mobile 390x844)...');
-  const inspector = new BoundingBoxInspector();
-  let elements = [
-    { id: 'header-nav', x: 0, y: 0, width: 390, height: 60 },
-    { id: 'hero-banner', x: 0, y: 60, width: 390, height: 200 },
-    { id: 'action-button', x: 20, y: 280, width: 350, height: 50 }
-  ];
-  if (targetArg && fs.existsSync(targetArg)) {
-    try {
-      const raw = fs.readFileSync(targetArg, 'utf8');
-      if (targetArg.endsWith('.json')) {
-        elements = JSON.parse(raw);
-      } else if (targetArg.endsWith('.html')) {
-        let curY = 0;
-        elements = Array.from(raw.matchAll(/id=["']([^"']+)["']/g)).slice(0, 10).map((m) => {
-          const el = { id: m[1], x: 20, y: curY, width: 350, height: 50 };
-          curY += 60;
-          return el;
-        });
-      }
-    } catch { /* use fallback elements */ }
+  const { boxes, error } = loadInspectBoxes(targetArg);
+  if (error || boxes.length === 0) {
+    console.error(`❌ UI Telemetry Inspection Unavailable: ${error ?? 'No valid bounding boxes found.'}`);
+    process.exitCode = 1;
+    return;
   }
 
-  const report = inspector.inspectLayout(elements, { width: 390, height: 844, name: 'Mobile' });
+  const inspector = new BoundingBoxInspector();
+  const report = inspector.inspectLayout(boxes, { width: 390, height: 844, name: 'Mobile' });
   console.log(` • Elements Checked: ${report.elementsScanned}`);
   console.log(` • Vision Tokens:    ${report.tokenCost} (100% token-free)`);
   console.log(` • Overlaps/Overflows: ${report.violations.length}`);
+  for (const v of report.violations.slice(0, 5)) console.log(`   - [${v.type}] ${v.message}`);
   console.log(` • Verdict:          ${report.passed ? 'PASSED ✅' : 'FAILED ❌'}`);
+  if (!report.passed) process.exitCode = 1;
 }
 
-export function handleMutate(targetFile?: string): void {
+export function handleMutate(...targetFiles: string[]): void {
   showBanner();
   const gate = new MutationGate({ minThresholdPercent: 70 });
+  const explicitFiles = targetFiles.filter(f => Boolean(f && f.trim()));
 
-  if (targetFile) {
-    if (!runMutationGateOnFile(targetFile, gate)) process.exit(1);
+  if (explicitFiles.length > 0) {
+    if (!explicitFiles.every(file => runMutationGateOnFile(file, gate))) process.exit(1);
     return;
   }
 
   const changedFiles = getChangedSourceFiles();
   if (changedFiles.length > 0) {
+    const repoRoot = resolveSafeRepoRoot();
     console.log(`🔍 Detected ${changedFiles.length} changed TypeScript source file(s) for mutation testing:`);
-    if (!changedFiles.every(file => runMutationGateOnFile(file, gate))) process.exit(1);
+    if (!changedFiles.every(file => runMutationGateOnFile(file, gate, getChangedLinesForFile(file, repoRoot)))) process.exit(1);
     console.log('✅ All changed files passed the Mutation Testing Gate!');
     return;
   }
@@ -163,35 +158,38 @@ export function handleMutate(targetFile?: string): void {
 
 export function handleAudit(modifiedFilesStr?: string): void {
   showBanner();
-  const oracle = new ImmutableOracle();
-  let files = (modifiedFilesStr || '').split(',').map(f => f.trim()).filter(Boolean);
-  if (files.length === 0) {
-    try {
-      const root = resolveSafeRepoRoot();
-      const out = fs.existsSync(path.join(root, '.git'))
-        ? execFileSync('git', ['status', '--porcelain'], {
-            cwd: root,
-            encoding: 'utf8',
-            env: cleanGitEnv()
-          })
-        : '';
-      files = out.split('\n').map(l => l.slice(3).trim()).filter(Boolean);
-    } catch { /* ignore */ }
-  }
-  if (files.length === 0) files = ['packages/core/iron-cage/src/cage-validator.ts'];
+  const root = resolveSafeRepoRoot();
+  const explicit = modifiedFilesStr !== undefined;
+  const files = explicit
+    ? modifiedFilesStr.split(',').map(f => f.trim()).filter(Boolean)
+    : getGitModifiedFiles(root);
 
+  if (files.length === 0) {
+    console.error('🔍 Trust Verification Audit:\n • Verdict:    UNAVAILABLE\n • Details:    No modified files supplied or detected.');
+    process.exitCode = 1;
+    return;
+  }
+
+  const testReport = loadAuditTestReport(root);
+  const testContents = collectAuditTestContents(files, root);
+  if (testReport.failedCount === 0 && (!testReport.found || testReport.passedCount <= 0 || testContents.length === 0)) {
+    console.error('🔍 Trust Verification Audit:\n • Verdict:    MANUAL_REVIEW_REQUIRED\n • Details:    Incomplete test evidence (require executed passing test report and companion test files).');
+    process.exitCode = 1;
+    return;
+  }
+
+  const oracle = new ImmutableOracle();
   const report = oracle.audit({
     modifiedFiles: files,
-    reportedPassedCount: 1,
-    reportedFailedCount: 0
+    testContents,
+    reportedPassedCount: testReport.passedCount,
+    reportedFailedCount: testReport.failedCount
   });
-
   console.log(`🔍 Trust Verification Audit:`);
   console.log(` • Verdict:    ${report.verdict}`);
   console.log(` • Suspicious: ${report.suspicious ? 'YES ⚠️' : 'NO ✅'}`);
-  for (const d of report.details) {
-    console.log(`   - ${d}`);
-  }
+  for (const d of report.details) console.log(`   - ${d}`);
+  if (report.verdict !== 'APPROVED') process.exitCode = 1;
 }
 
 export function handleSkeletonScan(targetDir?: string): void {

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
+import { debugLogIgnored } from '@aegis/shared';
 import { TsCallGraphExtractor } from './ts-call-graph-extractor.js';
 import type { SymbolIndexer } from './symbol-indexer.js';
 
@@ -92,7 +93,7 @@ export class TransitiveTypeResolver {
     const baseDir = this.options.baseDir || process.cwd();
     const full = path.isAbsolute(targetPath) ? targetPath : path.resolve(baseDir, targetPath);
     if (fs.existsSync(full)) {
-      try { return fs.readFileSync(full, 'utf8'); } catch { /* ignore */ }
+      try { return fs.readFileSync(full, 'utf8'); } catch (err: unknown) { debugLogIgnored('TransitiveTypeResolver:readTargetFile', err); }
     }
     return null;
   }

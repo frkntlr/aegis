@@ -149,10 +149,10 @@ Eşzamanlı `/aegis tw` senaryolarında alt ajanların (`qa-hunter`, `issue-solv
 
 ## 7. İlgili Belgeler
 
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — Çoklu ajan görev döngüsü.
-- [`04-mcp-server-specification.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/04-mcp-server-specification.md) — Godot MCP araçları.
-- [`06-diagnostics-and-quality-gates.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/06-diagnostics-and-quality-gates.md) — Multimodal Kalite Kapısı.
-- [GODOT_UI.md](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/GODOT_UI.md) — Orijinal Godot UI el kitabı.
-- [RFC-002: Aegis Godot Bridge](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-002-aegis-godot-bridge.md)
-- [RFC-038: Godot 4 UI Teamwork Scaffolding](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-038-rfc-011-godot-4-ui-teamwork-scaffolding-static-linter-and-mutual-exclusion-lock-allocation.md)
-- [RFC-051: Multi-Agent Godot Toolchain Ephemeral Port Sharding & Zero-Token Scene Slicing](file:///C:/Users/Lenovo/Documents/work/aegis/docs/rfc/RFC-051-high-performance-multi-agent-godot-toolchain-ephemeral-port-sharding-and-zero-token-scene-slicing.md)
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — Çoklu ajan görev döngüsü.
+- [`04-mcp-server-specification.md`](./04-mcp-server-specification.md) — Godot MCP araçları.
+- [`06-diagnostics-and-quality-gates.md`](./06-diagnostics-and-quality-gates.md) — Multimodal Kalite Kapısı.
+- [GODOT_UI.md](./GODOT_UI.md) — Orijinal Godot UI el kitabı.
+- [RFC-002: Aegis Godot Bridge](./rfc/RFC-002-aegis-godot-bridge.md)
+- [RFC-038: Godot 4 UI Teamwork Scaffolding](./rfc/RFC-038-rfc-011-godot-4-ui-teamwork-scaffolding-static-linter-and-mutual-exclusion-lock-allocation.md)
+- [RFC-051: Multi-Agent Godot Toolchain Ephemeral Port Sharding & Zero-Token Scene Slicing](./rfc/RFC-051-high-performance-multi-agent-godot-toolchain-ephemeral-port-sharding-and-zero-token-scene-slicing.md)

@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { TeamworkReflectionEngine } from './teamwork-reflection.js';
 import { TeamworkMesh } from './teamwork-mesh.js';
 
@@ -73,7 +74,7 @@ test('TeamworkReflectionEngine: generates follow-up tasks into task inbox', () =
 
     const followUps = engine.generateFollowUpTasks(gaps, 'plan-gen-1');
     assert.strictEqual(followUps.length, 2);
-    const saved = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+    const saved = readJsonSafe<unknown[]>(inboxPath);
     assert.strictEqual(saved.length, 2);
     assert.ok(mesh.getEvents().some(e => e.message.includes('follow-up task(s)')));
   } finally {

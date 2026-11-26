@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { readJsonSafe } from '@aegis/shared';
 import { refreshEngineInstallations } from './engine-update-refresh.js';
 import { EngineUpdater } from './engine-updater.js';
 
@@ -45,7 +46,7 @@ test('Antigravity-only project refresh preserves peers and never creates Codex i
   assert.equal(fs.existsSync(path.join(project, '.codex')), false);
   assert.equal(fs.existsSync(path.join(home, '.agents')), false);
   assert.equal(fs.readFileSync(path.join(project, '.gemini/config/plugins/aegis/skills/aegis/SKILL.md'), 'utf8'), 'Updated Antigravity skill');
-  const config = JSON.parse(fs.readFileSync(path.join(project, '.gemini/config/mcp_config.json'), 'utf8')) as { mcpServers: Record<string, { command: string; cwd?: string }> };
+  const config = readJsonSafe<{ mcpServers: Record<string, { command: string; cwd?: string }> }>(path.join(project, '.gemini/config/mcp_config.json'));
   assert.equal(config.mcpServers.other.command, 'keep');
   assert.equal(config.mcpServers.aegis.cwd, project);
 }));

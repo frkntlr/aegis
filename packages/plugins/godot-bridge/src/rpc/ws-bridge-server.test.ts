@@ -102,3 +102,119 @@ test('WsBridgeServer executes commands and matches responses', async () => {
   client.destroy();
   await server.stop();
 });
+
+async function sendUpgradeHandshake(port: number, token: string, origin?: string): Promise<string> {
+  const conn = net.createConnection({ port, host: '127.0.0.1' });
+  const originHeader = origin !== undefined ? `Origin: ${origin}\r\n` : '';
+  return new Promise<string>((resolve, reject) => {
+    conn.on('error', reject);
+    conn.on('connect', () => {
+      conn.write(
+        `GET /?token=${token} HTTP/1.1\r\nHost: 127.0.0.1\r\n${originHeader}Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n`
+      );
+    });
+    conn.once('data', (d) => {
+      const text = d.toString();
+      conn.destroy();
+      resolve(text);
+    });
+  });
+}
+
+test('WsBridgeServer verifyOrigin rejects null, spoofed prefix, file, and malformed origins', async () => {
+  const token = 'origin-deny-token';
+  const server = new WsBridgeServer({ port: 0, sessionToken: token });
+  const port = await server.start();
+  const deniedOrigins = [
+    'null',
+    'http://localhost.evil.com',
+    'http://127.0.0.1.attacker.tld',
+    'file://localhost',
+    'ws://localhost:6850',
+    'not-a-valid-url'
+  ];
+  for (const origin of deniedOrigins) {
+    const resp = await sendUpgradeHandshake(port, token, origin);
+    assert.ok(resp.includes('403 Forbidden'), `Expected 403 for origin ${origin}, got: ${resp}`);
+  }
+  await server.stop();
+});
+
+test('WsBridgeServer verifyOrigin allows omitted Origin and loopback http/https origins', async () => {
+  const token = 'origin-allow-token';
+  const allowedOrigins = [
+    undefined,
+    'http://localhost:3000',
+    'https://127.0.0.1:8443',
+    'http://[::1]:5173'
+  ];
+  for (const origin of allowedOrigins) {
+    const server = new WsBridgeServer({ port: 0, sessionToken: token });
+    const port = await server.start();
+    const resp = await sendUpgradeHandshake(port, token, origin);
+    assert.ok(resp.includes('101 Switching Protocols'), `Expected 101 for origin ${String(origin)}, got: ${resp}`);
+    await server.stop();
+  }
+});
+
+test('WsBridgeServer returns 400 on malformed req.url and stays alive for valid upgrades', async () => {
+  const token = 'malformed-url-token';
+  const server = new WsBridgeServer({ port: 0, sessionToken: token });
+  const port = await server.start();
+  const badResp = await new Promise<string>((resolve, reject) => {
+    const conn = net.createConnection({ port, host: '127.0.0.1' });
+    conn.on('error', reject);
+    conn.on('connect', () => {
+      conn.write('GET http://[::1 HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n');
+    });
+    conn.once('data', (d) => {
+      const text = d.toString();
+      conn.destroy();
+      resolve(text);
+    });
+  });
+  assert.ok(badResp.includes('400 Bad Request'), `Expected 400 Bad Request, got: ${badResp}`);
+  const okResp = await sendUpgradeHandshake(port, token);
+  assert.ok(okResp.includes('101 Switching Protocols'), `Expected server alive for 101, got: ${okResp}`);
+  await server.stop();
+});
+
+function connectWsClient(port: number, token: string): Promise<net.Socket> {
+  return new Promise<net.Socket>((resolve, reject) => {
+    const conn = net.createConnection({ port, host: '127.0.0.1' });
+    conn.on('error', reject);
+    conn.on('connect', () => {
+      conn.write(`GET /?token=${token} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n`);
+    });
+    conn.once('data', (d) => {
+      assert.ok(d.toString().includes('101 Switching Protocols'));
+      resolve(conn);
+    });
+  });
+}
+
+function encodeMaskedTextFrame(text: string): Buffer {
+  const mask = Buffer.from([0x11, 0x22, 0x33, 0x44]);
+  const p = Buffer.from(text, 'utf8');
+  const masked = Buffer.alloc(p.length);
+  for (let i = 0; i < p.length; i++) masked[i] = p[i] ^ mask[i % 4];
+  return Buffer.concat([Buffer.from([0x81, 0x80 | p.length]), mask, masked]);
+}
+
+test('WsBridgeServer closes superseded upgrade socket, blocks orphan telemetry, and stops cleanly', async () => {
+  const server = new WsBridgeServer({ port: 0, sessionToken: 'orphan-test-token' });
+  const port = await server.start();
+  const c1 = await connectWsClient(port, 'orphan-test-token');
+  let c1Closed = false;
+  c1.on('error', () => undefined);
+  c1.on('close', () => { c1Closed = true; });
+  const c2 = await connectWsClient(port, 'orphan-test-token');
+  c2.on('error', () => undefined);
+  if (!c1.destroyed && c1.writable) c1.write(encodeMaskedTextFrame(JSON.stringify({ type: 'telemetry', payload: { root: 'SPOOFED_BY_ORPHAN_C1' } })));
+  await new Promise((r) => setTimeout(r, 40));
+  assert.strictEqual(c1Closed, true);
+  assert.strictEqual(server.getLatestTelemetry(), null);
+  await Promise.race([server.stop(), new Promise((_, rej) => setTimeout(() => rej(new Error('stop timed out')), 1000))]);
+  c1.destroy();
+  c2.destroy();
+});

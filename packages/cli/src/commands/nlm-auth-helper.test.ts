@@ -7,6 +7,7 @@
 import test from 'node:test';
 import * as assert from 'node:assert';
 import { handleNlmAuth, promptInteractiveAuthResolution, runClipboardAuth, runRotateAuth } from './nlm-auth-helper.js';
+import { handlePromptChoice } from './nlm-auth-interactive.js';
 
 test('handleNlmAuth outputs status check when no arguments given', async () => {
   const originalLog = console.log;
@@ -88,10 +89,24 @@ test('runRotateAuth handles rotation attempt gracefully', async () => {
   }
 });
 
-test('promptInteractiveAuthResolution defaults to OFFLINE_FALLBACK in CI / non-TTY', async () => {
-  const res = await promptInteractiveAuthResolution({
-    operation: 'query',
-    errorDetails: 'Session expired'
-  });
-  assert.strictEqual(res, 'OFFLINE_FALLBACK');
+test('noninteractive authentication requires an explicit user choice', async () => {
+  const previous = process.env.CI;
+  process.env.CI = '1';
+  try {
+    await assert.rejects(promptInteractiveAuthResolution({ operation: 'query', errorDetails: 'Session expired' }),
+      /query: Session expired.*reauthenticate.*local-only.*cancel/);
+  } finally {
+    if (previous === undefined) delete process.env.CI;
+    else process.env.CI = previous;
+  }
+});
+
+test('only explicit local-only choice authorizes fallback', async () => {
+  const failed = async () => false;
+  assert.strictEqual(await handlePromptChoice('4', failed, failed), 'OFFLINE_FALLBACK');
+  assert.strictEqual(await handlePromptChoice('5', failed, failed), 'ABORT');
+  await assert.rejects(handlePromptChoice('', failed, failed), /Invalid choice/);
+  await assert.rejects(handlePromptChoice('1', failed, failed), /reauthentication failed/);
+  await assert.rejects(handlePromptChoice('2', failed, failed), /reauthentication failed/);
+  assert.strictEqual(await handlePromptChoice('1', async () => true, failed), 'REAUTH');
 });

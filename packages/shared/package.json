@@ -4,12 +4,19 @@
   "description": "Common types, interfaces, and utilities for Aegis Engine",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --version"
+    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.existsSync('dist')?fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x)):[];if(!f.length){console.error('No test files found in dist');process.exit(1);}process.exit(cp.spawnSync(process.execPath,['--test','--test-timeout=20000',...f],{stdio:'inherit',timeout:60000}).status??1)\""
   },
   "devDependencies": {
+    "@types/node": "^22.10.1",
     "typescript": "^5.7.2"
   }
 }

@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { debugLogIgnored } from '@aegis/shared';
 import { SessionCredentialsManager } from './session-credentials-manager.js';
 
 export interface FirefoxProfile {
@@ -30,8 +31,8 @@ export class AmbientFirefoxVaultExtractor {
           profiles.push({ profileName: entry.name, cookiesDbPath: dbPath });
         }
       }
-    } catch {
-      // return empty on error
+    } catch (err: unknown) {
+      debugLogIgnored('notebooklm-firefox:profiles', err);
     }
     return profiles;
   }
@@ -67,10 +68,12 @@ export class AmbientFirefoxVaultExtractor {
     }
   }
 
-  private static queryFirefoxSqlite(dbPath: string): Array<{ host: string; name: string; value: string }> {
+  public static queryFirefoxSqlite(
+    dbPath: string,
+    sqliteLoader: () => unknown = () => require('node:sqlite')
+  ): Array<{ host: string; name: string; value: string }> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const sqlite = require('node:sqlite') as {
+      const sqlite = sqliteLoader() as {
         DatabaseSync: new (p: string, opts?: { readOnly?: boolean }) => {
           prepare: (q: string) => { all: () => Array<Record<string, unknown>> };
           close: () => void;
@@ -86,7 +89,14 @@ export class AmbientFirefoxVaultExtractor {
       } finally {
         db.close();
       }
-    } catch {
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (code === 'ERR_UNKNOWN_BUILTIN_MODULE' || msg.includes('node:sqlite') || msg.includes('Cannot find module')) {
+        debugLogIgnored('notebooklm-sqlite:unsupported', `node:sqlite unavailable on Node ${process.version} (requires >=22.5): ${msg}`);
+      } else {
+        debugLogIgnored('notebooklm-sqlite:firefox', err);
+      }
       return [];
     }
   }

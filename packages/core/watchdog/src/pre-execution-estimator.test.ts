@@ -68,7 +68,7 @@ test('PreExecutionEstimator safely handles undefined factors without producing N
   const estimator = new PreExecutionEstimator();
   const result = estimator.estimate({} as unknown as EstimationFactors);
 
-  assert.strictEqual(isNaN(result.calculatedTimeoutSeconds), false);
+  assert.strictEqual(Number.isNaN(result.calculatedTimeoutSeconds), false);
   assert.strictEqual(result.calculatedTimeoutSeconds, 30);
   assert.strictEqual(result.confidence, 'medium');
 });
@@ -85,4 +85,48 @@ test('PreExecutionEstimator safely handles NaN factors without producing NaN', (
   assert.strictEqual(Number.isNaN(result.calculatedTimeoutSeconds), false);
   assert.strictEqual(result.calculatedTimeoutSeconds, 30);
   assert.strictEqual(result.confidence, 'medium');
+});
+
+test('PreExecutionEstimator builds reasoning strings and handles confidence boundaries', () => {
+  const estimator = new PreExecutionEstimator();
+  const boundaryTwo = estimator.estimate({
+    blastRadiusFiles: 2,
+    affectedTestCount: 3,
+    dependencyDepth: 1
+  });
+  assert.strictEqual(boundaryTwo.calculatedTimeoutSeconds, 85);
+  assert.strictEqual(boundaryTwo.confidence, 'medium');
+  assert.strictEqual(
+    boundaryTwo.reasoning,
+    'Base 30s + (2 files × 15s) + (3 tests × 5s) + (depth 1 × 10s)'
+  );
+
+  const boundaryThree = estimator.estimate({
+    blastRadiusFiles: 3,
+    affectedTestCount: 0,
+    dependencyDepth: 0
+  });
+  assert.strictEqual(boundaryThree.confidence, 'low');
+});
+
+test('PreExecutionEstimator clamps negative inputs and keeps raw timeout above 1.5x history', () => {
+  const estimator = new PreExecutionEstimator();
+  const neg = estimator.estimate({
+    blastRadiusFiles: -5,
+    affectedTestCount: -2,
+    dependencyDepth: -1,
+    historicalAverageSeconds: -10
+  });
+  assert.strictEqual(neg.calculatedTimeoutSeconds, 30);
+  assert.strictEqual(neg.confidence, 'medium');
+
+  const highRaw = estimator.estimate({
+    blastRadiusFiles: 10,
+    affectedTestCount: 0,
+    dependencyDepth: 0,
+    historicalAverageSeconds: 20
+  });
+  assert.strictEqual(highRaw.calculatedTimeoutSeconds, 180);
+  assert.strictEqual(highRaw.confidence, 'high');
+  assert.ok(highRaw.reasoning.includes('Calibrated with historical average 20.0s (1.5x buffer)'));
 });

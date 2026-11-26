@@ -1,12 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
-import { WorktreeMutex, normPath, matchesLockOwner } from './worktree-mutex.js';
+import { debugLogIgnored, resolveSafeRepoRoot, safeParseJson, stripBom } from '@aegis/shared';
+import { isLockConflict, isPidAlive, type LockMetadata, parseLockEntry } from './worktree-lock-helpers.js';
+import { matchesLockOwner, normPath, WorktreeMutex } from './worktree-mutex.js';
 
-export interface LockMetadata {
-  acquiredAt: number;
-  pid?: number;
-}
+export { isLockConflict, type LockMetadata } from './worktree-lock-helpers.js';
 
 export interface WorktreeLockManagerOptions {
   repoRoot?: string;
@@ -14,57 +12,11 @@ export interface WorktreeLockManagerOptions {
   staleTimeoutMs?: number;
 }
 
-function isPidAlive(pid: number): boolean {
-  if (!pid || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err: unknown) {
-    return (err as { code?: string })?.code === 'EPERM';
-  }
-}
-
-function parseLockEntry(val: unknown): { agent: string; metadata?: LockMetadata } | null {
-  if (typeof val === 'string' || typeof val === 'number') {
-    const agent = String(val).trim();
-    return agent ? { agent } : null;
-  }
-  if (val && typeof val === 'object') {
-    const obj = val as Record<string, unknown>;
-    const rawAgent = obj.agent ?? obj.lockedBy ?? obj.worktreeId;
-    if (typeof rawAgent === 'string' && rawAgent.trim()) {
-      return {
-        agent: rawAgent.trim(),
-        metadata: {
-          acquiredAt: typeof obj.acquiredAt === 'number' ? obj.acquiredAt : Date.now(),
-          pid: typeof obj.pid === 'number' ? obj.pid : undefined
-        }
-      };
-    }
-  }
-  return null;
-}
-
-function parseLockKey(key: string): { filePath: string; section?: string } {
-  const norm = normPath(key);
-  const hashIdx = norm.indexOf('#');
-  return hashIdx >= 0
-    ? { filePath: norm.slice(0, hashIdx).toLowerCase(), section: norm.slice(hashIdx + 1).toLowerCase() }
-    : { filePath: norm.toLowerCase() };
-}
-
-export function isLockConflict(keyA: string, keyB: string): boolean {
-  const a = parseLockKey(keyA);
-  const b = parseLockKey(keyB);
-  if (a.filePath !== b.filePath) return false;
-  if (!a.section || !b.section) return true;
-  return a.section === b.section;
-}
-
 export class WorktreeLockManager {
   private repoRoot: string;
   private persistLocks: boolean;
   private staleTimeoutMs: number;
+  private lockDepth = 0;
   private activeLocks: Map<string, string> = new Map();
   private lockMeta: Map<string, LockMetadata> = new Map();
 
@@ -79,14 +31,16 @@ export class WorktreeLockManager {
   public getMetaFilePath(): string { return path.resolve(this.repoRoot, '.aegis', 'locks-meta.json'); }
 
   public withLock<T>(fn: () => T): T {
-    if (!this.persistLocks) return fn();
+    if (!this.persistLocks || this.lockDepth > 0) return fn();
     const unlock = WorktreeMutex.acquire(this.getLockFilePath());
+    this.lockDepth++;
     try {
       this.loadLocks();
       const res = fn();
       this.saveLocks();
       return res;
     } finally {
+      this.lockDepth--;
       unlock();
     }
   }
@@ -96,8 +50,8 @@ export class WorktreeLockManager {
     const map = new Map<string, LockMetadata>();
     if (!fs.existsSync(metaFile)) return map;
     try {
-      const raw = fs.readFileSync(metaFile, 'utf8').trim();
-      const data = raw ? JSON.parse(raw) : null;
+      const raw = stripBom(fs.readFileSync(metaFile, 'utf8')).trim();
+      const data = raw ? safeParseJson(raw) : null;
       if (data && typeof data === 'object') {
         for (const [k, v] of Object.entries(data)) {
           const obj = v as Record<string, unknown> | null;
@@ -106,13 +60,22 @@ export class WorktreeLockManager {
           }
         }
       }
-    } catch { /* ignore meta read errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeLockManager:readMetaFile', err);
+    }
     return map;
   }
 
   private handleCorruptLockFile(lockFile: string): void {
-    try { fs.renameSync(lockFile, `${lockFile}.corrupt.${Date.now()}`); } catch {
-      try { fs.rmSync(lockFile, { force: true }); } catch { /* ignore */ }
+    try {
+      fs.renameSync(lockFile, `${lockFile}.corrupt.${Date.now()}`);
+    } catch (renameErr: unknown) {
+      debugLogIgnored('WorktreeLockManager:renameCorruptLockFile', renameErr);
+      try {
+        fs.rmSync(lockFile, { force: true });
+      } catch (rmErr: unknown) {
+        debugLogIgnored('WorktreeLockManager:rmCorruptLockFile', rmErr);
+      }
     }
     this.activeLocks.clear();
     this.lockMeta.clear();
@@ -128,9 +91,9 @@ export class WorktreeLockManager {
     const lockFile = this.getLockFilePath();
     if (!fs.existsSync(lockFile)) return;
     try {
-      const raw = fs.readFileSync(lockFile, 'utf8').trim();
+      const raw = stripBom(fs.readFileSync(lockFile, 'utf8')).trim();
       if (!raw) throw new Error('Empty lock file');
-      const data = JSON.parse(raw);
+      const data = safeParseJson(raw);
       if (!data || typeof data !== 'object') throw new Error('Invalid lock structure');
 
       const metaMap = this.readMetaFile();
@@ -149,21 +112,32 @@ export class WorktreeLockManager {
         this.activeLocks.set(file, parsed.agent);
         this.lockMeta.set(file, meta);
       }
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeLockManager:loadLocks', err);
       this.handleCorruptLockFile(lockFile);
     }
   }
 
   private writeAtomicJson(filePath: string, data: unknown): void {
+    const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
     try {
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
       fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-      try { fs.renameSync(tmp, filePath); } catch {
+      try {
+        fs.renameSync(tmp, filePath);
+      } catch (renameErr: unknown) {
+        debugLogIgnored('WorktreeLockManager:renameTmp', renameErr);
         fs.copyFileSync(tmp, filePath);
-        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
       }
-    } catch { /* ignore write failure */ }
+    } catch (err: unknown) {
+      debugLogIgnored('WorktreeLockManager:writeAtomicJson', err);
+    } finally {
+      try {
+        if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true });
+      } catch (cleanupErr: unknown) {
+        debugLogIgnored('WorktreeLockManager:cleanupTmp', cleanupErr);
+      }
+    }
   }
 
   public saveLocks(): void {
@@ -182,7 +156,7 @@ export class WorktreeLockManager {
 
   public acquireFileLocks(agentName: string, files: string[]): { success: boolean; conflictingFiles: string[] } {
     return this.withLock(() => {
-      this.pruneStaleLocks();
+      this.pruneStaleLocksInternal(this.staleTimeoutMs);
       const conflictingFiles: string[] = [];
       const normalized = files.map(normPath);
       for (const file of normalized) {
@@ -204,7 +178,7 @@ export class WorktreeLockManager {
     conflictingFiles: string[];
   } {
     return this.withLock(() => {
-      this.pruneStaleLocks();
+      this.pruneStaleLocksInternal(this.staleTimeoutMs);
       const conflictingFiles: string[] = [];
       const toApply: Array<{ file: string; agentName: string }> = [];
       for (const item of batch) {
@@ -268,19 +242,21 @@ export class WorktreeLockManager {
     return new Map(this.lockMeta);
   }
 
-  public pruneStaleLocks(maxAgeMs = this.staleTimeoutMs): number {
-    return this.withLock(() => {
-      let pruned = 0;
-      const now = Date.now();
-      for (const [file] of this.activeLocks.entries()) {
-        const meta = this.lockMeta.get(file);
-        if (this.isLockEntryStale(meta, now, maxAgeMs)) {
-          this.activeLocks.delete(file);
-          this.lockMeta.delete(file);
-          pruned++;
-        }
+  private pruneStaleLocksInternal(maxAgeMs = this.staleTimeoutMs): number {
+    let pruned = 0;
+    const now = Date.now();
+    for (const [file] of this.activeLocks.entries()) {
+      const meta = this.lockMeta.get(file);
+      if (this.isLockEntryStale(meta, now, maxAgeMs)) {
+        this.activeLocks.delete(file);
+        this.lockMeta.delete(file);
+        pruned++;
       }
-      return pruned;
-    });
+    }
+    return pruned;
+  }
+
+  public pruneStaleLocks(maxAgeMs = this.staleTimeoutMs): number {
+    return this.withLock(() => this.pruneStaleLocksInternal(maxAgeMs));
   }
 }

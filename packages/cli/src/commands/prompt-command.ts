@@ -150,7 +150,7 @@ export async function compilePrompt(
 }
 
 function parsePromptArgs(agentArg?: string, issueArg?: string, flag?: string) {
-  if (agentArg && !isNaN(parseInt(agentArg, 10))) {
+  if (agentArg && !Number.isNaN(parseInt(agentArg, 10))) {
     return {
       role: 'auto',
       issueNumber: parseInt(agentArg, 10),

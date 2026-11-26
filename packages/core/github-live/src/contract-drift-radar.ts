@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 
 export class CrlfNormalizerStream extends Transform {
   override _transform(
@@ -116,8 +117,8 @@ export class ContractDriftRadar {
         if (hash) {
           results.push({ path: file, hash, size: stat.size, mtimeMs: stat.mtimeMs });
         }
-      } catch {
-        // Skip unreadable files
+      } catch (err: unknown) {
+        debugLogIgnored('contract-drift-radar:scanLockfiles', err);
       }
     }
     return results;
@@ -127,7 +128,7 @@ export class ContractDriftRadar {
     const ledgerPath = path.join(this.cacheDir, 'lockfiles.hash');
     if (!fs.existsSync(ledgerPath)) return {};
     try {
-      return JSON.parse(fs.readFileSync(ledgerPath, 'utf8')) as Record<string, string>;
+      return readJsonSafe<Record<string, string>>(ledgerPath);
     } catch {
       return {};
     }

@@ -1,4 +1,5 @@
 import * as http from 'node:http';
+import { debugLogIgnored } from '@aegis/shared';
 
 export function notifyDashboardFocus(workspacePath: string = process.cwd()): void {
   try {
@@ -14,11 +15,11 @@ export function notifyDashboardFocus(workspacePath: string = process.cwd()): voi
       },
       timeout: 300
     });
-    req.on('error', () => { /* no-op */ });
+    req.on('error', (err) => { debugLogIgnored('FocusNotifier:request', err); });
     req.on('timeout', () => { req.destroy(); });
     req.write(postData);
     req.end();
-  } catch {
-    // Non-blocking fire-and-forget
+  } catch (err: unknown) {
+    debugLogIgnored('FocusNotifier:notify', err);
   }
 }

@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import * as assert from 'node:assert/strict';
 import { GitHubLiveAdapter } from './live-adapter.js';
 import { TeamworkGitHubSynchronizer, type GitHubCompletionProof } from './teamwork-github-synchronizer.js';

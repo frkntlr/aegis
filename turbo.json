@@ -1,5 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": [
+    "CODEX_HOME",
+    "npm_execpath"
+  ],
   "tasks": {
     "build": {
       "dependsOn": [
@@ -28,10 +32,7 @@
       "dependsOn": [
         "^build"
       ],
-      "outputs": [
-        "dist/tsconfig.tsbuildinfo",
-        "dist/**"
-      ]
+      "outputs": []
     }
   }
 }

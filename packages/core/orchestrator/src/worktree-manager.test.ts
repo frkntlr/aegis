@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { WorktreeManager } from './worktree-manager.js';
 import { WorktreeMutex } from './worktree-mutex.js';
 
@@ -54,7 +55,7 @@ test('WorktreeManager safely synchronizes locks across multiple instances withou
 
     const lockFile = path.resolve(tmpRepo, '.aegis', 'locks.json');
     assert.ok(fs.existsSync(lockFile));
-    const json = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+    const json = readJsonSafe<Record<string, unknown>>(lockFile);
     assert.strictEqual(json['src/solver.ts'], 'solver');
     assert.strictEqual(json['src/qa.ts'], 'qa');
   } finally {
@@ -144,4 +145,27 @@ test('WorktreeManager acquires batch file locks atomically', () => {
   assert.strictEqual(res2.success, false);
   assert.deepStrictEqual(res2.conflictingFiles, ['src/b.ts']);
   assert.strictEqual(manager.getLockedFiles().has('src/d.ts'), false);
+});
+
+test('WorktreeManager validates agentName and blocks traversal or protected rmSync', () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-wt-bounds-'));
+  try {
+    const outsideDir = path.join(tmpRepo, 'outside');
+    const prefixDir = path.join(tmpRepo, 'experimental');
+    fs.mkdirSync(outsideDir, { recursive: true });
+    fs.mkdirSync(prefixDir, { recursive: true });
+
+    const manager = new WorktreeManager({ repoRoot: tmpRepo, worktreePrefix: 'experimental' });
+    const badAgents = ['', '.', '..', '../outside', 'a/b', 'a\\b', '-flag', 'bad\0name', 'C:\\outside', 'foo..bar'];
+    for (const bad of badAgents) {
+      assert.throws(() => manager.getWorktreePath(bad), /Invalid agent name|escapes prefix/);
+      assert.throws(() => manager.ensureWorktree(bad), /Invalid agent name|escapes prefix/);
+      assert.throws(() => manager.removeWorktree(bad), /Invalid agent name|escapes prefix/);
+    }
+    assert.throws(() => manager.ensureWorktree('alice', '--evil-flag'), /Invalid base branch/);
+    assert.strictEqual(fs.existsSync(outsideDir), true);
+    assert.strictEqual(fs.existsSync(prefixDir), true);
+  } finally {
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
+  }
 });

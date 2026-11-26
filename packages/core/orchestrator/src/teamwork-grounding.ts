@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import { SkeletonGenerator } from '@aegis/ast-skeleton';
 
 export interface FileGroundingReport {
@@ -105,8 +105,7 @@ export class TeamworkGroundingEngine {
     try {
       const meshPath = path.join(this.repoRoot, '.aegis', 'analysis-mesh.json');
       if (!fs.existsSync(meshPath)) return '';
-      const raw = fs.readFileSync(meshPath, 'utf8');
-      const state = JSON.parse(raw);
+      const state = readJsonSafe<{ insights?: Record<string, unknown> }>(meshPath);
       const allInsights = Object.values(state.insights || {}) as Array<{ target: string; lens: string; severity: string; finding: string; actionableStep?: string }>;
       const relevant = allInsights.filter(i => targetFiles.some(tf => tf.includes(i.target) || i.target.includes(tf)));
       if (relevant.length === 0) return '';

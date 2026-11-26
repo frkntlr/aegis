@@ -10,13 +10,23 @@ export const DASHBOARD_JS = `
     }
     const handleDrop = onDrop;
 
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, function(c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function safeNum(n) {
+      const v = Number(n);
+      return Number.isFinite(v) ? Math.trunc(v) : 0;
+    }
+
     function renderProjectSelector(projects, active) {
       const sel = document.getElementById('project-selector');
       if (!sel || !projects) return;
       sel.innerHTML = projects.map(p => {
         const isSel = p.id === active?.id ? ' selected' : '';
         const icon = p.isLocalBound ? '💻 ' : '☁️ ';
-        return '<option value="' + p.id + '"' + isSel + '>' + icon + p.name + '</option>';
+        return '<option value="' + esc(p.id) + '"' + isSel + '>' + icon + esc(p.name) + '</option>';
       }).join('');
       const badge = document.getElementById('project-badge');
       if (badge && active) badge.innerText = '📁 ' + active.name;
@@ -33,8 +43,8 @@ export const DASHBOARD_JS = `
       el.innerHTML = agents.map(a => {
         const badge = a.status === 'locked' ? 'status-active' : (a.status === 'active' ? 'status-active' : 'status-idle');
         const badgeTxt = a.status === 'locked' ? 'KİLİTLİ' : (a.status === 'active' ? 'ÇALIŞIYOR' : 'BOŞTA');
-        const locks = a.lockedFiles?.length ? '<br><small style="color:#d29922">Kilit: ' + a.lockedFiles[0] + '</small>' : '';
-        return '<div class="agent-box"><div><div class="agent-name">🤖 ' + a.agentName.toUpperCase() + ' <span style="font-size:0.75rem; color:var(--accent);">[' + a.ideType + ']</span></div><div style="font-size:0.75rem; color:var(--text-muted);">' + a.worktreePath + locks + '</div></div><span class="status-badge ' + badge + '" style="margin-left:auto;">' + badgeTxt + '</span></div>';
+        const locks = a.lockedFiles?.length ? '<br><small style="color:#d29922">Kilit: ' + esc(a.lockedFiles[0]) + '</small>' : '';
+        return '<div class="agent-box"><div><div class="agent-name">🤖 ' + esc(String(a.agentName ?? '').toUpperCase()) + ' <span style="font-size:0.75rem; color:var(--accent);">[' + esc(a.ideType) + ']</span></div><div style="font-size:0.75rem; color:var(--text-muted);">' + esc(a.worktreePath) + locks + '</div></div><span class="status-badge ' + badge + '" style="margin-left:auto;">' + badgeTxt + '</span></div>';
       }).join('');
       document.getElementById('fleet-count').innerText = agents.length + ' Aktif Ajan';
     }
@@ -47,17 +57,19 @@ export const DASHBOARD_JS = `
         const matching = issues.filter(i => i.status === col);
         if (matching.length === 0) { listEl.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center; margin-top:2rem;">Görev yok</div>'; return; }
         listEl.innerHTML = matching.map(i => {
-          const files = i.targetFiles?.length ? '<br><small style="color:var(--text-muted);">' + i.targetFiles[0] + '</small>' : '';
-          const act = col === 'in_progress' ? '<div style="margin-top:0.35rem;"><button class="btn btn-secondary btn-sm" onclick="sendAction(\\'move_task\\', { issueNumber: ' + i.number + ', targetStatus: \\'done\\' })">Tamamla ✓</button></div>' : '';
-          return '<div class="kanban-card" draggable="true" ondragstart="onDragStart(event, ' + i.number + ')" style="' + (col === 'in_progress' ? 'border-color:var(--accent);' : '') + '"><strong>#' + i.number + ' ' + i.title + '</strong>' + files + act + '</div>';
+          const num = safeNum(i.number);
+          const files = i.targetFiles?.length ? '<br><small style="color:var(--text-muted);">' + esc(i.targetFiles[0]) + '</small>' : '';
+          const act = col === 'in_progress' ? '<div style="margin-top:0.35rem;"><button class="btn btn-secondary btn-sm" onclick="sendAction(\\'move_task\\', { issueNumber: ' + num + ', targetStatus: \\'done\\' })">Tamamla ✓</button></div>' : '';
+          return '<div class="kanban-card" draggable="true" ondragstart="onDragStart(event, ' + num + ')" style="' + (col === 'in_progress' ? 'border-color:var(--accent);' : '') + '"><strong>#' + num + ' ' + esc(i.title) + '</strong>' + files + act + '</div>';
         }).join('');
       });
     }
 
     function renderMetrics(tm) {
       if (!tm) return;
+      const pct = Math.max(0, Math.min(100, Number(tm.savingsPercent) || 0));
       document.getElementById('savings-badge').innerText = '%' + tm.savingsPercent + ' Tasarruf';
-      document.getElementById('thermo-bar').style.width = tm.savingsPercent + '%';
+      document.getElementById('thermo-bar').style.width = pct + '%';
       document.getElementById('used-tokens').innerText = (tm.usedTokens >= 1000 ? (tm.usedTokens / 1000).toFixed(1) + 'K' : tm.usedTokens);
       document.getElementById('cached-tokens').innerText = (tm.cachedTokens >= 1000 ? (tm.cachedTokens / 1000).toFixed(1) + 'K' : tm.cachedTokens);
       if (tm.filesScanned) document.getElementById('files-scanned').innerText = tm.filesScanned + ' Dosya';
@@ -75,7 +87,7 @@ export const DASHBOARD_JS = `
     function appendLog(msg) {
       const b = document.getElementById('log-box');
       if (!b) return;
-      b.innerHTML += '<br>[' + new Date().toLocaleTimeString() + '] ' + msg;
+      b.innerHTML += '<br>[' + esc(new Date().toLocaleTimeString()) + '] ' + esc(msg);
       b.scrollTop = b.scrollHeight;
     }
 

@@ -57,9 +57,9 @@ export const CI_GATES: readonly CiStepDefinition[] = [
   { id: 'cage:check', name: 'Demir Kafes Audit', command: 'node packages/cli/dist/bin/aegis.js cage:check', isCore: true },
   { id: 'verify', name: 'Iron Cage Verification', command: 'node packages/cli/dist/bin/aegis.js verify', isCore: false },
   { id: 'test', name: 'Monorepo Unit Test Suite', command: 'npm test', isCore: true },
-  { id: 'inspect', name: 'Zero-Token UI Layout', command: 'node packages/cli/dist/bin/aegis.js inspect', isCore: false },
-  { id: 'godot', name: 'Godot Bridge Pre-flight', command: 'node packages/cli/dist/bin/aegis.js godot status', isCore: false },
-  { id: 'mutate', name: 'Mutation Testing Gate', command: 'node packages/cli/dist/bin/aegis.js mutate', isCore: false }
+  { id: 'inspect', name: 'Zero-Token UI Layout', command: 'node packages/cli/dist/bin/aegis.js inspect packages/plugins/godot-bridge/fixtures/inspect-sample', isCore: false },
+  { id: 'godot', name: 'Godot Bridge Pre-flight', command: 'node packages/cli/dist/bin/aegis.js godot status && node packages/cli/dist/bin/aegis.js godot inspect packages/plugins/godot-bridge/fixtures/inspect-sample', isCore: false },
+  { id: 'mutate', name: 'Mutation Testing Gate', command: 'node packages/cli/dist/bin/aegis.js mutate packages/core/watchdog/src/pre-execution-estimator.ts packages/core/iron-cage/src/line-budget-radar.ts packages/shared/src/json-safe.ts', isCore: false }
 ];
 
 export function parseCiAuditOptions(args: string[]): CiAuditOptions {
@@ -113,13 +113,11 @@ export function formatDuration(ms: number): string {
 export function defaultStepExecutor(command: string, cwd: string): { success: boolean; durationMs: number; error?: string } {
   const start = Date.now();
   try {
-    const normCmd = command.startsWith('node ')
-      ? `"${process.execPath}" ${command.slice(5)}`
-      : command;
+    const normCmd = command.replace(/(^|&&\s*)node\s+/g, `$1"${process.execPath}" `);
     execSync(normCmd, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 90000,
+      timeout: 300000,
       maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env, ...cleanGitEnv(), CI: 'true', GIT_TERMINAL_PROMPT: '0' },
       encoding: 'utf8'

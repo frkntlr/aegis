@@ -68,7 +68,7 @@ export class OrphanTaskReclaimer {
     }
     const hbTime = new Date(session.lastHeartbeat).getTime();
     const elapsed = Date.now() - hbTime;
-    if (isNaN(hbTime) || elapsed > this.staleTimeoutMs) {
+    if (Number.isNaN(hbTime) || elapsed > this.staleTimeoutMs) {
       const mins = Math.round(elapsed / 60000);
       return { active: false, reason: `Agent [${agentName}] heartbeat expired (${mins}m silence).` };
     }

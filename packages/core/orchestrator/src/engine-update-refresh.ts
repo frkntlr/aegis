@@ -2,6 +2,7 @@ import * as cp from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { readJsonSafe } from '@aegis/shared';
 import { AntigravityInstaller } from './antigravity-installer.js';
 import { CodexInstaller } from './codex-installer.js';
 import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
@@ -19,7 +20,7 @@ export function resolveUpdateEngineRoot(explicit?: string): string {
   const candidates = explicit ? [path.resolve(explicit)] : [path.resolve(__dirname, '../../../..')];
   const root = candidates.find(candidate => {
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(candidate, 'package.json'), 'utf8').replace(/^\uFEFF/, '')) as { name?: string };
+      const pkg = readJsonSafe<{ name?: string }>(path.join(candidate, 'package.json'));
       return pkg.name === 'aegis' && fs.existsSync(path.join(candidate, 'packages/cli'));
     } catch { return false; }
   });

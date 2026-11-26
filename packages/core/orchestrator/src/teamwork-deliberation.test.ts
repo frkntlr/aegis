@@ -9,6 +9,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { debugLogIgnored } from '@aegis/shared';
 import {
   TeamworkDeliberationEngine,
   SemanticAIDecomposer,
@@ -25,8 +26,8 @@ beforeEach(() => {
 afterEach(() => {
   try {
     fs.rmSync(testTmpDir, { recursive: true, force: true });
-  } catch {
-    /* ignore */
+  } catch (err: unknown) {
+    debugLogIgnored('TeamworkDeliberationTest:cleanup', err);
   }
 });
 

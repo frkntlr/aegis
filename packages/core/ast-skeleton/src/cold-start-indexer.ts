@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import { ActiveHeadResolver } from './active-head-resolver.js';
 import type { CodebaseMemoryEngine } from './codebase-memory.js';
@@ -148,7 +148,9 @@ export class ColdStartIndexer {
         const content = fs.readFileSync(full, 'utf8');
         if (engine.indexFile(full, content, active)) indexed++;
         else cached++;
-      } catch { /* skip read error */ }
+      } catch (err: unknown) {
+        debugLogIgnored('ColdStartIndexer:indexDirectory', err);
+      }
     }
     if (indexed > 0 || (fastSync.headCommit && fastSync.headCommit !== ns.lastCommit)) {
       if (fastSync.headCommit) ns.lastCommit = fastSync.headCommit;

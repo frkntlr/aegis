@@ -1,29 +1,36 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as child_process from 'node:child_process';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import {
   GodotUiVerifier,
   GodotLocator,
   DoctoolRunner,
-  GodotUiPerfAuditor,
   GodotPortRouter,
-  GodotSceneSlicer,
   type ClassDbOracle,
   type GodotUiNode,
   type ValidationResult
 } from '@aegis/godot-bridge';
 import { showBanner } from './banner.js';
 
+export {
+  type GodotTreeCliOptions,
+  parseGodotTreeArgs,
+  handleGodotTree,
+  handleGodotUiPerf,
+  handleGodotUiOptimize
+} from './godot-ui-helpers.js';
+
 export function resolveInspectAspectRatios(projectDir: string): string[] {
   const configPath = path.join(projectDir, 'aegis.config.json');
   if (fs.existsSync(configPath)) {
     try {
-      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const cfg = readJsonSafe<{ godot?: { aspectRatios?: unknown } }>(configPath);
       if (Array.isArray(cfg.godot?.aspectRatios) && cfg.godot.aspectRatios.length > 0) {
-        return cfg.godot.aspectRatios;
+        return cfg.godot.aspectRatios as string[];
       }
-    } catch {
-      // fallback
+    } catch (err: unknown) {
+      debugLogIgnored('GodotHelpers:resolveInspectAspectRatios', err);
     }
   }
   return GodotUiVerifier.REQUIRED_ASPECT_RATIOS;
@@ -37,9 +44,9 @@ export function loadProjectTelemetryNodes(projectDir: string): GodotUiNode[] {
   for (const c of candidates) {
     if (fs.existsSync(c)) {
       try {
-        const data = JSON.parse(fs.readFileSync(c, 'utf8'));
-        if (Array.isArray(data.nodes)) return data.nodes;
-      } catch { /* ignore */ }
+        const data = readJsonSafe<{ nodes?: unknown }>(c);
+        if (Array.isArray(data.nodes)) return data.nodes as GodotUiNode[];
+      } catch (err: unknown) { debugLogIgnored('GodotHelpers:loadProjectTelemetryNodes', err); }
     }
   }
   return [];
@@ -51,7 +58,8 @@ export function scanAndValidateGd(dir: string, oracle: ClassDbOracle): Validatio
     if (!dir.endsWith('.gd')) return [];
     try {
       return oracle.validateUsage(fs.readFileSync(dir, 'utf8'), path.basename(dir));
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('GodotHelpers:scanSingleGd', err);
       return [];
     }
   }
@@ -64,8 +72,8 @@ export function scanAndValidateGd(dir: string, oracle: ClassDbOracle): Validatio
       try {
         const content = fs.readFileSync(full, 'utf8');
         results.push(...oracle.validateUsage(content, s));
-      } catch {
-        // ignore unreadable files
+      } catch (err: unknown) {
+        debugLogIgnored('GodotHelpers:scanDirGd', err);
       }
     }
   }
@@ -132,11 +140,12 @@ function loadScenarioActions(scenarioPath?: string): unknown[] {
     return fallback;
   }
   try {
-    const raw = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
+    const raw = readJsonSafe<unknown[] | { actions?: unknown[] }>(scenarioPath);
     const actions: unknown[] = Array.isArray(raw) ? raw : (raw.actions || fallback);
     console.log(` • Scenario loaded from: ${path.basename(scenarioPath)} (${actions.length} action(s))`);
     return actions;
-  } catch {
+  } catch (err: unknown) {
+    debugLogIgnored('GodotHelpers:loadScenarioActions', err);
     console.log(' ℹ️ Failed to read scenario file; using default smoke scenario.');
     return fallback;
   }
@@ -156,122 +165,4 @@ export function handleGodotPlaytest(scenarioArg?: string, ...extraArgs: string[]
   const reqId = `playtest-${Date.now()}`;
   console.log(`✅ Queued playtest scenario [${reqId}] with ${actions.length} action(s).`);
   console.log(' • Status: Ready for Godot AegisBridge autonomous execution.');
-}
-
-export function handleGodotUiPerf(targetArg?: string): void {
-  showBanner();
-  const target = targetArg || process.cwd();
-  console.log(`⚡ Running Zero-Stutter UI Performance Audit for: ${target}...`);
-  const files: string[] = [];
-  if (fs.existsSync(target) && fs.statSync(target).isFile() && target.endsWith('.tscn')) {
-    files.push(target);
-  } else if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
-    const entries = fs.readdirSync(target, { recursive: true });
-    for (const e of entries) {
-      if (String(e).endsWith('.tscn')) files.push(path.join(target, String(e)));
-    }
-  }
-
-  if (files.length === 0) {
-    console.log('ℹ️ No .tscn UI scene files found to audit.');
-    return;
-  }
-
-  for (const f of files) {
-    const rep = GodotUiPerfAuditor.auditScene(f);
-    console.log(`🎨 UI Performance: ${path.basename(f)} [Grade: ${rep.grade} | Score: ${rep.score}/100]`);
-    console.log(` • Nodes: ${rep.totalNodes} | Mouse Picking Stop on Decoratives: ${rep.metrics.mouseFilterStopOnNonInteractive}`);
-    for (const iss of rep.issues) {
-      console.log(`   [${iss.severity.toUpperCase()}] ${iss.nodeName} (${iss.rule}): ${iss.message}`);
-      console.log(`     💡 Fix: ${iss.fixSuggestion}`);
-    }
-  }
-}
-
-export function handleGodotUiOptimize(targetArg?: string): void {
-  showBanner();
-  const target = targetArg || process.cwd();
-  if (!fs.existsSync(target) || !target.endsWith('.tscn')) {
-    console.log('Usage: aegis godot ui:optimize <scene.tscn>');
-    return;
-  }
-  const content = fs.readFileSync(target, 'utf8');
-  const { optimizedContent, fixesApplied } = GodotUiPerfAuditor.optimizeContent(content);
-  fs.writeFileSync(target, optimizedContent, 'utf8');
-  console.log(`⚡ Optimized UI Scene: ${target}`);
-  console.log(` • Applied ${fixesApplied.length} performance fix(es):`);
-  for (const fix of fixesApplied) console.log(`   - ${fix}`);
-}
-
-
-export interface GodotTreeCliOptions {
-  scenePath?: string;
-  focusNode?: string;
-  maxDepth?: number;
-  compact?: boolean;
-}
-
-export function parseGodotTreeArgs(args: string[]): GodotTreeCliOptions {
-  const options: GodotTreeCliOptions = {};
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--focus=')) {
-      options.focusNode = arg.slice('--focus='.length);
-    } else if (arg === '--focus' && i + 1 < args.length) {
-      options.focusNode = args[++i];
-    } else if (arg.startsWith('--depth=')) {
-      const parsed = parseInt(arg.slice('--depth='.length), 10);
-      if (!Number.isNaN(parsed)) options.maxDepth = parsed;
-    } else if (arg === '--depth' && i + 1 < args.length) {
-      const parsed = parseInt(args[++i], 10);
-      if (!Number.isNaN(parsed)) options.maxDepth = parsed;
-    } else if (arg === '--compact') {
-      options.compact = true;
-    } else if (!arg.startsWith('--') && !options.scenePath) {
-      options.scenePath = arg;
-    }
-  }
-  return options;
-}
-
-function resolveScenePath(scenePath?: string): string | undefined {
-  if (!scenePath) return undefined;
-  if (scenePath.startsWith('res://')) {
-    return path.resolve(process.cwd(), scenePath.slice(6));
-  }
-  return path.isAbsolute(scenePath) ? scenePath : path.resolve(process.cwd(), scenePath);
-}
-
-export function handleGodotTree(...rawArgs: (string | string[])[]): void {
-  showBanner();
-  const args = rawArgs.flat();
-  const parsed = parseGodotTreeArgs(args);
-  if (!parsed.scenePath) {
-    console.log('Usage: aegis godot tree <scene.tscn> [--focus=<node>] [--depth=<n>] [--compact]');
-    return;
-  }
-  const targetPath = resolveScenePath(parsed.scenePath);
-  if (!targetPath || !fs.existsSync(targetPath)) {
-    console.error(`❌ Scene file not found: ${parsed.scenePath}`);
-    return;
-  }
-  console.log(`🌲 Slicing Godot scene: ${path.basename(targetPath)}...`);
-  if (parsed.focusNode) console.log(` • Focus: ${parsed.focusNode}`);
-  if (parsed.maxDepth !== undefined) console.log(` • Max Depth: ${parsed.maxDepth}`);
-  if (parsed.compact) console.log(` • Mode: Compact`);
-
-  try {
-    const slice = GodotSceneSlicer.sliceScene(targetPath, {
-      focusNode: parsed.focusNode,
-      maxDepth: parsed.maxDepth,
-      compact: parsed.compact
-    });
-    if (!slice.trim()) {
-      console.log('ℹ️ Scene slice is empty (no matching nodes found).');
-    } else {
-      console.log(slice);
-    }
-  } catch (err) {
-    console.error(`❌ Slicing failed: ${(err as Error).message}`);
-  }
 }

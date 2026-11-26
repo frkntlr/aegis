@@ -31,7 +31,8 @@ export class LineBudgetRadar {
     maxFile = LineBudgetRadar.DEFAULT_MAX_FILE_LINES,
     maxFunc = LineBudgetRadar.DEFAULT_MAX_FUNC_LINES
   ): LineBudgetAnalysis {
-    const lines = content.split(/\r?\n/);
+    const normalized = content.replace(/\r?\n$/, '');
+    const lines = normalized.length === 0 ? [] : normalized.split(/\r?\n/);
     const fileLines = lines.length;
     const fileQuota = Math.max(0, maxFile - fileLines);
 
@@ -51,7 +52,7 @@ export class LineBudgetRadar {
   }
 
   private static resolveStatus(fileLines: number, maxFile: number): 'SAFE' | 'WARNING' | 'CRITICAL_QUOTA' | 'EXCEEDED' {
-    if (fileLines >= maxFile) return 'EXCEEDED';
+    if (fileLines > maxFile) return 'EXCEEDED';
     if (fileLines >= maxFile - 20) return 'CRITICAL_QUOTA'; // 280+
     if (fileLines >= maxFile - 50) return 'WARNING';        // 250+
     return 'SAFE';

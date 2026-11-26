@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cp from 'node:child_process';
+import { debugLogIgnored, safeParseJson, stripBom } from '@aegis/shared';
 
 export type BumpType = 'patch' | 'minor' | 'major';
 
@@ -74,7 +75,7 @@ export class VersionManager {
         cwd: repoRoot, timeout: 5000, env, stdio: ['ignore', 'pipe', 'ignore']
       }).toString().trim();
       if (desc) return desc;
-    } catch { /* describe failed, try tag -l */ }
+    } catch (err: unknown) { debugLogIgnored('VersionManager:getLatestTagDescribe', err); }
 
     try {
       const raw = cp.execSync('git tag -l "v*"', {
@@ -87,7 +88,7 @@ export class VersionManager {
           return tags[0] || null;
         }
       }
-    } catch { /* tag query failed */ }
+    } catch (err: unknown) { debugLogIgnored('VersionManager:getLatestTagList', err); }
 
     return null;
   }
@@ -160,8 +161,8 @@ export class VersionManager {
     newVersion: string
   ): { name: string; prevVersion: string } | null {
     try {
-      const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
-      const parsed = JSON.parse(raw) as { name?: string; version?: string };
+      const raw = stripBom(fs.readFileSync(filePath, 'utf8'));
+      const parsed = safeParseJson<{ name?: string; version?: string }>(raw);
       const name = parsed.name || path.basename(path.dirname(filePath));
       const prevVersion = parsed.version || '0.1.0';
 

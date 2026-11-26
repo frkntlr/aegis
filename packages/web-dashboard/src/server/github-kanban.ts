@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { GitHubLiveAdapter, GitHubProjectsAdapter, GitHubTokenResolver, RateLimitInfo } from '@aegis/github-live';
 import type { SystemIssue } from './realtime-metrics.js';
 import { INITIAL_DEFAULT_ISSUES, buildIssueBody, buildQualityGateComment } from './kanban-templates.js';
@@ -51,12 +52,14 @@ export class GitHubKanbanService {
     const sFile = path.resolve(this.repoRoot, '.aegis', 'issues.json');
     if (fs.existsSync(sFile)) {
       try {
-        const raw = JSON.parse(fs.readFileSync(sFile, 'utf8'));
+        const raw = readJsonSafe<SystemIssue[]>(sFile);
         if (Array.isArray(raw) && raw.length > 0) {
           this.issues = raw;
           return;
         }
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        debugLogIgnored('github-kanban:initOfflineDefaults', err);
+      }
     }
     this.issues = [...INITIAL_DEFAULT_ISSUES];
   }
@@ -66,7 +69,9 @@ export class GitHubKanbanService {
       const sFile = path.resolve(this.repoRoot, '.aegis', 'issues.json');
       fs.mkdirSync(path.dirname(sFile), { recursive: true });
       fs.writeFileSync(sFile, JSON.stringify(this.issues, null, 2), 'utf8');
-    } catch { /* non-fatal */ }
+    } catch (err: unknown) {
+      debugLogIgnored('github-kanban:persistIssues', err);
+    }
   }
 
   private initAdapter(customAdapter?: GitHubLiveAdapter, customProj?: GitHubProjectsAdapter): void {
@@ -169,10 +174,12 @@ export class GitHubKanbanService {
         this.issues.unshift(newIssue);
         this.persistIssues();
         if (this.projectsAdapter && issue.number) {
-          this.projectsAdapter.syncIssue(this.projectNumber, issue.number, 'ready').catch(() => { /* no-op */ });
+          this.projectsAdapter.syncIssue(this.projectNumber, issue.number, 'ready').catch((err: unknown) => debugLogIgnored('github-kanban:syncProjectIssue', err));
         }
         return newIssue;
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        debugLogIgnored('github-kanban:createIssue', err);
+      }
     }
     return this.createLocalIssue(title, targetFiles, labels, defaultBody);
   }
@@ -217,11 +224,11 @@ export class GitHubKanbanService {
       } else if (targetStatus === 'blocked') {
         this.adapter?.addComment(num, `🛑 **Aegis Loop Breaker**: Task marked as blocked. Locks released.`);
       }
-    }).catch(() => { /* no-op */ });
+    }).catch((err: unknown) => debugLogIgnored('github-kanban:updateIssue', err));
 
     if (this.projectsAdapter) {
       const pStatus = targetStatus === 'in_progress' ? 'in_progress' : targetStatus === 'done' ? 'done' : 'ready';
-      this.projectsAdapter.syncIssue(this.projectNumber, num, pStatus).catch(() => { /* no-op */ });
+      this.projectsAdapter.syncIssue(this.projectNumber, num, pStatus).catch((err: unknown) => debugLogIgnored('github-kanban:syncIssueStatus', err));
     }
   }
 

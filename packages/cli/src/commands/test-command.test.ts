@@ -9,7 +9,8 @@ import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
-import { runResilientTest, handleTestCommand } from './test-command.js';
+import { debugLogIgnored } from '@aegis/shared';
+import { buildTestCommand, runResilientTest, handleTestCommand } from './test-command.js';
 
 async function inFixtureDirectory(root: string, action: () => Promise<void>): Promise<void> {
   const originalCwd = process.cwd();
@@ -40,7 +41,7 @@ test('runResilientTest executes in node project and returns structured result', 
     assert.ok(res.durationMs >= 0);
     assert.ok(res.message.includes('passed'));
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });
 
@@ -62,7 +63,7 @@ test('runResilientTest terminates timed-out process tree and reports timeout cle
     assert.ok(res.message.includes('TIMED OUT'));
     assert.ok(elapsed < 4000, `Expected elapsed < 4000ms, got ${elapsed}ms`);
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });
 
@@ -83,7 +84,7 @@ test('runResilientTest captures failure and enriches with Socratic diagnosis', a
     assert.ok(res.diagnostic?.category === 'TEST_FAILURE' || res.diagnostic?.category === 'RUNTIME_ERROR');
     assert.ok(res.stderr.includes('Boom'));
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });
 
@@ -100,7 +101,7 @@ test('handleTestCommand handles --soft flag and returns boolean outcome', async 
       assert.strictEqual(passed, true);
     });
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });
 
@@ -121,7 +122,7 @@ test('runResilientTest with offline: true executes via OfflineTestHarness with n
     assert.ok(res.message.includes('offline'));
     assert.ok(res.telemetryPath && fs.existsSync(res.telemetryPath));
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });
 
@@ -141,7 +142,7 @@ test('handleTestCommand parses --offline flag and runs isolated offline test', a
       assert.strictEqual(passed2, true);
     });
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });
 
@@ -161,6 +162,28 @@ test('runResilientTest offline mode captures failure and formats diagnostic', as
     assert.strictEqual(res.offlineVerified, true);
     assert.ok(res.diagnostic !== undefined);
   } finally {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
+  }
+});
+
+test('runResilientTest preserves target with spaces and metacharacters without shell injection', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-test-inject-'));
+  try {
+    const pwnedFile = path.join(tmpDir, 'pwned.txt');
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'inject-safe-project',
+      scripts: { test: 'node -e "process.exit(0)"' }
+    }), 'utf8');
+
+    const payload = `ok & echo pwned > ${pwnedFile}`;
+    const spec = buildTestCommand(tmpDir, { target: payload });
+    assert.ok(spec.command.length > 0);
+    assert.ok(spec.args.length > 0);
+
+    const res = await runResilientTest({ cwd: tmpDir, target: payload, timeoutMs: 5000 });
+    assert.strictEqual(res.passed, true);
+    assert.strictEqual(fs.existsSync(pwnedFile), false);
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('TestCommandTest:rm', err); }
   }
 });

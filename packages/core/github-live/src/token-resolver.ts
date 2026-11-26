@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { debugLogIgnored } from '@aegis/shared';
 
 export interface GitHubAuthContext {
   token?: string;
@@ -78,8 +79,8 @@ export class GitHubTokenResolver {
             repo: match[2]
           };
         }
-      } catch {
-        // try next candidate
+      } catch (err: unknown) {
+        debugLogIgnored('token-resolver:detectRepo', err);
       }
     }
 

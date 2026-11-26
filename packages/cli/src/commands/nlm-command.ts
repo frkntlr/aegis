@@ -96,6 +96,7 @@ export async function handleNlmQuery(...rawArgs: string[]): Promise<void> {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`❌ Unified Knowledge Query Failed: ${msg}`);
+    process.exitCode = 1;
   }
 }
 
@@ -145,6 +146,7 @@ async function runDeepResearch(nbId: string, topic: string, detach: boolean, doI
     if (res.quotaWarning) console.log(`\n⚠️  Quota Warning: Notebook has ${res.sourceCount}/50 sources. Consider running: aegis nlm:prune`);
   } catch (err: unknown) {
     console.error(`❌ Deep Research Failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
   }
 }
 
@@ -163,6 +165,7 @@ async function runFastResearch(nbId: string, topic: string): Promise<void> {
     console.log(pub ? '\n✅ Report pushed to GitHub Wiki!' : '\n📘 Report staged in Living Memory.');
   } catch (err: unknown) {
     console.error(`❌ Research Failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
   }
 }
 
@@ -183,6 +186,7 @@ export async function handleNlmSources(notebookIdArg?: string): Promise<void> {
     }
   } catch (err: unknown) {
     console.error(`❌ Failed to list sources: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
   }
 }
 
@@ -200,6 +204,7 @@ export async function handleNlmPoll(taskIdArg?: string, notebookIdArg?: string):
     if (poll.synthesis) console.log(`\nSynthesis preview:\n${poll.synthesis.slice(0, 300)}...`);
   } catch (err: unknown) {
     console.error(`❌ Poll Failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
   }
 }
 
@@ -219,6 +224,7 @@ export async function handleNlmImport(taskIdArg?: string, notebookIdArg?: string
     console.log(`✅ Ingested Synthesized Digest (Source ID: ${added.sourceId})`);
   } catch (err: unknown) {
     console.error(`❌ Import Failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
   }
 }
 

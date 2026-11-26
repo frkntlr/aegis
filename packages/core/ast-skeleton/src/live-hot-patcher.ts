@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import type { CodebaseMemoryEngine, MemoryNamespace } from './codebase-memory.js';
 
@@ -47,7 +48,9 @@ export class LiveHotPatcher {
       try {
         stored = fs.readFileSync(full, 'utf8');
         ns.fileContents.set(filePath, stored);
-      } catch { /* ignore read failure */ }
+      } catch (err: unknown) {
+        debugLogIgnored('LiveHotPatcher:getOrLoadContent', err);
+      }
     }
     return stored;
   }

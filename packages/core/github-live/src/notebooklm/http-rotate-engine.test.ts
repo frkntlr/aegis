@@ -7,6 +7,7 @@
 import test from 'node:test';
 import * as assert from 'node:assert';
 import { HttpRotateEngine } from './http-rotate-engine.js';
+import { fetchPostWithTimeout } from './http-transport.js';
 
 test('HttpRotateEngine parses and serializes cookies correctly', () => {
   const str = 'SID=abc123; HSID=def456; __Secure-1PSIDTS=ts789;';
@@ -89,4 +90,30 @@ test('HttpRotateEngine rotate returns error when cookies lack required tokens', 
   const res = await HttpRotateEngine.rotate('INVALID_COOKIES', { saveOnSuccess: false });
   assert.strictEqual(res.success, false);
   assert.ok(res.error?.includes('Cannot rotate cookies'));
+});
+
+test('fetchPostWithTimeout preserves multiple Set-Cookie headers via getSetCookie', async (t) => {
+  const headers = new Headers();
+  headers.append('set-cookie', '__Secure-1PSIDTS=rotated_ts_1; Domain=.google.com; Path=/; Secure');
+  headers.append('set-cookie', 'SIDCC=rotated_sidcc_2; Domain=.google.com; Path=/');
+  t.mock.method(globalThis, 'fetch', async () => new Response('[1,"ok"]', { status: 200, headers }));
+  const initial = 'SID=sid123; APISID=api; SAPISID=sapi;';
+  const res = await HttpRotateEngine.rotate(initial, { saveOnSuccess: false });
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.newPsidts, 'rotated_ts_1');
+  assert.ok(res.refreshedCookies?.includes('SIDCC=rotated_sidcc_2'));
+});
+
+test('fetchPostWithTimeout aborts stalled body streaming within timeoutMs', async (t) => {
+  t.mock.method(globalThis, 'fetch', async (_url: string, init?: RequestInit) => ({
+    status: 200,
+    headers: new Headers(),
+    text: () => new Promise<string>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('Body stream aborted')), { once: true });
+    })
+  }));
+  await assert.rejects(
+    async () => fetchPostWithTimeout('https://example.test/rpc', 'body', { timeoutMs: 25 }),
+    /timed out|aborted/i
+  );
 });

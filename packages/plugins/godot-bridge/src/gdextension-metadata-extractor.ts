@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 
 export interface GdExtensionClassInfo {
   name: string;
@@ -142,7 +143,7 @@ export class GdExtensionMetadataExtractor {
           compatibilityMinimum,
           classes
         });
-      } catch { /* ignore */ }
+      } catch (err: unknown) { debugLogIgnored('gdextension-metadata:extractFromProject', err); }
     }
 
     return contracts;

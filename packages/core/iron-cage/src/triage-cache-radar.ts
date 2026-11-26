@@ -8,7 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
 
 export interface QuotaAlert {
   file: string;
@@ -60,7 +60,7 @@ export class TriageCacheRadar {
 
   constructor(options: { cacheDir?: string; engineRulesSalt?: string } = {}) {
     const baseDir = options.cacheDir || resolveSafeCacheDir();
-    try { fs.mkdirSync(baseDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(baseDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('TriageCacheRadar:mkdir', err); }
     this.cacheFilePath = path.join(baseDir, 'triage-cache.json');
     this.currentEngineHash = this.computeEngineHash(options.engineRulesSalt || 'aegis-iron-cage-v2');
     this.cacheData = this.loadCache();
@@ -75,8 +75,7 @@ export class TriageCacheRadar {
       return this.initFreshCache();
     }
     try {
-      const raw = fs.readFileSync(this.cacheFilePath, 'utf8');
-      const parsed = JSON.parse(raw) as TriageCacheData;
+      const parsed = readJsonSafe<TriageCacheData>(this.cacheFilePath);
       if (parsed.engineHash !== this.currentEngineHash || parsed.version !== '1.0.0') {
         return this.initFreshCache();
       }
@@ -154,8 +153,8 @@ export class TriageCacheRadar {
       this.cacheData.timestamp = new Date().toISOString();
       fs.writeFileSync(this.cacheFilePath, JSON.stringify(this.cacheData, null, 2), 'utf8');
       this.dirty = false;
-    } catch {
-      // Safe fallback on filesystem write restrictions
+    } catch (err: unknown) {
+      debugLogIgnored('TriageCacheRadar:flush', err);
     }
   }
 

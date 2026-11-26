@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 export interface ToolPermission {
   agentName: string;
   allowedTools: Set<string>;
@@ -117,13 +120,93 @@ export class MCPSecurityManager {
     return { allowed: true };
   }
 
+  private tryReadDanglingLink(cur: string): string | null {
+    try {
+      const st = fs.lstatSync(cur);
+      if (!st.isSymbolicLink()) return null;
+      const target = fs.readlinkSync(cur);
+      return path.isAbsolute(target) ? target : path.resolve(path.dirname(cur), target);
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveNearestRealpath(targetPath: string): string | null {
+    let cur = targetPath;
+    const tail: string[] = [];
+    let symlinkHops = 0;
+    while (true) {
+      if (fs.existsSync(cur)) {
+        try {
+          const real = fs.realpathSync(cur);
+          return tail.length > 0 ? path.join(real, ...tail.reverse()) : real;
+        } catch (err: unknown) {
+          if (process.env.AEGIS_DEBUG === '1') {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`[aegis:mcp-security] realpathSync failed for "${cur}": ${msg}\n`);
+          }
+          return null;
+        }
+      }
+      const linkTarget = this.tryReadDanglingLink(cur);
+      if (linkTarget) {
+        symlinkHops++;
+        if (symlinkHops > 32) return null;
+        cur = linkTarget;
+        continue;
+      }
+      const parent = path.dirname(cur);
+      if (parent === cur) return symlinkHops > 0 ? null : targetPath;
+      tail.push(path.basename(cur));
+      cur = parent;
+    }
+  }
+
+  private isPathWithinBase(baseDir: string, targetPath: string, pathImpl: typeof path.posix | typeof path.win32): boolean {
+    const caseInsensitive = pathImpl === path.win32 || process.platform === 'win32';
+    const cmpBase = caseInsensitive ? baseDir.toLowerCase() : baseDir;
+    const cmpTarget = caseInsensitive ? targetPath.toLowerCase() : targetPath;
+    const rel = pathImpl.relative(cmpBase, cmpTarget);
+    return rel !== '..' && !rel.startsWith(`..${pathImpl.sep}`) && !pathImpl.isAbsolute(rel);
+  }
+
+  private resolveContainmentPair(worktreeDir: string, filePath: string): { base: string; target: string; pathImpl: typeof path.posix | typeof path.win32 } | null {
+    const safeBase = worktreeDir.replace(/\\/g, '/');
+    const safeTarget = filePath.replace(/\\/g, '/');
+    const devicePrefix = /^\/\/[?.](\/|$)/;
+    if (devicePrefix.test(safeBase) || devicePrefix.test(safeTarget)) return null;
+    const driveRelative = /^[A-Za-z]:(?![\\/])/;
+    if (driveRelative.test(safeBase) || driveRelative.test(safeTarget)) return null;
+    const winDrive = /^[A-Za-z]:(\/|$)/;
+    const baseIsWin = winDrive.test(safeBase);
+    const targetIsWin = winDrive.test(safeTarget);
+    if (targetIsWin && !baseIsWin) return null;
+    if (baseIsWin && targetIsWin && safeBase[0].toLowerCase() !== safeTarget[0].toLowerCase()) return null;
+    const pathImpl = baseIsWin ? path.win32 : path;
+    const base = pathImpl.resolve(safeBase);
+    const target = pathImpl.isAbsolute(safeTarget) ? pathImpl.resolve(safeTarget) : pathImpl.resolve(base, safeTarget);
+    return { base, target, pathImpl };
+  }
+
   public authorizeFileOperation(agentName: string, filePath: string, worktreeDir?: string): { allowed: boolean; reason?: string } {
     if (agentName === 'human' || !worktreeDir) return { allowed: true };
-    const normFile = filePath.replace(/\\/g, '/');
-    const normWt = worktreeDir.replace(/\\/g, '/');
-    if (normFile.includes('../') && !normFile.startsWith(normWt)) {
+    if (filePath.includes('\0') || worktreeDir.includes('\0') || filePath.trim() === '') {
+      this.recordAudit(agentName, 'write_file', false, 'Invalid or null-byte file path.');
+      return { allowed: false, reason: `Agent "${agentName}" supplied an invalid file path.` };
+    }
+    const pair = this.resolveContainmentPair(worktreeDir, filePath);
+    if (!pair || !this.isPathWithinBase(pair.base, pair.target, pair.pathImpl)) {
       this.recordAudit(agentName, 'write_file', false, 'Path traversal detected outside worktree.');
       return { allowed: false, reason: `Agent "${agentName}" cannot write outside worktree "${worktreeDir}".` };
+    }
+    const checkSymlinks = pair.pathImpl === path || process.platform === 'win32';
+    if (checkSymlinks) {
+      const realBase = this.resolveNearestRealpath(pair.base);
+      const realTarget = this.resolveNearestRealpath(pair.target);
+      if (!realBase || !realTarget || !this.isPathWithinBase(realBase, realTarget, pair.pathImpl)) {
+        this.recordAudit(agentName, 'write_file', false, 'Symlink path escape detected outside worktree.');
+        return { allowed: false, reason: `Agent "${agentName}" cannot write outside worktree "${worktreeDir}".` };
+      }
     }
     return { allowed: true };
   }

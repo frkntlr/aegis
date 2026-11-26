@@ -3,6 +3,8 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
+import type { LockMetadata } from './worktree-lock-manager.js';
 import { WorktreeLockManager } from './worktree-lock-manager.js';
 
 test('WorktreeLockManager acquires conflict-free locks and reports conflicts', () => {
@@ -47,7 +49,7 @@ test('WorktreeLockManager automatically prunes stale locks older than staleTimeo
 
     // Simulate lock age > 2000ms
     const metaFile = manager.getMetaFilePath();
-    const metaData = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+    const metaData = readJsonSafe<Record<string, LockMetadata>>(metaFile);
     metaData['src/old.ts'].acquiredAt = Date.now() - 5000;
     fs.writeFileSync(metaFile, JSON.stringify(metaData), 'utf8');
 
@@ -153,4 +155,47 @@ test('WorktreeLockManager releaseFileLocks strictly isolates locks without prefi
   // Releasing exact 'issue-solver [Contract]' releases [Contract]
   manager.releaseFileLocks('issue-solver [Contract]');
   assert.strictEqual(manager.getLockedFiles().has('src/6.ts'), false);
+});
+
+test('WorktreeLockManager acquireFileLocks and acquireBatchLocks complete in < 250ms without self-deadlock', () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-fast-lock-'));
+  try {
+    const manager = new WorktreeLockManager({ repoRoot: tmpRepo, persistLocks: true });
+    const start1 = performance.now();
+    const res1 = manager.acquireFileLocks('alice', ['src/fast1.ts']);
+    const elapsed1 = performance.now() - start1;
+    assert.strictEqual(res1.success, true);
+    assert.ok(elapsed1 < 250, `Expected acquireFileLocks < 250ms, got ${elapsed1.toFixed(1)}ms`);
+
+    const start2 = performance.now();
+    const res2 = manager.acquireBatchLocks([{ agentName: 'bob', files: ['src/fast2.ts'] }]);
+    const elapsed2 = performance.now() - start2;
+    assert.strictEqual(res2.success, true);
+    assert.ok(elapsed2 < 250, `Expected acquireBatchLocks < 250ms, got ${elapsed2.toFixed(1)}ms`);
+  } finally {
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
+  }
+});
+
+test('WorktreeLockManager nested withLock preserves locks.json.lock until outer callback exits', () => {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-reentrant-lock-'));
+  try {
+    const manager = new WorktreeLockManager({ repoRoot: tmpRepo, persistLocks: true });
+    const lockDir = `${manager.getLockFilePath()}.lock`;
+    let lockExistsAfterInner = false;
+
+    manager.withLock(() => {
+      assert.strictEqual(fs.existsSync(lockDir), true);
+      manager.acquireFileLocks('alice', ['src/outer.ts']);
+      manager.pruneStaleLocks();
+      lockExistsAfterInner = fs.existsSync(lockDir);
+      assert.strictEqual(lockExistsAfterInner, true);
+    });
+
+    assert.strictEqual(lockExistsAfterInner, true);
+    assert.strictEqual(fs.existsSync(lockDir), false);
+    assert.strictEqual(manager.getLockedFiles().get('src/outer.ts'), 'alice');
+  } finally {
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
+  }
 });

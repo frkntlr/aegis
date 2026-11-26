@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { TeamworkCoordinator } from './teamwork-coordinator.js';
 
 test('TeamworkCoordinator lists all 4 official Antigravity subagent profiles', () => {
@@ -41,7 +42,7 @@ test('TeamworkCoordinator plans teamwork, stages tracks in inbox, and acquires l
 
     const inboxPath = path.join(tmpDir, '.aegis', 'task-inbox.json');
     assert.ok(fs.existsSync(inboxPath));
-    const staged = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+    const staged = readJsonSafe<unknown[]>(inboxPath);
     assert.ok(staged.length >= 3);
 
     const status = coordinator.getTeamworkStatus();
@@ -97,7 +98,7 @@ test('TeamworkCoordinator exports Antigravity subagents manifest cleanly', () =>
 
     const manifestPath = path.join(tmpDir, 'subagents.json');
     assert.ok(fs.existsSync(manifestPath));
-    const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const parsed = readJsonSafe<{ framework: string; subagents: Array<{ name: string; defaultModel: string }> }>(manifestPath);
     assert.strictEqual(parsed.framework, 'antigravity-subagents');
     assert.strictEqual(parsed.subagents.length, 4);
     assert.strictEqual(parsed.subagents.find((s: { name: string }) => s.name === 'doc-architect')?.defaultModel, 'flash');

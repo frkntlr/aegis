@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { WorktreeMutexShield } from '@aegis/shared';
+import { debugLogIgnored, WorktreeMutexShield } from '@aegis/shared';
 
 export interface AstGrepMatch {
   file?: string;
@@ -54,7 +54,7 @@ export class AstGrepBridge {
       varNames.push(name);
       return `(?<${name}>(?:"[^"]*"|'[^']*'|\`[^\`]*\`|[^,();\n]+?))`;
     });
-    p = p.replace(/\$(?![a-zA-Z_])/g, '(?:"[^"]*"|\'[^\']*\'|`[^\`]*`|[^,();\\n]+?)');
+    p = p.replace(/\$(?![a-zA-Z_])/g, '(?:"[^"]*"|\'[^\']*\'|`[^`]*`|[^,();\\n]+?)');
 
     const normalized = p.replace(/\s+/g, '\\s+');
     return { regex: new RegExp(normalized, 'g'), varNames };
@@ -189,11 +189,47 @@ export class AstGrepBridge {
     return { ...result, written: result.hasChanges };
   }
 
+  private static quoteBatchArg(arg: string): string {
+    if (/[\0\r\n]/.test(arg)) throw new Error('Command argument contains unsupported control characters');
+    if (arg.length === 0) return '""';
+    if (!/[\s"&|<>^()%!;*?]/.test(arg)) return arg;
+    return `"${arg.replace(/"/g, '""')}"`;
+  }
+
+  private static resolveSgExecutable(): string {
+    if (process.platform !== 'win32') return 'sg';
+    const pathEnv = process.env.PATH || process.env.Path || '';
+    const exts = ['sg.exe', 'sg.cmd', 'sg.bat', 'sg'];
+    for (const rawDir of pathEnv.split(path.delimiter)) {
+      const dir = rawDir.trim().replace(/^"+|"+$/g, '');
+      if (!dir) continue;
+      for (const name of exts) {
+        const candidate = path.join(dir, name);
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+    return 'sg';
+  }
+
+  private static spawnSg(args: string[], cwd?: string) {
+    const exe = AstGrepBridge.resolveSgExecutable();
+    const lower = exe.toLowerCase();
+    if (process.platform === 'win32' && (lower.endsWith('.cmd') || lower.endsWith('.bat'))) {
+      const qExe = /[\s&|<>^()%!;*?]/.test(exe) ? `"${exe}"` : exe;
+      const inner = [qExe, ...args.map((a) => AstGrepBridge.quoteBatchArg(a))].join(' ');
+      return spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${inner}"`], {
+        cwd, encoding: 'utf8', shell: false, windowsHide: true, windowsVerbatimArguments: true
+      });
+    }
+    return spawnSync(exe, args, { cwd, encoding: 'utf8', shell: false, windowsHide: true });
+  }
+
   public static checkCliAvailable(): boolean {
     try {
-      const res = spawnSync('sg', ['--version'], { encoding: 'utf8', shell: true });
+      const res = AstGrepBridge.spawnSg(['--version']);
       return res.status === 0;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('AstGrepBridge:checkCliAvailable', err);
       return false;
     }
   }
@@ -201,9 +237,10 @@ export class AstGrepBridge {
   public static runCli(args: string[], cwd = process.cwd()): string | null {
     if (!AstGrepBridge.checkCliAvailable()) return null;
     try {
-      const res = spawnSync('sg', args, { cwd, encoding: 'utf8', shell: true });
+      const res = AstGrepBridge.spawnSg(args, cwd);
       return res.stdout || res.stderr || '';
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('AstGrepBridge:runCli', err);
       return null;
     }
   }

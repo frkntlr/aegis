@@ -19,7 +19,7 @@ import {
   RESEARCH_INDEX_PAGE
 } from './wiki-pages/index.js';
 
-export { WikiSuitePage };
+export type { WikiSuitePage };
 
 export const DEFAULT_WIKI_SUITE: WikiSuitePage[] = [
   HOME_PAGE,

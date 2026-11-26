@@ -5,6 +5,7 @@
  */
 
 import * as child_process from 'node:child_process';
+import { debugLogIgnored } from '@aegis/shared';
 
 export interface WatchdogOptions {
   timeoutMs?: number;
@@ -79,8 +80,8 @@ export class GodotProcessWatchdog {
     } catch {
       try {
         process.kill(pid, 'SIGKILL');
-      } catch {
-        // Process might have already exited cleanly
+      } catch (err: unknown) {
+        debugLogIgnored('godot-process-watchdog:killProcessTree', err);
       }
     }
   }

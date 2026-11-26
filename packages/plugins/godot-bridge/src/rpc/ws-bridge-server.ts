@@ -7,6 +7,7 @@
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type { Socket } from 'node:net';
+import { debugLogIgnored } from '@aegis/shared';
 import { WsFrameCodec } from './ws-frame-codec.js';
 import type { GodotRpcRequest, GodotRpcResponse, GodotUiTreePayload } from './rpc-types.js';
 
@@ -24,6 +25,7 @@ export class WsBridgeServer {
   private host: string;
   private sessionToken: string;
   private clientSocket: Socket | null = null;
+  private readonly activeSockets = new Set<Socket>();
   private socketBuffer = Buffer.alloc(0);
   private latestTelemetry: GodotUiTreePayload | null = null;
   private pendingCommands = new Map<string, (res: GodotRpcResponse) => void>();
@@ -56,18 +58,34 @@ export class WsBridgeServer {
     });
   }
 
-  public async stop(): Promise<void> {
-    if (this.clientSocket && !this.clientSocket.destroyed) {
-      this.clientSocket.write(WsFrameCodec.encodeCloseFrame());
-      this.clientSocket.destroy();
-      this.clientSocket = null;
+  private closeSocket(socket: Socket | null): void {
+    if (!socket) return;
+    if (!socket.destroyed && socket.writable) {
+      try {
+        socket.write(WsFrameCodec.encodeCloseFrame());
+      } catch (err: unknown) {
+        debugLogIgnored('ws-bridge-server:closeSocket', err);
+      }
     }
+    if (!socket.destroyed) socket.destroy();
+  }
+
+  public async stop(): Promise<void> {
+    const toClose = new Set<Socket>(this.activeSockets);
+    if (this.clientSocket) toClose.add(this.clientSocket);
+    for (const sock of toClose) {
+      this.closeSocket(sock);
+    }
+    this.activeSockets.clear();
+    this.clientSocket = null;
+    this.socketBuffer = Buffer.alloc(0);
     return new Promise((resolve) => {
       if (!this.server) return resolve();
       this.server.close(() => {
         this.server = null;
         resolve();
       });
+      this.server.closeAllConnections?.();
     });
   }
 
@@ -97,8 +115,13 @@ export class WsBridgeServer {
       socket.destroy();
       return;
     }
-    const token = new URL(req.url || '/', 'http://127.0.0.1').searchParams.get('token');
-    if (token !== this.sessionToken) {
+    const parsedUrl = this.extractToken(req.url);
+    if (!parsedUrl.valid) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    if (parsedUrl.token !== this.sessionToken) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
@@ -113,16 +136,56 @@ export class WsBridgeServer {
 
     const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    this.attachClientSocket(socket);
+  }
 
+  private attachClientSocket(socket: Socket): void {
+    const previous = this.clientSocket;
     this.clientSocket = socket;
     this.socketBuffer = Buffer.alloc(0);
-    socket.on('data', (chunk) => this.handleSocketData(chunk));
-    socket.on('close', () => { if (this.clientSocket === socket) this.clientSocket = null; });
+    this.activeSockets.add(socket);
+    if (previous && previous !== socket) this.closeSocket(previous);
+    socket.on('data', (chunk) => {
+      if (this.clientSocket !== socket) return;
+      this.handleSocketData(chunk);
+    });
+    socket.on('close', () => {
+      this.activeSockets.delete(socket);
+      if (this.clientSocket === socket) {
+        this.clientSocket = null;
+        this.onLogCb?.({ level: 'info', message: 'Godot client disconnected' });
+      }
+    });
+    socket.on('error', error => {
+      this.activeSockets.delete(socket);
+      if (this.clientSocket === socket) this.clientSocket = null;
+      this.onLogCb?.({ level: 'warn', message: `Godot connection closed: ${error.message}` });
+      socket.destroy();
+    });
+  }
+
+  private extractToken(rawUrl?: string): { valid: boolean; token: string | null } {
+    try {
+      const parsed = new URL(rawUrl || '/', 'http://127.0.0.1');
+      return { valid: true, token: parsed.searchParams.get('token') };
+    } catch (err: unknown) {
+      debugLogIgnored('ws-bridge-server:extractToken', err);
+      return { valid: false, token: null };
+    }
   }
 
   private verifyOrigin(origin?: string): boolean {
-    if (!origin || origin === 'null') return true;
-    return origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1');
+    if (!origin) return true;
+    if (origin === 'null') return false;
+    try {
+      const u = new URL(origin);
+      const validProtocol = u.protocol === 'http:' || u.protocol === 'https:';
+      const validHost = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+      return validProtocol && validHost;
+    } catch (err: unknown) {
+      debugLogIgnored('ws-bridge-server:verifyOrigin', err);
+      return false;
+    }
   }
 
   private handleSocketData(chunk: Buffer): void {
@@ -153,8 +216,8 @@ export class WsBridgeServer {
         this.pendingCommands.delete(msg.id);
         handler?.(msg as GodotRpcResponse);
       }
-    } catch {
-      // Ignore unparseable raw packets
+    } catch (err: unknown) {
+      debugLogIgnored('ws-bridge-server:processClientMessage', err);
     }
   }
 

@@ -36,25 +36,39 @@ static func _traverse_control_tree(node: Node, acc: Array) -> void:
 				"height": rect.size.y
 			}
 		}
-		if "text" in node and node.get("text") != null:
-			node_info["text"] = str(node.get("text"))
-		if "tooltip_text" in node and node.get("tooltip_text") != "":
-			node_info["tooltip_text"] = str(node.get("tooltip_text"))
-		if "disabled" in node:
-			node_info["disabled"] = bool(node.get("disabled"))
-		if "theme_type_variation" in node and str(node.get("theme_type_variation")) != "":
-			node_info["theme_type_variation"] = str(node.get("theme_type_variation"))
+		node_info.merge(_control_metadata(node))
 		acc.append(node_info)
 	for child in node.get_children():
 		_traverse_control_tree(child, acc)
 
+static func _control_metadata(node: Node) -> Dictionary:
+	var metadata = {}
+	if "text" in node and node.get("text") != null:
+		metadata["text"] = str(node.get("text"))
+	if "tooltip_text" in node and node.get("tooltip_text") != "":
+		metadata["tooltip_text"] = str(node.get("tooltip_text"))
+	if "disabled" in node:
+		metadata["disabled"] = bool(node.get("disabled"))
+	if "theme_type_variation" in node and str(node.get("theme_type_variation")) != "":
+		metadata["theme_type_variation"] = str(node.get("theme_type_variation"))
+	return metadata
+
 static func build_payload(root: Node, aspect_key: String) -> Dictionary:
-	var res = ASPECT_RATIOS.get(aspect_key, Vector2(1920, 1080))
+	var res = root.get_viewport().get_visible_rect().size
 	return {
 		"viewport": {
 			"width": res.x,
 			"height": res.y,
-			"aspectRatio": aspect_key
+			"aspectRatio": _actual_aspect_key(res, aspect_key)
 		},
 		"nodes": collect_ui_nodes(root)
 	}
+
+static func _actual_aspect_key(size: Vector2, fallback: String) -> String:
+	if size.y <= 0:
+		return fallback
+	for key in ASPECT_RATIOS:
+		var candidate: Vector2 = ASPECT_RATIOS[key]
+		if absf(size.x / size.y - candidate.x / candidate.y) < 0.001:
+			return key
+	return str(int(size.x)) + ":" + str(int(size.y))

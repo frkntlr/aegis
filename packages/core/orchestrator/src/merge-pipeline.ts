@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import { cleanGitEnv } from './worktree-mutex.js';
 import { BranchReconciler } from './branch-reconciler.js';
 
@@ -42,7 +43,7 @@ export class MergePipeline {
         }).trim();
         if (branch && branch !== 'HEAD') return branch;
       }
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('MergePipeline:detectCurrentBranch', err); }
     return 'master';
   }
 
@@ -105,7 +106,7 @@ export class MergePipeline {
         stdio: 'pipe',
         env: cleanGitEnv()
       });
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('MergePipeline:abortRebase', err); }
   }
 
   private step3Merge(mergingAgent: string, agentDir: string, steps: MergeStepReport[]): boolean {
@@ -185,7 +186,7 @@ export class MergePipeline {
         stdio: 'pipe',
         env: cleanGitEnv()
       });
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('MergePipeline:abortMerge', err); }
   }
 
   private step4SyncSiblings(siblingAgents: string[], mergingAgent: string, steps: MergeStepReport[]): void {
@@ -225,7 +226,7 @@ export class MergePipeline {
           fs.cpSync(defaultMemDir, path.join(memDir, sibling), { recursive: true, force: true });
         }
       }
-    } catch { /* ignore memory sync error */ }
+    } catch (err: unknown) { debugLogIgnored('MergePipeline:fuseMemory', err); }
   }
 
   public async executePipeline(

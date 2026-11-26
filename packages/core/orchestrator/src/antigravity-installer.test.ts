@@ -69,3 +69,78 @@ test('AntigravityInstaller writeMcpSchemas writes valid schemas', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('AntigravityInstaller installShims emits aegis-tr instead of tr and discoverHomes avoids hardcoded user paths', () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-shims-homes-'));
+  try {
+    const binDir = path.join(tmpRoot, 'bin');
+    AntigravityInstaller.installShims(binDir, path.join(tmpRoot, 'aegis.js'));
+    assert.strictEqual(fs.existsSync(path.join(binDir, 'tr.cmd')), false);
+    assert.strictEqual(fs.existsSync(path.join(binDir, 'tr.ps1')), false);
+    assert.strictEqual(fs.existsSync(path.join(binDir, 'tr')), false);
+    assert.strictEqual(fs.existsSync(path.join(binDir, 'aegis-tr.cmd')), true);
+    assert.strictEqual(fs.existsSync(path.join(binDir, 'aegis-tr.ps1')), true);
+
+    const fakeHome = path.join(tmpRoot, 'home');
+    const profileHome = path.join(fakeHome, 'AntigravityProfiles', 'client-x');
+    fs.mkdirSync(path.join(fakeHome, '.gemini'), { recursive: true });
+    fs.mkdirSync(path.join(profileHome, '.gemini'), { recursive: true });
+
+    const prevEnv = { USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME, ANTIGRAVITY_APP_DATA_DIR: process.env.ANTIGRAVITY_APP_DATA_DIR };
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
+    delete process.env.ANTIGRAVITY_APP_DATA_DIR;
+    try {
+      const homes = AntigravityInstaller.discoverHomes(fakeHome);
+      assert.deepStrictEqual(homes, [path.resolve(fakeHome), path.resolve(profileHome)]);
+      assert.strictEqual(homes.some(h => h.endsWith(`${path.sep}client-a`)), false);
+    } finally {
+      for (const [k, v] of Object.entries(prevEnv)) {
+        if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      }
+    }
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('AntigravityInstaller syncGlobal installs shims into APPDATA npm dir and invokes MCP registration', () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-sync-global-'));
+  const prevEnv = {
+    USERPROFILE: process.env.USERPROFILE,
+    HOME: process.env.HOME,
+    APPDATA: process.env.APPDATA,
+    ANTIGRAVITY_APP_DATA_DIR: process.env.ANTIGRAVITY_APP_DATA_DIR
+  };
+  try {
+    const fakeHome = path.join(tmpRoot, 'home');
+    const fakeAppData = path.join(tmpRoot, 'appdata');
+    const fakeNpmDir = path.join(fakeAppData, 'npm');
+    const fakeRepo = path.join(tmpRoot, 'repo');
+    fs.mkdirSync(path.join(fakeHome, '.gemini'), { recursive: true });
+    fs.mkdirSync(fakeNpmDir, { recursive: true });
+    fs.mkdirSync(fakeRepo, { recursive: true });
+    fs.writeFileSync(path.join(fakeRepo, 'GEMINI.md'), '# Rules', 'utf8');
+
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
+    process.env.APPDATA = fakeAppData;
+    delete process.env.ANTIGRAVITY_APP_DATA_DIR;
+
+    const registeredConfigs: string[] = [];
+    AntigravityInstaller.syncGlobal(fakeHome, fakeRepo, cfg => registeredConfigs.push(cfg));
+
+    assert.ok(registeredConfigs.includes(path.resolve(fakeHome, '.gemini', 'config', 'mcp_config.json')));
+    assert.strictEqual(fs.existsSync(path.join(fakeHome, '.gemini', 'antigravity', 'bin', 'aegis-tr.cmd')), true);
+    assert.strictEqual(fs.existsSync(path.join(fakeHome, '.gemini', 'antigravity', 'bin', 'tr.cmd')), false);
+    if (process.platform === 'win32') {
+      assert.strictEqual(fs.existsSync(path.join(fakeNpmDir, 'aegis.cmd')), true);
+      assert.strictEqual(fs.existsSync(path.join(fakeNpmDir, 'tr.cmd')), false);
+    }
+  } finally {
+    for (const [k, v] of Object.entries(prevEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});

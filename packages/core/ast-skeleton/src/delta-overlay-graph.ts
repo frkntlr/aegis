@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeCacheDir } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeCacheDir } from '@aegis/shared';
 import {
   RelationalGraph,
   type RelationalNode,
@@ -182,7 +182,7 @@ export class DeltaOverlayGraph {
         fs.renameSync(tmpPath, p);
       } catch {
         fs.copyFileSync(tmpPath, p);
-        try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+        try { fs.rmSync(tmpPath, { force: true }); } catch (rmErr: unknown) { debugLogIgnored('DeltaOverlayGraph:cleanup', rmErr); }
       }
       return true;
     } catch {
@@ -199,7 +199,7 @@ export class DeltaOverlayGraph {
     const p = customPath || this.externalPath;
     if (!fs.existsSync(p)) return false;
     try {
-      const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+      const parsed = readJsonSafe<{ packages?: Record<string, unknown>; graph?: GraphSerialized }>(p);
       if (parsed.packages) {
         for (const [k, v] of Object.entries(parsed.packages)) {
           this.packageVersions.set(k, String(v));

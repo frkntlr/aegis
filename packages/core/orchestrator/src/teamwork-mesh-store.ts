@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeRepoRoot, safeParseJson } from '@aegis/shared';
 import { WorktreeMutex } from './worktree-mutex.js';
 import type { TeamworkTrack, TeamworkPeerState, TeamworkEvent, TeamworkMeshState } from './teamwork-types.js';
 
@@ -103,9 +103,10 @@ export class TeamworkMeshStore {
         fs.writeFileSync(tmp, payload, { encoding: 'utf8', flush: true });
         try {
           fs.renameSync(tmp, this.meshFile);
-        } catch {
+        } catch (renameErr: unknown) {
+          debugLogIgnored('TeamworkMeshStore:renameTmp', renameErr);
           fs.copyFileSync(tmp, this.meshFile);
-          try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+          try { fs.rmSync(tmp, { force: true }); } catch (rmErr: unknown) { debugLogIgnored('TeamworkMeshStore:rmTmp', rmErr); }
         }
         const stat = fs.statSync(this.meshFile);
         TeamworkMeshStore.processCache.set(this.meshFile, {
@@ -115,7 +116,7 @@ export class TeamworkMeshStore {
         });
         return;
       } catch (err) {
-        try { if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+        try { if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true }); } catch (cleanupErr: unknown) { debugLogIgnored('TeamworkMeshStore:cleanupTmp', cleanupErr); }
         if (attempt === maxRetries - 1) throw err;
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, (attempt + 1) * 15);
       }
@@ -129,12 +130,12 @@ export class TeamworkMeshStore {
   public clearState(): void {
     TeamworkMeshStore.processCache.delete(this.meshFile);
     if (fs.existsSync(this.meshFile)) {
-      try { fs.unlinkSync(this.meshFile); } catch { /* ignore */ }
+      try { fs.unlinkSync(this.meshFile); } catch (err: unknown) { debugLogIgnored('TeamworkMeshStore:clearState', err); }
     }
   }
 
   private parseMeshPayload(raw: string): TeamworkMeshState {
-    const p = JSON.parse(raw) as Partial<TeamworkMeshState>;
+    const p = safeParseJson<Partial<TeamworkMeshState>>(raw);
     return {
       planId: typeof p.planId === 'string' ? p.planId : 'default',
       objective: typeof p.objective === 'string' ? p.objective : '',

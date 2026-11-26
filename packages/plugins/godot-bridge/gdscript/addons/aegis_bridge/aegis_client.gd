@@ -95,7 +95,8 @@ func _execute_command(cmd: Dictionary) -> void:
 	elif action == "ping":
 		resp_data["pong"] = true
 
-	_send_command_result(cmd_id, true, resp_data)
+	var succeeded = resp_data.get("result", {}).get("success", true)
+	_send_command_result(cmd_id, succeeded, resp_data)
 
 func _evaluate_expression(expr_str: String) -> Variant:
 	var expression = Expression.new()

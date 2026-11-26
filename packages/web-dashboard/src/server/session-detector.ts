@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AgentWorktree } from '@aegis/shared';
+import { AgentWorktree, debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { WorktreeManager } from '@aegis/orchestrator';
 
 export interface AgentSession {
@@ -43,13 +43,13 @@ export class SessionDetector {
     const sessionFile = path.resolve(sessionsDir, `${agentName}.json`);
     if (fs.existsSync(sessionFile)) {
       try {
-        const parsed = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+        const parsed = readJsonSafe<{ ideType?: string; lastHeartbeat?: string }>(sessionFile);
         return {
           ideType: (parsed.ideType as AgentSession['ideType']) || defaultIde,
           lastHeartbeat: parsed.lastHeartbeat || new Date().toISOString()
         };
-      } catch {
-        // Fallback on corrupt file
+      } catch (err: unknown) {
+        debugLogIgnored('session-detector:readSessionFile', err);
       }
     }
     return { ideType: defaultIde, lastHeartbeat: new Date().toISOString() };

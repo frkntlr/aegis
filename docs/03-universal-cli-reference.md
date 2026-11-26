@@ -160,7 +160,7 @@ flowchart LR
 
 ## 4. İlgili Belgeler
 
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — TIP ve Git Worktrees.
-- [`04-mcp-server-specification.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/04-mcp-server-specification.md) — 19 MCP aracı referansı.
-- [`05-godot-bridge-and-ui.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/05-godot-bridge-and-ui.md) — `aegis godot *` komutları.
-- [`06-diagnostics-and-quality-gates.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/06-diagnostics-and-quality-gates.md) — Doğrulama ve Sokratik teşhis.
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — TIP ve Git Worktrees.
+- [`04-mcp-server-specification.md`](./04-mcp-server-specification.md) — 19 MCP aracı referansı.
+- [`05-godot-bridge-and-ui.md`](./05-godot-bridge-and-ui.md) — `aegis godot *` komutları.
+- [`06-diagnostics-and-quality-gates.md`](./06-diagnostics-and-quality-gates.md) — Doğrulama ve Sokratik teşhis.

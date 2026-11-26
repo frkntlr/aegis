@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeAegisDir } from '@aegis/shared';
 import type { ParsedRfc } from './rfc-triager.js';
 
 export interface ResearchNoteResult {
@@ -16,7 +16,7 @@ export class NotebookLmBridge {
   }
 
   public exportRfcResearchNote(rfc: ParsedRfc): ResearchNoteResult {
-    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('notebooklm-bridge:mkdir', err); }
     const rawSlug = rfc.targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
     const slug = rawSlug || 'unnamed-rfc';
     const filePath = path.resolve(this.researchDir, `rfc-${slug}-research.md`);
@@ -58,7 +58,7 @@ export class NotebookLmBridge {
       '- **Deterministik Demir Kafes:** Maks. 40 satır/fonksiyon, maks. 300 satır/dosya statik sınırları.',
       '- **Sıfır-Token UI Testi:** BoundingBox geometrik çakışma tespiti ile LLM vision token maliyeti sıfıra indirilir.'
     ].join('\n');
-    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('notebooklm-bridge:mkdir', err); }
     fs.writeFileSync(filePath, content, 'utf8');
     return { filePath, markdownContent: content };
   }
@@ -78,7 +78,7 @@ export class NotebookLmBridge {
       '- Hedef dosyalar `lock:<path>` etiketiyle kilitlenir.',
       '- İki ajan aynı dosyayı asla eşzamanlı değiştiremez.'
     ].join('\n');
-    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('notebooklm-bridge:mkdir', err); }
     fs.writeFileSync(filePath, content, 'utf8');
     return { filePath, markdownContent: content };
   }
@@ -97,7 +97,7 @@ export class NotebookLmBridge {
       '- Dosya kilitleri serbest bırakılır ve ajan sıradaki bağımsız göreve yönlendirilir.',
       '- GitHub issue üzerine teşhis raporu otomatik yorumlanır.'
     ].join('\n');
-    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('notebooklm-bridge:mkdir', err); }
     fs.writeFileSync(filePath, content, 'utf8');
     return { filePath, markdownContent: content };
   }
@@ -117,13 +117,13 @@ export class NotebookLmBridge {
       '## 3. Immutable Oracle (Güven Denetçisi)',
       '- Test dosyalarının tahrif edilmesi veya boş assertions (`assert.ok(true)`) engellenir.'
     ].join('\n');
-    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('notebooklm-bridge:mkdir', err); }
     fs.writeFileSync(filePath, content, 'utf8');
     return { filePath, markdownContent: content };
   }
 
   public exportAllKnowledgeSources(): ResearchNoteResult[] {
-    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.researchDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('notebooklm-bridge:mkdir', err); }
     const s1 = this.exportArchitectureSource();
     const s2 = this.exportWorkflowSource();
     const s3 = this.exportErrorSolutionsSource();

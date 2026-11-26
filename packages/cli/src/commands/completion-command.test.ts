@@ -9,7 +9,8 @@ import {
   generateBashCompletion,
   installToProfile,
   installToBinScript,
-  handleCompletion
+  handleCompletion,
+  resolveAntigravityBinPath
 } from './completion-command.js';
 
 test('ALL_AEGIS_COMMANDS includes key subcommands and aliases', () => {
@@ -86,4 +87,28 @@ test('handleCompletion runs without errors for shells', () => {
   assert.doesNotThrow(() => handleCompletion('powershell'));
   assert.doesNotThrow(() => handleCompletion('bash'));
   assert.doesNotThrow(() => handleCompletion());
+});
+
+test('resolveAntigravityBinPath resolves ANTIGRAVITY_APP_DATA_DIR and USERPROFILE/HOME dynamically', () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-comp-env-'));
+  try {
+    const appDataDir = path.join(tmpRoot, 'appdata');
+    const appBin = path.join(appDataDir, 'bin', 'aegis.ps1');
+    fs.mkdirSync(path.dirname(appBin), { recursive: true });
+    fs.writeFileSync(appBin, '# appdata', 'utf8');
+
+    const homeDir = path.join(tmpRoot, 'home');
+    const homeBin = path.join(homeDir, '.gemini', 'antigravity', 'bin', 'aegis.ps1');
+    fs.mkdirSync(path.dirname(homeBin), { recursive: true });
+    fs.writeFileSync(homeBin, '# home', 'utf8');
+
+    assert.strictEqual(
+      resolveAntigravityBinPath({ ANTIGRAVITY_APP_DATA_DIR: appDataDir, USERPROFILE: homeDir }),
+      appBin
+    );
+    assert.strictEqual(resolveAntigravityBinPath({ HOME: homeDir }), homeBin);
+    assert.strictEqual(resolveAntigravityBinPath({ USERPROFILE: path.join(tmpRoot, 'missing') }), null);
+  } finally {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
 });

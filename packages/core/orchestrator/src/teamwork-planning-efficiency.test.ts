@@ -3,6 +3,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { readJsonSafe } from '@aegis/shared';
 import { TeamworkCoordinator } from './teamwork-coordinator.js';
 import { ProjectBootstrapEngine } from './project-bootstrap.js';
 
@@ -42,7 +43,7 @@ test('repeated plan staging allocates distinct numeric IDs and preserves unrelat
   const coordinator = new TeamworkCoordinator({ repoRoot: root, bootstrap: false });
   for (let i = 0; i < 2; i++) coordinator.planTeamwork('Implement feature', ['src/a.ts'],
     { deterministic: true, acquireLocks: false });
-  const records = JSON.parse(fs.readFileSync(inbox, 'utf8')) as Array<typeof unrelated>;
+  const records = readJsonSafe<Array<typeof unrelated>>(inbox);
   assert.deepEqual(records[0], unrelated);
   const staged = records.slice(1);
   assert.ok(staged.length >= 2);

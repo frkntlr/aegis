@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeCacheDir } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeCacheDir } from '@aegis/shared';
 
 export interface OracleCacheOptions {
   cacheDir?: string;
@@ -23,7 +23,7 @@ export class OracleCache {
     this.cacheDir = options.cacheDir || resolveSafeCacheDir('godot');
     this.ttlMs = options.ttlMs ?? 24 * 60 * 60 * 1000;
     this.maxSizeBytes = options.maxSizeBytes ?? 50 * 1024 * 1024;
-    try { fs.mkdirSync(this.cacheDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.cacheDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('oracle-cache:mkdir', err); }
   }
 
   public getCacheDir(): string {
@@ -35,8 +35,7 @@ export class OracleCache {
     if (!fs.existsSync(filePath)) return undefined;
 
     try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const entry: CacheEntry<T> = JSON.parse(raw);
+      const entry = readJsonSafe<CacheEntry<T>>(filePath);
       if (this.isExpired(entry) || this.isVersionMismatch(entry, expectedVersion)) {
         this.delete(key);
         return undefined;
@@ -97,8 +96,8 @@ export class OracleCache {
           totalFiles++;
           totalSizeBytes += stat.size;
         }
-      } catch {
-        // ignore unreadable files
+      } catch (err: unknown) {
+        debugLogIgnored('oracle-cache:getStats', err);
       }
     }
     return { totalFiles, totalSizeBytes };
@@ -136,8 +135,8 @@ export class OracleCache {
         const size = fs.statSync(f.path).size;
         fs.rmSync(f.path, { force: true });
         currentSize -= size;
-      } catch {
-        // ignore prune errors
+      } catch (err: unknown) {
+        debugLogIgnored('oracle-cache:pruneIfNeeded', err);
       }
     }
   }

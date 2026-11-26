@@ -15,7 +15,7 @@ import {
   TransitiveTypeUtils
 } from './transitive-type-utils.js';
 
-export { type TypeClosureOptions, type BoundedTypeClosureResult };
+export type { TypeClosureOptions, BoundedTypeClosureResult };
 
 export class TransitiveTypeClosure {
   private readonly options: Required<TypeClosureOptions>;

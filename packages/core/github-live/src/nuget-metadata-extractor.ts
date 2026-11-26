@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import type { Context7DocEntry } from './context7-bridge.js';
 
 export interface NuGetPackageRef {
@@ -26,7 +27,7 @@ export class NuGetMetadataExtractor {
     const refs: NuGetPackageRef[] = [];
 
     try {
-      const data = JSON.parse(fs.readFileSync(assetsJsonPath, 'utf8'));
+      const data = readJsonSafe<{ libraries?: Record<string, unknown> }>(assetsJsonPath);
       const libraries = data.libraries || {};
 
       for (const [key, val] of Object.entries(libraries)) {
@@ -40,7 +41,7 @@ export class NuGetMetadataExtractor {
           }
         }
       }
-    } catch { /* ignore non-fatal */ }
+    } catch (err: unknown) { debugLogIgnored('nuget-metadata:parseProjectAssets', err); }
 
     return refs;
   }
@@ -96,7 +97,7 @@ export class NuGetMetadataExtractor {
           if (xml) return path.join(tfmDir, xml);
         }
       }
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('nuget-metadata:findCompanionXml', err); }
 
     return null;
   }
@@ -117,7 +118,7 @@ export class NuGetMetadataExtractor {
             break;
           }
         }
-      } catch { /* ignore */ }
+      } catch (err: unknown) { debugLogIgnored('nuget-metadata:scanAssets', err); }
     }
 
     if (!assetsPath) return docs;
@@ -130,7 +131,7 @@ export class NuGetMetadataExtractor {
           const content = fs.readFileSync(xmlPath, 'utf8');
           const parsed = NuGetMetadataExtractor.parseXmlCompanion(content, ref.name, ref.version);
           docs.push(...parsed);
-        } catch { /* ignore */ }
+        } catch (err: unknown) { debugLogIgnored('nuget-metadata:parseXml', err); }
       }
     }
 

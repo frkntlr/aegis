@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeMutex } from './worktree-mutex.js';
 import { TeamworkMesh } from './teamwork-mesh.js';
 import { TeamworkResearchSwarm } from './teamwork-research-swarm.js';
@@ -25,25 +25,33 @@ function readInboxTasks(repoRoot: string): InboxTaskItem[] {
   const p = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
   if (!fs.existsSync(p)) return [];
   try {
-    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const raw = readJsonSafe<unknown>(p);
     if (Array.isArray(raw)) return raw as InboxTaskItem[];
     if (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown[] }).tasks)) {
       return (raw as { tasks: InboxTaskItem[] }).tasks;
     }
-  } catch { /* ignore */ }
+  } catch (err: unknown) { debugLogIgnored('TeamworkReflection:readInboxTasks', err); }
   return [];
 }
 
 function writeInboxTasks(repoRoot: string, tasks: InboxTaskItem[]): void {
   const p = path.resolve(repoRoot, '.aegis', 'task-inbox.json');
-  try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch { /* ignore */ }
+  try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch (err: unknown) { debugLogIgnored('TeamworkReflection:mkdirInbox', err); }
   const tmp = `${p}.tmp.${process.pid}.${Date.now()}`;
   fs.writeFileSync(tmp, JSON.stringify(tasks, null, 2), 'utf8');
   try {
-    fs.renameSync(tmp, p);
-  } catch {
-    fs.copyFileSync(tmp, p);
-    try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+    try {
+      fs.renameSync(tmp, p);
+    } catch (renameErr: unknown) {
+      debugLogIgnored('TeamworkReflection:renameTmp', renameErr);
+      fs.copyFileSync(tmp, p);
+    }
+  } finally {
+    try {
+      if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true });
+    } catch (cleanupErr: unknown) {
+      debugLogIgnored('TeamworkReflection:cleanupTmp', cleanupErr);
+    }
   }
 }
 

@@ -6,13 +6,16 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { cleanGitEnv } from './wiki-helpers.js';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
+import { cleanGitEnv, redactGitToken } from './wiki-helpers.js';
 import type { WikiFastSyncResult, WikiSyncOptions, WikiSyncStateManifest } from './types.js';
 
 export interface ReconcileParams {
   cloneDir: string;
   remoteUrl: string;
   remoteRepo: string;
+  gitEnv?: NodeJS.ProcessEnv;
+  token?: string;
   options?: WikiSyncOptions;
 }
 
@@ -79,7 +82,7 @@ export class WikiSyncRadar {
       const parts = out.split(/\s+/);
       const ahead = parseInt(parts[0] || '0', 10);
       const behind = parseInt(parts[1] || '0', 10);
-      return { ahead: isNaN(ahead) ? 0 : ahead, behind: isNaN(behind) ? 0 : behind };
+      return { ahead: Number.isNaN(ahead) ? 0 : ahead, behind: Number.isNaN(behind) ? 0 : behind };
     } catch {
       return { ahead: 0, behind: 0 };
     }
@@ -106,12 +109,13 @@ export class WikiSyncRadar {
   public static readSyncManifest(manifestPath: string): WikiSyncStateManifest | null {
     if (!fs.existsSync(manifestPath)) return null;
     try {
-      const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const parsed = readJsonSafe<Record<string, unknown>>(manifestPath);
       if (typeof parsed.lastSyncTimestamp === 'number' && typeof parsed.headSha === 'string') {
-        return parsed as WikiSyncStateManifest;
+        return parsed as unknown as WikiSyncStateManifest;
       }
       return null;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-sync-radar:readSyncManifest', err);
       return null;
     }
   }
@@ -120,8 +124,8 @@ export class WikiSyncRadar {
     try {
       fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
       fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-    } catch {
-      // Graceful fallback
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-sync-radar:writeSyncManifest', err);
     }
   }
 
@@ -158,8 +162,8 @@ export function executeFastReconcile(params: ReconcileParams): WikiFastSyncResul
 }
 
 function performNetworkReconcile(params: ReconcileParams, start: number, manifestPath: string): WikiFastSyncResult {
-  const { cloneDir, remoteUrl, remoteRepo } = params;
-  const env = cleanGitEnv();
+  const { cloneDir, remoteUrl, remoteRepo, token } = params;
+  const env = params.gitEnv ?? cleanGitEnv();
   const gitDir = path.join(cloneDir, '.git');
 
   if (!fs.existsSync(gitDir)) {
@@ -174,7 +178,7 @@ function performNetworkReconcile(params: ReconcileParams, start: number, manifes
       });
       return { success: true, message: 'Cloned remote wiki repository.', pulled: true, pushed: false, cached: false, durationMs: Date.now() - start };
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = redactGitToken(err instanceof Error ? err.message : String(err), token);
       return { success: false, message: `Failed to clone remote wiki: ${msg}`, pulled: false, pushed: false, cached: false, durationMs: Date.now() - start };
     }
   }
@@ -182,11 +186,11 @@ function performNetworkReconcile(params: ReconcileParams, start: number, manifes
   try {
     execFileSync('git', ['-C', cloneDir, 'fetch', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = redactGitToken(err instanceof Error ? err.message : String(err), token);
     return { success: false, message: `Failed to fetch remote wiki: ${msg}`, pulled: false, pushed: false, cached: false, durationMs: Date.now() - start };
   }
 
-  return applyDivergence(cloneDir, remoteRepo, start, manifestPath, env);
+  return applyDivergence(cloneDir, remoteRepo, start, manifestPath, env, token);
 }
 
 function handleBehindMerge(cloneDir: string, behind: number, env: NodeJS.ProcessEnv) {
@@ -198,12 +202,12 @@ function handleBehindMerge(cloneDir: string, behind: number, env: NodeJS.Process
   }
 }
 
-function handleAheadPush(cloneDir: string, ahead: number, env: NodeJS.ProcessEnv) {
+function handleAheadPush(cloneDir: string, ahead: number, env: NodeJS.ProcessEnv, token?: string) {
   try {
     execFileSync('git', ['-C', cloneDir, 'push', 'origin', 'master'], { stdio: 'pipe', timeout: 15000, env });
     return { pulled: false, pushed: true, message: `Pushed ${ahead} local wiki commit(s) to remote.`, lastStatus: 'ahead' as const };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = redactGitToken(err instanceof Error ? err.message : String(err), token);
     return { pulled: false, pushed: false, message: `Failed to push local wiki commits: ${msg}`, lastStatus: 'ahead' as const };
   }
 }
@@ -216,8 +220,8 @@ function handleDivergedReconcile(cloneDir: string, div: { ahead: number; behind:
   } catch {
     try {
       execFileSync('git', ['-C', cloneDir, 'merge', '--abort'], { stdio: 'pipe', env });
-    } catch {
-      // abort cleanup
+    } catch (err: unknown) {
+      debugLogIgnored('wiki-sync-radar:mergeAbort', err);
     }
     return { pulled: false, pushed: false, message: 'Divergence conflict detected during wiki reconciliation.', lastStatus: 'diverged' as const };
   }
@@ -226,10 +230,11 @@ function handleDivergedReconcile(cloneDir: string, div: { ahead: number; behind:
 function resolveDivergenceAction(
   cloneDir: string,
   div: { ahead: number; behind: number },
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
+  token?: string
 ): { pulled: boolean; pushed: boolean; message: string; lastStatus: WikiSyncStateManifest['lastStatus'] } {
   if (div.behind > 0 && div.ahead === 0) return handleBehindMerge(cloneDir, div.behind, env);
-  if (div.ahead > 0 && div.behind === 0) return handleAheadPush(cloneDir, div.ahead, env);
+  if (div.ahead > 0 && div.behind === 0) return handleAheadPush(cloneDir, div.ahead, env, token);
   if (div.ahead > 0 && div.behind > 0) return handleDivergedReconcile(cloneDir, div, env);
   return { pulled: false, pushed: false, message: 'Wiki up to date with remote.', lastStatus: 'clean' };
 }
@@ -239,10 +244,11 @@ function applyDivergence(
   remoteRepo: string,
   start: number,
   manifestPath: string,
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
+  token?: string
 ): WikiFastSyncResult {
   const div = WikiSyncRadar.getCommitDivergence(cloneDir);
-  const action = resolveDivergenceAction(cloneDir, div, env);
+  const action = resolveDivergenceAction(cloneDir, div, env, token);
   const sha = WikiSyncRadar.getHeadSha(cloneDir);
 
   WikiSyncRadar.writeSyncManifest(manifestPath, {

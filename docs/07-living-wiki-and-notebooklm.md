@@ -105,10 +105,10 @@ aegis nlm:restore <sourceId>
 
 ## 5. İlgili Belgeler
 
-- [`01-architecture-and-memory.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/01-architecture-and-memory.md) — 5-Katmanlı Kod Tabanı Hafızası.
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — TIP görev kuyruğu.
-- [`03-universal-cli-reference.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/03-universal-cli-reference.md) — `rfc:*`, `wiki:*` ve `nlm:*` komutları.
-- [RFC-001: Autonomous NotebookLM Ideation](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-001-autonomous-notebooklm-ideation-and-gap-filling-engine.md)
-- [RFC-022: Zero-Click Ambient Browser Session Harvester](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-022-rfc-022-zero-click-ambient-browser-session-harvester-and-conversational-account-switching-intent-substrate.md)
-- [RFC-023: Quota Sentinel & Source Freshness Radar](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-023-autonomous-knowledge-lifecycle-management-quota-sentinel-source-freshness-radar.md)
-- [RFC-029: Zero-Roundtrip GitHub Wiki Synchronization](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-029-high-performance-zero-roundtrip-github-wiki-synchronization-substrate.md)
+- [`01-architecture-and-memory.md`](./01-architecture-and-memory.md) — 5-Katmanlı Kod Tabanı Hafızası.
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — TIP görev kuyruğu.
+- [`03-universal-cli-reference.md`](./03-universal-cli-reference.md) — `rfc:*`, `wiki:*` ve `nlm:*` komutları.
+- [RFC-001: Autonomous NotebookLM Ideation](./rfc/RFC-001-autonomous-notebooklm-ideation-and-gap-filling-engine.md)
+- [RFC-022: Zero-Click Ambient Browser Session Harvester](./rfc/RFC-022-rfc-022-zero-click-ambient-browser-session-harvester-and-conversational-account-switching-intent-substrate.md)
+- [RFC-023: Quota Sentinel & Source Freshness Radar](./rfc/RFC-023-autonomous-knowledge-lifecycle-management-quota-sentinel-source-freshness-radar.md)
+- [RFC-029: Zero-Roundtrip GitHub Wiki Synchronization](./rfc/RFC-029-high-performance-zero-roundtrip-github-wiki-synchronization-substrate.md)

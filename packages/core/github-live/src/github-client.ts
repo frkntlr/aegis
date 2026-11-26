@@ -1,3 +1,4 @@
+import { debugLogIgnored } from '@aegis/shared';
 import type { GitHubIssue } from './types.js';
 import { GitHubLiveAdapter } from './live-adapter.js';
 import { GitHubTokenResolver } from './token-resolver.js';
@@ -115,8 +116,8 @@ export class GitHubClient {
         issueNumber,
         `🤖 **Aegis Fleet**: Agent \`@${agentName}\` claimed this task in \`experimental/${agentName}\`.\nLocks acquired: ${lockNotice}`
       );
-    } catch {
-      // Soft-fail: retain local claim even if network request fails
+    } catch (err: unknown) {
+      debugLogIgnored('github-client:claimLiveIssue', err);
     }
     return claimRes;
   }
@@ -153,8 +154,8 @@ export class GitHubClient {
           issueNumber,
           `✅ **Aegis Fleet**: Task #${issueNumber} completed and verified by @${agentName || 'agent'}. Closed.`
         );
-      } catch {
-        // Soft-fail
+      } catch (err: unknown) {
+        debugLogIgnored('github-client:completeIssue', err);
       }
     }
     return { success: true, issue };
@@ -180,8 +181,8 @@ export class GitHubClient {
           issueNumber,
           `🛑 **Aegis Loop Breaker**: Task halted after repeated failures.\n**Reason**: ${reason}\nLocks released.`
         );
-      } catch {
-        // Soft-fail: retain local blocked state
+      } catch (err: unknown) {
+        debugLogIgnored('github-client:blockIssue', err);
       }
     }
 

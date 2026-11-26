@@ -29,7 +29,7 @@ export interface TestExecutionResult {
 
 export class GodotTestRunner {
   private static extractOrphanDelta(stdout: string): number | undefined {
-    const orphanMatch = stdout.match(/ORPHAN_NODES_DELTA:\s*(\d+)/);
+    const orphanMatch = stdout.match(/ORPHAN_NODES_DELTA:\s*(-?\d+)/);
     return orphanMatch ? parseInt(orphanMatch[1], 10) : undefined;
   }
 
@@ -69,7 +69,7 @@ export class GodotTestRunner {
     const res = await GodotProcessWatchdog.executeWithWatchdog(install.binaryPath, args, { timeoutMs });
     const durationMs = Date.now() - start;
     const orphanDelta = this.extractOrphanDelta(res.stdout);
-    const passed = res.exitCode === 0 && !res.timedOut && !res.stderr.includes('SCRIPT ERROR:') && (orphanDelta === undefined || orphanDelta === 0);
+    const passed = this.isSuccessfulExecution(res);
 
     return { passed, exitCode: res.exitCode, durationMs, stdout: res.stdout, stderr: res.stderr, orphanNodesDelta: orphanDelta, timedOut: res.timedOut };
   }
@@ -96,14 +96,22 @@ export class GodotTestRunner {
     const start = Date.now();
     const res = await GodotProcessWatchdog.executeWithWatchdog(install.binaryPath, ['--path', projectDir, ...args], { timeoutMs: 20000 });
     const durationMs = Date.now() - start;
+    const orphanDelta = this.extractOrphanDelta(res.stdout);
 
     return {
-      passed: res.exitCode === 0 && !res.timedOut,
+      passed: this.isSuccessfulExecution(res),
       exitCode: res.exitCode,
       durationMs,
       stdout: res.stdout,
       stderr: res.stderr,
+      orphanNodesDelta: orphanDelta,
       timedOut: res.timedOut
     };
+  }
+
+  private static isSuccessfulExecution(res: { exitCode: number | null; timedOut: boolean; stdout: string; stderr: string }): boolean {
+    const orphanDelta = this.extractOrphanDelta(res.stdout);
+    return res.exitCode === 0 && !res.timedOut && !`${res.stdout}\n${res.stderr}`.includes('SCRIPT ERROR:') &&
+      (orphanDelta === undefined || orphanDelta === 0);
   }
 }

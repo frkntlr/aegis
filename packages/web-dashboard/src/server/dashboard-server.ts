@@ -1,4 +1,5 @@
 import * as http from 'node:http';
+import { debugLogIgnored } from '@aegis/shared';
 import { getDashboardHtml } from '../ui/dashboard-html.js';
 import { IdeLauncher, UniversalToolchainSync } from '@aegis/orchestrator';
 import { OrphanTaskReclaimer } from '@aegis/watchdog';
@@ -6,6 +7,7 @@ import { AegisEngineService } from './engine-service.js';
 import { ProjectHub } from './project-hub.js';
 import { RealtimeMetricsService } from './realtime-metrics.js';
 import { ActionDispatcher } from './action-dispatcher.js';
+import { HttpRequestError, isAllowedLocalOrigin, readJsonObjectBody, sendJsonError } from './server-security.js';
 
 export interface DashboardServerOptions {
   port?: number;
@@ -32,7 +34,7 @@ export class DashboardServer {
     this.hub = new ProjectHub(options.repoRoot, options.offline, options.persistLocks ?? false);
     if (options.metricsService) this.hub.getActiveContext().metrics = options.metricsService;
     this.toolchainSync = new UniversalToolchainSync(options.repoRoot);
-    this.hub.discoverProjects().catch(() => { /* no-op */ });
+    this.hub.discoverProjects().catch((err: unknown) => debugLogIgnored('dashboard-server:discoverProjects', err));
     this.dispatcher = new ActionDispatcher({
       hub: this.hub,
       launcher: this.launcher,
@@ -82,27 +84,20 @@ export class DashboardServer {
       }
       try {
         client.write(msg);
-      } catch {
+      } catch (err: unknown) {
+        debugLogIgnored('dashboard-server:sseWrite', err);
         this.sseClients.delete(client);
-        try { client.destroy(); } catch { /* ignore */ }
+        try {
+          client.destroy();
+        } catch (destroyErr: unknown) {
+          debugLogIgnored('dashboard-server:clientDestroy', destroyErr);
+        }
       }
     }
   }
 
-  private isAllowedOrigin(origin?: string): boolean {
-    if (!origin) return true;
-    try {
-      const u = new URL(origin);
-      const isLocal = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
-      const portMatch = !u.port || Number(u.port) === this.port || this.port === 0;
-      return isLocal && (u.protocol === 'http:' || u.protocol === 'https:') && portMatch;
-    } catch {
-      return false;
-    }
-  }
-
   private setCorsHeaders(res: http.ServerResponse, origin?: string): void {
-    const allowed = origin && this.isAllowedOrigin(origin) ? origin : `http://127.0.0.1:${this.port}`;
+    const allowed = origin && isAllowedLocalOrigin(origin, this.port) ? origin : `http://127.0.0.1:${this.port}`;
     res.setHeader('Access-Control-Allow-Origin', allowed);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -118,60 +113,39 @@ export class DashboardServer {
       this.sseClients.delete(res);
       try {
         if (!res.writableEnded) res.end();
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        debugLogIgnored('dashboard-server:sseCleanup', err);
+      }
     };
     req.on('close', cleanup);
     res.on('close', cleanup);
     res.on('error', cleanup);
   }
 
-  private readJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
-    return new Promise((resolve, reject) => {
-      const MAX_BYTES = 1024 * 1024;
-      let bodyStr = '';
-      let receivedBytes = 0;
-
-      req.on('data', (chunk: Buffer | string) => {
-        receivedBytes += chunk.length;
-        if (receivedBytes > MAX_BYTES) {
-          req.destroy();
-          const err = new Error('Payload Too Large: İstek boyutu 1 MB sınırını aştı.');
-          (err as unknown as { statusCode: number }).statusCode = 413;
-          reject(err);
-          return;
-        }
-        bodyStr += chunk;
-      });
-      req.on('end', () => {
-        try { resolve(bodyStr ? JSON.parse(bodyStr) : {}); } catch (err) { reject(err); }
-      });
-      req.on('error', reject);
-    });
-  }
-
   private async handleActionApi(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     this.setCorsHeaders(res, req.headers.origin);
     try {
-      const body = await this.readJsonBody(req);
-      const result = await this.dispatcher.executeAction(body.action as string, body);
+      const body = await readJsonObjectBody(req);
+      if (typeof body.action !== 'string' || !body.action.trim()) {
+        throw new HttpRequestError('Invalid action: expected non-empty string.', 400);
+      }
+      const result = await this.dispatcher.executeAction(body.action, body);
       this.broadcast('update', this.getStatusPayload());
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
     } catch (err: unknown) {
-      const statusCode = (err && typeof err === 'object' && 'statusCode' in err && typeof (err as { statusCode: unknown }).statusCode === 'number')
-        ? (err as { statusCode: number }).statusCode
-        : 400;
-      const msg = err instanceof Error ? err.message : String(err);
-      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: msg }));
+      sendJsonError(res, err);
     }
   }
 
   private async handleFocusApi(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     this.setCorsHeaders(res, req.headers.origin);
     try {
-      const body = await this.readJsonBody(req);
-      const result = this.hub.handleFocus((body.workspacePath as string) || process.cwd());
+      const body = await readJsonObjectBody(req);
+      if (typeof body.workspacePath !== 'string' || !body.workspacePath.trim()) {
+        throw new HttpRequestError('Invalid workspacePath: expected non-empty string.', 400);
+      }
+      const result = this.hub.handleFocus(body.workspacePath);
       if (result.switched) {
         this.broadcast('context_switched', result);
         this.broadcast('update', this.getStatusPayload());
@@ -179,18 +153,13 @@ export class DashboardServer {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, ...result }));
     } catch (err: unknown) {
-      const statusCode = (err && typeof err === 'object' && 'statusCode' in err && typeof (err as { statusCode: unknown }).statusCode === 'number')
-        ? (err as { statusCode: number }).statusCode
-        : 400;
-      const msg = err instanceof Error ? err.message : String(err);
-      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: false, error: msg }));
+      sendJsonError(res, err);
     }
   }
 
   private handleRoutes(req: http.IncomingMessage, res: http.ServerResponse): void {
     const origin = req.headers.origin;
-    if (origin && !this.isAllowedOrigin(origin)) {
+    if (origin !== undefined && !isAllowedLocalOrigin(origin, this.port)) {
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: false, error: 'Forbidden: Invalid Origin' }));
       return;
@@ -246,7 +215,9 @@ export class DashboardServer {
         try {
           if (!client.writableEnded) client.end();
           client.destroy();
-        } catch { /* ignore */ }
+        } catch (err: unknown) {
+          debugLogIgnored('dashboard-server:stopCleanup', err);
+        }
       }
       this.sseClients.clear();
       (this.server as unknown as { closeAllConnections?: () => void })?.closeAllConnections?.();

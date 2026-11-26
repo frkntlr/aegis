@@ -182,6 +182,6 @@ Standart 19 araca ek olarak, çoklu ajan koordinasyonu ve Godot motoru için öz
 
 ## 4. İlgili Belgeler
 
-- [`01-architecture-and-memory.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/01-architecture-and-memory.md) — 5-Katmanlı Hafıza Motoru.
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — TIP ve Mutex kilitleri.
-- [`05-godot-bridge-and-ui.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/05-godot-bridge-and-ui.md) — Godot köprü araçları.
+- [`01-architecture-and-memory.md`](./01-architecture-and-memory.md) — 5-Katmanlı Hafıza Motoru.
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — TIP ve Mutex kilitleri.
+- [`05-godot-bridge-and-ui.md`](./05-godot-bridge-and-ui.md) — Godot köprü araçları.

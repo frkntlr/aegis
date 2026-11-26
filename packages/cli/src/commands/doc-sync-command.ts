@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { WikiMemoryManager } from '@aegis/github-live';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import { cleanseExistingRfcForWiki } from './rfc-templates.js';
 import { rfcStatus } from './rfc-source-evidence.js';
@@ -63,7 +63,7 @@ function buildDynamicRfcIndex(rfcs: RfcFileInfo[]): string {
       if (tm) title = tm[1].replace(/^[^\w]+/, '').trim();
       status = rfcStatus(content);
       status = rfcStatus(content);
-    } catch { /* use default */ }
+    } catch (err: unknown) { debugLogIgnored('DocSync:buildDynamicRfcIndex', err); }
     const pad = String(rfc.num).padStart(3, '0');
     lines.push(`| **RFC-${pad}** | **${title}** | \`${status}\` | [[${rfc.slug}]] |`);
   }

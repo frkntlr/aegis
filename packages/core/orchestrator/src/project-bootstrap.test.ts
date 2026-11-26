@@ -87,3 +87,23 @@ test('TeamworkDocSynthesizer updateReadme replaces architecture block in README.
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('ProjectBootstrapEngine accepts valid custom branch and rejects injection payloads', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-boot-branch-'));
+  try {
+    const res = ProjectBootstrapEngine.bootstrap(tmpDir, { defaultBranch: 'feature/main-1' });
+    assert.strictEqual(res.initializedGit, true);
+
+    const badBranches = ['main && echo pwned', '--template=evil', '../bad', '', 'foo..bar', 'bad.lock'];
+    for (const bad of badBranches) {
+      const badDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-boot-bad-'));
+      try {
+        assert.throws(() => ProjectBootstrapEngine.bootstrap(badDir, { defaultBranch: bad }), /Invalid git branch name/);
+      } finally {
+        fs.rmSync(badDir, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

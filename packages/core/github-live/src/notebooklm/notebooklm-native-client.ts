@@ -5,13 +5,13 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import { fetchPostWithTimeout } from './http-transport.js';
 import { MultiRootTokenResolver } from './multi-root-token-resolver.js';
 import { RpcParsers } from './rpc-parsers.js';
 import type {
   NotebookQueryResult,
   NotebookSummary,
   HttpPostFunction,
-  HttpResponse,
   ResearchPollResult,
   NotebookSourceSummary
 } from './types.js';
@@ -33,7 +33,7 @@ export class NotebookLmNativeClient {
 
   constructor(options: NativeClientOptions = {}) {
     this.cookies = options.cookies || MultiRootTokenResolver.resolve().cookies;
-    this.httpPost = options.httpPost || NotebookLmNativeClient.defaultFetchPost;
+    this.httpPost = options.httpPost || ((u, b, o) => fetchPostWithTimeout(u, b, o, 30000));
     this.timeoutMs = options.timeoutMs ?? 30000;
   }
 
@@ -118,27 +118,5 @@ export class NotebookLmNativeClient {
 
   public static parseNotebookListResponse(rawText: string): NotebookSummary[] {
     return RpcParsers.parseNotebookList(rawText);
-  }
-
-  private static async defaultFetchPost(
-    url: string,
-    body: string,
-    options?: { headers?: Record<string, string>; timeoutMs?: number }
-  ): Promise<HttpResponse> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 30000);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: options?.headers,
-        body,
-        signal: controller.signal
-      });
-      const headerObj: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headerObj[k.toLowerCase()] = v; });
-      return { status: res.status, text: () => res.text(), headers: headerObj };
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

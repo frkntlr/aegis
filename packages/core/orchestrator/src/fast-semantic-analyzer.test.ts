@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { FastSemanticAnalyzer } from './fast-semantic-analyzer.js';
 
 test('FastSemanticAnalyzer extracts normalized keywords ignoring stop words', () => {
@@ -75,7 +76,7 @@ test('FastSemanticAnalyzer creates and utilizes persistent disk cache with git i
 
     const manifestPath = path.join(tmpDir, '.aegis', 'cache', 'fast-semantic-manifest.json');
     assert.ok(fs.existsSync(manifestPath));
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const manifest = readJsonSafe<{ files: string[]; gitIndexMtime: number }>(manifestPath);
     assert.ok(Array.isArray(manifest.files));
     assert.strictEqual(typeof manifest.gitIndexMtime, 'number');
 

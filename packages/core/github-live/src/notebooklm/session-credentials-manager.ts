@@ -9,6 +9,7 @@ import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { debugLogIgnored, readJsonSafe, safeParseJson } from '@aegis/shared';
 import { MultiRootTokenResolver } from './multi-root-token-resolver.js';
 
 export interface CookieValidationResult {
@@ -62,13 +63,13 @@ export class SessionCredentialsManager {
   private static extractFromJson(input: string): string | null {
     if (!input.startsWith('{') || !input.endsWith('}')) return null;
     try {
-      const parsed = JSON.parse(input) as Record<string, unknown>;
+      const parsed = safeParseJson<Record<string, unknown>>(input);
       if (typeof parsed.cookies === 'string') return parsed.cookies.trim();
       if (typeof parsed.cookie === 'string') return parsed.cookie.trim();
       const entries = Object.entries(parsed).filter(([_, v]) => typeof v === 'string');
       if (entries.length > 0) return entries.map(([k, v]) => `${k}=${v}`).join('; ');
-    } catch {
-      // Non-JSON string
+    } catch (err: unknown) {
+      debugLogIgnored('session-credentials:extractFromJson', err);
     }
     return null;
   }
@@ -183,8 +184,7 @@ export class SessionCredentialsManager {
 
   private static inspectCustomFile(filePath: string): CredentialsInspectResult {
     try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const parsed = readJsonSafe<Record<string, unknown>>(filePath);
       const cookies = typeof parsed?.cookies === 'string' ? parsed.cookies : '';
       const hasPsidts = /(?:^|;\s*)__Secure-1PSIDTS=/.test(cookies);
       const hasSid = /(?:^|;\s*)SID=/.test(cookies);

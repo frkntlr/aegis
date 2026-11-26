@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readJsonSafe } from '@aegis/shared';
 import type { IdeAdapter } from './ide-adapter.js';
 import { syncCodexMcp } from './codex-config.js';
 import { parse } from 'smol-toml';
@@ -75,7 +76,7 @@ export class McpSkillsSyncEngine {
     let existingConfig: Record<string, unknown> = {};
     if (fs.existsSync(targetFile)) {
       try {
-        existingConfig = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
+        existingConfig = readJsonSafe<Record<string, unknown>>(targetFile);
       } catch {
         existingConfig = {};
       }

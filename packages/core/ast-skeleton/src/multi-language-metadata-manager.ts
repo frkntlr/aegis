@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
+import { readJsonSafe } from '@aegis/shared';
 
 export type EcosystemType = 'npm' | 'godot' | 'nuget';
 
@@ -83,7 +84,7 @@ export class MultiLanguageMetadataManager {
     const lockPath = path.join(this.cacheDir, 'metadata.lock');
     if (!fs.existsSync(lockPath)) return this.createEmptyLedger();
     try {
-      return JSON.parse(fs.readFileSync(lockPath, 'utf8')) as MetadataLockLedger;
+      return readJsonSafe<MetadataLockLedger>(lockPath);
     } catch {
       return this.createEmptyLedger();
     }
@@ -134,7 +135,7 @@ export class MultiLanguageMetadataManager {
     const file = locksPath ?? path.join(this.projectRoot, '.aegis', 'locks.json');
     if (!fs.existsSync(file)) return { isLocked: false };
     try {
-      const json = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, string>;
+      const json = readJsonSafe<Record<string, string>>(file);
       const holder = json['deps'] || json['lock:deps'];
       return { isLocked: Boolean(holder), holder };
     } catch {

@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { SkeletonGenerator } from '@aegis/ast-skeleton';
 import { IronCageValidator } from '@aegis/iron-cage';
 import { GitHubKanbanService, GitHubKanbanStatus } from './github-kanban.js';
@@ -63,7 +64,7 @@ export class RealtimeMetricsService {
       this.repoRoot = options?.repoRoot ?? process.cwd();
       this.githubService = options?.githubService ?? new GitHubKanbanService({ repoRoot: this.repoRoot, offline: options?.offline });
     }
-    this.githubService.fetchLiveIssues().catch(() => { /* no-op */ });
+    this.githubService.fetchLiveIssues().catch((err: unknown) => debugLogIgnored('realtime-metrics:fetchLiveIssues', err));
   }
 
   private resolveSourceDir(): string {
@@ -72,11 +73,13 @@ export class RealtimeMetricsService {
     const rootPkgJson = path.resolve(this.repoRoot, '..', '..', 'package.json');
     if (fs.existsSync(rootPkgJson)) {
       try {
-        const pkg = JSON.parse(fs.readFileSync(rootPkgJson, 'utf8'));
+        const pkg = readJsonSafe<{ name?: string }>(rootPkgJson);
         if (pkg.name === 'aegis' && fs.existsSync(path.resolve(this.repoRoot, '..', '..', 'packages'))) {
           return path.resolve(this.repoRoot, '..', '..', 'packages');
         }
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        debugLogIgnored('realtime-metrics:resolveSourceDir', err);
+      }
     }
 
     const srcPath = path.resolve(this.repoRoot, 'src');
@@ -121,8 +124,8 @@ export class RealtimeMetricsService {
       try {
         const content = fs.readFileSync(f, 'utf8');
         if (validator.validateFileContent(rel, content).passed) passCount++;
-      } catch {
-        passCount++;
+      } catch (err: unknown) {
+        debugLogIgnored('realtime-metrics:computeCageMetrics', err);
       }
     }
     const isPass = passCount === files.length;
@@ -177,9 +180,11 @@ export class RealtimeMetricsService {
     const sFile = path.resolve(this.repoRoot, '.aegis', 'settings.json');
     if (fs.existsSync(sFile)) {
       try {
-        const parsed = JSON.parse(fs.readFileSync(sFile, 'utf8'));
+        const parsed = readJsonSafe<Record<string, unknown>>(sFile);
         return { primaryBranch: parsed.primaryBranch || 'master', ...parsed };
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        debugLogIgnored('realtime-metrics:getSettings', err);
+      }
     }
     return { primaryBranch: 'master', timeoutCeiling: 180, maxFunctionLines: 40, maxFileLines: 300, preferredIde: 'Google Antigravity' };
   }

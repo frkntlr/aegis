@@ -112,7 +112,7 @@ Modellerin bir dosyayı baştan sona yeniden yazması (*full-file rewrite*) yasa
 
 ## 5. İlgili Belgeler
 
-- [`01-architecture-and-memory.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/01-architecture-and-memory.md) — Çekirdek mimari.
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — Git Worktree ve kilitler.
-- [`03-universal-cli-reference.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/03-universal-cli-reference.md) — Komut kataloğu.
-- [agent-constitution.md](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/agent-constitution.md) — Orijinal Anayasa metni.
+- [`01-architecture-and-memory.md`](./01-architecture-and-memory.md) — Çekirdek mimari.
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — Git Worktree ve kilitler.
+- [`03-universal-cli-reference.md`](./03-universal-cli-reference.md) — Komut kataloğu.
+- [agent-constitution.md](./agent-constitution.md) — Orijinal Anayasa metni.

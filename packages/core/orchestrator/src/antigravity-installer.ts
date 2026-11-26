@@ -5,11 +5,13 @@
  */
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import { AEGIS_TOOL_SCHEMAS } from './mcp-tool-schemas.js';
 
 const SKILL_NAMES: readonly string[] = ['aegis'];
-const SHIM_COMMANDS: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw', 'tr'];
+const SHIM_COMMANDS: readonly string[] = ['aegis', 'aegist', 'tw', 'aegis-tw', 'aegist-tw', 'aegis-tr'];
 
 const LEGACY_PATHS: readonly string[] = [
   '.gemini/config/skills.json',
@@ -51,7 +53,7 @@ export class AntigravityInstaller {
     for (const rel of LEGACY_PATHS) {
       const p = path.resolve(userHome, rel);
       if (fs.existsSync(p)) {
-        try { fs.rmSync(p, { recursive: true, force: true }); } catch { /* ignore */ }
+        try { fs.rmSync(p, { recursive: true, force: true }); } catch (err: unknown) { debugLogIgnored('AntigravityInstaller:cleanLegacy', err); }
       }
     }
   }
@@ -105,7 +107,7 @@ export class AntigravityInstaller {
           fs.writeFileSync(path.join(binDir, name), sh, { mode: 0o755 });
         }
       }
-    } catch { /* ignore non-fatal */ }
+    } catch (err: unknown) { debugLogIgnored('AntigravityInstaller:installShims', err); }
   }
 
   public static writeMcpSchemas(dir: string): void {
@@ -119,21 +121,30 @@ export class AntigravityInstaller {
         };
         fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(schema, null, 2), 'utf8');
       }
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('AntigravityInstaller:writeMcpSchemas', err); }
   }
 
   public static discoverHomes(userHome: string): string[] {
-    const list = [
-      userHome,
-      process.env.USERPROFILE,
-      process.env.HOME,
-      process.env.ANTIGRAVITY_APP_DATA_DIR ? path.resolve(process.env.ANTIGRAVITY_APP_DATA_DIR, '..', '..') : null,
-      'C:\\Users\\Lenovo\\AntigravityProfiles\\client-a',
-      'C:\\Users\\Lenovo'
-    ].filter((x): x is string => typeof x === 'string' && x.length > 0);
+    const appDataParent = process.env.ANTIGRAVITY_APP_DATA_DIR
+      ? path.resolve(process.env.ANTIGRAVITY_APP_DATA_DIR, '..', '..')
+      : null;
+    const baseHomes = [userHome, os.homedir(), process.env.USERPROFILE, process.env.HOME, appDataParent]
+      .filter((x): x is string => typeof x === 'string' && x.length > 0);
+    const candidates = [...baseHomes];
+    for (const base of baseHomes) {
+      const profilesDir = path.join(path.resolve(base), 'AntigravityProfiles');
+      if (!fs.existsSync(profilesDir)) continue;
+      try {
+        for (const entry of fs.readdirSync(profilesDir, { withFileTypes: true })) {
+          if (entry.isDirectory()) candidates.push(path.join(profilesDir, entry.name));
+        }
+      } catch (err: unknown) {
+        debugLogIgnored('AntigravityInstaller:discoverHomes', err);
+      }
+    }
     const seen = new Set<string>();
     const results: string[] = [];
-    for (const h of list) {
+    for (const h of candidates) {
       const resolved = path.resolve(h);
       if (!seen.has(resolved) && fs.existsSync(path.join(resolved, '.gemini'))) {
         seen.add(resolved);
@@ -154,10 +165,11 @@ export class AntigravityInstaller {
       registerMcpFn(path.resolve(h, '.gemini', 'config', 'mcp_config.json'));
     }
     if (process.platform === 'win32') {
-      const npmCandidates = [
+      const baseHome = userHome || os.homedir();
+      const npmCandidates = Array.from(new Set([
         process.env.APPDATA ? path.resolve(process.env.APPDATA, 'npm') : null,
-        'C:\\Users\\Lenovo\\AppData\\Roaming\\npm'
-      ].filter((x): x is string => typeof x === 'string');
+        baseHome ? path.resolve(baseHome, 'AppData', 'Roaming', 'npm') : null
+      ].filter((x): x is string => typeof x === 'string')));
       for (const npmDir of npmCandidates) {
         if (fs.existsSync(npmDir)) {
           this.installShims(npmDir, cliPath);

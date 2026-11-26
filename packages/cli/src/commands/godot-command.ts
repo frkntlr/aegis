@@ -9,8 +9,10 @@ import {
   type UiScaffoldType,
   ClassDbOracle,
   GodotTestRunner,
+  type GodotUiNode,
   type GodotUiTreePayload
 } from '@aegis/godot-bridge';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import {
   resolveInspectAspectRatios,
@@ -68,16 +70,44 @@ export function handleGodotStatus(): void {
   const configPath = path.join(process.cwd(), 'aegis.config.json');
   if (fs.existsSync(configPath)) {
     try {
-      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const cfg = readJsonSafe<{ godot?: { bridgePort?: number; aspectRatios?: string[] } }>(configPath);
       if (cfg.godot) {
         console.log(`⚙️  Active Godot Config:`);
         console.log(` • Bridge Port: ${cfg.godot.bridgePort ?? 6850}`);
         console.log(` • Aspect Ratios: ${(cfg.godot.aspectRatios || []).join(', ')}`);
       }
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      debugLogIgnored('godot-command:status', err);
     }
   }
+}
+
+function hasTelemetry(nodeCount: number): boolean {
+  if (nodeCount > 0) return true;
+  console.error('UI Telemetry Verification unavailable: no usable telemetry nodes. Capture runtime telemetry before verification.');
+  process.exitCode = 1;
+  return false;
+}
+
+function verifyAspectRatio(verifier: GodotUiVerifier, ratio: string, nodes: GodotUiNode[]): boolean {
+  const dims = GodotUiVerifier.ASPECT_DIMENSIONS[ratio] ?? { width: 1920, height: 1080 };
+  const payload: GodotUiTreePayload = {
+    viewport: { width: dims.width, height: dims.height, aspectRatio: ratio },
+    nodes
+  };
+  const res = verifier.verifyPayload(payload);
+  if (!res.passed) {
+    console.log(` • Aspect [${ratio}] (${dims.width}x${dims.height}): ❌ FAIL (overlaps/clippings)`);
+    for (const ov of res.overlaps.slice(0, 2)) console.log(`   - Overlap: "${ov.nodeA}" and "${ov.nodeB}"`);
+    for (const cl of res.clippings.slice(0, 2)) console.log(`   - Clipping: "${cl.nodeId}" (${cl.reason})`);
+    return false;
+  }
+  console.log(` • Aspect [${ratio}] (${dims.width}x${dims.height}): ✅ PASS`);
+  if (res.undersizedTargets.length > 0) {
+    const ut = res.undersizedTargets[0];
+    console.log(`   ℹ️ Küçük Dokunma Hedefi: "${ut.nodeId}" (${ut.width}x${ut.height}px < ${ut.minRecommended}px)`);
+  }
+  return true;
 }
 
 export function handleGodotInspect(projectDirArg?: string): void {
@@ -88,35 +118,20 @@ export function handleGodotInspect(projectDirArg?: string): void {
   const verifier = new GodotUiVerifier();
   const ratios = resolveInspectAspectRatios(projectDir);
   const nodes = loadProjectTelemetryNodes(projectDir);
-  if (nodes.length > 0) {
-    console.log(` ℹ️ Loaded ${nodes.length} UI nodes from telemetry cache.`);
-  }
+  if (!hasTelemetry(nodes.length)) return;
+  console.log(` ℹ️ Loaded ${nodes.length} UI nodes from telemetry cache.`);
   console.log(`Checking ${ratios.length} target aspect ratios: ${ratios.join(', ')}`);
 
   let allPassed = true;
   for (const ratio of ratios) {
-    const dims = GodotUiVerifier.ASPECT_DIMENSIONS[ratio] ?? { width: 1920, height: 1080 };
-    const payload: GodotUiTreePayload = {
-      viewport: { width: dims.width, height: dims.height, aspectRatio: ratio },
-      nodes
-    };
-    const res = verifier.verifyPayload(payload);
-    if (!res.passed) {
-      allPassed = false;
-      console.log(` • Aspect [${ratio}] (${dims.width}x${dims.height}): ❌ FAIL (overlaps/clippings)`);
-      for (const ov of res.overlaps.slice(0, 2)) console.log(`   - Overlap: "${ov.nodeA}" and "${ov.nodeB}"`);
-      for (const cl of res.clippings.slice(0, 2)) console.log(`   - Clipping: "${cl.nodeId}" (${cl.reason})`);
-    } else {
-      console.log(` • Aspect [${ratio}] (${dims.width}x${dims.height}): ✅ PASS`);
-      if (res.undersizedTargets.length > 0) {
-        const ut = res.undersizedTargets[0];
-        console.log(`   ℹ️ Küçük Dokunma Hedefi: "${ut.nodeId}" (${ut.width}x${ut.height}px < ${ut.minRecommended}px)`);
-      }
-    }
+    if (!verifyAspectRatio(verifier, ratio, nodes)) allPassed = false;
   }
 
   if (allPassed) {
-    console.log(`🎯 UI Telemetry Verification complete: All aspect ratios valid${nodes.length > 0 ? ` (${nodes.length} nodes verified)` : ''}.`);
+    console.log(`🎯 UI Telemetry Verification complete: All aspect ratios valid (${nodes.length} nodes verified).`);
+  } else {
+    console.error('🎯 UI Telemetry Verification FAILED: overlaps or clippings detected.');
+    process.exitCode = 1;
   }
 }
 

@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import type {
   AnalysisInsight,
   AnalysisMeshFilter,
@@ -33,9 +33,9 @@ export class TeamworkAnalysisMesh {
     const filePath = this.getMeshFilePath();
     if (this.persist && fs.existsSync(filePath)) {
       try {
-        const raw = fs.readFileSync(filePath, 'utf8');
-        return JSON.parse(raw) as AnalysisMeshState;
-      } catch {
+        return readJsonSafe<AnalysisMeshState>(filePath);
+      } catch (err: unknown) {
+        debugLogIgnored('TeamworkAnalysisMesh:loadOrInit', err);
         return this.createDefaultState();
       }
     }
@@ -84,15 +84,14 @@ export class TeamworkAnalysisMesh {
     const filePath = this.getMeshFilePath();
     if (!fs.existsSync(filePath)) return;
     try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      const loaded = JSON.parse(raw) as AnalysisMeshState;
+      const loaded = readJsonSafe<AnalysisMeshState>(filePath);
       if (loaded && loaded.insights) {
         this.state.insights = { ...loaded.insights, ...this.state.insights };
         this.state.hotspots = Array.from(new Set([...loaded.hotspots, ...this.state.hotspots]));
         this.state.objective = loaded.objective || this.state.objective;
         this.state.swarmId = loaded.swarmId || this.state.swarmId;
       }
-    } catch { /* ignore parse error */ }
+    } catch (err: unknown) { debugLogIgnored('TeamworkAnalysisMesh:reloadLatest', err); }
   }
 
   public batchPost(list: Array<Omit<AnalysisInsight, 'id' | 'timestamp'>>): AnalysisInsight[] {
@@ -143,26 +142,33 @@ export class TeamworkAnalysisMesh {
     if (this.persist) {
       const filePath = this.getMeshFilePath();
       if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+        try { fs.unlinkSync(filePath); } catch (err: unknown) { debugLogIgnored('TeamworkAnalysisMesh:clear', err); }
       }
     }
   }
 
   public saveState(): void {
+    let tmp = '';
     try {
       const aegisDir = path.join(this.repoRoot, '.aegis');
       if (!fs.existsSync(aegisDir)) fs.mkdirSync(aegisDir, { recursive: true });
       const filePath = this.getMeshFilePath();
-      const tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+      tmp = `${filePath}.tmp.${process.pid}.${Date.now()}`;
       fs.writeFileSync(tmp, JSON.stringify(this.state, null, 2), 'utf8');
       try {
         fs.renameSync(tmp, filePath);
-      } catch {
+      } catch (renameErr: unknown) {
+        debugLogIgnored('TeamworkAnalysisMesh:renameTmp', renameErr);
         fs.copyFileSync(tmp, filePath);
-        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
       }
-    } catch {
-      /* ignore file system errors in restricted test environments */
+    } catch (err: unknown) {
+      debugLogIgnored('TeamworkAnalysisMesh:saveState', err);
+    } finally {
+      try {
+        if (tmp && fs.existsSync(tmp)) fs.rmSync(tmp, { force: true });
+      } catch (cleanupErr: unknown) {
+        debugLogIgnored('TeamworkAnalysisMesh:cleanupTmp', cleanupErr);
+      }
     }
   }
 }

@@ -5,10 +5,12 @@
  */
 
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 import {
   IdeAdapterRegistry,
   McpSkillsSyncEngine,
-  UniversalToolchainSync
+  UniversalToolchainSync,
+  type McpServerConfig
 } from '@aegis/orchestrator';
 import { CodexInstaller } from '@aegis/orchestrator';
 import { GodotInitWorkflow } from '@aegis/godot-bridge';
@@ -22,8 +24,8 @@ export function autoConfigureGodot(repoRoot: string): void {
     } else if (res) {
       console.log('🎮 Godot project detected: Aegis Bridge verified and active.');
     }
-  } catch {
-    // Ignore non-fatal auto-install errors
+  } catch (err: unknown) {
+    debugLogIgnored('ide-commands:autoConfigureGodot', err);
   }
 }
 
@@ -57,30 +59,37 @@ export function handleIdeList(): void {
   }
 }
 
+export function buildIdeMcpServers(
+  repoRoot: string,
+  engineRoot: string,
+  platform: NodeJS.Platform = process.platform
+): Record<string, McpServerConfig> {
+  const resolvedEngine = path.resolve(engineRoot);
+  const resolvedRepo = path.resolve(repoRoot);
+  const isSameRoot = platform === 'win32'
+    ? resolvedEngine.toLowerCase() === resolvedRepo.toLowerCase()
+    : resolvedEngine === resolvedRepo;
+  const cliEntry = isSameRoot
+    ? 'packages/cli/dist/bin/aegis.js'
+    : path.join(engineRoot, 'packages', 'cli', 'dist', 'bin', 'aegis.js');
+  return {
+    'aegis-engine': {
+      command: 'node',
+      args: [cliEntry, 'mcp']
+    }
+  };
+}
+
 export function handleIdeSync(): void {
   showBanner();
   console.log('🔄 Synchronizing MCP Servers & Skills across all supported IDEs...');
   const registry = new IdeAdapterRegistry();
-  const nodeBin = 'node';
-  const engineRoot = CodexInstaller.resolveEngineRoot(process.cwd());
-  const engine = new McpSkillsSyncEngine({
-    aegis: {
-      command: process.execPath,
-      args: [path.join(engineRoot, 'packages/cli/dist/bin/aegis.js'), 'mcp']
-    },
-    notebooklm: {
-      command: nodeBin,
-      args: ['packages/plugins/notebooklm/dist/index.js', 'server']
-    },
-    godot: {
-      command: nodeBin,
-      args: ['packages/plugins/godot-bridge/dist/bin/godot-mcp.js'],
-      env: { GODOT_MCP_DISABLE_ELICITATION: 'true' }
-    }
-  });
+  const repoRoot = process.cwd();
+  const engineRoot = CodexInstaller.resolveEngineRoot(repoRoot);
+  const engine = new McpSkillsSyncEngine(buildIdeMcpServers(repoRoot, engineRoot));
 
-  const results = engine.syncAll(registry.listAdapters(), process.cwd());
-  new UniversalToolchainSync(process.cwd()).syncAll();
+  const results = engine.syncAll(registry.listAdapters(), repoRoot);
+  new UniversalToolchainSync(repoRoot).syncAll();
   for (const r of results) {
     if (r.supported) {
       console.log(`✅ [${r.ideId}] ${r.message}`);

@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeAegisDir } from '@aegis/shared';
 import { NotebookLmNativeClient } from './notebooklm-native-client.js';
 import type { NotebookSourceSummary } from './types.js';
 
@@ -32,7 +32,7 @@ export class TombstoneVaultManager {
 
   constructor(vaultDir?: string) {
     this.vaultDir = vaultDir || path.join(resolveSafeAegisDir(), 'vault', 'tombstones');
-    try { fs.mkdirSync(this.vaultDir, { recursive: true }); } catch { /* ignore */ }
+    try { fs.mkdirSync(this.vaultDir, { recursive: true }); } catch (err: unknown) { debugLogIgnored('tombstone-vault:mkdir', err); }
   }
 
   public getVaultDir(): string {
@@ -61,8 +61,7 @@ export class TombstoneVaultManager {
     const filePath = path.join(this.vaultDir, `${sourceId}.json`);
     if (!fs.existsSync(filePath)) return null;
     try {
-      const raw = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(raw) as ArchivedTombstone;
+      return readJsonSafe<ArchivedTombstone>(filePath);
     } catch {
       return null;
     }
@@ -74,10 +73,9 @@ export class TombstoneVaultManager {
     const list: ArchivedTombstone[] = [];
     for (const f of files) {
       try {
-        const raw = fs.readFileSync(path.join(this.vaultDir, f), 'utf8');
-        list.push(JSON.parse(raw) as ArchivedTombstone);
-      } catch {
-        // Safe skip on corrupt vault files
+        list.push(readJsonSafe<ArchivedTombstone>(path.join(this.vaultDir, f)));
+      } catch (err: unknown) {
+        debugLogIgnored('tombstone-vault:listArchived', err);
       }
     }
     return list;
@@ -132,16 +130,11 @@ export class TombstoneVaultManager {
       try {
         await nlmClient.deleteSource(c.id);
         prunedCount++;
-      } catch {
-        // Soft-tolerate transient RPC errors; vault already has full copy
+      } catch (err: unknown) {
+        debugLogIgnored('tombstone-vault:executeTransactionalSwap', err);
       }
     }
 
-    return {
-      result,
-      prunedCount,
-      rollbacked: false,
-      archivedIds
-    };
+    return { result, prunedCount, rollbacked: false, archivedIds };
   }
 }

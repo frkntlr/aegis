@@ -66,7 +66,7 @@ test('NotebookLmDeepResearchWorkflow executes digest ingestion when requested', 
   const workflow = new NotebookLmDeepResearchWorkflow(client);
   const res = await workflow.execute('nb-1', 'Clean Architecture', {
     ingestMode: 'digest',
-    sleeper: async () => {},
+    sleeper: async () => undefined,
     pollIntervalMs: 1
   });
 
@@ -102,7 +102,7 @@ test('NotebookLmDeepResearchWorkflow executes curated ingestion by default', asy
 
   const res = await workflow.execute('nb-1', 'Signals', {
     maxCuratedSources: 2,
-    sleeper: async () => {}
+    sleeper: async () => undefined
   });
 
   assert.strictEqual(res.status, 'COMPLETED');
@@ -128,7 +128,7 @@ test('NotebookLmDeepResearchWorkflow warns when source quota is high', async () 
   const client = new NotebookLmNativeClient({ cookies: 'SID=test;', httpPost: mockHttp });
   const workflow = new NotebookLmDeepResearchWorkflow(client);
 
-  const res = await workflow.execute('nb-1', 'Quota Check', { sleeper: async () => {} });
+  const res = await workflow.execute('nb-1', 'Quota Check', { sleeper: async () => undefined });
   assert.strictEqual(res.quotaWarning, true);
   assert.strictEqual(res.sourceCount, 46);
 });

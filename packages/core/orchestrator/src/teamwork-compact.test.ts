@@ -3,6 +3,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { readJsonSafe } from '@aegis/shared';
 import { TeamworkCompactEngine } from './teamwork-compact.js';
 import { TeamworkCoordinator } from './teamwork-coordinator.js';
 
@@ -36,11 +37,11 @@ test('TeamworkCompactEngine archives done tasks and compacts inbox', () => {
     assert.strictEqual(res.archivedCount, 2);
     assert.strictEqual(res.remainingCount, 1);
 
-    const remaining = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+    const remaining = readJsonSafe<Array<{ issueNumber: number }>>(inboxPath);
     assert.strictEqual(remaining.length, 1);
     assert.strictEqual(remaining[0].issueNumber, 102);
 
-    const ledger = JSON.parse(fs.readFileSync(res.ledgerPath, 'utf8'));
+    const ledger = readJsonSafe<Array<{ issueNumber: number }>>(res.ledgerPath);
     assert.strictEqual(ledger.length, 2);
     assert.strictEqual(ledger[0].issueNumber, 101);
   } finally {

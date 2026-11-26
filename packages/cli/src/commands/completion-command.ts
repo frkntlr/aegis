@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { showBanner } from './banner.js';
 
@@ -59,7 +60,7 @@ export function generateBashCompletion(commands = ALL_AEGIS_COMMANDS): string {
 }
 
 function resolvePowerShellProfilePath(): string | null {
-  const home = process.env.USERPROFILE || process.env.HOME;
+  const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
   if (!home) return null;
   return path.join(home, 'Documents', 'WindowsPowerShell', 'Microsoft.PowerShell_profile.ps1');
 }
@@ -81,12 +82,12 @@ export function installToProfile(customPath?: string): boolean {
   }
 }
 
-function resolveAntigravityBinPath(): string | null {
+export function resolveAntigravityBinPath(env: NodeJS.ProcessEnv = process.env): string | null {
+  const home = env.USERPROFILE || env.HOME || os.homedir();
   const candidates = [
-    'C:\\Users\\Lenovo\\AntigravityProfiles\\client-a\\.gemini\\antigravity\\bin\\aegis.ps1',
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, '.gemini', 'antigravity', 'bin', 'aegis.ps1') : null,
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AntigravityProfiles', 'client-a', '.gemini', 'antigravity', 'bin', 'aegis.ps1') : null
-  ].filter(Boolean) as string[];
+    env.ANTIGRAVITY_APP_DATA_DIR ? path.join(env.ANTIGRAVITY_APP_DATA_DIR, 'bin', 'aegis.ps1') : null,
+    home ? path.join(home, '.gemini', 'antigravity', 'bin', 'aegis.ps1') : null
+  ].filter((p): p is string => Boolean(p));
 
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;

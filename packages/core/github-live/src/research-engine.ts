@@ -5,6 +5,7 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
+import { debugLogIgnored } from '@aegis/shared';
 import type { ResearchReport } from './types.js';
 import type { GitHubWikiLiveAdapter } from './wiki-adapter.js';
 import { NotebookLmNativeClient } from './notebooklm/notebooklm-native-client.js';
@@ -36,8 +37,8 @@ export class NotebookLmResearchEngine {
     try {
       const res = await this.nativeClient.startResearch(nbId, topic, 'web', mode);
       taskId = res?.task_id;
-    } catch {
-      // Graceful fallback: continue with synthesized query
+    } catch (err: unknown) {
+      debugLogIgnored('research-engine:startResearch', err);
     }
 
     const queryPrompt = `Synthesize a rigorous, objective architectural research report on: "${topic}". Identify core patterns, key trade-offs, and 3-5 concrete acceptance criteria.`;

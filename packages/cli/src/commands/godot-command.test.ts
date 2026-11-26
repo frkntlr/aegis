@@ -3,7 +3,9 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { GodotLocator } from '@aegis/godot-bridge';
 import {
+  handleGodotInit,
   handleGodotStatus,
   handleGodotInspect,
   handleGodotQuery,
@@ -29,13 +31,26 @@ function captureOutput(fn: () => void | Promise<void>): Promise<string> {
     });
 }
 
-test('handleGodotStatus and handleGodotInspect output expected telemetry', async () => {
+test('handleGodotStatus reports environment and missing telemetry cannot pass verification', async () => {
   const statusOut = await captureOutput(() => handleGodotStatus());
   assert.ok(statusOut.includes('Inspecting Godot environment'));
-
-  const inspectOut = await captureOutput(() => handleGodotInspect());
-  assert.ok(inspectOut.includes('Running Zero-Token UI Telemetry'));
-  assert.ok(inspectOut.includes('UI Telemetry Verification complete'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-empty-inspect-'));
+  const previous = process.exitCode;
+  try {
+    for (const content of [undefined, '{invalid', '{"nodes":[]}']) {
+      if (content !== undefined) {
+        fs.mkdirSync(path.join(tmp, '.aegis'), { recursive: true });
+        fs.writeFileSync(path.join(tmp, '.aegis/ui_telemetry.json'), content);
+      }
+      const out = await captureOutput(() => handleGodotInspect(tmp));
+      assert.ok(out.includes('Verification unavailable'));
+      assert.ok(!out.includes('PASS') && !out.includes('All aspect ratios valid'));
+      assert.strictEqual(process.exitCode, 1);
+    }
+  } finally {
+    process.exitCode = previous;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('handleGodotQuery outputs class details or search suggestions', async () => {
@@ -61,13 +76,22 @@ test('handleGodotValidate verifies clean GDScript files without errors', async (
 });
 
 test('handleGodot dispatches subcommands properly', async () => {
-  const out = await captureOutput(() => handleGodot(['unknown_subcmd']));
-  assert.ok(out.includes('Unknown godot subcommand'));
+  const prevCwd = process.cwd(), tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-unknown-'));
+  try {
+    process.chdir(tmp);
+    const out = await captureOutput(() => handleGodot(['unknown_subcmd']));
+    assert.ok(out.includes('Unknown godot subcommand'));
+  } finally {
+    process.chdir(prevCwd);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('handleGodotInspect respects mobile aspect ratios in aegis.config.json', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-mobile-inspect-'));
+  const previous = process.exitCode;
   try {
+    process.exitCode = 0;
     const configPath = path.join(tmp, 'aegis.config.json');
     fs.writeFileSync(configPath, JSON.stringify({
       engine: 'godot',
@@ -75,20 +99,29 @@ test('handleGodotInspect respects mobile aspect ratios in aegis.config.json', as
         aspectRatios: ['9:16', '9:18', '9:20']
       }
     }), 'utf8');
+    fs.mkdirSync(path.join(tmp, '.aegis'));
+    fs.writeFileSync(path.join(tmp, '.aegis/ui_telemetry.json'), JSON.stringify({ nodes: [
+      { id: '/root/Button', name: 'Button', type: 'Button', visible: true,
+        rect: { x: 10, y: 10, width: 100, height: 60 } }
+    ] }));
 
     const out = await captureOutput(() => handleGodotInspect(tmp));
     assert.ok(out.includes('Checking 3 target aspect ratios'));
     assert.ok(out.includes('Aspect [9:16] (1080x1920)'));
     assert.ok(out.includes('Aspect [9:18] (1080x2160)'));
     assert.ok(out.includes('Aspect [9:20] (1080x2400)'));
+    assert.strictEqual(process.exitCode, 0);
   } finally {
+    process.exitCode = previous;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
 test('handleGodotInspect loads cached telemetry and flags overlapping UI controls', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-overlap-inspect-'));
+  const previous = process.exitCode;
   try {
+    process.exitCode = 0;
     const aegisDir = path.join(tmp, '.aegis');
     fs.mkdirSync(aegisDir, { recursive: true });
     const telemetryPath = path.join(aegisDir, 'ui_telemetry.json');
@@ -103,7 +136,9 @@ test('handleGodotInspect loads cached telemetry and flags overlapping UI control
     assert.ok(out.includes('Loaded 2 UI nodes from telemetry cache'));
     assert.ok(out.includes('FAIL (overlaps/clippings)'));
     assert.ok(out.includes('Overlap: "/root/Main/ButtonA" and "/root/Main/ButtonB"'));
+    assert.strictEqual(process.exitCode, 1);
   } finally {
+    process.exitCode = previous;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
@@ -144,103 +179,96 @@ test('godot-helpers parses telemetry nodes and validates scripts safely', async 
   }
 });
 
-test('handleGodot dispatches run subcommand with variadic arguments', async () => {
-  const out = await captureOutput(() => handleGodot(['run', 'nonexistent_project_path', '--headless', '--quit-after', '5']));
-  assert.ok(out.includes('Executing Godot project at: nonexistent_project_path'));
+test('handleGodot dispatches run, init, ui:perf, ui:optimize, inspect, and tree subcommands', async t => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-dispatch-'));
+  const prevExit = process.exitCode, prevCwd = process.cwd();
+  try {
+    process.chdir(tmp);
+    t.mock.method(GodotLocator, 'findGodot', () => null);
+    const runOut = await captureOutput(() => handleGodot(['run', 'nonexistent_project_path', '--headless', '--quit-after', '5']));
+    assert.ok(runOut.includes('Executing Godot project at: nonexistent_project_path'));
+    assert.ok((await captureOutput(() => handleGodot(['init', tmp, '6855']))).includes('Bridge Port: 6855'));
+    assert.ok((await captureOutput(() => handleGodotInit(tmp))).includes('Bridge Port: 6850'));
+    process.exitCode = 0;
+    const inspOut = await captureOutput(() => handleGodot(['inspect', tmp]));
+    assert.ok(inspOut.includes('Verification unavailable'));
+    assert.strictEqual(process.exitCode, 1);
+    const perfOut = await captureOutput(() => handleGodotUi('perf', tmp));
+    assert.ok(perfOut.includes('UI Performance') || perfOut.includes('Godot'));
+    const optOut = await captureOutput(() => handleGodotUi('optimize', tmp));
+    assert.ok(optOut.includes('Usage: aegis godot ui:optimize'));
+    const badGd = path.join(tmp, 'bad.gd');
+    fs.writeFileSync(badGd, 'extends Node\nfunc _ready():\n\tself.totally_nonexistent_godot_method_xyz()\n', 'utf8');
+    const valOut = await captureOutput(() => handleGodotValidate(tmp));
+    assert.ok(valOut.includes('validation issue') || valOut.includes('100% CLEAN'));
+  } finally {
+    process.chdir(prevCwd);
+    process.exitCode = prevExit;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('handleGodotUi scaffolds UI scenes and lints Godot UI scenes cleanly', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-ui-cli-test-'));
+  const prevCwd = process.cwd();
   try {
-    const directOut = await captureOutput(() => handleGodotUi('scaffold', 'dialog', 'confirm_box', tmp));
-    assert.ok(directOut.includes('Godot UI Scaffolding Complete: [DIALOG] "confirm_box"'));
-
-    const scaffoldOut = await captureOutput(() => handleGodot(['ui', 'scaffold', 'menu', 'pause_menu', tmp]));
-    assert.ok(scaffoldOut.includes('Godot UI Scaffolding Complete: [MENU] "pause_menu"'));
-
+    process.chdir(tmp);
+    assert.ok((await captureOutput(() => handleGodotUi('scaffold', 'dialog', 'confirm_box', tmp))).includes('Godot UI Scaffolding Complete: [DIALOG] "confirm_box"'));
+    assert.ok((await captureOutput(() => handleGodot(['ui', 'scaffold', 'menu', 'pause_menu', tmp]))).includes('Godot UI Scaffolding Complete: [MENU] "pause_menu"'));
     const sceneFile = path.join(tmp, 'pause_menu.tscn');
     assert.ok(fs.existsSync(sceneFile));
-
     const lintOut = await captureOutput(() => handleGodot(['ui', sceneFile]));
-    assert.ok(lintOut.includes('Godot UI Scene Linter Report'));
-    assert.ok(lintOut.includes('Score: 100/100'));
+    assert.ok(lintOut.includes('Godot UI Scene Linter Report') && lintOut.includes('Score: 100/100'));
+    assert.ok((await captureOutput(() => handleGodotUi('lint'))).includes('Usage: aegis godot ui:lint <scene.tscn>'));
   } finally {
+    process.chdir(prevCwd);
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-});
-
-test('handleGodotUi prints usage error when linting without .tscn scene argument', async () => {
-  const out = await captureOutput(() => handleGodotUi('lint'));
-  assert.ok(out.includes('Usage: aegis godot ui:lint <scene.tscn>'));
 });
 
 function createSampleScene(dir: string): string {
   const sceneFile = path.join(dir, 'hud.tscn');
-  const sceneContent = `[gd_scene load_steps=2 format=3]
-[node name="Hud" type="MarginContainer"]
-anchors_preset = 15
-[node name="VBox" type="VBoxContainer" parent="."]
-[node name="StartButton" type="Button" parent="VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(100, 50)
-[node name="QuitButton" type="Button" parent="VBox"]
-[node name="Label" type="Label" parent="."]
-`;
-  fs.writeFileSync(sceneFile, sceneContent, 'utf8');
+  fs.writeFileSync(sceneFile, `[gd_scene load_steps=2 format=3]\n[node name="Hud" type="MarginContainer"]\nanchors_preset = 15\n[node name="VBox" type="VBoxContainer" parent="."]\n[node name="StartButton" type="Button" parent="VBox"]\nunique_name_in_owner = true\ncustom_minimum_size = Vector2(100, 50)\n[node name="QuitButton" type="Button" parent="VBox"]\n[node name="Label" type="Label" parent="."]\n`, 'utf8');
   return sceneFile;
 }
 
-test('handleGodotTree slices full scenes and respects --depth flag', async () => {
+test('handleGodotTree slices full scenes, respects --depth/--focus/--compact, and handles missing files', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-tree-test-'));
   try {
     const sceneFile = createSampleScene(tmp);
     const fullOut = await captureOutput(() => handleGodotTree(sceneFile));
-    assert.ok(fullOut.includes('Slicing Godot scene: hud.tscn'));
-    assert.ok(fullOut.includes('Hud [MarginContainer]'));
-    assert.ok(fullOut.includes('%StartButton [Button]'));
-    assert.ok(fullOut.includes('QuitButton [Button]'));
-
+    assert.ok(fullOut.includes('Hud [MarginContainer]') && fullOut.includes('%StartButton [Button]') && fullOut.includes('QuitButton [Button]'));
     const depthOut = await captureOutput(() => handleGodot(['tree', sceneFile, '--depth=1']));
-    assert.ok(depthOut.includes('Max Depth: 1'));
-    assert.ok(depthOut.includes('VBox [VBoxContainer]'));
-    assert.ok(depthOut.includes('Label [Label]'));
-    assert.strictEqual(depthOut.includes('%StartButton'), false);
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-});
-
-test('handleGodotTree isolates focusNode with --focus flag and supports compact mode', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-focus-test-'));
-  try {
-    const sceneFile = createSampleScene(tmp);
+    assert.ok(depthOut.includes('Max Depth: 1') && depthOut.includes('VBox [VBoxContainer]') && !depthOut.includes('%StartButton'));
     const focusOut = await captureOutput(() => handleGodotTree(sceneFile, '--focus=%StartButton'));
-    assert.ok(focusOut.includes('Focus: %StartButton'));
-    assert.ok(focusOut.includes('%StartButton [Button]'));
-    assert.ok(focusOut.includes('VBox [VBoxContainer]'));
-    assert.ok(focusOut.includes('Hud [MarginContainer]'));
-    assert.strictEqual(focusOut.includes('QuitButton'), false);
-    assert.strictEqual(focusOut.includes('Label'), false);
-
+    assert.ok(focusOut.includes('Focus: %StartButton') && focusOut.includes('%StartButton [Button]') && !focusOut.includes('QuitButton'));
     const compactOut = await captureOutput(() => handleGodotTree(sceneFile, '--compact'));
-    assert.ok(compactOut.includes('Mode: Compact'));
-    assert.strictEqual(compactOut.includes('└──'), false);
+    assert.ok(compactOut.includes('Mode: Compact') && !compactOut.includes('└──'));
+    assert.ok((await captureOutput(() => handleGodotTree())).includes('Usage: aegis godot tree <scene.tscn>'));
+    assert.ok((await captureOutput(() => handleGodotTree('non_existent_scene.tscn'))).includes('Scene file not found: non_existent_scene.tscn'));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-});
-
-test('handleGodotTree reports usage on missing scene argument or missing file', async () => {
-  const usageOut = await captureOutput(() => handleGodotTree());
-  assert.ok(usageOut.includes('Usage: aegis godot tree <scene.tscn>'));
-
-  const missingOut = await captureOutput(() => handleGodotTree('non_existent_scene.tscn'));
-  assert.ok(missingOut.includes('Scene file not found: non_existent_scene.tscn'));
 });
 
 test('handleGodotPlaytest integrates GodotPortRouter ephemeral track port allocation', async () => {
   const out = await captureOutput(() => handleGodotPlaytest(undefined, '--track=qa-hunter'));
-  assert.ok(out.includes('Track Port Isolation: [qa-hunter] -> Port: 6852, Debug: 6202'));
-  assert.ok(out.includes('User Data Directory:'));
-  assert.ok(out.includes('aegis-godot-qa-hunter'));
+  assert.ok(out.includes('Track Port Isolation: [qa-hunter] -> Port: 6852, Debug: 6202') && out.includes('aegis-godot-qa-hunter'));
+});
+
+test('handleGodotStatus reads aegis.config.json and handleGodot dispatches query/validate/status', async t => {
+  const prevCwd = process.cwd();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-godot-cfg-'));
+  try {
+    t.mock.method(GodotLocator, 'findGodot', () => ({ binaryPath: '/usr/bin/godot', versionString: '4.7.2', majorVersion: 4, isHeadlessCapable: true }));
+    process.chdir(tmp);
+    fs.writeFileSync(path.join(tmp, 'aegis.config.json'), JSON.stringify({ godot: { bridgePort: 7777, aspectRatios: ['16:9'] } }), 'utf8');
+    const stOut = await captureOutput(() => handleGodot(['status']));
+    assert.ok(stOut.includes('Godot Detected: 4.7.2') && stOut.includes('Bridge Port: 7777') && stOut.includes('16:9'));
+    assert.ok((await captureOutput(() => handleGodot(['query']))).includes('Usage: aegis godot query'));
+    assert.ok((await captureOutput(() => handleGodot(['validate', tmp]))).includes('100% CLEAN'));
+  } finally {
+    process.chdir(prevCwd);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });

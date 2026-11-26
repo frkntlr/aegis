@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir, type ExecutionHistoryRecord } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeAegisDir, type ExecutionHistoryRecord } from '@aegis/shared';
 
 export class HistoryTracker {
   private historyFilePath: string;
@@ -14,13 +14,12 @@ export class HistoryTracker {
   private load(): void {
     if (fs.existsSync(this.historyFilePath)) {
       try {
-        const raw = fs.readFileSync(this.historyFilePath, 'utf8');
-        const parsed = JSON.parse(raw) as Record<string, ExecutionHistoryRecord>;
+        const parsed = readJsonSafe<Record<string, ExecutionHistoryRecord>>(this.historyFilePath);
         for (const [k, v] of Object.entries(parsed)) {
           this.records.set(k, v);
         }
-      } catch {
-        // ignore invalid file
+      } catch (err: unknown) {
+        debugLogIgnored('HistoryTracker:load', err);
       }
     }
   }
@@ -77,10 +76,14 @@ export class HistoryTracker {
         fs.renameSync(tmp, this.historyFilePath);
       } catch {
         fs.copyFileSync(tmp, this.historyFilePath);
-        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+        try {
+          fs.rmSync(tmp, { force: true });
+        } catch (rmErr: unknown) {
+          debugLogIgnored('HistoryTracker:persistCleanup', rmErr);
+        }
       }
-    } catch {
-      // non-fatal
+    } catch (err: unknown) {
+      debugLogIgnored('HistoryTracker:persist', err);
     }
   }
 }

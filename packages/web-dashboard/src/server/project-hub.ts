@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored } from '@aegis/shared';
 
 import { WorktreeManager } from '@aegis/orchestrator';
 import { GitHubProjectsAdapter, GitHubTokenResolver } from '@aegis/github-live';
@@ -72,8 +73,8 @@ export class ProjectHub {
           return path.join(parent, ent.name);
         }
       }
-    } catch {
-      // Ignore read errors
+    } catch (err: unknown) {
+      debugLogIgnored('project-hub:findMatchingLocalPath', err);
     }
     return undefined;
   }
@@ -102,32 +103,39 @@ export class ProjectHub {
           this.contexts.set(id, ctx);
         }
       }
-    } catch {
-      // Offline fallback
+    } catch (err: unknown) {
+      debugLogIgnored('project-hub:discoverProjects', err);
     }
     return this.listProjects();
   }
 
-  public handleFocus(workspacePath: string): FocusResult {
-    const resolved = path.resolve(workspacePath);
-    const norm = resolved.replace(/\\/g, '/');
-    let matchedCtx: ProjectContext | undefined;
-
+  private findContextByPath(resolved: string): ProjectContext | undefined {
+    const isWin = process.platform === 'win32';
+    const norm = (isWin ? resolved.toLowerCase() : resolved).replace(/\\/g, '/');
     for (const ctx of this.contexts.values()) {
-      const ctxNorm = path.resolve(ctx.localPath).replace(/\\/g, '/');
-      if (norm === ctxNorm || norm.startsWith(ctxNorm + '/')) {
-        matchedCtx = ctx;
-        break;
-      }
+      const rawCtx = path.resolve(ctx.localPath).replace(/\\/g, '/');
+      const ctxNorm = isWin ? rawCtx.toLowerCase() : rawCtx;
+      const prefix = ctxNorm.endsWith('/') ? ctxNorm : `${ctxNorm}/`;
+      if (norm === ctxNorm || norm.startsWith(prefix)) return ctx;
     }
+    return undefined;
+  }
+
+  public handleFocus(workspacePath: string): FocusResult {
+    if (typeof workspacePath !== 'string' || !workspacePath.trim() || workspacePath.includes('\0')) {
+      throw new Error('Geçersiz proje kökü: geçerli bir dizin yolu belirtilmedi.');
+    }
+    const resolved = path.resolve(workspacePath);
+    let matchedCtx = this.findContextByPath(resolved);
 
     if (!matchedCtx) {
-      if (!fs.existsSync(resolved) || !fs.existsSync(path.join(resolved, '.git'))) {
+      const isDir = fs.existsSync(resolved) && fs.statSync(resolved).isDirectory();
+      if (!isDir || !fs.existsSync(path.join(resolved, '.git'))) {
         throw new Error(`Geçersiz proje kökü: '${workspacePath}' geçerli bir git deposu değil (.git bulunamadı).`);
       }
-      const baseName = path.basename(workspacePath);
+      const baseName = path.basename(resolved);
       const newId = `${this.owner}/${baseName.toLowerCase()}`;
-      matchedCtx = this.createContext(newId, baseName, 4, workspacePath, true);
+      matchedCtx = this.createContext(newId, baseName, 4, resolved, true);
       this.contexts.set(newId, matchedCtx);
     }
 

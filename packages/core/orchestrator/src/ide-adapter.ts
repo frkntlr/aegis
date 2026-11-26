@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { IdeCapabilities, IdeExclusionResult, IdeAdapter } from '@aegis/shared';
+import { type IdeCapabilities, type IdeExclusionResult, type IdeAdapter, readJsonSafe } from '@aegis/shared';
 import { CodexAdapter } from './codex-adapter.js';
 export { CodexAdapter } from './codex-adapter.js';
 
@@ -19,7 +19,7 @@ function updateJsonSettings(filePath: string, mutator: (s: Record<string, unknow
   let settings: Record<string, unknown> = {};
   if (fs.existsSync(filePath)) {
     try {
-      settings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      settings = readJsonSafe<Record<string, unknown>>(filePath);
     } catch {
       settings = {};
     }

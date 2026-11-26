@@ -1,4 +1,4 @@
-﻿const {test}=require('node:test');
+const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
@@ -47,7 +47,7 @@ test('setup parser accepts both value forms and rejects ambiguous options',()=>{
 
 test('dry-run needs no installed dependencies and never starts subprocesses or writes settings',t=>{
   const f=fixture(t);const before=fs.readdirSync(f.project);
-  runSetup({...f,client:'both',user:true,dryRun:true},{run:()=>{throw new Error('must not run');},log:()=>{}});
+  runSetup({...f,client:'both',user:true,dryRun:true},{run:()=>{throw new Error('must not run');},log:()=>undefined});
   assert.deepEqual(fs.readdirSync(f.project),before);
   assert.ok(!fs.existsSync(path.join(f.engine,'node_modules')));
 });
@@ -84,7 +84,7 @@ test('Antigravity merge preserves unrelated server/settings and never configures
   const config=path.join(f.project,'.gemini/config/mcp_config.json');
   fs.mkdirSync(path.dirname(config),{recursive:true});
   fs.writeFileSync(config,JSON.stringify({custom:true,mcpServers:{other:{url:'https://example.com'},aegis:{disabled:false,env:{KEEP:'yes'},url:'https://old'}}}));
-  runSetup({...f,client:'antigravity',user:false},{npm:['npm',[]],dependenciesMissing:()=>false,run:fakeRunner(f.engine,calls),log:()=>{}});
+  runSetup({...f,client:'antigravity',user:false},{npm:['npm',[]],dependenciesMissing:()=>false,run:fakeRunner(f.engine,calls),log:()=>undefined});
   const value=JSON.parse(fs.readFileSync(config,'utf8'));
   assert.equal(value.custom,true);assert.equal(value.mcpServers.other.url,'https://example.com');
   assert.equal(value.mcpServers.aegis.cwd,f.project);assert.equal(value.mcpServers.aegis.env.KEEP,'yes');
@@ -105,20 +105,29 @@ test('malformed Antigravity JSON is preserved before any configuration write',t=
   assert.ok(!fs.existsSync(path.join(f.project,'.gemini/settings.json')));
 });
 
-test('user shims preserve argument boundaries and route tw/tr aliases',t=>{
-  const f=fixture(t),prefix=path.join(f.root,'user npm prefix');
+test('user shims preserve argument boundaries, skip bare tr, and route tw/aegis-tr aliases',t=>{
+  const f=fixture(t),prefix=path.join(f.root,'user npm prefix'),linuxPrefix=path.join(f.root,'linux prefix');
   const files=installUserShims(f.engine,prefix);
   assert.ok(files.every(file=>fs.existsSync(file)));
+  installUserShims(f.engine,linuxPrefix,'linux');
+  assert.equal(fs.existsSync(path.join(linuxPrefix,'bin/tr')),false);
+  assert.ok(fs.existsSync(path.join(linuxPrefix,'bin/aegis-tr')));
+  for(const forbidden of ['tr','tr.cmd','tr.ps1','bin/tr']) {
+    assert.equal(fs.existsSync(path.join(prefix,forbidden)),false);
+  }
   const tw=path.join(prefix,process.platform==='win32'?'tw.ps1':'bin/tw');
-  const content=fs.readFileSync(tw,'utf8');
-  assert.match(content,process.platform==='win32'?/'tw' @args/:/tw "\$@"/);
+  const aegisTr=path.join(prefix,process.platform==='win32'?'aegis-tr.ps1':'bin/aegis-tr');
+  assert.ok(fs.existsSync(aegisTr));
+  assert.match(fs.readFileSync(tw,'utf8'),process.platform==='win32'?/'tw' @args/:/tw "\$@"/);
+  assert.match(fs.readFileSync(aegisTr,'utf8'),process.platform==='win32'?/'tr' @args/:/tr "\$@"/);
   const cli=path.join(f.engine,'packages/cli/dist/bin/aegis.js');
   fs.mkdirSync(path.dirname(cli),{recursive:true});fs.writeFileSync(cli,'console.log(JSON.stringify(process.argv.slice(2)))');
   const args=['an objective with spaces','$(should-not-run)'];
-  const output=process.platform==='win32'?
-    cp.execFileSync('powershell',['-NoProfile','-ExecutionPolicy','Bypass','-File',tw,...args],{encoding:'utf8',windowsHide:true}):
-    cp.execFileSync(tw,args,{encoding:'utf8'});
-  assert.deepEqual(JSON.parse(output),['tw',...args]);
+  const runShim=(shim)=>process.platform==='win32'?
+    cp.execFileSync('powershell',['-NoProfile','-ExecutionPolicy','Bypass','-File',shim,...args],{encoding:'utf8',windowsHide:true}):
+    cp.execFileSync(shim,args,{encoding:'utf8'});
+  assert.deepEqual(JSON.parse(runShim(tw)),['tw',...args]);
+  assert.deepEqual(JSON.parse(runShim(aegisTr)),['tr',...args]);
 });
 
 test('subprocess exit failures are propagated instead of converted into success',()=>{
@@ -129,7 +138,7 @@ test('Antigravity user install adds CLI shims without installing Codex routing',
   const f=fixture(t),calls=[],prefix=path.join(f.root,'global prefix');
   const runner=fakeRunner(f.engine,calls);
   runSetup({...f,client:'antigravity',user:true},{npm:['npm',[]],dependenciesMissing:()=>false,
-    run:(command,args,cwd)=>args.includes('prefix')?prefix:runner(command,args,cwd),log:()=>{}});
+    run:(command,args,cwd)=>args.includes('prefix')?prefix:runner(command,args,cwd),log:()=>undefined});
   assert.ok(!calls.some(call=>call.args.some(arg=>arg.endsWith('install-codex-commands.cjs'))));
   assert.ok(fs.existsSync(path.join(prefix,process.platform==='win32'?'aegis.cmd':'bin/aegis')));
   assert.ok(!fs.existsSync(path.join(f.project,'.codex')));
@@ -138,7 +147,7 @@ test('Antigravity user install adds CLI shims without installing Codex routing',
 test('both clients keep their distinct skills and preserve custom project instructions',t=>{
   const f=fixture(t),calls=[];
   runSetup({...f,client:'both',user:false},{npm:['npm',[]],dependenciesMissing:()=>false,
-    run:fakeRunner(f.engine,calls),log:()=>{}});
+    run:fakeRunner(f.engine,calls),log:()=>undefined});
   assert.ok(fs.existsSync(path.join(f.project,'.agents/skills/aegis/SKILL.md')));
   assert.equal(fs.readFileSync(path.join(f.project,'.gemini/config/plugins/aegis/skills/aegis/SKILL.md'),'utf8'),'Aegis Antigravity Skill');
 });

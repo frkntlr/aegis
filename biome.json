@@ -3,7 +3,10 @@
   "files": {
     "includes": [
       "packages/**/src/**/*.ts",
-      "packages/**/src/**/*.js"
+      "packages/**/src/**/*.js",
+      "packages/cli/scripts/bundle.mjs",
+      "scripts/**/*.js",
+      "scripts/**/*.cjs"
     ],
     "ignoreUnknown": true
   },
@@ -13,11 +16,9 @@
       "preset": "recommended",
       "suspicious": {
         "noExplicitAny": "error",
-        "noEmptyBlockStatements": "off",
+        "noEmptyBlockStatements": "error",
         "noAssignInExpressions": "off",
-        "noControlCharactersInRegex": "off",
-        "noUselessEscapeInString": "off",
-        "noGlobalIsNan": "off"
+        "noControlCharactersInRegex": "off"
       },
       "complexity": {
         "noBannedTypes": "error",
@@ -25,17 +26,11 @@
         "noStaticOnlyClass": "off",
         "useLiteralKeys": "off",
         "noUselessEscapeInRegex": "off",
-        "useOptionalChain": "off",
-        "useRegexLiterals": "off"
-      },
-      "correctness": {
-        "noInnerDeclarations": "off"
+        "useOptionalChain": "off"
       },
       "style": {
         "useTemplate": "off",
         "useImportType": "off",
-        "useExportType": "off",
-        "useNodejsImportProtocol": "off",
         "noNonNullAssertion": "off"
       }
     }

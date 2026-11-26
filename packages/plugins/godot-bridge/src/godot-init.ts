@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readJsonSafe } from '@aegis/shared';
 import { GodotLocator, type GodotInstallation } from './godot-locator.js';
 
 export interface GodotInitOptions {
@@ -177,7 +178,7 @@ export class GodotInitWorkflow {
 
     if (fs.existsSync(configPath)) {
       try {
-        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        config = readJsonSafe<Record<string, unknown>>(configPath);
       } catch {
         config = {};
       }

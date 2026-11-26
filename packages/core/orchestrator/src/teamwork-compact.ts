@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { readJsonSafe, resolveSafeRepoRoot } from '@aegis/shared';
 import { RTKTokenKiller } from '@aegis/watchdog';
 import type { TeamworkPlan, TeamworkStatusReport } from './teamwork-coordinator.js';
 
@@ -48,10 +48,10 @@ export class TeamworkCompactEngine {
     }
 
     try {
-      const raw = JSON.parse(fs.readFileSync(inboxPath, 'utf8'));
+      const raw = readJsonSafe<unknown>(inboxPath);
       const tasks: Array<{ status?: string; issueNumber?: number; title?: string }> = Array.isArray(raw)
         ? raw
-        : (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown[] }).tasks) ? (raw as { tasks: unknown[] }).tasks : []);
+        : (raw && typeof raw === 'object' && Array.isArray((raw as { tasks?: unknown[] }).tasks) ? (raw as { tasks: unknown[] }).tasks as Array<{ status?: string; issueNumber?: number; title?: string }> : []);
 
       const completed = tasks.filter(t => t.status === 'done');
       const active = tasks.filter(t => t.status !== 'done');
@@ -59,7 +59,7 @@ export class TeamworkCompactEngine {
         return { archivedCount: 0, remainingCount: active.length, ledgerPath };
       }
 
-      const existingLedger: unknown[] = fs.existsSync(ledgerPath) ? (JSON.parse(fs.readFileSync(ledgerPath, 'utf8')) || []) : [];
+      const existingLedger: unknown[] = fs.existsSync(ledgerPath) ? (readJsonSafe<unknown[]>(ledgerPath) || []) : [];
       const updatedLedger = [...existingLedger, ...completed];
       fs.writeFileSync(ledgerPath, JSON.stringify(updatedLedger, null, 2), 'utf8');
       fs.writeFileSync(inboxPath, JSON.stringify(active, null, 2), 'utf8');

@@ -1,9 +1,19 @@
+import * as path from 'node:path';
 import type { ProjectHub } from './project-hub.js';
 import type { IdeLauncher, UniversalToolchainSync } from '@aegis/orchestrator';
 import { RoleClassifier } from '@aegis/orchestrator';
 import { LoopBreaker, type OrphanTaskReclaimer } from '@aegis/watchdog';
 import type { AegisEngineService } from './engine-service.js';
 import type { SystemIssue } from './realtime-metrics.js';
+import { isSafeIdentifier, requireExistingRepoRoot, resolveContainedPath } from './path-containment.js';
+
+type SupportedIde = 'Google Antigravity' | 'Cursor AI' | 'VS Code' | 'Universal IDE';
+const ALLOWED_IDES: ReadonlySet<string> = new Set<SupportedIde>([
+  'Google Antigravity',
+  'Cursor AI',
+  'VS Code',
+  'Universal IDE'
+]);
 
 export interface ActionDispatcherContext {
   hub: ProjectHub;
@@ -25,7 +35,10 @@ export class ActionDispatcher {
       return { success: true, ...res };
     }
     if (action === 'focus_project') {
-      const res = this.ctx.hub.handleFocus(payload.workspacePath as string);
+      if (typeof payload.workspacePath !== 'string' || !payload.workspacePath.trim()) {
+        return { success: false, error: 'Invalid workspacePath: expected non-empty string.' };
+      }
+      const res = this.ctx.hub.handleFocus(payload.workspacePath);
       if (res.switched) this.ctx.broadcast('context_switched', res);
       return { success: true, ...res };
     }
@@ -74,8 +87,12 @@ export class ActionDispatcher {
     }
     if (action === 'complete_task') return this.handleMoveTask({ issueNumber: payload.issueNumber, targetStatus: 'done' });
     if (action === 'release_locks') {
-      hubCtx.wtManager.releaseFileLocks((payload.agentName as string) || 'solver');
-      hubCtx.metrics.releaseIssueLocks(payload.agentName as string);
+      const rawAgent = payload.agentName;
+      if (rawAgent !== undefined && (typeof rawAgent !== 'string' || !isSafeIdentifier(rawAgent))) {
+        return { success: false, error: 'Invalid agentName.' };
+      }
+      hubCtx.wtManager.releaseFileLocks((rawAgent as string) || 'solver');
+      hubCtx.metrics.releaseIssueLocks(rawAgent as string | undefined);
       return { success: true, message: 'Kilitler boşaltıldı.' };
     }
     return { success: false, error: 'Bilinmeyen aksiyon: ' + action };
@@ -100,6 +117,8 @@ export class ActionDispatcher {
       if (!agent || agent === 'auto') {
         const inf = new RoleClassifier().classify({ title: issue.title, targetFiles: issue.targetFiles });
         agent = inf.role;
+      } else if (typeof agent !== 'string' || !isSafeIdentifier(agent)) {
+        return { success: false, message: 'Geçersiz ajan adı.' };
       }
       const ide = (payload.ideType as string) || 'Google Antigravity';
       const lockRes = ctx.wtManager.acquireFileLocks(agent, issue.targetFiles);
@@ -142,16 +161,37 @@ export class ActionDispatcher {
     return { success: true, message: `Görev #${target.number} [@${agentName}] (${ideType}) atandı.` };
   }
 
+  private handleLaunchIde(localPath: string, payload: Record<string, unknown>): Record<string, unknown> {
+    const rawIde = payload.ideType === undefined ? 'Google Antigravity' : payload.ideType;
+    if (typeof rawIde !== 'string' || !ALLOWED_IDES.has(rawIde)) {
+      return { success: false, message: 'Geçersiz IDE türü.' };
+    }
+    const rootRes = requireExistingRepoRoot(localPath);
+    if (!rootRes.ok) return { success: false, message: rootRes.reason };
+    const rawWt = payload.worktreePath === undefined ? path.join(rootRes.root, 'experimental', 'solver') : payload.worktreePath;
+    if (typeof rawWt !== 'string') return { success: false, message: 'Geçersiz worktreePath.' };
+    const wtRes = resolveContainedPath(rootRes.root, rawWt, { allowNonExistent: true });
+    if (!wtRes.ok) return { success: false, message: wtRes.reason };
+    let focusPath: string | undefined;
+    if (payload.focusFile !== undefined) {
+      if (typeof payload.focusFile !== 'string') return { success: false, message: 'Geçersiz focusFile.' };
+      const inWt = resolveContainedPath(wtRes.realPath, payload.focusFile, { allowNonExistent: true });
+      if (!inWt.ok) return { success: false, message: inWt.reason };
+      const inRoot = resolveContainedPath(rootRes.root, inWt.realPath, { allowNonExistent: true });
+      if (!inRoot.ok) return { success: false, message: inRoot.reason };
+      focusPath = inWt.realPath;
+    }
+    const res = this.ctx.launcher.launchIde({
+      ideType: rawIde as SupportedIde,
+      worktreePath: wtRes.realPath,
+      focusFile: focusPath
+    });
+    return { success: res.success, command: res.command, message: res.message, pid: res.pid };
+  }
+
   private async handleIdeAndSync(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
     const ctx = this.ctx.hub.getActiveContext();
-    if (action === 'launch_ide') {
-      const res = this.ctx.launcher.launchIde({
-        ideType: ((payload.ideType as string) || 'Google Antigravity') as 'Google Antigravity' | 'Cursor AI' | 'VS Code' | 'Universal IDE',
-        worktreePath: (payload.worktreePath as string) || `${ctx.localPath}/experimental/solver`,
-        focusFile: payload.focusFile as string | undefined
-      });
-      return { success: res.success, command: res.command, message: res.message, pid: res.pid };
-    }
+    if (action === 'launch_ide') return this.handleLaunchIde(ctx.localPath, payload);
     if (action === 'sync_toolchain') {
       const rep = this.ctx.toolchainSync.syncAll();
       return { success: rep.success, report: rep, message: `Toolchain senkronize edildi: ${rep.syncedIdes.join(', ')}` };
@@ -167,7 +207,7 @@ export class ActionDispatcher {
     const t = payload.tool;
     let res: Record<string, unknown>;
     if (t === 'ui_inspector') res = this.ctx.engineSvc.runUiInspector(payload.layoutPath as string | undefined);
-    else if (t === 'mutation_gate') res = this.ctx.engineSvc.runMutationGate();
+    else if (t === 'mutation_gate') res = this.ctx.engineSvc.runMutationGate(payload.filePath as string | undefined);
     else if (t === 'adaptive_timeout') res = { ...this.ctx.engineSvc.runAdaptiveTimeout(Number(payload.files ?? 2), Number(payload.tests ?? 4)) };
     else if (t === 'mcp_security') res = this.ctx.engineSvc.runMcpSecurity(payload.agent as string, payload.mcpTool as string);
     else if (t === 'diff_validator') res = await this.ctx.engineSvc.runDiffValidator(payload.diffText as string);

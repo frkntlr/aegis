@@ -24,8 +24,8 @@ const PARITY_SUBCOMMANDS = [
 beforeEach(() => {
   // Handler output is not asserted here. Large Unicode logs can corrupt older
   // node:test IPC framing under concurrent load (nodejs/node#64061).
-  mock.method(console, 'log', () => {});
-  mock.method(console, 'error', () => {});
+  mock.method(console, 'log', () => undefined);
+  mock.method(console, 'error', () => undefined);
   previousWorkspace = process.env.AEGIS_WORKSPACE;
   testTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-tr-test-'));
   process.env.AEGIS_WORKSPACE = testTmpDir;

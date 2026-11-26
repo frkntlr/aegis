@@ -6,8 +6,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
-import { cleanGitEnv, resolveSafeRepoRoot } from '@aegis/shared';
+import { execFileSync } from 'node:child_process';
+import { cleanGitEnv, debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 
 export interface BootstrapOptions {
   force?: boolean;
@@ -24,6 +24,26 @@ export interface BootstrapResult {
   createdDocs: boolean;
   createdAegis: boolean;
   message: string;
+}
+
+export function validateGitBranchName(branch: string): string {
+  if (
+    typeof branch !== 'string' ||
+    !branch ||
+    branch.startsWith('-') ||
+    branch.startsWith('.') ||
+    branch.endsWith('.') ||
+    branch.startsWith('/') ||
+    branch.endsWith('/') ||
+    branch.includes('..') ||
+    branch.includes('//') ||
+    branch.endsWith('.lock') ||
+    branch.includes('@{') ||
+    !/^[A-Za-z0-9._/-]+$/.test(branch)
+  ) {
+    throw new Error(`Invalid git branch name: ${branch}`);
+  }
+  return branch;
 }
 
 function buildDefaultGitignore(): string {
@@ -81,29 +101,23 @@ function buildDefaultReadme(projectName: string, description?: string): string {
 }
 
 function initGitRepo(repoRoot: string, branch = 'master'): boolean {
+  const safeBranch = validateGitBranchName(branch);
+  const gitOpts = { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] as ['ignore', 'pipe', 'pipe'], env: cleanGitEnv(), windowsHide: true };
   try {
-    execSync(`git init -b ${branch}`, {
-      cwd: repoRoot,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: cleanGitEnv()
-    });
+    execFileSync('git', ['init', '-b', safeBranch], gitOpts);
     return true;
-  } catch {
+  } catch (err: unknown) {
+    debugLogIgnored('ProjectBootstrap:gitInitWithBranch', err);
     try {
-      execSync('git init', {
-        cwd: repoRoot,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: cleanGitEnv()
-      });
+      execFileSync('git', ['init'], gitOpts);
       try {
-        execSync(`git branch -M ${branch}`, {
-          cwd: repoRoot,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: cleanGitEnv()
-        });
-      } catch { /* branch rename can be skipped on empty git repo */ }
+        execFileSync('git', ['branch', '-M', safeBranch], gitOpts);
+      } catch (branchErr: unknown) {
+        debugLogIgnored('ProjectBootstrap:gitBranchRename', branchErr);
+      }
       return true;
-    } catch {
+    } catch (fallbackErr: unknown) {
+      debugLogIgnored('ProjectBootstrap:gitInitFallback', fallbackErr);
       return false;
     }
   }

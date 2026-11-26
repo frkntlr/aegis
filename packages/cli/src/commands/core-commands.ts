@@ -7,7 +7,7 @@ import {
   BranchReconciler
 } from '@aegis/orchestrator';
 import { GitHubClient } from '@aegis/github-live';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { debugLogIgnored, readJsonSafe, resolveSafeAegisDir } from '@aegis/shared';
 import { LoopBreaker, OrphanTaskReclaimer } from '@aegis/watchdog';
 import { DashboardServer } from '@aegis/web-dashboard';
 import { showBanner } from './banner.js';
@@ -74,11 +74,11 @@ async function syncOrLoadAutoIssues(ghClient: GitHubClient, wtManager: WorktreeM
     const localIssuesFile = path.join(resolveSafeAegisDir(), 'issues.json');
     if (fs.existsSync(localIssuesFile)) {
       try {
-        const raw = JSON.parse(fs.readFileSync(localIssuesFile, 'utf8'));
+        const raw = readJsonSafe<unknown>(localIssuesFile);
         if (Array.isArray(raw)) {
           for (const item of raw) ghClient.registerIssue(item);
         }
-      } catch { /* ignore */ }
+      } catch (err: unknown) { debugLogIgnored('CoreCommands:loadLocalIssues', err); }
     }
   }
   await reclaimStaleTasks(ghClient, wtManager);
@@ -120,9 +120,9 @@ function getPrimaryBranch(): string {
   const sFile = path.join(resolveSafeAegisDir(), 'settings.json');
   if (fs.existsSync(sFile)) {
     try {
-      const s = JSON.parse(fs.readFileSync(sFile, 'utf8'));
+      const s = readJsonSafe<{ primaryBranch?: string }>(sFile);
       if (s.primaryBranch) return s.primaryBranch;
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('CoreCommands:getPrimaryBranch', err); }
   }
   const wt = new WorktreeManager();
   return wt.detectCurrentBranch();

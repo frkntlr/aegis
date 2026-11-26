@@ -6,7 +6,15 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { debugLogIgnored, readJsonSafe } from '@aegis/shared';
 import type { Context7DocEntry } from './context7-bridge.js';
+
+interface PackageJsonMeta {
+  version?: string;
+  types?: string;
+  typings?: string;
+  exports?: { '.'?: { types?: string }; types?: string };
+}
 
 export interface ManifestEntry {
   version: string;
@@ -32,7 +40,7 @@ export class JitDocSynthesizer {
     const pkgJsonPath = path.join(pkgDir, 'package.json');
     if (!fs.existsSync(pkgJsonPath)) return null;
     try {
-      const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+      const pkg = readJsonSafe<PackageJsonMeta>(pkgJsonPath);
       const candidate = pkg.types || pkg.typings || pkg.exports?.['.']?.types || pkg.exports?.types;
       if (candidate) {
         const resolved = path.resolve(pkgDir, candidate);
@@ -120,7 +128,7 @@ export class JitDocSynthesizer {
     const manifestPath = path.join(cacheDir, 'manifest.json');
     let manifest: Record<string, ManifestEntry> = {};
     if (fs.existsSync(manifestPath)) {
-      try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { manifest = {}; }
+      try { manifest = readJsonSafe<Record<string, ManifestEntry>>(manifestPath); } catch { manifest = {}; }
     }
     if (!manifest[pkgName]) {
       manifest[pkgName] = { version, symbols: {} };
@@ -141,9 +149,11 @@ export class JitDocSynthesizer {
 
     let version = '1.0.0';
     try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+      const pkg = readJsonSafe<PackageJsonMeta>(path.join(pkgDir, 'package.json'));
       version = pkg.version || '1.0.0';
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      debugLogIgnored('jit-doc-synthesizer:version', err);
+    }
 
     const dtsPath = JitDocSynthesizer.resolveEntryDeclaration(pkgDir);
     if (!dtsPath) return null;
@@ -159,7 +169,9 @@ export class JitDocSynthesizer {
       const docPath = path.join(targetCacheDir, `${library}__${symbol}.json`);
       fs.writeFileSync(docPath, JSON.stringify(doc, null, 2), 'utf8');
       JitDocSynthesizer.updateManifest(targetCacheDir, library, version, symbol, dtsPath, sliceResult.line);
-    } catch { /* ignore */ }
+    } catch (err: unknown) {
+      debugLogIgnored('jit-doc-synthesizer:cache', err);
+    }
 
     return doc;
   }

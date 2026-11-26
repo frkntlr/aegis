@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { debugLogIgnored } from '@aegis/shared';
 import {
   IMemorySliceResolver,
   MemorySymbolSlice
@@ -45,7 +46,7 @@ export class CliMemorySliceResolver implements IMemorySliceResolver {
           context7Doc: res.groundTruthDocs?.[0]
         };
       }
-    } catch { /* fallback to direct extractor */ }
+    } catch (err: unknown) { debugLogIgnored('CliMemoryResolver:resolveSlice', err); }
 
     return this.resolveFallbackSlice(filePath, lineNumber, symbolName);
   }
@@ -71,7 +72,7 @@ export class CliMemorySliceResolver implements IMemorySliceResolver {
         }
       }
       return this.readSnippetSlice(filePath, lineNumber, symbolName);
-    } catch { /* ignore */ }
+    } catch (err: unknown) { debugLogIgnored('CliMemoryResolver:resolveFallback', err); }
     return null;
   }
 

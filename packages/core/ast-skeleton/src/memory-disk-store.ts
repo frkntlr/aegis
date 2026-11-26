@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafeAegisDir } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeAegisDir } from '@aegis/shared';
 import { GitFastSyncEngine } from './git-fast-sync.js';
 import type { SymbolIndexer } from './symbol-indexer.js';
 import type { RelationalGraph } from './relational-graph.js';
@@ -25,7 +25,7 @@ export class MemoryDiskStore {
       fs.renameSync(tmpPath, filePath);
     } catch {
       fs.copyFileSync(tmpPath, filePath);
-      try { fs.rmSync(tmpPath, { force: true }); } catch { /* ignore */ }
+      try { fs.rmSync(tmpPath, { force: true }); } catch (err: unknown) { debugLogIgnored('MemoryDiskStore:writeAtomicCleanup', err); }
     }
   }
 
@@ -41,9 +41,11 @@ export class MemoryDiskStore {
           fs.renameSync(filePath, corruptPath);
         } catch {
           fs.copyFileSync(filePath, corruptPath);
-          try { fs.rmSync(filePath, { force: true }); } catch { /* ignore */ }
+          try { fs.rmSync(filePath, { force: true }); } catch (rmErr: unknown) { debugLogIgnored('MemoryDiskStore:readSafeCleanup', rmErr); }
         }
-      } catch { /* ignore */ }
+      } catch (corruptErr: unknown) {
+        debugLogIgnored('MemoryDiskStore:readSafeCorrupt', corruptErr);
+      }
       return null;
     }
   }

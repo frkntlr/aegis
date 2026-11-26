@@ -141,8 +141,8 @@ Aegis 5-Katmanlı Hafıza Motoru, tipik vibe coding senaryolarında dramatik bir
 
 ## 5. İlgili CLI Komutları ve Belgeler
 
-- [`02-task-ingestion-and-teamwork.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/02-task-ingestion-and-teamwork.md) — TIP ve Git Worktree izolasyonu.
-- [`03-universal-cli-reference.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/03-universal-cli-reference.md) — `aegis memory:*` ve `aegis deps:drift` komutları.
-- [`04-mcp-server-specification.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/04-mcp-server-specification.md) — `memory_query`, `memory_stats`, `skeleton_extract` araçları.
-- [RFC-007: 5-Layer Codebase Memory Engine](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-007-rfc-007-fortified-5-layer-codebase-memory-ide-integration-engine.md)
-- [RFC-032: Fast-Stat Cache Radar](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-032-deterministic-incremental-caching-for-demir-kafes-cagecheck-via-fast-stat-cache-radar.md)
+- [`02-task-ingestion-and-teamwork.md`](./02-task-ingestion-and-teamwork.md) — TIP ve Git Worktree izolasyonu.
+- [`03-universal-cli-reference.md`](./03-universal-cli-reference.md) — `aegis memory:*` ve `aegis deps:drift` komutları.
+- [`04-mcp-server-specification.md`](./04-mcp-server-specification.md) — `memory_query`, `memory_stats`, `skeleton_extract` araçları.
+- [RFC-007: 5-Layer Codebase Memory Engine](./rfc/RFC-007-rfc-007-fortified-5-layer-codebase-memory-ide-integration-engine.md)
+- [RFC-032: Fast-Stat Cache Radar](./rfc/RFC-032-deterministic-incremental-caching-for-demir-kafes-cagecheck-via-fast-stat-cache-radar.md)

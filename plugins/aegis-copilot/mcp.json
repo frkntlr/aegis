@@ -1,10 +1,9 @@
 {
   "servers": {
     "aegis-engine": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "--yes",
-        "@aegis/cli",
+        "packages/cli/dist/bin/aegis.js",
         "mcp"
       ]
     }

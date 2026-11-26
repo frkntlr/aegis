@@ -4,10 +4,16 @@
   "description": "Aegis Git Worktree and Agent Lifecycle Orchestrator",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x));if(f.length)process.exit(cp.spawnSync(process.execPath,['--require',p.resolve('../../../scripts/test-workspace.cjs'),'--test','--test-timeout=20000',...f],{stdio:'inherit',timeout:60000}).status??1)\""
+    "test": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.existsSync('dist')?fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x)):[];if(!f.length){console.error('No test files found in dist');process.exit(1);}process.exit(cp.spawnSync(process.execPath,['--require',p.resolve('../../../scripts/test-workspace.cjs'),'--test','--test-timeout=20000',...f],{stdio:'inherit',timeout:60000}).status??1)\""
   },
   "dependencies": {
     "@aegis/ast-skeleton": "*",

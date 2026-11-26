@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { IronCageValidator, LineBudgetRadar, TriageCacheRadar } from '@aegis/iron-cage';
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 import { showBanner } from './banner.js';
 import {
   collectSourceFiles,
@@ -51,7 +51,7 @@ function handleUncachedFile(
   if (res.passed) {
     acc.passedCount++;
     const r = LineBudgetRadar.analyze(rel, content);
-    if (r.status === 'CRITICAL_QUOTA') {
+    if (r.status === 'CRITICAL_QUOTA' || r.status === 'EXCEEDED') {
       quotaAlert = { file: rel, lines: r.fileLines, msg: r.advice?.title || 'Kritik kota' };
       acc.radarAlerts.push(quotaAlert);
     }
@@ -76,7 +76,9 @@ function scanCageFiles(files: string[], noCache = false): CageScanAcc {
       } else {
         handleUncachedFile(file, rel, stat, validator, radar, acc);
       }
-    } catch { /* ignore unreadable file */ }
+    } catch (err: unknown) {
+      debugLogIgnored('CageCheckRunner:scanFile', err);
+    }
   }
 
   if (radar) radar.flush();

@@ -1,8 +1,8 @@
 /** CLI GitHub tracking with resumable, project-local remote links. */
 import { TeamworkCoordinator } from '@aegis/orchestrator';
 import { TeamworkGitHubSynchronizer } from '@aegis/github-live';
+import { readJsonSafe } from '@aegis/shared';
 import { showBanner } from './banner.js';
-import * as fs from 'node:fs';
 import { loadTeamworkPlan, saveTeamworkPlan } from './teamwork-plan-store.js';
 import { syncTeamworkPlanToGitHub } from './teamwork-github-sync.js';
 
@@ -61,7 +61,6 @@ export async function handleTeamworkGitHubCloseCommand(...args: string[]): Promi
   if (args.length !== 4 || !/^\d+$/.test(issue ?? '') || !proofFile) {
     throw new Error('Usage: aegis tw:gh:close <full-commit-hash> "<summary>" <remote-issue-number> <proof.json>');
   }
-  const proof = JSON.parse(fs.readFileSync(proofFile, 'utf8').replace(/^\uFEFF/, '')) as
-    Parameters<TeamworkGitHubSynchronizer['closeIssueWithProof']>[3];
+  const proof = readJsonSafe<Parameters<TeamworkGitHubSynchronizer['closeIssueWithProof']>[3]>(proofFile);
   await handleTeamworkGitHubClose(commit, summary, Number(issue), proof);
 }

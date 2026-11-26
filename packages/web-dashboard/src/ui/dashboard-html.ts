@@ -83,7 +83,7 @@ function renderKanbanSection(): string {
 
 function renderTerminalSection(): string {
   return `  <div class="card" style="margin-top: 1rem;">
-    <div class="card-title"><span>Otonom Telemetri & Canlı Sistem Günlüğü</span><button class="btn btn-secondary btn-sm" onclick="document.getElementById('log-box').innerHTML='Günlük temizlendi.'">Temizle</button></div>
+    <div class="card-title"><span>Otonom Telemetri & Canlı Sistem Günlüğü</span><button class="btn btn-secondary btn-sm" onclick="document.getElementById('log-box').textContent='Günlük temizlendi.'">Temizle</button></div>
     <div class="terminal-box" id="log-box">[Sistem] Aegis Command Center hazır.</div>
   </div>`;
 }

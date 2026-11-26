@@ -100,3 +100,25 @@ test('LoopBreaker prunes stale records to prevent unbounded memory growth', () =
   breaker.recordFailure(106, 'trigger prune');
   assert.ok(breaker.getAllRecords().size <= 100);
 });
+
+test('LoopBreaker loads UTF-8 BOM-prefixed persisted state cleanly', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-breaker-bom-'));
+  const cacheFile = path.join(tmpDir, 'loop_breaker.json');
+  try {
+    const payload = {
+      '42': {
+        attempts: 3,
+        lastError: 'BOM test failure',
+        firstFailedAt: 1,
+        lastFailedAt: 2,
+        blocked: true
+      }
+    };
+    fs.writeFileSync(cacheFile, `\uFEFF${JSON.stringify(payload)}`, 'utf8');
+    const breaker = new LoopBreaker({ maxFailures: 3, persistPath: cacheFile });
+    assert.strictEqual(breaker.isBlocked(42), true);
+    assert.deepStrictEqual(breaker.getBlockedIssues(), [42]);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

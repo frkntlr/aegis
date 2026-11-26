@@ -4,12 +4,12 @@
  * Complies with Demir Kafes: <300 lines/file, <40 lines/function, 0 any.
  */
 
-import { resolveSafeRepoRoot } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeRepoRoot } from '@aegis/shared';
 import { WorktreeManager } from './worktree-manager.js';
 import { RoleClassifier, type RoleType } from './role-classifier.js';
 import { type SubagentProfile, getSubagentProfiles } from './teamwork-prompts.js';
 import { ProjectBootstrapEngine, type BootstrapResult, type BootstrapOptions } from './project-bootstrap.js';
-import { TeamworkDecomposer, TeamworkSharder, TeamworkHierarchicalTree, type DecomposedSubtask } from './teamwork-decomposer.js';
+import { TeamworkDecomposer, TeamworkHierarchicalTree, type DecomposedSubtask } from './teamwork-decomposer.js';
 import { TeamworkTrackBuilder } from './teamwork-track-builder.js';
 import { TeamworkVisualizer } from './teamwork-visualizer.js';
 import { TeamworkGroundingEngine } from './teamwork-grounding.js';
@@ -24,6 +24,7 @@ import { TeamworkAnalysisSwarm } from './teamwork-analysis-swarm.js';
 import { TeamworkDeliberationEngine, type DeliberationResult, type DeliberationOptions } from './teamwork-deliberation.js';
 import { SemanticAIDecomposer } from './semantic-ai-decomposer.js';
 import { TeamworkReflectionEngine, type ReflectionLoopOptions, type FeedbackLoopIterationResult } from './teamwork-reflection.js';
+import { buildCoordinatorTracks, reconcileSemanticSubtasks, scaleSemanticSubtasks } from './teamwork-coordinator-helpers.js';
 import type { TeamworkTrack, TeamworkPlan, TeamworkStatusReport, ExecutionWave } from './teamwork-types.js';
 
 export * from './teamwork-types.js';
@@ -96,7 +97,7 @@ export class TeamworkCoordinator {
   }
   private ensureBootstrap(): void {
     if (this.bootstrapped) return;
-    try { this.bootstrap(); } catch { /* retry on the next staging attempt */ }
+    try { this.bootstrap(); } catch (err: unknown) { debugLogIgnored('TeamworkCoordinator:ensureBootstrap', err); }
   }
   public get repoRootPath(): string { return this.repoRoot; }
   public get worktreeManager(): WorktreeManager {
@@ -137,41 +138,6 @@ export class TeamworkCoordinator {
     return this.cachedProfiles;
   }
 
-  private scaleSemanticSubtasks(subtasks: DecomposedSubtask[], files: string[], objective: string, target: number): DecomposedSubtask[] {
-    const solvers = subtasks.filter(t => t.roleType === 'solver');
-    TeamworkSharder.shardSolversByFiles(subtasks, files, objective);
-    TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
-    const scaled = (solvers.length <= 1 && subtasks.length < target) ? TeamworkSharder.shardMaxConcurrency(subtasks, files, target) : subtasks;
-    this.alignSubtaskPhases(scaled, files);
-    return scaled;
-  }
-
-  private alignSubtaskPhases(subtasks: DecomposedSubtask[], files: string[]): void {
-    for (const t of subtasks) {
-      if (t.roleType === 'ui' || t.roleType === 'solver') { t.phase = 1; t.dependsOn = []; }
-      else if (t.roleType === 'qa') {
-        t.phase = 2;
-        if (!t.dependsOn?.length) t.dependsOn = subtasks.filter(s => s.phase === 1).map(s => s.label);
-      } else if (t.roleType === 'docs') {
-        t.phase = 3;
-        const qa = subtasks.filter(s => s.phase === 2).map(s => s.label);
-        t.dependsOn = qa.length > 0 ? qa : subtasks.filter(s => s.phase === 1).map(s => s.label);
-      }
-    }
-    if (files.length > 0) TeamworkSharder.partitionFiles(subtasks, files);
-  }
-
-  private reconcileSemanticSubtasks(subtasks: DecomposedSubtask[], files: string[], objective: string): void {
-    if (!subtasks.some(t => t.roleType === 'solver') && files.some(f => !RoleClassifier.isUiFile(f) && !f.endsWith('.md') && !f.includes('docs/'))) {
-      subtasks.unshift({ roleType: 'solver', label: 'Core', title: `Implement core logic: ${objective}`, targetFiles: [], phase: 1, dependsOn: [] });
-    }
-    if (!subtasks.some(t => t.roleType === 'qa')) {
-      subtasks.push({ roleType: 'qa', label: 'Audit', title: `Audit, triage, and test: ${objective}`, targetFiles: [] });
-    }
-    TeamworkSharder.shardQaByFiles(subtasks, files, objective, true);
-    this.alignSubtaskPhases(subtasks, files);
-  }
-
   private resolveSubtasks(
     objective: string,
     files: string[],
@@ -181,10 +147,10 @@ export class TeamworkCoordinator {
     const isSemantic = Boolean(options?.semantic || options?.deliberate);
     if (isSemantic) {
       let subtasks = SemanticAIDecomposer.toDecomposedSubtasks(SemanticAIDecomposer.decompose(objective, files));
-      this.reconcileSemanticSubtasks(subtasks, files, objective);
+      reconcileSemanticSubtasks(subtasks, files, objective);
       const isScaling = Boolean(complexity.tier === 'COMPLEX' || complexity.tier === 'HYPER_SCALE' || options?.autoScale || (options?.maxConcurrency && options.maxConcurrency > 1));
       if (isScaling) {
-        subtasks = this.scaleSemanticSubtasks(subtasks, files, objective, options?.maxConcurrency ?? complexity.optimalAgentCount);
+        subtasks = scaleSemanticSubtasks(subtasks, files, objective, options?.maxConcurrency ?? complexity.optimalAgentCount);
       }
       return options?.selectedRoles?.length ? subtasks.filter(t => options.selectedRoles!.includes(t.roleType)) : subtasks;
     }
@@ -231,15 +197,7 @@ export class TeamworkCoordinator {
   }
 
   private buildTracks(subtasks: ReturnType<typeof TeamworkDecomposer.decompose>, isDet: boolean): TeamworkTrack[] {
-    const profiles = this.listProfiles();
-    const tracks: TeamworkTrack[] = [];
-    const upstreamFilesMap = new Map<string, string[]>();
-    for (const sub of subtasks) {
-      const track = TeamworkTrackBuilder.buildSubtaskTrack(sub, profiles, upstreamFilesMap, isDet, this.groundingEngine);
-      tracks.push(track);
-      upstreamFilesMap.set(sub.label, sub.targetFiles);
-    }
-    return tracks;
+    return buildCoordinatorTracks(subtasks, this.listProfiles(), isDet, this.groundingEngine);
   }
 
   public compactTeamwork(plan?: TeamworkPlan): string {
@@ -275,7 +233,7 @@ export class TeamworkCoordinator {
   public clearTeamwork(): { locksCleared: number; tasksCleared: number } {
     const locksCleared = this.clearLocks();
     const tasksCleared = clearStagedInboxHelper(this.repoRoot);
-    try { this.mesh.clearMesh(); } catch { /* safe */ }
+    try { this.mesh.clearMesh(); } catch (err: unknown) { debugLogIgnored('TeamworkCoordinator:clearMesh', err); }
     return { locksCleared, tasksCleared };
   }
 

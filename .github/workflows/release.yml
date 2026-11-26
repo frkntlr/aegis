@@ -29,6 +29,15 @@ jobs:
       - name: Build Monorepo
         run: npm run build
 
+      - name: Typecheck Monorepo
+        run: npm run typecheck
+
+      - name: Lint Monorepo
+        run: npm run lint
+
+      - name: Run Demir Kafes Structural Audit
+        run: node packages/cli/dist/bin/aegis.js cage:check --no-cache
+
       - name: Run Test Verification (Turbo Parallel & Cached)
         run: npm test
 

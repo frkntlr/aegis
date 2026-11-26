@@ -13,11 +13,17 @@ WORKDIR /workspace
 RUN mkdir -p /workspace /app /home/aegis-agent && \
     chown -R aegis-agent:aegis /workspace /app /home/aegis-agent
 
-# Copy compiled Aegis CLI standalone bundle
-COPY packages/cli/dist/bin/aegis.js /usr/local/bin/aegis
-RUN chmod +x /usr/local/bin/aegis
+# Stage Aegis CLI package and runtime dependencies (typescript)
+WORKDIR /opt/aegis
+COPY packages/cli/package.json /opt/aegis/package.json
+COPY packages/cli/dist /opt/aegis/dist
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund --no-package-lock && \
+    chmod +x /opt/aegis/dist/bin/aegis.js && \
+    ln -sf /opt/aegis/dist/bin/aegis.js /usr/local/bin/aegis && \
+    chown -R aegis-agent:aegis /opt/aegis
 
 # Switch to non-root user
+WORKDIR /workspace
 USER aegis-agent
 
 # Set environment

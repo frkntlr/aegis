@@ -127,8 +127,8 @@ aegis merge solver master
 
 ## 6. İlgili Belgeler
 
-- [`01-architecture-and-memory.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/01-architecture-and-memory.md) — 5-Katmanlı Kod Tabanı Hafızası.
-- [`03-universal-cli-reference.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/03-universal-cli-reference.md) — CLI komut kataloğu.
-- [`06-diagnostics-and-quality-gates.md`](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/06-diagnostics-and-quality-gates.md) — Kalite kapıları ve devre kesici.
-- [TEAMWORK.md](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/TEAMWORK.md) — Orijinal takım çalışması mimarisi.
-- [RFC-034: Google Antigravity Bidirectional Task Bridge](file:///C:/Users/Lenovo/AntigravityProfiles/client-a/.gemini/antigravity/scratch/aegis/docs/rfc/RFC-034-google-antigravity-bidirectional-orchestration-and-task-bridge.md)
+- [`01-architecture-and-memory.md`](./01-architecture-and-memory.md) — 5-Katmanlı Kod Tabanı Hafızası.
+- [`03-universal-cli-reference.md`](./03-universal-cli-reference.md) — CLI komut kataloğu.
+- [`06-diagnostics-and-quality-gates.md`](./06-diagnostics-and-quality-gates.md) — Kalite kapıları ve devre kesici.
+- [TEAMWORK.md](./TEAMWORK.md) — Orijinal takım çalışması mimarisi.
+- [RFC-034: Google Antigravity Bidirectional Task Bridge](./rfc/RFC-034-google-antigravity-bidirectional-orchestration-and-task-bridge.md)

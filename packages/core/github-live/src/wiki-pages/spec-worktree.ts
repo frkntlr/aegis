@@ -68,6 +68,6 @@ export const SPEC_WORKTREE_PAGE: WikiSuitePage = {
     '| `aegis task:claim <id> [agent]` (`task_claim`) | Görevi ajan için üstlenir ve dosya kilitlerini edinir. |',
     '| `aegis task:release <id> [status]` (`task_release`) | Görevi tamamlar ve kilitleri serbest bırakır. |',
     '| `aegis merge <agent>` | 4-aşamalı atomik merge pipeline çalıştırır. |',
-    '| `aegis branch:sync [agent\|--all]` | Worktree dallarını master ile stash-korumalı eşitler. |'
+    '| `aegis branch:sync [agent|--all]` | Worktree dallarını master ile stash-korumalı eşitler. |'
   ].join('\n')
 };

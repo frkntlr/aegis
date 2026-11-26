@@ -16,7 +16,7 @@ test('RFC sync reports actual page/count evidence and keeps source statuses with
     fs.writeFileSync(path.join(root, 'docs/rfc/RFC-099-proposal.md'), proposed);
     fs.writeFileSync(path.join(root, 'docs/rfc/RFC-001-unknown.md'), '# RFC-001: Undeclared');
     fs.writeFileSync(path.join(root, 'README.md'), 'RFC (99 Adet)\nMCP-77 Native Tools\nRFC-001 - RFC-099');
-    const setPage = t.mock.method(WikiMemoryManager.prototype, 'setPage', () => {});
+    const setPage = t.mock.method(WikiMemoryManager.prototype, 'setPage', () => undefined);
     const push = t.mock.method(WikiMemoryManager.prototype, 'pushAllToRemote', () => { throw new Error('Unexpected push'); });
     const result = await syncRfcToWikiAndReadme(99, 'Proposal', 'RFC-099-proposal.md', proposed);
     assert.equal(result.totalRfcs, 2);

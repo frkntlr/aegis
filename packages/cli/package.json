@@ -12,35 +12,41 @@
     "tw": "dist/bin/aegis.js",
     "aegis-tw": "dist/bin/aegis.js",
     "aegist-tw": "dist/bin/aegis.js",
-    "tr": "dist/bin/aegis.js",
     "aegis-tr": "dist/bin/aegis.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./bin/aegis.js": "./dist/bin/aegis.js"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc && node scripts/bundle.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"process.env.AEGIS_TEST='1';process.env.NODE_ENV='test';const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x));if(f.length)process.exit(cp.spawnSync(process.execPath,['--require',p.resolve('../../scripts/test-workspace.cjs'),'--test','--test-timeout=20000',...f],{stdio:'inherit',timeout:60000,env:process.env}).status??1)\""
+    "test": "node -e \"process.env.AEGIS_TEST='1';process.env.NODE_ENV='test';const fs=require('fs'),cp=require('child_process'),p=require('path');const f=fs.existsSync('dist')?fs.readdirSync('dist',{recursive:true}).map(String).filter(x=>x.endsWith('.test.js')).map(x=>p.join('dist',x)):[];if(!f.length){console.error('No test files found in dist');process.exit(1);}process.exit(cp.spawnSync(process.execPath,['--require',p.resolve('../../scripts/test-workspace.cjs'),'--test','--test-timeout=20000',...f],{stdio:'inherit',timeout:60000,env:process.env}).status??1)\""
   },
   "dependencies": {
-    "@aegis/shared": "*",
-    "@aegis/watchdog": "*",
-    "@aegis/orchestrator": "*",
-    "@aegis/iron-cage": "*",
-    "@aegis/ast-skeleton": "*",
-    "@aegis/github-live": "*",
-    "@aegis/trust-verifier": "*",
-    "@aegis/web-dashboard": "*",
-    "@aegis/telemetry-tester": "*",
-    "@aegis/godot-bridge": "*",
-    "@aegis/dialogue-engine": "*"
+    "typescript": "^5.7.2"
   },
   "devDependencies": {
+    "@aegis/ast-skeleton": "*",
+    "@aegis/dialogue-engine": "*",
+    "@aegis/github-live": "*",
+    "@aegis/godot-bridge": "*",
+    "@aegis/iron-cage": "*",
+    "@aegis/orchestrator": "*",
+    "@aegis/shared": "*",
+    "@aegis/telemetry-tester": "*",
+    "@aegis/trust-verifier": "*",
+    "@aegis/watchdog": "*",
+    "@aegis/web-dashboard": "*",
     "@types/node": "^22.10.1",
-    "esbuild": "^0.28.2",
-    "typescript": "^5.7.2"
+    "esbuild": "^0.28.2"
   }
 }

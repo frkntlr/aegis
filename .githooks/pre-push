@@ -16,13 +16,25 @@ if command -v npm.cmd >/dev/null 2>&1; then
   NPM_CMD="npm.cmd"
 fi
 
-echo "🔍 [1/2] Running Deterministic Demir Kafes Audit..."
+echo "🔍 [1/4] Running TypeScript Typecheck..."
+$NPM_CMD run typecheck || {
+  echo "❌ [Aegis] Pre-push rejected: TypeScript typecheck failed."
+  exit 1
+}
+
+echo "🧹 [2/4] Running Biome Lint..."
+$NPM_CMD run lint || {
+  echo "❌ [Aegis] Pre-push rejected: Biome lint failed."
+  exit 1
+}
+
+echo "🔍 [3/4] Running Deterministic Demir Kafes Audit..."
 $NPM_CMD run aegis -- cage:check || {
   echo "❌ [Aegis] Pre-push rejected: Iron Cage violations detected."
   exit 1
 }
 
-echo "🧪 [2/2] Running Monorepo Unit Test Suite (Turbo Parallel & Cached)..."
+echo "🧪 [4/4] Running Monorepo Unit Test Suite (Turbo Parallel & Cached)..."
 $NPM_CMD test || {
   echo "❌ [Aegis] Pre-push rejected: One or more unit tests failed."
   exit 1

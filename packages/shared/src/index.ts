@@ -10,3 +10,5 @@ export * from './active-head-resolver.js';
 export * from './diff-budgeting.js';
 export * from './worktree-mutex-shield.js';
 export * from './ide.js';
+export * from './json-safe.js';
+export * from './runtime-helpers.js';

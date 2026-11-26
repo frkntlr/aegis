@@ -11,7 +11,7 @@ import {
 } from '@aegis/iron-cage';
 import { RelationalGraph } from '@aegis/ast-skeleton';
 import { LoopBreaker } from '@aegis/watchdog';
-import { resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
+import { debugLogIgnored, resolveSafeCacheDir, type CageViolation } from '@aegis/shared';
 import { handleDebugCommand } from './debug-command.js';
 import { showBanner } from './banner.js';
 import { collectSourceFiles } from './dev-helpers.js';
@@ -71,7 +71,9 @@ function resolveRelationalGraph(): RelationalGraph | undefined {
     try {
       const graph = new RelationalGraph();
       if (graph.loadCache(graphCachePath)) return graph;
-    } catch { /* ignore graph cache errors */ }
+    } catch (err: unknown) {
+      debugLogIgnored('triage-command:graphCache', err);
+    }
   }
   return undefined;
 }
@@ -105,7 +107,9 @@ function scanFiles(files: string[], noCache = false): ScanResult {
       if (radar) {
         radar.recordFile(rel, stat.mtimeMs, stat.size, content, res.violations);
       }
-    } catch { /* ignore unreadable file */ }
+    } catch (err: unknown) {
+      debugLogIgnored('triage-command:scanFile', err);
+    }
   }
 
   if (radar) radar.flush();

@@ -1,5 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readJsonSafe } from './json-safe.js';
+import { debugLogIgnored } from './runtime-helpers.js';
 
 export interface ActiveLockInfo {
   filePath: string;
@@ -38,8 +40,7 @@ export class WorktreeMutexShield {
     if (!fs.existsSync(lockFile)) return null;
 
     try {
-      const raw = fs.readFileSync(lockFile, 'utf8');
-      const data = JSON.parse(raw);
+      const data = readJsonSafe<unknown>(lockFile);
       if (!data || typeof data !== 'object') return null;
 
       const normTarget = WorktreeMutexShield.normalizeLockPath(filePath);
@@ -55,7 +56,8 @@ export class WorktreeMutexShield {
         }
       }
       return null;
-    } catch {
+    } catch (err: unknown) {
+      debugLogIgnored('worktree-mutex-shield', err);
       return null;
     }
   }
