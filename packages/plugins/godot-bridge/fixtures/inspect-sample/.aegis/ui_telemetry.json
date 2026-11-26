@@ -1,0 +1,33 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "aspectRatio": "9:16"
+  },
+  "nodes": [
+    {
+      "id": "/root/MainMenu/HeaderLabel",
+      "name": "HeaderLabel",
+      "type": "Label",
+      "visible": true,
+      "rect": { "x": 20, "y": 24, "width": 350, "height": 48 },
+      "text": "AEGIS"
+    },
+    {
+      "id": "/root/MainMenu/StartButton",
+      "name": "StartButton",
+      "type": "Button",
+      "visible": true,
+      "rect": { "x": 20, "y": 96, "width": 350, "height": 56 },
+      "text": "Start"
+    },
+    {
+      "id": "/root/MainMenu/QuitButton",
+      "name": "QuitButton",
+      "type": "Button",
+      "visible": true,
+      "rect": { "x": 20, "y": 176, "width": 350, "height": 56 },
+      "text": "Quit"
+    }
+  ]
+}

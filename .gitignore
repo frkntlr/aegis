@@ -27,6 +27,8 @@ Thumbs.db
 experimental/
 experimental/*
 .aegis/
+!packages/plugins/godot-bridge/fixtures/inspect-sample/.aegis/
+!packages/plugins/godot-bridge/fixtures/inspect-sample/.aegis/ui_telemetry.json
 
 # Coverage & Testing
 coverage/
