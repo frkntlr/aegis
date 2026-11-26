@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import type { RelationalGraph } from './relational-graph.js';
+import type { RelationalEdge, RelationalGraph, RelationalNode } from './relational-graph.js';
 import type { CompositeGraphView } from './delta-overlay-graph.js';
 import type { GraphQueryEngine, TraceResult } from './graph-query-engine.js';
 import { LanguageBarrierGate } from './language-barrier-gate.js';
@@ -10,6 +10,72 @@ export interface MemoryResolverAdapters {
   docProvider?: (library: string, topic: string) => string | null;
   logCompressor?: (raw: string) => { text: string; tokenSavingsPercent: number };
   constitutionProvider?: (filePath: string) => string[];
+}
+
+function formatExternalContract(ext: RelationalNode): { lib: string; contract: string } {
+  const lib = ext.metadata?.library || 'external';
+  const sig = ext.metadata?.signature ? `: ${ext.metadata.signature}` : '';
+  const dep = ext.metadata?.deprecation ? ` [⚠️ DEPRECATED: ${ext.metadata.deprecation}]` : '';
+  return { lib, contract: `[${lib}] ${ext.name}${sig}${dep}` };
+}
+
+function appendExternalDoc(
+  ext: RelationalNode,
+  lib: string,
+  adapters: MemoryResolverAdapters,
+  docs: string[]
+): void {
+  if (ext.metadata?.doc) {
+    docs.push(ext.metadata.doc);
+    return;
+  }
+  if (!adapters.docProvider) return;
+  const doc = adapters.docProvider(lib, ext.name);
+  if (doc && !docs.includes(doc)) {
+    docs.push(doc);
+  }
+}
+
+function collectNodeContracts(
+  extNodes: RelationalNode[],
+  seenExt: Set<string>,
+  adapters: MemoryResolverAdapters,
+  out: { externalContracts: string[]; docs: string[] }
+): void {
+  for (const ext of extNodes) {
+    if (seenExt.has(ext.id)) continue;
+    seenExt.add(ext.id);
+    const { lib, contract } = formatExternalContract(ext);
+    out.externalContracts.push(contract);
+    appendExternalDoc(ext, lib, adapters, out.docs);
+  }
+}
+
+function appendUniqueEdges(
+  target: RelationalEdge[],
+  incoming: RelationalEdge[],
+  seenEdges: Set<string>
+): void {
+  for (const edge of incoming) {
+    const key = `${edge.from}->${edge.to}:${edge.type}`;
+    if (seenEdges.has(key)) continue;
+    seenEdges.add(key);
+    target.push(edge);
+  }
+}
+
+function mergeMethodTrace(
+  traceResult: TraceResult,
+  methodTrace: TraceResult,
+  seenEdges: Set<string>
+): void {
+  appendUniqueEdges(traceResult.upstreamEdges, methodTrace.upstreamEdges, seenEdges);
+  appendUniqueEdges(traceResult.downstreamEdges, methodTrace.downstreamEdges, seenEdges);
+  for (const file of methodTrace.blastRadiusFiles) {
+    if (!traceResult.blastRadiusFiles.includes(file)) {
+      traceResult.blastRadiusFiles.push(file);
+    }
+  }
 }
 
 export class MemoryAdapterResolver {
@@ -46,32 +112,13 @@ export class MemoryAdapterResolver {
     candidateIds: string[],
     adapters: MemoryResolverAdapters
   ): { externalContracts: string[]; docs: string[] } {
-    const contracts: string[] = [];
-    const docs: string[] = [];
+    const out = { externalContracts: [] as string[], docs: [] as string[] };
     const seenExt = new Set<string>();
 
     for (const cid of candidateIds) {
-      const extNodes = composite.getExternalCallees(cid);
-      for (const ext of extNodes) {
-        if (seenExt.has(ext.id)) continue;
-        seenExt.add(ext.id);
-
-        const lib = ext.metadata?.library || 'external';
-        const sig = ext.metadata?.signature ? `: ${ext.metadata.signature}` : '';
-        const dep = ext.metadata?.deprecation ? ` [⚠️ DEPRECATED: ${ext.metadata.deprecation}]` : '';
-        contracts.push(`[${lib}] ${ext.name}${sig}${dep}`);
-
-        if (ext.metadata?.doc) {
-          docs.push(ext.metadata.doc);
-        } else if (adapters.docProvider) {
-          const doc = adapters.docProvider(lib, ext.name);
-          if (doc && !docs.includes(doc)) {
-            docs.push(doc);
-          }
-        }
-      }
+      collectNodeContracts(composite.getExternalCallees(cid), seenExt, adapters, out);
     }
-    return { externalContracts: contracts, docs };
+    return out;
   }
 
   public static resolveConstitution(adapters: MemoryResolverAdapters, filePath?: string): string[] {
@@ -111,20 +158,8 @@ export class MemoryAdapterResolver {
     const seenEdges = new Set(traceResult.upstreamEdges.map(e => `${e.from}->${e.to}:${e.type}`));
 
     for (const node of graph.getAllNodes()) {
-      if (node.name.startsWith(methodPrefix) || node.id.includes(`::${methodPrefix}`)) {
-        const methodTrace = queryEngine.trace(node.id, 2);
-        for (const e of methodTrace.upstreamEdges) {
-          const k = `${e.from}->${e.to}:${e.type}`;
-          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.upstreamEdges.push(e); }
-        }
-        for (const e of methodTrace.downstreamEdges) {
-          const k = `${e.from}->${e.to}:${e.type}`;
-          if (!seenEdges.has(k)) { seenEdges.add(k); traceResult.downstreamEdges.push(e); }
-        }
-        for (const f of methodTrace.blastRadiusFiles) {
-          if (!traceResult.blastRadiusFiles.includes(f)) traceResult.blastRadiusFiles.push(f);
-        }
-      }
+      if (!node.name.startsWith(methodPrefix) && !node.id.includes(`::${methodPrefix}`)) continue;
+      mergeMethodTrace(traceResult, queryEngine.trace(node.id, 2), seenEdges);
     }
   }
 

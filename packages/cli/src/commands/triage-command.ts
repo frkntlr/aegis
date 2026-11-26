@@ -114,7 +114,13 @@ function scanFiles(files: string[], noCache = false): ScanResult {
       const res = validator.validateFileContent(rel, content);
       violations.push(...res.violations);
       if (radar) {
-        radar.recordFile(rel, stat.mtimeMs, stat.size, content, res.violations);
+        radar.recordFile({
+          filePath: rel,
+          mtimeMs: stat.mtimeMs,
+          size: stat.size,
+          content,
+          violations: res.violations
+        });
       }
     } catch (err: unknown) {
       debugLogIgnored('triage-command:scanFile', err);

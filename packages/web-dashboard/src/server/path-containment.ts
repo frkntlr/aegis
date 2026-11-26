@@ -33,31 +33,41 @@ function tryReadDanglingLink(cur: string): string | null {
   }
 }
 
+type RealpathStep =
+  | { done: true; value: string | null }
+  | { done: false; next: string; hops: number };
+
+function resolveExistingRealpath(cur: string, tail: string[]): string | null {
+  try {
+    const real = fs.realpathSync(cur);
+    return tail.length > 0 ? path.join(real, ...tail.reverse()) : real;
+  } catch (err: unknown) {
+    debugLogIgnored('path-containment:resolveNearestRealpath', err);
+    return null;
+  }
+}
+
+function stepNearestRealpath(cur: string, tail: string[], hops: number, targetPath: string): RealpathStep {
+  if (fs.existsSync(cur)) return { done: true, value: resolveExistingRealpath(cur, tail) };
+  const linkTarget = tryReadDanglingLink(cur);
+  if (linkTarget) {
+    return hops + 1 > 32 ? { done: true, value: null } : { done: false, next: linkTarget, hops: hops + 1 };
+  }
+  const parent = path.dirname(cur);
+  if (parent === cur) return { done: true, value: hops > 0 ? null : targetPath };
+  tail.push(path.basename(cur));
+  return { done: false, next: parent, hops };
+}
+
 export function resolveNearestRealpath(targetPath: string): string | null {
   let cur = targetPath;
   const tail: string[] = [];
   let hops = 0;
   while (true) {
-    if (fs.existsSync(cur)) {
-      try {
-        const real = fs.realpathSync(cur);
-        return tail.length > 0 ? path.join(real, ...tail.reverse()) : real;
-      } catch (err: unknown) {
-        debugLogIgnored('path-containment:resolveNearestRealpath', err);
-        return null;
-      }
-    }
-    const linkTarget = tryReadDanglingLink(cur);
-    if (linkTarget) {
-      hops++;
-      if (hops > 32) return null;
-      cur = linkTarget;
-      continue;
-    }
-    const parent = path.dirname(cur);
-    if (parent === cur) return hops > 0 ? null : targetPath;
-    tail.push(path.basename(cur));
-    cur = parent;
+    const step = stepNearestRealpath(cur, tail, hops, targetPath);
+    if (step.done) return step.value;
+    cur = step.next;
+    hops = step.hops;
   }
 }
 

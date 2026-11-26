@@ -43,12 +43,26 @@ test('PreEmptiveDiffBudgeting: formatWarningForSlice formats comments for TS and
 });
 
 test('PreEmptiveDiffBudgeting: assessProposedDiff validates diff headroom against limits', () => {
-  const passCheck = PreEmptiveDiffBudgeting.assessProposedDiff(280, 15, 5, 20, 10, 2);
+  const passCheck = PreEmptiveDiffBudgeting.assessProposedDiff({
+    fileLines: 280,
+    addedLines: 15,
+    removedLines: 5,
+    funcLines: 20,
+    funcAddedLines: 10,
+    funcRemovedLines: 2
+  });
   assert.strictEqual(passCheck.allowed, true);
   assert.strictEqual(passCheck.newFileLines, 290);
   assert.strictEqual(passCheck.newFuncLines, 28);
 
-  const failCheck = PreEmptiveDiffBudgeting.assessProposedDiff(290, 20, 0, 35, 10, 0);
+  const failCheck = PreEmptiveDiffBudgeting.assessProposedDiff({
+    fileLines: 290,
+    addedLines: 20,
+    removedLines: 0,
+    funcLines: 35,
+    funcAddedLines: 10,
+    funcRemovedLines: 0
+  });
   assert.strictEqual(failCheck.allowed, false);
   assert.strictEqual(failCheck.fileAllowed, false);
   assert.strictEqual(failCheck.funcAllowed, false);

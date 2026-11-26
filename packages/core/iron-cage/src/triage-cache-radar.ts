@@ -46,21 +46,6 @@ export interface RecordFileInput {
   quotaAlert?: QuotaAlert;
 }
 
-export type RecordFileLegacyArgs =
-  | []
-  | [mtimeMs: number, size: number, content: string, violations: CageViolation[], quotaAlert?: QuotaAlert];
-
-function resolveRecordFileInput(
-  first: string | RecordFileInput,
-  legacyArgs: RecordFileLegacyArgs
-): RecordFileInput {
-  if (typeof first !== 'string') {
-    return first;
-  }
-  const [mtimeMs = 0, size = 0, content = '', violations = [], quotaAlert] = legacyArgs;
-  return { filePath: first, mtimeMs, size, content, violations, quotaAlert };
-}
-
 export function fnv1a(str: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -152,8 +137,7 @@ export class TriageCacheRadar {
     return { hit: false };
   }
 
-  public recordFile(first: string | RecordFileInput, ...legacyArgs: RecordFileLegacyArgs): void {
-    const input = resolveRecordFileInput(first, legacyArgs);
+  public recordFile(input: RecordFileInput): void {
     const norm = normalizeCachePath(input.filePath);
     this.cacheData.files[norm] = {
       mtimeMs: input.mtimeMs,

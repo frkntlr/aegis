@@ -40,6 +40,32 @@ function readPackageVersion(pkgDir: string): string {
   }
 }
 
+function updateBraceDepth(line: string, state: { depth: number; foundOpen: boolean }): void {
+  for (const ch of line) {
+    if (ch === '{') {
+      state.depth++;
+      state.foundOpen = true;
+    } else if (ch === '}') {
+      state.depth--;
+    }
+  }
+}
+
+function collectSymbolSlice(lines: string[], startLine: number): string[] {
+  const state = { depth: 0, foundOpen: false };
+  const slicedLines: string[] = [];
+  const endLimit = Math.min(lines.length, startLine + 60);
+
+  for (let i = startLine; i < endLimit; i++) {
+    const line = lines[i];
+    slicedLines.push(line);
+    updateBraceDepth(line, state);
+    if (state.foundOpen && state.depth <= 0) break;
+    if (!state.foundOpen && line.trim().endsWith(';')) break;
+  }
+  return slicedLines;
+}
+
 export class JitDocSynthesizer {
   public static resolvePackageDir(pkgName: string, startDir = process.cwd()): string | null {
     let cur = path.resolve(startDir);
@@ -77,34 +103,12 @@ export class JitDocSynthesizer {
 
   public static sliceSymbolByteRange(filePath: string, symbol: string): { slice: string; line: number } | null {
     if (!fs.existsSync(filePath)) return null;
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split('\n');
+    const lines = fs.readFileSync(filePath, 'utf8').split('\n');
     const pat = new RegExp(`(?:export\\s+(?:declare\\s+)?)?(?:const|let|var|class|interface|type|function|namespace)\\s+${symbol}\\b`);
-
-    let startLine = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (pat.test(lines[i])) {
-        startLine = i;
-        break;
-      }
-    }
+    const startLine = lines.findIndex(line => pat.test(line));
     if (startLine === -1) return null;
 
-    let braceDepth = 0;
-    let foundOpen = false;
-    const slicedLines: string[] = [];
-
-    for (let i = startLine; i < lines.length && i < startLine + 60; i++) {
-      const line = lines[i];
-      slicedLines.push(line);
-      for (const ch of line) {
-        if (ch === '{') { braceDepth++; foundOpen = true; }
-        else if (ch === '}') { braceDepth--; }
-      }
-      if (foundOpen && braceDepth <= 0) break;
-      if (!foundOpen && line.trim().endsWith(';')) break;
-    }
-
+    const slicedLines = collectSymbolSlice(lines, startLine);
     return { slice: slicedLines.join('\n'), line: startLine + 1 };
   }
 
@@ -136,13 +140,8 @@ export class JitDocSynthesizer {
     };
   }
 
-  public static updateManifest(
-    ...args: [UpdateManifestOptions] | [string, string, string, string, string, number]
-  ): void {
-    const opts: UpdateManifestOptions = typeof args[0] === 'string'
-      ? { cacheDir: args[0], pkgName: args[1] as string, version: args[2] as string, symbol: args[3] as string, file: args[4] as string, line: args[5] as number }
-      : args[0];
-    const { cacheDir, pkgName, version, symbol, file, line } = opts;
+  public static updateManifest(options: UpdateManifestOptions): void {
+    const { cacheDir, pkgName, version, symbol, file, line } = options;
     const manifestPath = path.join(cacheDir, 'manifest.json');
     let manifest: Record<string, ManifestEntry> = {};
     if (fs.existsSync(manifestPath)) {

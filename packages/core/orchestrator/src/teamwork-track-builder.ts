@@ -118,7 +118,7 @@ export class TeamworkTrackBuilder {
     return `${roleType}-${label.toLowerCase()}-${suffix}`;
   }
 
-  private static buildTrackFromInput(input: BuildTrackInput): TeamworkTrack {
+  public static buildTrack(input: BuildTrackInput): TeamworkTrack {
     const {
       roleType, profile, desc, files, label,
       deterministic = false, dependsOn = [], phase = 1,
@@ -154,44 +154,5 @@ export class TeamworkTrackBuilder {
         Model: profile.defaultModel ?? 'inherit'
       }
     };
-  }
-
-  public static buildTrack(input: BuildTrackInput): TeamworkTrack;
-  /** @deprecated Pass a {@link BuildTrackInput} options object instead. */
-  public static buildTrack(
-    roleType: RoleType,
-    profile: SubagentProfile,
-    desc: string,
-    files: string[],
-    ...legacyArgs: [
-      label: string,
-      deterministic?: boolean,
-      dependsOn?: string[],
-      phase?: number,
-      groundingContext?: string,
-      upstreamContracts?: string
-    ]
-  ): TeamworkTrack;
-  public static buildTrack(
-    roleOrInput: RoleType | BuildTrackInput,
-    ...rest: [
-      SubagentProfile?, string?, string[]?, string?, boolean?, string[]?, number?, string?, string?
-    ]
-  ): TeamworkTrack {
-    const input: BuildTrackInput = typeof roleOrInput === 'object'
-      ? roleOrInput
-      : {
-          roleType: roleOrInput,
-          profile: rest[0]!,
-          desc: rest[1]!,
-          files: rest[2]!,
-          label: rest[3]!,
-          deterministic: rest[4],
-          dependsOn: rest[5],
-          phase: rest[6],
-          groundingContext: rest[7],
-          upstreamContracts: rest[8]
-        };
-    return this.buildTrackFromInput(input);
   }
 }

@@ -40,6 +40,28 @@ export const ROLE_SPECIALISTS: Record<RoleType, MicroSpecialistDef[]> = {
   ]
 };
 
+type FilePredicate = (file: string) => boolean;
+
+const SPECIALIST_FILE_PREDICATES: Partial<Record<RoleType, Record<string, FilePredicate>>> = {
+  qa: {
+    Playtest: f => f.includes('test') || f.endsWith('.gd'),
+    Layout: f => f.endsWith('.tscn') || f.endsWith('.tres'),
+    Cage: f => f.endsWith('.ts') || f.endsWith('.gd'),
+    default: f => f.includes('test')
+  },
+  ui: {
+    Scaffold: f => f.endsWith('.tscn'),
+    Theme: f => f.endsWith('.tres'),
+    Controller: f => f.endsWith('.gd'),
+    default: f => f.endsWith('.tscn') || f.endsWith('.tres')
+  },
+  docs: {
+    Wiki: f => f.includes('wiki') || f.endsWith('.md'),
+    RFC: f => f.includes('rfc'),
+    default: f => f.endsWith('.md')
+  }
+};
+
 export class TeamworkHierarchicalTree {
   public static detectSelectedRoles(objective: string, explicitRole?: string): RoleType[] | null {
     if (explicitRole) {
@@ -142,24 +164,10 @@ export class TeamworkHierarchicalTree {
 
   private static filterFilesForSpecialist(role: RoleType, label: string, files: string[], assigned: Set<string>): string[] {
     if (files.length === 0) return [];
-    const pool = files.filter(f => !assigned.has(f));
-    if (role === 'qa') {
-      if (label === 'Playtest') return pool.filter(f => f.includes('test') || f.endsWith('.gd'));
-      if (label === 'Layout') return pool.filter(f => f.endsWith('.tscn') || f.endsWith('.tres'));
-      if (label === 'Cage') return pool.filter(f => f.endsWith('.ts') || f.endsWith('.gd'));
-      return pool.filter(f => f.includes('test'));
-    }
-    if (role === 'ui') {
-      if (label === 'Scaffold') return pool.filter(f => f.endsWith('.tscn'));
-      if (label === 'Theme') return pool.filter(f => f.endsWith('.tres'));
-      if (label === 'Controller') return pool.filter(f => f.endsWith('.gd'));
-      return pool.filter(f => f.endsWith('.tscn') || f.endsWith('.tres'));
-    }
-    if (role === 'docs') {
-      if (label === 'Wiki') return pool.filter(f => f.includes('wiki') || f.endsWith('.md'));
-      if (label === 'RFC') return pool.filter(f => f.includes('rfc'));
-      return pool.filter(f => f.endsWith('.md'));
-    }
-    return [];
+    const rolePredicates = SPECIALIST_FILE_PREDICATES[role];
+    if (!rolePredicates) return [];
+    const predicate = rolePredicates[label] ?? rolePredicates.default;
+    if (!predicate) return [];
+    return files.filter(f => !assigned.has(f) && predicate(f));
   }
 }

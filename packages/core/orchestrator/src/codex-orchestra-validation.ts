@@ -69,20 +69,23 @@ export function resolvePlanDependencies(tracks: TeamworkTrack[], tasks: Orchestr
   validateGraph(tasks);
 }
 
-export function validateGraph(tasks: OrchestraTask[]): void {
-  const table = new Map(tasks.map(t => [t.id, t]));
-  if (table.size !== tasks.length) throw new Error('Duplicate task identifier');
-  const remaining = new Map<string, number>(), consumers = new Map<string, string[]>();
-  for (const task of tasks) {
-    const prerequisites = [...new Set([...task.dependsOn, ...task.children])];
-    remaining.set(task.id, prerequisites.length);
-    for (const id of prerequisites) {
-      const dependency = table.get(id);
-      if (!dependency) throw new Error(`Unknown task dependency: ${id}`);
-      if (dependency.phase > task.phase) throw new Error('Dependencies cannot point to later phases');
-      consumers.set(id, [...(consumers.get(id) ?? []), task.id]);
-    }
+function registerTaskEdges(
+  task: OrchestraTask,
+  table: Map<string, OrchestraTask>,
+  remaining: Map<string, number>,
+  consumers: Map<string, string[]>
+): void {
+  const prerequisites = [...new Set([...task.dependsOn, ...task.children])];
+  remaining.set(task.id, prerequisites.length);
+  for (const id of prerequisites) {
+    const dependency = table.get(id);
+    if (!dependency) throw new Error(`Unknown task dependency: ${id}`);
+    if (dependency.phase > task.phase) throw new Error('Dependencies cannot point to later phases');
+    consumers.set(id, [...(consumers.get(id) ?? []), task.id]);
   }
+}
+
+function countAcyclicVisits(remaining: Map<string, number>, consumers: Map<string, string[]>): number {
   const ready = [...remaining].filter(([, count]) => count === 0).map(([id]) => id);
   let visited = 0;
   for (let index = 0; index < ready.length; index++) {
@@ -93,7 +96,20 @@ export function validateGraph(tasks: OrchestraTask[]): void {
       if (count === 0) ready.push(id);
     }
   }
-  if (visited !== tasks.length) throw new Error('Cyclic task dependencies');
+  return visited;
+}
+
+export function validateGraph(tasks: OrchestraTask[]): void {
+  const table = new Map(tasks.map(t => [t.id, t]));
+  if (table.size !== tasks.length) throw new Error('Duplicate task identifier');
+  const remaining = new Map<string, number>();
+  const consumers = new Map<string, string[]>();
+  for (const task of tasks) {
+    registerTaskEdges(task, table, remaining, consumers);
+  }
+  if (countAcyclicVisits(remaining, consumers) !== tasks.length) {
+    throw new Error('Cyclic task dependencies');
+  }
 }
 
 export function validateStoredRun(value: unknown, id: string, root: string): asserts value is OrchestraRun {

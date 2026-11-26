@@ -12,18 +12,14 @@ import type { FeedbackLoopIterationResult, ReflectionLoopOptions } from './teamw
 import type { ExecutionWave, TeamworkPlan, TeamworkTrack } from './teamwork-types.js';
 import {
   TeamworkCoordinatorEngines,
-  type LegacyCoordinatorArgs,
   type TeamworkCoordinatorOptions
 } from './teamwork-coordinator-engines.js';
 
 export class TeamworkCoordinatorFacade extends TeamworkCoordinatorEngines {
   private cachedProfiles?: SubagentProfile[];
 
-  constructor(
-    repoRootOrOptions?: string | TeamworkCoordinatorOptions,
-    ...legacyArgs: LegacyCoordinatorArgs
-  ) {
-    super(repoRootOrOptions, ...legacyArgs);
+  constructor(repoRootOrOptions?: string | TeamworkCoordinatorOptions) {
+    super(repoRootOrOptions);
   }
 
   public computeWaves(tracks?: TeamworkTrack[]): ExecutionWave[] { return computeExecutionWaves(tracks ?? []); }

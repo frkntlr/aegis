@@ -85,35 +85,40 @@ function formatTaskDescription(agentName: string, issue: GitHubIssue): string {
   return lines.join('\n');
 }
 
+function queryFileMemory(memEngine: CodebaseMemoryEngine, filePath: string, worktreeId: string) {
+  const normRes = memEngine.queryMemory(filePath.replace(/\\/g, '/'), { worktreeId });
+  if (normRes.found) return normRes;
+  const base = path.basename(filePath, path.extname(filePath));
+  const baseRes = memEngine.queryMemory(base, { worktreeId });
+  if (baseRes.found) return baseRes;
+  const pascal = base.split(/[-_]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+  return memEngine.queryMemory(pascal, { worktreeId });
+}
+
+function formatMemoryEntry(res: ReturnType<CodebaseMemoryEngine['queryMemory']>, filePath: string): string[] {
+  const lines = [
+    `• **Symbol:** ${res.symbol} (${res.filePath || filePath})`,
+    `  - **Upstream Callers:** ${res.callers.length > 0 ? res.callers.join(', ') : 'None'}`,
+    `  - **Downstream Callees:** ${res.callees.length > 0 ? res.callees.join(', ') : 'None'}`,
+    `  - **Blast Radius:** ${res.blastRadius.length} affected file(s)`
+  ];
+  if (res.connectedSignals.length > 0) lines.push(`  - **Signals:** ${res.connectedSignals.join(', ')}`);
+  if (res.connectedScenes.length > 0) lines.push(`  - **Scenes:** ${res.connectedScenes.join(', ')}`);
+  return lines;
+}
+
 export function extractMemoryContext(targetFiles: string[], worktreeId = 'default', engine?: CodebaseMemoryEngine): string {
   const isTest = process.env.NODE_ENV === 'test' || process.env.AEGIS_TEST === '1';
   const memEngine = engine || new CodebaseMemoryEngine({ persistToDisk: !isTest });
   const lines: string[] = ['### 🧠 Codebase Memory & Relational Impact'];
   let found = false;
   for (const f of targetFiles) {
-    const norm = f.replace(/\\/g, '/');
-    let res = memEngine.queryMemory(norm, { worktreeId });
-    if (!res.found) {
-      const base = path.basename(f, path.extname(f));
-      res = memEngine.queryMemory(base, { worktreeId });
-      if (!res.found) {
-        const pascal = base.split(/[-_]/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
-        res = memEngine.queryMemory(pascal, { worktreeId });
-      }
-    }
-    if (res.found) {
-      found = true;
-      lines.push(`• **Symbol:** ${res.symbol} (${res.filePath || f})`);
-      lines.push(`  - **Upstream Callers:** ${res.callers.length > 0 ? res.callers.join(', ') : 'None'}`);
-      lines.push(`  - **Downstream Callees:** ${res.callees.length > 0 ? res.callees.join(', ') : 'None'}`);
-      lines.push(`  - **Blast Radius:** ${res.blastRadius.length} affected file(s)`);
-      if (res.connectedSignals.length > 0) lines.push(`  - **Signals:** ${res.connectedSignals.join(', ')}`);
-      if (res.connectedScenes.length > 0) lines.push(`  - **Scenes:** ${res.connectedScenes.join(', ')}`);
-    }
+    const res = queryFileMemory(memEngine, f, worktreeId);
+    if (!res.found) continue;
+    found = true;
+    lines.push(...formatMemoryEntry(res, f));
   }
-  if (!found) {
-    lines.push('• No high-risk relational dependencies detected.');
-  }
+  if (!found) lines.push('• No high-risk relational dependencies detected.');
   return lines.join('\n');
 }
 

@@ -28,6 +28,7 @@ export interface ArchitectureHealthSummary {
   runtimeCycleCount: number;
   typeOnlyCycleCount: number;
   complexityViolations: number;
+  cognitiveViolations: number;
   paramViolations: number;
   godClassViolations: number;
   fanOutViolations: number;
@@ -57,6 +58,7 @@ interface AuditAccumulator {
 
 const STRICT_DEFAULTS: Required<AntiSpaghettiOptions> = {
   maxCyclomaticComplexity: 15,
+  maxCognitiveComplexity: 18,
   maxParams: 5,
   maxClassMethods: 12,
   maxFileImports: 10
@@ -67,6 +69,7 @@ function computeHealthScore(summary: Omit<ArchitectureHealthSummary, 'healthScor
   const scale = Math.max(1, summary.scannedFiles / 20);
   const rawStructural =
     summary.complexityViolations * 5 +
+    summary.cognitiveViolations * 4 +
     summary.godClassViolations * 5 +
     summary.fanOutViolations * 4 +
     summary.paramViolations * 3 +
@@ -91,7 +94,7 @@ function buildPrescriptions(
   });
   for (const v of violations) {
     const target = v.line ? `${v.filePath}:${v.line}` : v.filePath;
-    if (v.rule === 'CYCLOMATIC_COMPLEXITY') {
+    if (v.rule === 'CYCLOMATIC_COMPLEXITY' || v.rule === 'ARCH_003_COGNITIVE_COMPLEXITY') {
       rx.push({ pattern: 'EXTRACT_PREDICATE_TABLE', target, summary: v.message });
     } else if (v.rule === 'TS_004_MAX_PARAMS') {
       rx.push({ pattern: 'OPTIONS_OBJECT_REFACTOR', target, summary: v.message });
@@ -153,6 +156,7 @@ export class ArchitectureHealthAuditor {
       runtimeCycleCount: runtimeCycles.length,
       typeOnlyCycleCount: typeOnlyCycles.length,
       complexityViolations: acc.violations.filter((v) => v.rule === 'CYCLOMATIC_COMPLEXITY').length,
+      cognitiveViolations: acc.violations.filter((v) => v.rule === 'ARCH_003_COGNITIVE_COMPLEXITY').length,
       paramViolations: acc.violations.filter((v) => v.rule === 'TS_004_MAX_PARAMS').length,
       godClassViolations: acc.violations.filter((v) => v.rule === 'TS_005_GOD_CLASS').length,
       fanOutViolations: acc.violations.filter((v) => v.rule === 'ARCH_001_HIGH_FAN_OUT').length,
@@ -180,7 +184,7 @@ export function formatArchitectureHealthReport(report: ArchitectureHealthReport)
     `Architecture Health Report (${report.targetDir})`,
     `Health Score: ${report.healthScore}/100 | Files Scanned: ${s.scannedFiles}`,
     `Runtime Cycles: ${s.runtimeCycleCount} | Type-Only Cycles: ${s.typeOnlyCycleCount}`,
-    `Violations -> Complexity: ${s.complexityViolations}, Params: ${s.paramViolations}, God Class: ${s.godClassViolations}, Fan-Out: ${s.fanOutViolations}`,
+    `Violations -> Complexity: ${s.complexityViolations}, Cognitive: ${s.cognitiveViolations}, Params: ${s.paramViolations}, God Class: ${s.godClassViolations}, Fan-Out: ${s.fanOutViolations}`,
     `Budget Pressure (>=250 lines): ${s.budgetPressureFiles}`
   ];
   if (report.prescriptions.length > 0) {

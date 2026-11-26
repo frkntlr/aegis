@@ -12,12 +12,12 @@ import {
 } from './teamwork-staging.js';
 import type { WaveStatus } from './teamwork-mesh.js';
 import type { PlanTeamworkOptions, TeamworkPlan, TeamworkStatusReport } from './teamwork-types.js';
-import type { LegacyCoordinatorArgs, TeamworkCoordinatorOptions } from './teamwork-coordinator-engines.js';
+import type { TeamworkCoordinatorOptions } from './teamwork-coordinator-engines.js';
 import { TeamworkCoordinatorFacade } from './teamwork-coordinator-facade.js';
 import { executePlanTeamwork } from './teamwork-coordinator-plan.js';
 
 export * from './teamwork-types.js';
-export type { TeamworkCoordinatorOptions, LegacyCoordinatorArgs } from './teamwork-coordinator-engines.js';
+export type { TeamworkCoordinatorOptions } from './teamwork-coordinator-engines.js';
 export { TeamworkVisualizer } from './teamwork-visualizer.js';
 export { TeamworkGroundingEngine } from './teamwork-grounding.js';
 export { FastSemanticAnalyzer } from './fast-semantic-analyzer.js';
@@ -32,11 +32,8 @@ export { TeamworkReflectionEngine } from './teamwork-reflection.js';
 export { ProjectBootstrapEngine, type BootstrapResult, type BootstrapOptions } from './project-bootstrap.js';
 
 export class TeamworkCoordinator extends TeamworkCoordinatorFacade {
-  constructor(
-    repoRootOrOptions?: string | TeamworkCoordinatorOptions,
-    ...legacyArgs: LegacyCoordinatorArgs
-  ) {
-    super(repoRootOrOptions, ...legacyArgs);
+  constructor(repoRootOrOptions?: string | TeamworkCoordinatorOptions) {
+    super(repoRootOrOptions);
   }
 
   public planTeamwork(objective: string, targetFiles: string[] = [], options: PlanTeamworkOptions = {}): TeamworkPlan {

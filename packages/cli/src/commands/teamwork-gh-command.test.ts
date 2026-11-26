@@ -29,8 +29,14 @@ afterEach(() => {
 function plan(count = 3): TeamworkPlan {
   const profile = getSubagentProfiles()[0];
   return { planId: 'tw-github-fixture', objective: 'Track verified teamwork', createdAt: '', summary: '',
-    tracks: Array.from({ length: count }, (_, i) => TeamworkTrackBuilder.buildTrack('solver', profile,
-      `Implement ${i}`, [`src/${i}.ts`], `Scope${i}`, true)) };
+    tracks: Array.from({ length: count }, (_, i) => TeamworkTrackBuilder.buildTrack({
+      roleType: 'solver',
+      profile,
+      desc: `Implement ${i}`,
+      files: [`src/${i}.ts`],
+      label: `Scope${i}`,
+      deterministic: true
+    })) };
 }
 
 function tracking(track: { id: string }, issueNumber: number) {

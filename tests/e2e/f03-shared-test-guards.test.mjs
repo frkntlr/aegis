@@ -129,7 +129,12 @@ async function testSharedApiBoundaries(t) {
   const shared = await loadSharedModule();
   const ws = createTempWorkspace('aegis-f03-api-');
   t.after(ws.cleanup);
-  const diff = shared.PreEmptiveDiffBudgeting.assessProposedDiff('a.ts', 301, 41);
+  const diff = shared.PreEmptiveDiffBudgeting.assessProposedDiff({
+    fileLines: 301,
+    addedLines: 0,
+    removedLines: 0,
+    funcLines: 41
+  });
   assert.equal(diff.allowed, false, 'PreEmptiveDiffBudgeting must reject >300 file or >40 func lines');
   const suggestion = shared.FuzzyMatcher.suggest('cage:chek', ['cage:check', 'status']);
   assert.equal(suggestion, 'cage:check');

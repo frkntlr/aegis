@@ -8,6 +8,14 @@ import { EventEmitter } from 'node:events';
 import { DashboardServer } from './dashboard-server.js';
 import { isAllowedLocalOrigin, parseJsonObjectText, readJsonObjectBody, sendJsonError } from './server-security.js';
 
+function createFastTestRepo(): string {
+  const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-srv-fast-'));
+  fs.mkdirSync(path.join(tmpRepo, '.git'), { recursive: true });
+  fs.mkdirSync(path.join(tmpRepo, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(tmpRepo, 'src', 'sample.ts'), 'export const ok = true;\n', 'utf8');
+  return tmpRepo;
+}
+
 function sendRawRequest(
   port: number,
   method: string,
@@ -28,7 +36,8 @@ function sendRawRequest(
 }
 
 test('DashboardServer returns 404 for unknown routes and 400 for invalid JSON', async () => {
-  const server = new DashboardServer({ port: 0, offline: true });
+  const tmpRepo = createFastTestRepo();
+  const server = new DashboardServer({ port: 0, repoRoot: tmpRepo, offline: true });
   const port = await server.start();
   try {
     const res404 = await fetch(`http://localhost:${port}/unknown-path-12345`);
@@ -43,11 +52,13 @@ test('DashboardServer returns 404 for unknown routes and 400 for invalid JSON', 
     assert.ok(body.error);
   } finally {
     await server.stop();
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
 
 test('DashboardServer serves SSE event stream on /api/events', async () => {
-  const server = new DashboardServer({ port: 0, offline: true });
+  const tmpRepo = createFastTestRepo();
+  const server = new DashboardServer({ port: 0, repoRoot: tmpRepo, offline: true });
   const port = await server.start();
   try {
     const controller = new AbortController();
@@ -66,11 +77,13 @@ test('DashboardServer serves SSE event stream on /api/events', async () => {
     clearTimeout(timeout);
   } finally {
     await server.stop();
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
 
 test('DashboardServer responds to OPTIONS preflight and allows valid local origins', async () => {
-  const server = new DashboardServer({ port: 0, offline: true });
+  const tmpRepo = createFastTestRepo();
+  const server = new DashboardServer({ port: 0, repoRoot: tmpRepo, offline: true });
   const port = await server.start();
   try {
     const pre = await fetch(`http://localhost:${port}/api/action`, {
@@ -87,11 +100,13 @@ test('DashboardServer responds to OPTIONS preflight and allows valid local origi
     }
   } finally {
     await server.stop();
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
 
 test('DashboardServer blocks spoofed, userinfo, path, query, fragment, and https Origins with 403', async () => {
-  const server = new DashboardServer({ port: 0, offline: true });
+  const tmpRepo = createFastTestRepo();
+  const server = new DashboardServer({ port: 0, repoRoot: tmpRepo, offline: true });
   const port = await server.start();
   try {
     const badOrigins = [
@@ -122,11 +137,13 @@ test('DashboardServer blocks spoofed, userinfo, path, query, fragment, and https
     }
   } finally {
     await server.stop();
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
 
 test('DashboardServer returns raw 413 without ECONNRESET on >1MB payloads and keeps serving', async () => {
-  const server = new DashboardServer({ port: 0, offline: true });
+  const tmpRepo = createFastTestRepo();
+  const server = new DashboardServer({ port: 0, repoRoot: tmpRepo, offline: true });
   const port = await server.start();
   try {
     const largeBody = JSON.stringify({ action: 'reclaim_orphans', data: 'A'.repeat(1024 * 1024 + 500) });
@@ -141,6 +158,7 @@ test('DashboardServer returns raw 413 without ECONNRESET on >1MB payloads and ke
     assert.strictEqual(followUp.status, 200);
   } finally {
     await server.stop();
+    fs.rmSync(tmpRepo, { recursive: true, force: true });
   }
 });
 

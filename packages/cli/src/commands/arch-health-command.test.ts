@@ -30,6 +30,7 @@ function makeReport(overrides: Partial<ArchitectureHealthReport> = {}): Architec
       runtimeCycleCount: 0,
       typeOnlyCycleCount: 0,
       complexityViolations: 0,
+      cognitiveViolations: 0,
       paramViolations: 0,
       godClassViolations: 0,
       fanOutViolations: 0,

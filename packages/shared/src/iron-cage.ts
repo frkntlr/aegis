@@ -20,7 +20,8 @@ export type CageRuleType =
   | 'TS_004_MAX_PARAMS'
   | 'TS_005_GOD_CLASS'
   | 'ARCH_001_HIGH_FAN_OUT'
-  | 'ARCH_002_CIRCULAR_DEPENDENCY';
+  | 'ARCH_002_CIRCULAR_DEPENDENCY'
+  | 'ARCH_003_COGNITIVE_COMPLEXITY';
 
 export interface CageViolation {
   rule: CageRuleType;

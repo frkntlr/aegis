@@ -28,19 +28,35 @@ test('PreEmptiveDiffBudgeting.formatWarningForSlice prefixes every warning line'
 });
 
 test('PreEmptiveDiffBudgeting.assessProposedDiff validates file and function deltas', () => {
-  const allowed = PreEmptiveDiffBudgeting.assessProposedDiff(280, 15, 5, 30, 5, 0);
+  const allowed = PreEmptiveDiffBudgeting.assessProposedDiff({
+    fileLines: 280,
+    addedLines: 15,
+    removedLines: 5,
+    funcLines: 30,
+    funcAddedLines: 5,
+    funcRemovedLines: 0
+  });
   assert.equal(allowed.allowed, true);
   assert.equal(allowed.newFileLines, 290);
   assert.equal(allowed.newFuncLines, 35);
 
-  const fileBlocked = PreEmptiveDiffBudgeting.assessProposedDiff(295, 10, 0);
+  const fileBlocked = PreEmptiveDiffBudgeting.assessProposedDiff({
+    fileLines: 295,
+    addedLines: 10,
+    removedLines: 0
+  });
   assert.equal(fileBlocked.allowed, false);
   assert.equal(fileBlocked.fileAllowed, false);
   assert.match(fileBlocked.reason ?? '', /file=305\/300/);
 
-  const customBlocked = PreEmptiveDiffBudgeting.assessProposedDiff(40, 5, 0, 18, 5, 0, {
-    maxFileLines: 50,
-    maxFunctionLines: 20
+  const customBlocked = PreEmptiveDiffBudgeting.assessProposedDiff({
+    fileLines: 40,
+    addedLines: 5,
+    removedLines: 0,
+    funcLines: 18,
+    funcAddedLines: 5,
+    funcRemovedLines: 0,
+    options: { maxFileLines: 50, maxFunctionLines: 20 }
   });
   assert.equal(customBlocked.allowed, false);
   assert.equal(customBlocked.funcAllowed, false);

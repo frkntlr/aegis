@@ -8,6 +8,41 @@ export interface ToolPermission {
   lastWindowResetMs: number;
 }
 
+type RealpathStep =
+  | { done: true; value: string | null }
+  | { done: false; next: string; hops: number };
+
+function resolveExistingRealpath(cur: string, tail: string[]): string | null {
+  try {
+    const real = fs.realpathSync(cur);
+    return tail.length > 0 ? path.join(real, ...tail.reverse()) : real;
+  } catch (err: unknown) {
+    if (process.env.AEGIS_DEBUG === '1') {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[aegis:mcp-security] realpathSync failed for "${cur}": ${msg}\n`);
+    }
+    return null;
+  }
+}
+
+function stepNearestRealpath(
+  cur: string,
+  tail: string[],
+  hops: number,
+  targetPath: string,
+  readDangling: (p: string) => string | null
+): RealpathStep {
+  if (fs.existsSync(cur)) return { done: true, value: resolveExistingRealpath(cur, tail) };
+  const linkTarget = readDangling(cur);
+  if (linkTarget) {
+    return hops + 1 > 32 ? { done: true, value: null } : { done: false, next: linkTarget, hops: hops + 1 };
+  }
+  const parent = path.dirname(cur);
+  if (parent === cur) return { done: true, value: hops > 0 ? null : targetPath };
+  tail.push(path.basename(cur));
+  return { done: false, next: parent, hops };
+}
+
 export class MCPSecurityManager {
   private permissions: Map<string, ToolPermission> = new Map();
   private auditLog: Array<{ timestamp: string; agent: string; tool: string; allowed: boolean; reason?: string }> = [];
@@ -136,29 +171,10 @@ export class MCPSecurityManager {
     const tail: string[] = [];
     let symlinkHops = 0;
     while (true) {
-      if (fs.existsSync(cur)) {
-        try {
-          const real = fs.realpathSync(cur);
-          return tail.length > 0 ? path.join(real, ...tail.reverse()) : real;
-        } catch (err: unknown) {
-          if (process.env.AEGIS_DEBUG === '1') {
-            const msg = err instanceof Error ? err.message : String(err);
-            process.stderr.write(`[aegis:mcp-security] realpathSync failed for "${cur}": ${msg}\n`);
-          }
-          return null;
-        }
-      }
-      const linkTarget = this.tryReadDanglingLink(cur);
-      if (linkTarget) {
-        symlinkHops++;
-        if (symlinkHops > 32) return null;
-        cur = linkTarget;
-        continue;
-      }
-      const parent = path.dirname(cur);
-      if (parent === cur) return symlinkHops > 0 ? null : targetPath;
-      tail.push(path.basename(cur));
-      cur = parent;
+      const step = stepNearestRealpath(cur, tail, symlinkHops, targetPath, p => this.tryReadDanglingLink(p));
+      if (step.done) return step.value;
+      cur = step.next;
+      symlinkHops = step.hops;
     }
   }
 

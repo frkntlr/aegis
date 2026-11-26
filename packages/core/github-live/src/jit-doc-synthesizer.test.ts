@@ -43,7 +43,14 @@ test('JitDocSynthesizer synthesizes doc entry and updates manifest', () => {
   assert.strictEqual(doc.version, '2.1.0');
   assert.ok(doc.signatures.length > 0);
 
-  JitDocSynthesizer.updateManifest(tmpDir, 'worker-pkg', '2.1.0', 'WorkerClient', 'index.d.ts', 15);
+  JitDocSynthesizer.updateManifest({
+    cacheDir: tmpDir,
+    pkgName: 'worker-pkg',
+    version: '2.1.0',
+    symbol: 'WorkerClient',
+    file: 'index.d.ts',
+    line: 15
+  });
   const manifest = readJsonSafe<Record<string, { version: string; symbols: Record<string, { line: number }> }>>(
     path.join(tmpDir, 'manifest.json')
   );

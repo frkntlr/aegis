@@ -12,13 +12,11 @@ import {
   computeDynamicFromLine,
   createSliceBudget,
   formatSliceLines,
-  normalizeSliceContentArgs,
   type DiffBudgetReport,
-  type SliceContentOptions,
-  type SliceContentRestArgs
+  type SliceContentOptions
 } from './symbol-slice-helpers.js';
 
-export type { SliceContentOptions, SliceContentRestArgs };
+export type { SliceContentOptions };
 
 export interface SliceResult {
   symbol: string;
@@ -69,7 +67,14 @@ export class SymbolSliceExtractor {
         const classSkel = this.extractClassSkeletonSlice(entry.name, entry.filePath, content, entry.startLine, entry.endLine);
         if (classSkel) return classSkel;
       }
-      return this.sliceContent(entry.name, entry.filePath, content, entry.startLine, entry.endLine, contextLines);
+      return this.sliceContent({
+        symbolName: entry.name,
+        filePath: entry.filePath,
+        content,
+        startLine: entry.startLine,
+        endLine: entry.endLine,
+        contextLines
+      });
     } catch {
       // Unreadable target file; treat as non-sliceable
       return null;
@@ -160,12 +165,8 @@ export class SymbolSliceExtractor {
     return { headerBlocks };
   }
 
-  public sliceContent(
-    nameOrOpts: string | SliceContentOptions,
-    ...rest: SliceContentRestArgs
-  ): SliceResult {
-    const { symbolName, filePath, content, startLine, endLine, contextLines } =
-      normalizeSliceContentArgs(nameOrOpts, rest);
+  public sliceContent(opts: SliceContentOptions): SliceResult {
+    const { symbolName, filePath, content, startLine, endLine, contextLines = 3 } = opts;
     const lines = content.split(/\r?\n/);
     const from = computeDynamicFromLine(lines, startLine, contextLines);
     const to = Math.min(lines.length, endLine + contextLines);

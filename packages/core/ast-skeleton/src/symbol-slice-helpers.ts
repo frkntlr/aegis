@@ -13,10 +13,6 @@ export interface SliceContentOptions {
   contextLines?: number;
 }
 
-export type SliceContentRestArgs =
-  | []
-  | [filePath: string, content: string, startLine: number, endLine: number, contextLines?: number];
-
 export interface SliceHeaderOptions {
   symbolName: string;
   filePath: string;
@@ -25,17 +21,6 @@ export interface SliceHeaderOptions {
   ambientBlock?: string;
   calleeBlock?: string;
   budgetWarning?: string;
-}
-
-export function normalizeSliceContentArgs(
-  nameOrOpts: string | SliceContentOptions,
-  rest: SliceContentRestArgs
-): Required<SliceContentOptions> {
-  if (typeof nameOrOpts !== 'string') {
-    return { ...nameOrOpts, contextLines: nameOrOpts.contextLines ?? 3 };
-  }
-  const [filePath = '', content = '', startLine = 1, endLine = 1, contextLines = 3] = rest;
-  return { symbolName: nameOrOpts, filePath, content, startLine, endLine, contextLines };
 }
 
 export function findClassDeclaration(sf: ts.SourceFile, name: string): ts.ClassDeclaration | null {

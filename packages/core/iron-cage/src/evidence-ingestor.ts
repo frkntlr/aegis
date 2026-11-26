@@ -25,6 +25,16 @@ export interface IngestedEvidence {
   sources: string[];
 }
 
+function formatFailedAssertion(ass: unknown, filePath: string): string | null {
+  if (typeof ass !== 'object' || ass === null) return null;
+  const assObj = ass as Record<string, unknown>;
+  if (assObj.status !== 'failed') return null;
+  const title = typeof assObj.title === 'string' ? assObj.title : 'Assertion Failed';
+  const msgs = Array.isArray(assObj.failureMessages) ? assObj.failureMessages.join('\n') : '';
+  const prefix = filePath ? `${filePath}: ` : '';
+  return `${prefix}${title}\n${msgs}`.trim();
+}
+
 export class EvidenceIngestor {
   private static readonly TEST_CANDIDATES = [
     'last-test-run.json',
@@ -149,20 +159,14 @@ export class EvidenceIngestor {
   }
 
   private static extractFromTestResultItem(item: Record<string, unknown>, out: string[]): void {
+    if (!Array.isArray(item.assertionResults)) {
+      if (typeof item.message === 'string' && item.message) out.push(item.message);
+      return;
+    }
     const filePath = typeof item.name === 'string' ? item.name : '';
-    if (Array.isArray(item.assertionResults)) {
-      for (const ass of item.assertionResults) {
-        if (typeof ass === 'object' && ass !== null) {
-          const assObj = ass as Record<string, unknown>;
-          if (assObj.status === 'failed') {
-            const title = typeof assObj.title === 'string' ? assObj.title : 'Assertion Failed';
-            const msgs = Array.isArray(assObj.failureMessages) ? assObj.failureMessages.join('\n') : '';
-            out.push(`${filePath ? filePath + ': ' : ''}${title}\n${msgs}`.trim());
-          }
-        }
-      }
-    } else if (typeof item.message === 'string' && item.message) {
-      out.push(item.message);
+    for (const ass of item.assertionResults) {
+      const formatted = formatFailedAssertion(ass, filePath);
+      if (formatted) out.push(formatted);
     }
   }
 

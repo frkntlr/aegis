@@ -17,6 +17,16 @@ interface CSharpMemberContext {
   symbols: SymbolEntry[];
 }
 
+function nextPythonDocstringState(trimmed: string, inDocstring: boolean): { inDocstring: boolean; skip: boolean } {
+  if (trimmed.includes('"""') || trimmed.includes("'''")) {
+    const tripleCount = (trimmed.match(/("""|''')/g) || []).length;
+    const next = tripleCount % 2 !== 0 ? !inDocstring : inDocstring;
+    const skip = next || trimmed.startsWith('"""') || trimmed.startsWith("'''");
+    return { inDocstring: next, skip };
+  }
+  return { inDocstring, skip: inDocstring || trimmed.startsWith('#') };
+}
+
 export class PolyglotParser {
   public static parsePython(filePath: string, content: string): SymbolEntry[] {
     const normPath = filePath.replace(/\\/g, '/');
@@ -26,15 +36,10 @@ export class PolyglotParser {
     let curClass = '';
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-
-      if (trimmed.includes('"""') || trimmed.includes("'''")) {
-        const tripleCount = (trimmed.match(/("""|''')/g) || []).length;
-        if (tripleCount % 2 !== 0) inDocstring = !inDocstring;
-        if (inDocstring || trimmed.startsWith('"""') || trimmed.startsWith("'''")) continue;
-      }
-      if (inDocstring || trimmed.startsWith('#')) continue;
+      const trimmed = lines[i].trim();
+      const doc = nextPythonDocstringState(trimmed, inDocstring);
+      inDocstring = doc.inDocstring;
+      if (doc.skip) continue;
 
       const clsMatch = trimmed.match(/^class\s+([a-zA-Z_]\w*)(?:\((.*?)\))?:/);
       if (clsMatch) {

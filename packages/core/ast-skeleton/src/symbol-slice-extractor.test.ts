@@ -47,11 +47,9 @@ test('TransitiveTypeResolver: resolves imported types from relative source file'
   const resolver = new TransitiveTypeResolver({ baseDir: tmpDir });
   const content = fs.readFileSync(serviceFile, 'utf8');
   const closure = resolver.resolveAmbientClosure('fetchUser', serviceFile, content);
-
   assert.strictEqual(closure.typeNames.length, 1);
   assert.strictEqual(closure.typeNames[0], 'UserProfile');
   assert.ok(closure.formattedBlock.includes('interface UserProfile'));
-
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -81,7 +79,6 @@ test('TransitiveTypeResolver: safely handles cyclic types and resolves transitiv
 test('SymbolSliceExtractor: prepends ambient type closure block to surgical slice', () => {
   const indexer = new SymbolIndexer();
   const extractor = new SymbolSliceExtractor(indexer);
-
   const code = [
     'export interface OrderOptions { fastDelivery: boolean; }',
     'export interface OrderReceipt { orderId: string; }',
@@ -89,8 +86,7 @@ test('SymbolSliceExtractor: prepends ambient type closure block to surgical slic
     '  return { orderId: "123" };',
     '}'
   ].join('\n');
-
-  const slice = extractor.sliceContent('placeOrder', 'order.ts', code, 3, 5, 1);
+  const slice = extractor.sliceContent({ symbolName: 'placeOrder', filePath: 'order.ts', content: code, startLine: 3, endLine: 5, contextLines: 1 });
   assert.ok(slice.codeSlice.includes('// 📦 [Ambient Type Closure - Param & Return Types]'));
   assert.ok(slice.codeSlice.includes('interface OrderOptions'));
   assert.ok(slice.codeSlice.includes('interface OrderReceipt'));
@@ -101,13 +97,11 @@ test('SymbolSliceExtractor: prepends ambient type closure block to surgical slic
 test('SymbolSliceExtractor: injects bounded opaque stubs for nested 2nd-degree types', () => {
   const indexer = new SymbolIndexer();
   const extractor = new SymbolSliceExtractor(indexer);
-
   const code = [
     'export interface ServiceConfig { options: RemoteDriverOptions; }',
     'export function initService(cfg: ServiceConfig): void {}'
   ].join('\n');
-
-  const slice = extractor.sliceContent('initService', 'service.ts', code, 2, 2, 1);
+  const slice = extractor.sliceContent({ symbolName: 'initService', filePath: 'service.ts', content: code, startLine: 2, endLine: 2, contextLines: 1 });
   assert.ok(slice.codeSlice.includes('interface ServiceConfig'));
   assert.ok(slice.codeSlice.includes('RemoteDriverOptions'));
   assert.ok(slice.codeSlice.includes('__opaque'));
@@ -146,7 +140,7 @@ test('SymbolSliceExtractor: injects both ambient types and callee signatures int
     '}'
   ].join('\n');
 
-  const slice = extractor.sliceContent('checkout', 'cashier.ts', code, 5, 8, 1);
+  const slice = extractor.sliceContent({ symbolName: 'checkout', filePath: 'cashier.ts', content: code, startLine: 5, endLine: 8, contextLines: 1 });
   assert.ok(slice.codeSlice.includes('// 📦 [Ambient Type Closure - Param & Return Types]'));
   assert.ok(slice.codeSlice.includes('interface PaymentRequest'));
   assert.ok(slice.codeSlice.includes('interface PaymentResponse'));
@@ -200,7 +194,7 @@ test('SymbolSliceExtractor: preserves GDScript signals, extends, and @onready am
     '    anim.play("hurt")'
   ].join('\n');
 
-  const slice = extractor.sliceContent('take_damage', 'hero.gd', gdCode, 7, 9, 1);
+  const slice = extractor.sliceContent({ symbolName: 'take_damage', filePath: 'hero.gd', content: gdCode, startLine: 7, endLine: 9, contextLines: 1 });
   assert.ok(slice.codeSlice.includes('# 🎮 [GDScript Ambient State - Signals & Onready Nodes]'));
   assert.ok(slice.codeSlice.includes('extends CharacterBody2D'));
   assert.ok(slice.codeSlice.includes('signal hero_damaged(amount: int)'));
@@ -225,7 +219,7 @@ test('SymbolSliceExtractor: dynamically expands context lines upwards to capture
   ].join('\n');
 
   // Requesting slice with contextLines = 1 should still capture the 5-line docstring above calculateLevel
-  const slice = extractor.sliceContent('calculateLevel', 'calc.ts', code, 9, 11, 1);
+  const slice = extractor.sliceContent({ symbolName: 'calculateLevel', filePath: 'calc.ts', content: code, startLine: 9, endLine: 11, contextLines: 1 });
   assert.ok(slice.codeSlice.includes('Calculates player level based on experience points'));
   assert.ok(slice.codeSlice.includes('@param xp Total experience points'));
   assert.ok(slice.codeSlice.includes('@returns Level number between 1 and 100'));

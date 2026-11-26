@@ -1,8 +1,9 @@
 import ts from 'typescript';
-import type { CageViolation } from '@aegis/shared';
+import type { CageRuleType, CageViolation } from '@aegis/shared';
 
 export interface AntiSpaghettiOptions {
   maxCyclomaticComplexity?: number;
+  maxCognitiveComplexity?: number;
   maxParams?: number;
   maxClassMethods?: number;
   maxFileImports?: number;
@@ -17,20 +18,12 @@ type CallableNode =
   | ts.GetAccessorDeclaration
   | ts.SetAccessorDeclaration;
 
-function isNestedCallable(node: ts.Node): boolean {
-  return (
-    ts.isFunctionDeclaration(node) ||
-    ts.isMethodDeclaration(node) ||
-    ts.isArrowFunction(node) ||
-    ts.isFunctionExpression(node) ||
-    ts.isConstructorDeclaration(node) ||
-    ts.isGetAccessorDeclaration(node) ||
-    ts.isSetAccessorDeclaration(node)
-  );
-}
-
 function isCallableNode(node: ts.Node): node is CallableNode {
-  return isNestedCallable(node);
+  return (
+    ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node) || ts.isConstructorDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)
+  );
 }
 
 function isBranchOperator(kind: ts.SyntaxKind): boolean {
@@ -41,38 +34,71 @@ function isBranchOperator(kind: ts.SyntaxKind): boolean {
   );
 }
 
+function isLoopOrCatchOrTernary(node: ts.Node): boolean {
+  return (
+    ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node) ||
+    ts.isWhileStatement(node) || ts.isDoStatement(node) ||
+    ts.isCatchClause(node) || ts.isConditionalExpression(node)
+  );
+}
+
 function isComplexityPoint(node: ts.Node): boolean {
-  if (
-    ts.isIfStatement(node) ||
-    ts.isForStatement(node) ||
-    ts.isForInStatement(node) ||
-    ts.isForOfStatement(node) ||
-    ts.isWhileStatement(node) ||
-    ts.isDoStatement(node) ||
-    ts.isCaseClause(node) ||
-    ts.isCatchClause(node) ||
-    ts.isConditionalExpression(node)
-  ) {
-    return true;
-  }
+  if (isLoopOrCatchOrTernary(node) || ts.isIfStatement(node) || ts.isCaseClause(node)) return true;
   return ts.isBinaryExpression(node) && isBranchOperator(node.operatorToken.kind);
 }
 
 export function calculateCyclomaticComplexity(node: ts.Node): number {
   let complexity = 1;
-
   const visit = (current: ts.Node): void => {
-    if (current !== node && isNestedCallable(current)) {
-      return;
-    }
-    if (current !== node && isComplexityPoint(current)) {
-      complexity += 1;
-    }
+    if (current !== node && isCallableNode(current)) return;
+    if (current !== node && isComplexityPoint(current)) complexity += 1;
     ts.forEachChild(current, visit);
   };
-
   visit(node);
   return complexity;
+}
+
+function isNewLogicalSequence(node: ts.Node): boolean {
+  if (!ts.isBinaryExpression(node) || !isBranchOperator(node.operatorToken.kind)) return false;
+  const { parent } = node;
+  if (!parent || !ts.isBinaryExpression(parent)) return true;
+  return parent.operatorToken.kind !== node.operatorToken.kind;
+}
+
+export function calculateCognitiveComplexity(node: ts.Node): number {
+  let score = 0;
+
+  const visitIf = (ifNode: ts.IfStatement, nesting: number): void => {
+    const isElseIf = Boolean(ifNode.parent && ts.isIfStatement(ifNode.parent) && ifNode.parent.elseStatement === ifNode);
+    score += isElseIf ? 1 : 1 + nesting;
+    visit(ifNode.expression, nesting);
+    visit(ifNode.thenStatement, nesting + 1);
+    if (!ifNode.elseStatement) return;
+    if (ts.isIfStatement(ifNode.elseStatement)) {
+      visit(ifNode.elseStatement, nesting);
+      return;
+    }
+    score += 1;
+    visit(ifNode.elseStatement, nesting + 1);
+  };
+
+  const visit = (current: ts.Node, nesting: number): void => {
+    if (current !== node && isCallableNode(current)) return;
+    if (current !== node && ts.isIfStatement(current)) {
+      visitIf(current, nesting);
+      return;
+    }
+    if (current !== node && (isLoopOrCatchOrTernary(current) || ts.isSwitchStatement(current))) {
+      score += 1 + nesting;
+      ts.forEachChild(current, (child) => visit(child, nesting + 1));
+      return;
+    }
+    if (current !== node && isNewLogicalSequence(current)) score += 1;
+    ts.forEachChild(current, (child) => visit(child, nesting));
+  };
+
+  visit(node, 0);
+  return score;
 }
 
 function resolveCallableName(node: CallableNode): string {
@@ -91,20 +117,35 @@ function resolveCallableName(node: CallableNode): string {
   return 'anonymous function';
 }
 
+function countTypeArity(typeNode: ts.TypeNode | undefined): number {
+  if (!typeNode) return 1;
+  if (ts.isParenthesizedTypeNode(typeNode)) return countTypeArity(typeNode.type);
+  if (ts.isTupleTypeNode(typeNode)) return Math.max(1, typeNode.elements.length);
+  if (ts.isUnionTypeNode(typeNode)) {
+    return typeNode.types.reduce((max, t) => Math.max(max, countTypeArity(t)), 1);
+  }
+  return 1;
+}
+
 function countParameters(node: CallableNode): number {
-  return node.parameters.filter((param) => {
-    return !(ts.isIdentifier(param.name) && param.name.text === 'this');
-  }).length;
+  let total = 0;
+  for (const param of node.parameters) {
+    if (ts.isIdentifier(param.name) && param.name.text === 'this') continue;
+    total += param.dotDotDotToken ? countTypeArity(param.type) : 1;
+  }
+  return total;
 }
 
 export class AntiSpaghettiValidator {
   private readonly maxCyclomaticComplexity: number;
+  private readonly maxCognitiveComplexity: number;
   private readonly maxParams: number;
   private readonly maxClassMethods: number;
   private readonly maxFileImports: number;
 
   constructor(options: AntiSpaghettiOptions = {}) {
     this.maxCyclomaticComplexity = options.maxCyclomaticComplexity ?? 15;
+    this.maxCognitiveComplexity = options.maxCognitiveComplexity ?? 18;
     this.maxParams = options.maxParams ?? 5;
     this.maxClassMethods = options.maxClassMethods ?? 12;
     this.maxFileImports = options.maxFileImports ?? 10;
@@ -152,33 +193,23 @@ export class AntiSpaghettiValidator {
     }
   }
 
-  private checkCallable(
-    node: CallableNode,
-    sf: ts.SourceFile,
-    filePath: string,
-    violations: CageViolation[]
-  ): void {
+  private checkCallable(node: CallableNode, sf: ts.SourceFile, filePath: string, violations: CageViolation[]): void {
     const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
     const name = resolveCallableName(node);
+    const add = (rule: CageRuleType, message: string, severity: 'error' | 'warning'): void => {
+      violations.push({ rule, filePath, line, message, severity });
+    };
     const complexity = calculateCyclomaticComplexity(node);
     if (complexity > this.maxCyclomaticComplexity) {
-      violations.push({
-        rule: 'CYCLOMATIC_COMPLEXITY',
-        filePath,
-        line,
-        message: `Function '${name}' has cyclomatic complexity ${complexity}, exceeding maximum ${this.maxCyclomaticComplexity}.`,
-        severity: 'error'
-      });
+      add('CYCLOMATIC_COMPLEXITY', `Function '${name}' has cyclomatic complexity ${complexity}, exceeding maximum ${this.maxCyclomaticComplexity}.`, 'error');
+    }
+    const cognitive = calculateCognitiveComplexity(node);
+    if (cognitive > this.maxCognitiveComplexity) {
+      add('ARCH_003_COGNITIVE_COMPLEXITY', `Function '${name}' has cognitive complexity ${cognitive}, exceeding maximum ${this.maxCognitiveComplexity}.`, 'warning');
     }
     const paramCount = countParameters(node);
     if (paramCount > this.maxParams) {
-      violations.push({
-        rule: 'TS_004_MAX_PARAMS',
-        filePath,
-        line,
-        message: `Function '${name}' takes ${paramCount} parameters, exceeding threshold (${this.maxParams}). Group into an options object.`,
-        severity: 'warning'
-      });
+      add('TS_004_MAX_PARAMS', `Function '${name}' takes ${paramCount} parameters, exceeding threshold (${this.maxParams}). Group into an options object.`, 'warning');
     }
   }
 

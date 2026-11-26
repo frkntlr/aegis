@@ -19,6 +19,30 @@ import {
 export { TeamworkSharder, TeamworkHierarchicalTree, TeamworkDocSharder };
 export type { DecomposedSubtask, DecomposeOptions } from './teamwork-decomposer-types.js';
 
+function collectFoundationLabels(subtasks: DecomposedSubtask[]): string[] {
+  const foundations = subtasks.filter(t => t.roleType === 'solver' || t.roleType === 'ui');
+  for (const t of foundations) {
+    t.phase = 1;
+    t.dependsOn = [];
+  }
+  return foundations.map(t => t.label);
+}
+
+function assignQaAndCollectLabels(subtasks: DecomposedSubtask[], foundationLabels: string[]): string[] {
+  const qaTasks = subtasks.filter(t => t.roleType === 'qa');
+  const qaPhase = foundationLabels.length > 0 ? 2 : 1;
+  for (const t of qaTasks) {
+    t.phase = qaPhase;
+    t.dependsOn = [...foundationLabels];
+  }
+  return qaTasks.map(t => t.label);
+}
+
+function resolveDocPhase(qaCount: number, foundationCount: number): number {
+  if (qaCount > 0) return 3;
+  return foundationCount > 0 ? 2 : 1;
+}
+
 export class TeamworkDecomposer {
   public static decompose(
     objective: string,
@@ -123,30 +147,13 @@ export class TeamworkDecomposer {
   }
 
   private static assignPhasesAndDependencies(subtasks: DecomposedSubtask[]): void {
-    const foundationLabels: string[] = [];
-    for (const t of subtasks) {
-      if (t.roleType === 'solver' || t.roleType === 'ui') {
-        t.phase = 1;
-        t.dependsOn = [];
-        foundationLabels.push(t.label);
-      }
-    }
-
-    const qaLabels: string[] = [];
-    for (const t of subtasks) {
-      if (t.roleType === 'qa') {
-        t.phase = foundationLabels.length > 0 ? 2 : 1;
-        t.dependsOn = [...foundationLabels];
-        qaLabels.push(t.label);
-      }
-    }
-
+    const foundationLabels = collectFoundationLabels(subtasks);
+    const qaLabels = assignQaAndCollectLabels(subtasks, foundationLabels);
     const docDeps = qaLabels.length > 0 ? qaLabels : foundationLabels;
-    for (const t of subtasks) {
-      if (t.roleType === 'docs') {
-        t.phase = qaLabels.length > 0 ? 3 : foundationLabels.length > 0 ? 2 : 1;
-        t.dependsOn = [...docDeps];
-      }
+    const docPhase = resolveDocPhase(qaLabels.length, foundationLabels.length);
+    for (const t of subtasks.filter(s => s.roleType === 'docs')) {
+      t.phase = docPhase;
+      t.dependsOn = [...docDeps];
     }
   }
 

@@ -28,14 +28,6 @@ export interface TeamworkCoordinatorOptions {
   reflectionEngine?: TeamworkReflectionEngine;
 }
 
-export type LegacyCoordinatorArgs = [
-  WorktreeManager?,
-  RoleClassifier?,
-  TeamworkGroundingEngine?,
-  FastSemanticAnalyzer?,
-  TeamworkCompactEngine?
-];
-
 export class TeamworkCoordinatorEngines {
   protected repoRoot: string;
   private _worktreeManager?: WorktreeManager;
@@ -48,10 +40,7 @@ export class TeamworkCoordinatorEngines {
   private _reflectionEngine?: TeamworkReflectionEngine;
   protected bootstrapped = false;
 
-  constructor(
-    repoRootOrOptions?: string | TeamworkCoordinatorOptions,
-    ...legacyArgs: LegacyCoordinatorArgs
-  ) {
+  constructor(repoRootOrOptions?: string | TeamworkCoordinatorOptions) {
     if (typeof repoRootOrOptions === 'object' && repoRootOrOptions !== null) {
       this.repoRoot = resolveSafeRepoRoot(repoRootOrOptions.repoRoot);
       this._worktreeManager = repoRootOrOptions.worktreeManager;
@@ -64,11 +53,6 @@ export class TeamworkCoordinatorEngines {
       this._reflectionEngine = repoRootOrOptions.reflectionEngine;
     } else {
       this.repoRoot = resolveSafeRepoRoot(repoRootOrOptions);
-      this._worktreeManager = legacyArgs[0];
-      this._roleClassifier = legacyArgs[1];
-      this._groundingEngine = legacyArgs[2];
-      this._semanticAnalyzer = legacyArgs[3];
-      this._compactEngine = legacyArgs[4];
     }
     if (typeof repoRootOrOptions !== 'object' || repoRootOrOptions?.bootstrap !== false) {
       this.ensureBootstrap();

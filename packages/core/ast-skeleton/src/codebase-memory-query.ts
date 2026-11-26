@@ -38,7 +38,14 @@ function buildSliceFromTarget(
     const classSkel = ns.extractor.extractClassSkeletonSlice(target.name, target.filePath, stored, target.startLine, target.endLine);
     if (classSkel) return classSkel;
   }
-  return ns.extractor.sliceContent(target.name, target.filePath, stored, target.startLine, target.endLine, contextLines);
+  return ns.extractor.sliceContent({
+    symbolName: target.name,
+    filePath: target.filePath,
+    content: stored,
+    startLine: target.startLine,
+    endLine: target.endLine,
+    contextLines
+  });
 }
 
 function resolveMemorySlice(

@@ -26,6 +26,16 @@ export interface DiffBudgetOptions {
   maxFunctionLines?: number;
 }
 
+export interface AssessDiffInput {
+  fileLines: number;
+  addedLines: number;
+  removedLines: number;
+  funcLines?: number;
+  funcAddedLines?: number;
+  funcRemovedLines?: number;
+  options?: DiffBudgetOptions;
+}
+
 interface WarningStringOptions {
   fileLines: number;
   maxFileLines: number;
@@ -122,13 +132,16 @@ export class PreEmptiveDiffBudgeting {
       .join('\n');
   }
 
-  public static assessProposedDiff(
-    fileLines: number,
-    addedLines: number,
-    removedLines: number,
-    ...rest: [funcLines?: number, funcAddedLines?: number, funcRemovedLines?: number, options?: DiffBudgetOptions]
-  ): DiffBudgetCheckResult {
-    const [funcLines, funcAddedLines, funcRemovedLines, options = {}] = rest;
+  public static assessProposedDiff(input: AssessDiffInput): DiffBudgetCheckResult {
+    const {
+      fileLines,
+      addedLines,
+      removedLines,
+      funcLines,
+      funcAddedLines,
+      funcRemovedLines,
+      options = {}
+    } = input;
     const maxF = options.maxFileLines ?? PreEmptiveDiffBudgeting.DEFAULT_MAX_FILE_LINES;
     const maxFn = options.maxFunctionLines ?? PreEmptiveDiffBudgeting.DEFAULT_MAX_FUNCTION_LINES;
     const newFileLines = fileLines + addedLines - removedLines;

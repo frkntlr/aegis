@@ -42,7 +42,7 @@ test('TriageCacheRadar records, checks hit and misses accurately', () => {
   const initialCheck = radar.checkFile('src/a.ts', mtime, size, content);
   assert.strictEqual(initialCheck.hit, false);
 
-  radar.recordFile('src/a.ts', mtime, size, content, []);
+  radar.recordFile({ filePath: 'src/a.ts', mtimeMs: mtime, size, content, violations: [] });
   radar.flush();
 
   const hitCheck = radar.checkFile('src/a.ts', mtime, size, content);
@@ -67,7 +67,7 @@ test('TriageCacheRadar checkFileStat provides zero-IO hit and quotaAlert memoiza
   const size = content.length;
   const quota = { file: 'src/large.ts', lines: 285, msg: 'Kritik kota' };
 
-  radar.recordFile('src/large.ts', mtime, size, content, [], quota);
+  radar.recordFile({ filePath: 'src/large.ts', mtimeMs: mtime, size, content, violations: [], quotaAlert: quota });
   radar.flush();
 
   // Fast-stat check without reading content
@@ -87,7 +87,7 @@ test('TriageCacheRadar checkFileStat provides zero-IO hit and quotaAlert memoiza
 test('TriageCacheRadar invalidates cache on engine rule salt change', () => {
   const cacheDir = createTempCacheDir();
   const radar1 = new TriageCacheRadar({ cacheDir, engineRulesSalt: 'v1' });
-  radar1.recordFile('src/b.ts', 2000, 10, 'content', []);
+  radar1.recordFile({ filePath: 'src/b.ts', mtimeMs: 2000, size: 10, content: 'content', violations: [] });
   radar1.flush();
 
   const radar2 = new TriageCacheRadar({ cacheDir, engineRulesSalt: 'v2-modified-rules' });
@@ -98,7 +98,7 @@ test('TriageCacheRadar invalidates cache on engine rule salt change', () => {
 test('TriageCacheRadar handles invalidateAll and corrupted file cleanly', () => {
   const cacheDir = createTempCacheDir();
   const radar = new TriageCacheRadar({ cacheDir, engineRulesSalt: 'v1' });
-  radar.recordFile('src/c.ts', 3000, 5, 'hello', []);
+  radar.recordFile({ filePath: 'src/c.ts', mtimeMs: 3000, size: 5, content: 'hello', violations: [] });
   radar.flush();
 
   radar.invalidateAll();

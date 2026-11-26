@@ -105,7 +105,14 @@ test('SymbolSliceExtractor slices function context and computes token savings', 
   fs.writeFileSync(targetPath, sampleTs, 'utf8');
 
   try {
-    const slice = extractor.sliceContent('helper', 'worker.ts', sampleTs, 10, 12, 1);
+    const slice = extractor.sliceContent({
+      symbolName: 'helper',
+      filePath: 'worker.ts',
+      content: sampleTs,
+      startLine: 10,
+      endLine: 12,
+      contextLines: 1
+    });
     assert.strictEqual(slice.symbol, 'helper');
     assert.strictEqual(slice.startLine, 10);
     assert.strictEqual(slice.endLine, 12);

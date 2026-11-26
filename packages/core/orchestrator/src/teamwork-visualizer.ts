@@ -6,34 +6,38 @@
 
 import type { TeamworkPlan, TeamworkTrack } from './teamwork-types.js';
 
+type TrackStatus = 'running' | 'done' | 'failed' | 'pending' | 'blocked';
+
+const STATUS_ICONS: Record<TrackStatus, string> = {
+  done: '✅ Tamamlandı',
+  failed: '🛑 Hata',
+  blocked: '🔒 Engellendi (Faz)',
+  pending: '⏳ Bekliyor',
+  running: '🔄 Çalışıyor'
+};
+
+function formatTrackRow(t: TeamworkTrack, statuses: Record<string, TrackStatus>): string {
+  const defaultStatus: TrackStatus = t.dependsOn.length > 0 ? 'blocked' : 'running';
+  const st = statuses[t.subagentName] ?? statuses[t.roleType] ?? defaultStatus;
+  const icon = STATUS_ICONS[st] ?? STATUS_ICONS.running;
+  const locks = t.targetFiles.length > 0 ? t.targetFiles.map(f => `\`${f}\``).join(', ') : '-';
+  const deps = t.dependsOn.length > 0 ? t.dependsOn.join(', ') : '-';
+  return `| Faz ${t.phase} | \`${t.subagentName}\` | ${icon} | ${deps} | ${locks} | \`${t.invocationPayload.Model}\` |`;
+}
+
 export class TeamworkVisualizer {
   public static formatLiveMatrix(
     plan: TeamworkPlan,
-    statuses: Record<string, 'running' | 'done' | 'failed' | 'pending' | 'blocked'> = {}
+    statuses: Record<string, TrackStatus> = {}
   ): string {
     const lines: string[] = [
       `### 🤖 Antigravity Teamwork Canlı Görev Matrisi [${plan.planId}]`,
       `**Hedef**: ${plan.objective}`,
       '',
       '| Faz | Ajan / Rol | Durum | Bağımlılık | Kilitli Dosyalar | Model |',
-      '| :---: | :--- | :--- | :--- | :--- | :--- |'
+      '| :---: | :--- | :--- | :--- | :--- | :--- |',
+      ...plan.tracks.map(t => formatTrackRow(t, statuses))
     ];
-
-    for (const t of plan.tracks) {
-      const st = statuses[t.subagentName] ?? statuses[t.roleType] ?? (t.dependsOn.length > 0 ? 'blocked' : 'running');
-      const icon = st === 'done'
-        ? '✅ Tamamlandı'
-        : st === 'failed'
-          ? '🛑 Hata'
-          : st === 'blocked'
-            ? '🔒 Engellendi (Faz)'
-            : st === 'pending'
-              ? '⏳ Bekliyor'
-              : '🔄 Çalışıyor';
-      const locks = t.targetFiles.length > 0 ? t.targetFiles.map(f => `\`${f}\``).join(', ') : '-';
-      const deps = t.dependsOn.length > 0 ? t.dependsOn.join(', ') : '-';
-      lines.push(`| Faz ${t.phase} | \`${t.subagentName}\` | ${icon} | ${deps} | ${locks} | \`${t.invocationPayload.Model}\` |`);
-    }
 
     return lines.join('\n');
   }

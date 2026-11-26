@@ -103,6 +103,7 @@ ${methods}
     const report = new ArchitectureHealthAuditor().auditDirectory(dir);
     assert.equal(report.summary.budgetPressureFiles, 1);
     assert.equal(report.summary.complexityViolations, 1);
+    assert.equal(report.summary.cognitiveViolations, 0);
     assert.equal(report.summary.paramViolations, 1);
     assert.equal(report.summary.godClassViolations, 1);
     assert.ok(report.healthScore < 100 && report.healthScore >= 0);
@@ -158,5 +159,37 @@ test('ArchitectureHealthAuditor normalizes structural penalties for > 20 files w
     // runtimePenalty = 15; scale = 40 / 20 = 2; rawStructural = 3 + 2 = 5 -> round(5 / 2) = 3
     // healthScore = 100 - 15 - 3 = 82
     assert.equal(report.healthScore, 82);
+  });
+});
+
+test('ArchitectureHealthAuditor tracks cognitiveViolations in summary, score, prescriptions, and report', () => {
+  withTempDir((dir) => {
+    writeFiles(dir, {
+      'src/nested.ts': `
+export function deepWork(rows: number[][], active: boolean): number {
+  let acc = 0;
+  for (const row of rows) {
+    if (active) {
+      for (const n of row) {
+        if (n > 0) {
+          if (n < 100) {
+            if (n !== 42) acc += n;
+          }
+        }
+      }
+    }
+  }
+  return acc;
+}
+`.trim()
+    });
+
+    const report = new ArchitectureHealthAuditor().auditDirectory(dir);
+    assert.equal(report.summary.complexityViolations, 0);
+    assert.equal(report.summary.cognitiveViolations, 1);
+    // 100 - 1 * 4 = 96
+    assert.equal(report.healthScore, 96);
+    assert.ok(report.prescriptions.some((p) => p.pattern === 'EXTRACT_PREDICATE_TABLE'));
+    assert.ok(formatArchitectureHealthReport(report).includes('Cognitive: 1'));
   });
 });

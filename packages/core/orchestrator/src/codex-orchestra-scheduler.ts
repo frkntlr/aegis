@@ -7,23 +7,45 @@ export function getTask(run: OrchestraRun, id: string): OrchestraTask {
   return task;
 }
 
+const SETTLEABLE_STATES = new Set<string>(['pending', 'waiting', 'deferred']);
+const FAILURE_STATES = new Set<string>(['failed', 'blocked']);
+
+function hasFailedBlocker(run: OrchestraRun, task: OrchestraTask): boolean {
+  return run.tasks.some(
+    other => FAILURE_STATES.has(other.state)
+      && (task.dependsOn.includes(other.id) || task.children.includes(other.id) || other.phase < task.phase)
+  );
+}
+
+function settleTaskStep(run: OrchestraRun, task: OrchestraTask): boolean {
+  if (!SETTLEABLE_STATES.has(task.state)) return false;
+  if (hasFailedBlocker(run, task)) {
+    task.state = 'blocked';
+    task.evidence = 'A prerequisite or child failed';
+    return true;
+  }
+  if (task.state === 'waiting' && task.children.every(id => getTask(run, id).state === 'done')) {
+    task.state = 'pending';
+    return true;
+  }
+  return false;
+}
+
+function resolveRunState(tasks: OrchestraTask[]): OrchestraRun['state'] {
+  if (tasks.every(t => t.state === 'done')) return 'done';
+  if (tasks.some(t => FAILURE_STATES.has(t.state))) return 'failed';
+  return tasks.some(t => t.state !== 'pending') ? 'active' : 'pending';
+}
+
 export function settle(run: OrchestraRun): void {
   for (let pass = 0; pass <= run.tasks.length; pass++) {
     let changed = false;
     for (const task of run.tasks) {
-      if (!['pending', 'waiting', 'deferred'].includes(task.state)) continue;
-      const failed = run.tasks.some(other => ['failed', 'blocked'].includes(other.state) &&
-        (task.dependsOn.includes(other.id) || task.children.includes(other.id) || other.phase < task.phase));
-      if (failed) { task.state = 'blocked'; task.evidence = 'A prerequisite or child failed'; changed = true; }
-      else if (task.state === 'waiting' && task.children.every(id => getTask(run, id).state === 'done')) {
-        task.state = 'pending'; changed = true;
-      }
+      if (settleTaskStep(run, task)) changed = true;
     }
     if (!changed) break;
   }
-  run.state = run.tasks.every(t => t.state === 'done') ? 'done'
-    : run.tasks.some(t => ['failed', 'blocked'].includes(t.state)) ? 'failed'
-      : run.tasks.some(t => t.state !== 'pending') ? 'active' : 'pending';
+  run.state = resolveRunState(run.tasks);
 }
 
 function hasFileConflict(candidate: OrchestraTask, active: OrchestraTask[]): boolean {
@@ -79,10 +101,39 @@ function dispatchMessage(run: OrchestraRun, task: OrchestraTask): string {
   ].join('\n');
 }
 
-export function reserveDispatches(run: OrchestraRun, availableWorkers?: number): OrchestraDispatch[] {
+function validateAvailableWorkers(availableWorkers?: number): void {
   if (availableWorkers !== undefined && (!Number.isSafeInteger(availableWorkers) || availableWorkers < 0)) {
     throw new Error('availableWorkers must be a nonnegative integer');
   }
+}
+
+function canReserveTask(run: OrchestraRun, task: OrchestraTask, active: OrchestraTask[]): boolean {
+  if (task.agentId && active.some(other => other.agentId === task.agentId)) return false;
+  return !hasFileConflict(task, active) && !hasWaitingScopeConflict(run, task);
+}
+
+function createDispatch(run: OrchestraRun, task: OrchestraTask): OrchestraDispatch {
+  task.state = 'reserved';
+  task.reservationId = randomUUID();
+  const parent = task.parentId ? getTask(run, task.parentId) : undefined;
+  const ownerId = run.options.mode === 'nested' && parent ? parent.id : 'root';
+  return {
+    taskId: task.id,
+    action: task.agentId ? 'resume' : 'spawn',
+    agentId: task.agentId,
+    parentId: task.parentId,
+    dispatchOwnerId: ownerId,
+    reservationId: task.reservationId,
+    codexInvocationPayload: {
+      task_name: task.id.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+      fork_turns: 'all',
+      message: dispatchMessage(run, task)
+    }
+  };
+}
+
+export function reserveDispatches(run: OrchestraRun, availableWorkers?: number): OrchestraDispatch[] {
+  validateAvailableWorkers(availableWorkers);
   settle(run);
   const active = run.tasks.filter(t => ['reserved', 'running'].includes(t.state));
   const slots = Math.min(run.options.maxWorkers - active.length, availableWorkers ?? run.options.maxWorkers);
@@ -90,15 +141,9 @@ export function reserveDispatches(run: OrchestraRun, availableWorkers?: number):
   const dispatches: OrchestraDispatch[] = [];
   for (const task of candidates) {
     if (dispatches.length >= slots) break;
-    if (task.agentId && active.some(other => other.agentId === task.agentId)) continue;
-    if (hasFileConflict(task, active) || hasWaitingScopeConflict(run, task)) continue;
-    task.state = 'reserved'; task.reservationId = randomUUID(); active.push(task);
-    const parent = task.parentId ? getTask(run, task.parentId) : undefined;
-    dispatches.push({ taskId: task.id, action: task.agentId ? 'resume' : 'spawn', agentId: task.agentId,
-      parentId: task.parentId, dispatchOwnerId: run.options.mode === 'nested' && parent ? parent.id : 'root',
-      reservationId: task.reservationId, codexInvocationPayload: {
-        task_name: task.id.toLowerCase().replace(/[^a-z0-9_]/g, '_'), fork_turns: 'all', message: dispatchMessage(run, task)
-      } });
+    if (!canReserveTask(run, task, active)) continue;
+    dispatches.push(createDispatch(run, task));
+    active.push(task);
   }
   settle(run);
   return dispatches;

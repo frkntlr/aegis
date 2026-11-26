@@ -53,27 +53,34 @@ function buildExecutiveSummary(state: TeamworkMeshState, facts?: GroundTruthFact
     `• **Subagent Swarm**: Coordinated execution between Solver, QA Hunter, and Architect personas.\n`;
 }
 
-function buildMermaidTopology(state: TeamworkMeshState): string {
-  const lines: string[] = ['```mermaid', 'flowchart TD'];
-  lines.push('  Client["Antigravity User / Goal"] --> Coordinator["Teamwork Coordinator"]');
-  const peers = Object.values(state.agents);
+const ROLE_BADGE_MAP: Record<string, string> = {
+  solver: '🛠️',
+  qa: '🎯',
+  ui: '🎨',
+  docs: '📚'
+};
 
+function appendPeerMermaidNodes(lines: string[], p: TeamworkMeshState['agents'][string]): void {
+  const cleanId = p.subagentName.replace(/[^a-zA-Z0-9]/g, '_');
+  const badgeIcon = ROLE_BADGE_MAP[p.role] ?? '📚';
+  lines.push(`  Coordinator --> ${cleanId}["${badgeIcon} ${p.subagentName}\\n[Status: ${p.status.toUpperCase()}]"]`);
+  if (p.modifiedFiles.length > 0) {
+    const fileNode = `${cleanId}_files["Files (${p.modifiedFiles.length}):\\n${p.modifiedFiles.slice(0, 2).join('\\n')}"]`;
+    lines.push(`  ${cleanId} --> ${fileNode}`);
+  }
+  if (p.publishedContracts.length > 0) {
+    const cNode = `${cleanId}_c["Contracts: [${p.publishedContracts.join(', ')}]"]`;
+    lines.push(`  ${cleanId} -.-> ${cNode}`);
+  }
+}
+
+function buildMermaidTopology(state: TeamworkMeshState): string {
+  const lines: string[] = ['```mermaid', 'flowchart TD', '  Client["Antigravity User / Goal"] --> Coordinator["Teamwork Coordinator"]'];
+  const peers = Object.values(state.agents);
   if (peers.length === 0) {
     lines.push('  Coordinator --> Mesh["Teamwork Dynamic Mesh Blackboard"]');
   } else {
-    for (const p of peers) {
-      const cleanId = p.subagentName.replace(/[^a-zA-Z0-9]/g, '_');
-      const badgeIcon = p.role === 'solver' ? '🛠️' : (p.role === 'qa' ? '🎯' : (p.role === 'ui' ? '🎨' : '📚'));
-      lines.push(`  Coordinator --> ${cleanId}["${badgeIcon} ${p.subagentName}\\n[Status: ${p.status.toUpperCase()}]"]`);
-      if (p.modifiedFiles.length > 0) {
-        const fileNode = `${cleanId}_files["Files (${p.modifiedFiles.length}):\\n${p.modifiedFiles.slice(0, 2).join('\\n')}"]`;
-        lines.push(`  ${cleanId} --> ${fileNode}`);
-      }
-      if (p.publishedContracts.length > 0) {
-        const cNode = `${cleanId}_c["Contracts: [${p.publishedContracts.join(', ')}]"]`;
-        lines.push(`  ${cleanId} -.-> ${cNode}`);
-      }
-    }
+    for (const p of peers) appendPeerMermaidNodes(lines, p);
   }
   lines.push('```');
   return lines.join('\n');
@@ -122,6 +129,31 @@ function buildAdrDecisions(state: TeamworkMeshState): string[] {
     `ADR-04 [Active]: Dynamic Wave Advancement (Current: Wave ${state.activeWave}) with smooth persona handoffs.`,
     'ADR-05 [Strict]: Demir Kafes Constitutional Constraints (<300L/file, <40L/fn, 0 any) 100% enforced.'
   ];
+}
+
+function findMarker(content: string, primary: string, legacy: string): string | null {
+  if (content.includes(primary)) return primary;
+  return content.includes(legacy) ? legacy : null;
+}
+
+function appendArchitectureBlock(content: string, block: string): string {
+  const trimmed = content.trimEnd();
+  return trimmed ? `${trimmed}\n\n${block}\n` : `${block}\n`;
+}
+
+function spliceArchitectureBlock(content: string, block: string): string {
+  const startMarker = findMarker(content, START_TAG, LEGACY_START_TAG);
+  const endMarker = findMarker(content, END_TAG, LEGACY_END_TAG);
+  if (!startMarker || !endMarker) return appendArchitectureBlock(content, block);
+
+  const startIdx = content.indexOf(startMarker);
+  const endIdx = content.indexOf(endMarker);
+  if (startIdx === -1 || endIdx < startIdx) return appendArchitectureBlock(content, block);
+
+  const before = content.slice(0, startIdx).trimEnd();
+  const after = content.slice(endIdx + endMarker.length).trimStart();
+  const head = before ? `${before}\n\n${block}` : block;
+  return after ? `${head}\n\n${after}\n` : `${head}\n`;
 }
 
 export class TeamworkDocSynthesizer {
@@ -192,40 +224,10 @@ export class TeamworkDocSynthesizer {
 
   public updateReadme(planId?: string): { updated: boolean; path: string; created: boolean } {
     const readmePath = path.resolve(this.repoRoot, 'README.md');
-    const briefing = this.generateBriefing(planId);
-    const block = buildArchitectureInjection(briefing);
-
-    let created = false;
-    let content = '';
-    if (fs.existsSync(readmePath)) {
-      content = fs.readFileSync(readmePath, 'utf8');
-    } else {
-      created = true;
-      content = '# Project\n';
-    }
-
-    const startMarker = content.includes(START_TAG) ? START_TAG : (content.includes(LEGACY_START_TAG) ? LEGACY_START_TAG : null);
-    const endMarker = content.includes(END_TAG) ? END_TAG : (content.includes(LEGACY_END_TAG) ? LEGACY_END_TAG : null);
-
-    let nextContent: string;
-    if (startMarker && endMarker) {
-      const startIdx = content.indexOf(startMarker);
-      const endIdx = content.indexOf(endMarker);
-      if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-        const before = content.slice(0, startIdx).trimEnd();
-        const after = content.slice(endIdx + endMarker.length).trimStart();
-        nextContent = before ? `${before}\n\n${block}` : block;
-        if (after) nextContent += `\n\n${after}`;
-        nextContent += '\n';
-      } else {
-        nextContent = `${content.trimEnd()}\n\n${block}\n`;
-      }
-    } else {
-      const trimmed = content.trimEnd();
-      nextContent = trimmed ? `${trimmed}\n\n${block}\n` : `${block}\n`;
-    }
-
-    fs.writeFileSync(readmePath, nextContent, 'utf8');
+    const block = buildArchitectureInjection(this.generateBriefing(planId));
+    const created = !fs.existsSync(readmePath);
+    const content = created ? '# Project\n' : fs.readFileSync(readmePath, 'utf8');
+    fs.writeFileSync(readmePath, spliceArchitectureBlock(content, block), 'utf8');
     return { updated: true, path: readmePath, created };
   }
 

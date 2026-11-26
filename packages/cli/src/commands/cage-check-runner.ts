@@ -60,7 +60,16 @@ function handleUncachedFile(ctx: UncachedFileContext): void {
   } else {
     for (const v of res.violations) ctx.acc.violations.push({ file: ctx.rel, rule: v.rule, msg: v.message });
   }
-  if (ctx.radar) ctx.radar.recordFile(ctx.rel, ctx.stat.mtimeMs, ctx.stat.size, content, res.violations, quotaAlert);
+  if (ctx.radar) {
+    ctx.radar.recordFile({
+      filePath: ctx.rel,
+      mtimeMs: ctx.stat.mtimeMs,
+      size: ctx.stat.size,
+      content,
+      violations: res.violations,
+      quotaAlert
+    });
+  }
 }
 
 function scanCageFiles(files: string[], noCache = false): CageScanAcc {

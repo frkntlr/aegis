@@ -11,6 +11,35 @@ export interface WatcherOptions {
   fileReader?: (filePath: string) => string;
 }
 
+const RETRYABLE_FS_CODES = new Set(['EBUSY', 'EPERM', 'EACCES']);
+
+function waitSync(ms: number): void {
+  const waitBuf = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(waitBuf, 0, 0, ms);
+}
+
+function isRetryableFsError(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  return typeof code === 'string' && RETRYABLE_FS_CODES.has(code);
+}
+
+function readSettledOnce(
+  filePath: string,
+  settlingMs: number,
+  fileReader: ((filePath: string) => string) | null
+): string | null {
+  if (!fs.existsSync(filePath)) return null;
+  const size1 = fs.statSync(filePath).size;
+  if (settlingMs > 0) {
+    waitSync(settlingMs);
+    if (!fs.existsSync(filePath)) return null;
+    if (fs.statSync(filePath).size !== size1) {
+      throw Object.assign(new Error('File mutating'), { code: 'EBUSY' });
+    }
+  }
+  return fileReader ? fileReader(filePath) : fs.readFileSync(filePath, 'utf8');
+}
+
 export class CodebaseMemoryWatcher {
   private engine: CodebaseMemoryEngine;
   private worktreeId: string;
@@ -103,23 +132,10 @@ export class CodebaseMemoryWatcher {
   public readFileWithSettling(filePath: string): string | null {
     for (let attempt = 0; attempt <= this.backoffDelays.length; attempt++) {
       try {
-        if (!fs.existsSync(filePath)) return null;
-        const size1 = fs.statSync(filePath).size;
-        if (this.settlingMs > 0) {
-          const waitBuf = new Int32Array(new SharedArrayBuffer(4));
-          Atomics.wait(waitBuf, 0, 0, this.settlingMs);
-          if (!fs.existsSync(filePath)) return null;
-          if (fs.statSync(filePath).size !== size1) {
-            throw Object.assign(new Error('File mutating'), { code: 'EBUSY' });
-          }
-        }
-        return this.fileReader ? this.fileReader(filePath) : fs.readFileSync(filePath, 'utf8');
+        return readSettledOnce(filePath, this.settlingMs, this.fileReader);
       } catch (err: unknown) {
-        const code = (err as { code?: string })?.code;
-        if (attempt < this.backoffDelays.length && (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')) {
-          const delay = this.backoffDelays[attempt];
-          const waitBuf = new Int32Array(new SharedArrayBuffer(4));
-          Atomics.wait(waitBuf, 0, 0, delay);
+        if (attempt < this.backoffDelays.length && isRetryableFsError(err)) {
+          waitSync(this.backoffDelays[attempt]);
           continue;
         }
         return null;
